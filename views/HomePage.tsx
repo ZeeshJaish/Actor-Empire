@@ -65,7 +65,7 @@ interface HomePageProps {
   onQueueBabyNamingCheat?: () => void;
   onOpenDeathSummaryPreview?: () => void;
   onShowWhatsNewCheat?: () => void;
-  onStreamingLaunchQa?: (action: 'READY' | 'COMPLETE_BUILD', report: (message: string) => void) => Promise<{ok:boolean;message:string}>;
+  onStreamingLaunchQa?: (action: 'READY' | 'COMPLETE_BUILD' | 'FULL_PLATFORM', report: (message: string) => void) => Promise<{ok:boolean;message:string}>;
 }
 
 type HomeProductionPhase = NonNullable<Commitment['projectPhase']>;
@@ -140,14 +140,26 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const [streamingQaFeedback,setStreamingQaFeedback]=useState('');
   const [streamingQaBusy,setStreamingQaBusy]=useState(false);
   const streamingQaLock=useRef(false);
-  const runStreamingQa=async(action:'READY'|'COMPLETE_BUILD')=>{
+  const runStreamingQa=async(action:'READY'|'COMPLETE_BUILD'|'FULL_PLATFORM')=>{
     if(!onStreamingLaunchQa||streamingQaLock.current||isProcessing) return;
     streamingQaLock.current=true;setStreamingQaBusy(true);
-    setStreamingQaFeedback(action==='READY'?'Preparing 197 markets and testing the network…':'Processing the commissioned build…');
+    setStreamingQaFeedback(action==='FULL_PLATFORM'?'Building the full test company…':action==='READY'?'Preparing 197 markets and testing the network…':'Processing the commissioned build…');
     try {const result=await onStreamingLaunchQa(action,setStreamingQaFeedback);setStreamingQaFeedback(result.message);}
     catch(error){setStreamingQaFeedback(error instanceof Error?error.message:'Streaming QA action failed.');}
     finally{streamingQaLock.current=false;setStreamingQaBusy(false);}
   };
+  // Raw fields only, so the menu never normalises the platform. The marker is
+  // STREAMING_FULL_PLATFORM_QA_MARKER in services/streamingFullPlatformQa.ts.
+  const fullPlatformQa=(()=>{
+    const platform=player.ownedStreamingPlatform;
+    const ours=(platform.milestoneKeys||[]).includes('dev-full-platform-qa');
+    if(ours&&platform.launchCommit&&(platform.weeklyHistory||[]).length>=16) return {allowed:false,note:'This test company is complete. Open Streaming, or keep playing with Age Up Week.'};
+    if(!ours&&platform.launchCommit) return {allowed:false,note:'This save’s platform is already live. Start a new career to use this.'};
+    if(!ours&&(platform.infrastructureSetup||(platform.marketOperations||[]).length)) return {allowed:false,note:'This save already has its own launch plan. Start a new career to use this.'};
+    return {allowed:true,note:ours
+      ?'Continues the test company from where it stopped.'
+      :'Founds NORTHSTAR+ in 25 markets with about 60 titles, six Originals, three plans plus a free ad tier and rentals, a leadership team and investors, then runs 16 live weeks so every screen has numbers. About a minute; every week is saved.'};
+  })();
   const [activeCheatMenu, setActiveCheatMenu] = useState<CheatMenuMode>('NONE');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -3927,6 +3939,10 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               </button>
                               {onStreamingLaunchQa && <section className="rounded-xl border border-cyan-400/30 bg-cyan-950/20 p-3 space-y-2" aria-label="Streaming launch test shortcuts">
                                 <p className="text-xs font-bold text-cyan-200">Streaming launch testing</p>
+                                <button type="button" disabled={isProcessing||streamingQaBusy||!fullPlatformQa.allowed} onClick={()=>void runStreamingQa('FULL_PLATFORM')} className="w-full rounded-lg border border-emerald-400/50 bg-emerald-950/30 px-3 py-3 text-left text-sm font-bold text-emerald-100 disabled:opacity-40">
+                                  Full streaming company · test everything
+                                  <span className="block pt-1 text-xs font-normal text-zinc-400">{fullPlatformQa.note}</span>
+                                </button>
                                 <button type="button" disabled={isProcessing||streamingQaBusy||Boolean(player.ownedStreamingPlatform.infrastructureSetup||player.ownedStreamingPlatform.launchCommit)} onClick={()=>void runStreamingQa('READY')} className="w-full rounded-lg border border-cyan-400/40 px-3 py-3 text-left text-sm font-bold text-cyan-100 disabled:opacity-40">
                                   Ready to Commission · 197 markets
                                   <span className="block pt-1 text-xs font-normal text-zinc-400">Sets a funded subscription test launch with QA titles and an organic campaign. Replaces the unbuilt plan; you press Commission.</span>

@@ -10,8 +10,9 @@
  *                  every licence on a one-year runway, what is kept for good,
  *                  what has lapsed
  *   SLATE        → the release weeks on the calendar, empty runs folded
- *   LOCALIZATION → the platform's subtitle and dubbing tiers and its
- *                  language networks
+ *   LOCALIZATION → language regions: the viewers this week's subtitles and
+ *                  dubbing added, the lab (energy), and each region's levels
+ *                  (LocalizationDesk.tsx)
  */
 import s from './presentation/screens/ContentDesk/ContentDesk.module.css';
 import { cx } from './presentation/cx';
@@ -21,9 +22,13 @@ import { Archive, ChevronRight, Film, LibraryBig, LockKeyhole, Sparkles, X } fro
 import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
 import room from './presentation/screens/ContentDesk/ContentRoom.module.css';
 import {
-  CatalogueMix, KeptGrid, LevelRing, PosterRail, RenewalCard, RightsRunway, SlateCalendar, Spotlight, TitleArt,
-  count as countLabel, type RenewalAction,
+  CatalogueMix, KeptGrid, PosterRail, RenewalCard, RightsRunway, SlateCalendar, SlatePlanner, Spotlight, TitleArt,
+  count as countLabel, formatTone, genreLabel, SourceBadge, type RenewalAction,
 } from './ContentPanels';
+import { LocalizationDesk, type LocalizationDeskActions } from './LocalizationDesk';
+import type { StreamingLocalizationDeskView } from '../../services/streamingLocalizationDesk';
+
+const LIST_PAGE = 10;
 import type { CustomPoster } from '../../types';
 
 /* ============================================================
@@ -50,6 +55,9 @@ export interface RenewalCase {
   pending: boolean;
   offer?: { cost: number; durationWeeks: number; expiresInWeeks: number };
   deadlineInWeeks: number;
+  /** #168: the executive who decided it, and how many weeks ago */
+  by?: string;
+  byWeeksAgo?: number;
 }
 
 export interface CatalogueTitle {
@@ -71,6 +79,8 @@ export interface CatalogueTitle {
       that runs out · LAPSED: a licensed title with no active licence */
   rightsState?: 'KEPT' | 'WINDOW' | 'LAPSED';
   renewal?: RenewalCase;
+  /** on the shelves but not on the service yet: the slate can give it a premiere week */
+  schedulable?: boolean;
 }
 
 export interface SlateRelease {
@@ -85,9 +95,20 @@ export interface SlateRelease {
   poster?: CustomPoster;
   /** set when the licence lapses before the release date — a real blocker */
   rightsRisk?: boolean;
+  format?: 'Film' | 'Series';
+  /** a premiere still ahead that the slate set: it can be moved or taken off */
+  editable?: boolean;
+  /** goes on the service by itself when its licence starts (a licence bought after setup);
+      the slate shows it but does not plan it */
+  auto?: boolean;
+  /** a licensed title's rights window, in absolute weeks (no end: kept for good) */
+  rightsFrom?: number;
+  rightsUntil?: number;
 }
 
-export interface SlateWeek { week: number; label?: string; now?: boolean; releases: SlateRelease[] }
+/** `week` is the absolute week once live (programme week before launch); `year` and
+    `weekOfYear` are the game calendar's, for labels */
+export interface SlateWeek { week: number; label?: string; now?: boolean; releases: SlateRelease[]; year?: number; weekOfYear?: number }
 
 export interface ContentDeskState {
   live: boolean;
@@ -95,6 +116,12 @@ export interface ContentDeskState {
   slate: SlateWeek[];
   /** PROGRAMME: weeks counted from opening night (before launch) · WEEKS: the calendar */
   calendar?: 'PROGRAMME' | 'WEEKS';
+  /** once live: the first absolute week a premiere can be set in (next week) */
+  scheduleFrom?: number;
+  /** once live: where Auto-fill would premiere the titles on the shelves, around the plan */
+  autoFill?: Array<{ projectId: string; title: string; absoluteWeek: number; marketingPlan: 'LEAN' | 'STANDARD' | 'EVENT' }>;
+  /** once live: the same, starting fresh (the planned premieres taken off first) */
+  autoFillFresh?: Array<{ projectId: string; title: string; absoluteWeek: number; marketingPlan: 'LEAN' | 'STANDARD' | 'EVENT' }>;
 }
 
 export type ContentEntryRouteId = 'LICENSE' | 'ORIGINAL' | 'OWNED' | 'CATALOGUE';
@@ -114,10 +141,7 @@ type Tab = 'LIBRARY' | 'RIGHTS' | 'SLATE' | 'LOCALIZATION';
 /* ============================================================
    HELPERS
    ============================================================ */
-const money = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B`
-  : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M`
-    : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${n}`;
-const count = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M`
+const count =(n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M`
   : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : `${n}`;
 
 const ENTRY_ICON = {
@@ -131,9 +155,10 @@ const ENTRY_ICON = {
 const slateWarnings = (slate: SlateWeek[], titles: CatalogueTitle[]) => {
   const out: { id: string; level: 'watch' | 'urgent'; text: string }[] = [];
 
-  // a run of empty weeks bleeds subscribers
+  // a run of empty weeks bleeds subscribers (read over the next twelve weeks: a
+  // year-long calendar is mostly empty far ahead, and that is not a warning)
   let gap = 0, worst = 0, worstAt: SlateWeek | null = null, runStart: SlateWeek | null = null;
-  slate.forEach(w => {
+  slate.slice(0, 12).forEach(w => {
     if (w.releases.length === 0) { if (gap === 0) runStart = w; gap++; if (gap > worst) { worst = gap; worstAt = runStart; } }
     else gap = 0;
   });
@@ -147,14 +172,6 @@ const slateWarnings = (slate: SlateWeek[], titles: CatalogueTitle[]) => {
     if (r.rightsRisk) out.push({
       id: `risk-${r.id}`, level: 'urgent',
       text: `${r.title} is scheduled for ${w.label?.toLowerCase() ?? `week ${w.week}`} but its licence ends first`,
-    });
-  }));
-
-  // an Original with only a lean campaign behind it
-  slate.forEach(w => w.releases.forEach(r => {
-    if (r.kind === 'ORIGINAL' && r.marketing === 'LEAN') out.push({
-      id: `mkt-${r.id}`, level: 'watch',
-      text: `${r.title} premieres ${w.label?.toLowerCase() ?? `week ${w.week}`} with only a lean campaign behind it`,
     });
   }));
 
@@ -184,27 +201,22 @@ export const ContentDesk: React.FC<{
   onLapse?: (t: CatalogueTitle) => void;
   /** Records a renewal decision on the rights calendar's open case. */
   onRenewalDecision?: (caseId: string, action: RenewalAction) => { ok: boolean; message: string };
+  /** once live: premiere a title from the shelves in a week */
+  onScheduleTitle?: (projectId: string, absoluteWeek: number, plan: 'LEAN' | 'STANDARD' | 'EVENT') => { ok: boolean; message: string };
+  /** once live: take a premiere that has not happened yet off the slate */
+  onUnscheduleTitle?: (projectId: string) => { ok: boolean; message: string };
+  /** once live: premiere everything on the shelves where the auto-fill plan puts it
+      (fresh: take the planned premieres off first and plan everything anew) */
+  onAutoFillSlate?: (fresh: boolean) => { ok: boolean; message: string };
+  /** once live: take every planned premiere off the slate */
+  onClearSlatePlans?: () => { ok: boolean; message: string };
   /** Opens the rights calendar (Rights Exchange, Calendar tab). */
   onOpenRightsCalendar?: () => void;
-  localization?: {
-    subtitleLevel: number;
-    dubbingLevel: number;
-    simultaneousLocalization: boolean;
-    coveredTitleCount: number;
-    activeLanguageCount: number;
-    packages: Array<{
-      id: string;
-      name: string;
-      languages: string[];
-      active: boolean;
-      locked: boolean;
-      activationCost: number;
-    }>;
-  };
-  onOpenLocalization?: () => void;
-  /** Returns what happened, so a refusal is shown instead of swallowed. */
-  onActivateLanguagePackage?: (packageId: string) => { ok: boolean; message: string } | void;
-}> = ({ brand, state, onBack, initialTab, onOpenTitle, entryRoutes = [], onAddContent, onOpenSlate, onRenew, onRenewalDecision, onOpenRightsCalendar, localization, onOpenLocalization, onActivateLanguagePackage }) => {
+  /** The Localization tab: regions, the lab and the week's figures (`getStreamingLocalizationDesk`). */
+  localizationDesk?: StreamingLocalizationDeskView;
+  /** Each returns what happened, so a refusal is shown instead of swallowed. */
+  localizationActions?: LocalizationDeskActions;
+}> = ({ brand, state, onBack, initialTab, onOpenTitle, entryRoutes = [], onAddContent, onOpenSlate, onRenew, onRenewalDecision, onScheduleTitle, onUnscheduleTitle, onAutoFillSlate, onClearSlatePlans, onOpenRightsCalendar, localizationDesk, localizationActions }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'LIBRARY');
@@ -224,6 +236,8 @@ export const ContentDesk: React.FC<{
       <button type="button" className={s.cdadd} disabled={(page + 1) * pageSize >= total} onClick={() => setListPages(current => ({ ...current, [key]: page + 1 }))}>Next →</button>
     </nav>;
   };
+  /* the list opens on ten titles; Load more adds ten, and a new filter starts again at ten */
+  const [listLimit, setListLimit] = useState(LIST_PAGE);
   const [showEntryRoutes, setShowEntryRoutes] = useState(false);
   const [openingMarket, setOpeningMarket] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
@@ -245,12 +259,20 @@ export const ContentDesk: React.FC<{
 
   const windows = useMemo(() => state.titles.filter(t => (t.rightsState ? t.rightsState === 'WINDOW' : Boolean(t.rights && !t.rights.perpetual)) && t.rights?.endsInWeeks !== undefined)
     .sort((a, b) => a.rights!.endsInWeeks! - b.rights!.endsInWeeks!), [state.titles]);
+  /* #168: renewals your team decided in the last four weeks */
+  const handled = useMemo(() => windows.filter(t => t.renewal?.by && !t.renewal.pending && (t.renewal.byWeeksAgo ?? 99) <= 4), [windows]);
+  const handledBy = useMemo(() => {
+    const names = new Set(handled.map(t => t.renewal!.by!.split(' ')[0]));
+    return names.size === 1 ? [...names][0] : 'your team';
+  }, [handled]);
   /* a decision is due: a licence in its last six weeks, or open renewal talks */
-  const decisions = useMemo(() => windows.filter(t => t.rights!.endsInWeeks! <= 6
-    || (t.renewal?.pending && ['OFFER', 'DECIDE', 'TALKS'].includes(t.renewal.stage))), [windows]);
+  const decisions = useMemo(() => windows.filter(t => !handled.includes(t) && (t.rights!.endsInWeeks! <= 6
+    || (t.renewal?.pending && ['OFFER', 'DECIDE', 'TALKS'].includes(t.renewal.stage)))), [windows, handled]);
   const kept = useMemo(() => state.titles.filter(t => (t.rightsState ?? (t.rights ? 'WINDOW' : 'KEPT')) === 'KEPT'), [state.titles]);
   const lapsed = useMemo(() => state.titles.filter(t => t.rightsState === 'LAPSED'), [state.titles]);
   const warnings = useMemo(() => slateWarnings(state.slate, state.titles), [state.slate, state.titles]);
+  /* once live, the Slate tab plans the calendar itself */
+  const planning = state.calendar === 'WEEKS' && state.live && state.scheduleFrom !== undefined;
   const byViews = useMemo(() => [...state.titles].sort((a, b) => (b.views ?? -1) - (a.views ?? -1)), [state.titles]);
   const titleById = useMemo(() => new Map(state.titles.map(t => [t.id, t])), [state.titles]);
 
@@ -269,10 +291,6 @@ export const ContentDesk: React.FC<{
   const decide = (caseId: string, action: RenewalAction) => {
     if (!onRenewalDecision) return;
     setFeedback(onRenewalDecision(caseId, action));
-  };
-  const activate = (packageId: string) => {
-    const result = onActivateLanguagePackage?.(packageId);
-    if (result) setFeedback(result);
   };
   const statusClass = (status: CatalogueTitle['status']) => s[status.replace(/\s/g, '').toLowerCase()];
 
@@ -338,7 +356,7 @@ export const ContentDesk: React.FC<{
               </div>
               <div className={s.chips}>
                 {(['ALL', 'ORIGINAL', 'LICENSED', 'OWNED', 'EXPIRING'] as const).map(f => (
-                  <button key={f} className={filter === f ? s.on : ''} onClick={() => setFilter(f)}>
+                  <button key={f} className={filter === f ? s.on : ''} onClick={() => { setFilter(f); setListLimit(LIST_PAGE); }}>
                     {f === 'ALL' ? 'All' : f === 'ORIGINAL' ? 'Originals' : f === 'LICENSED' ? 'Licensed' : f === 'OWNED' ? 'My studio' : 'Expiring'}
                   </button>
                 ))}
@@ -353,13 +371,14 @@ export const ContentDesk: React.FC<{
                 </div>
               ) : shown.length === 0 ? <div className={s.empty}>Nothing matches that filter.</div> : null}
 
-              {visibleTitles('library', shown).map(t => (
+              {shown.length > LIST_PAGE && <small className={room.listCount}>Showing {Math.min(listLimit, shown.length)} of {shown.length}</small>}
+              {shown.slice(0, listLimit).map(t => (
                 <button className={s.trow} key={t.id} onClick={() => onOpenTitle?.(t)}>
-                  <span className={s.tposter}><TitleArt title={t} size="xs" /></span>
+                  <span className={cx(s.tposter, room.thumb, formatTone(t))}><TitleArt title={t} size="xs" /></span>
                   <div className={s.tinfo}>
                     <b>{t.title}</b>
-                    <span className={s.tmeta}>
-                      {t.kind === 'ORIGINAL' ? 'Original' : t.kind === 'OWNED' ? 'Studio import' : 'Licensed'} · {t.format} · {t.genre}
+                    <span className={cx(s.tmeta, room.metaLine)}>
+                      <SourceBadge kind={t.kind} />{t.format} · {genreLabel(t.genre)}
                     </span>
                     <div className={s.tpills}>
                       <i className={cx(s.pill, statusClass(t.status))}>{t.status}</i>
@@ -384,7 +403,11 @@ export const ContentDesk: React.FC<{
                   </div>
                 </button>
               ))}
-              {pagination('library', shown.length)}
+              {shown.length > listLimit && (
+                <button type="button" className={room.more} onClick={() => setListLimit(limit => limit + LIST_PAGE)}>
+                  Load more <small>{Math.min(LIST_PAGE, shown.length - listLimit)} of {shown.length - listLimit} left</small>
+                </button>
+              )}
             </section>
           </>
         )}
@@ -405,6 +428,17 @@ export const ContentDesk: React.FC<{
               </section>
             )}
 
+            {handled.length > 0 && (
+              <section className={s.cdsec}>
+                <div className={s.cdhead}><h2>Handled by {handledBy}</h2><span>{handled.length} licence{handled.length === 1 ? '' : 's'} · last 4 weeks</span></div>
+                {handled.map(t => (
+                  <RenewalCard key={t.id} title={t}
+                    onOpenCalendar={onOpenRightsCalendar ?? (onRenew ? () => onRenew(t) : undefined)}
+                    onOpen={() => onOpenTitle?.(t)} />
+                ))}
+              </section>
+            )}
+
             <section className={s.cdsec}>
               <div className={s.cdhead}><h2>Licence runway</h2><span>{windows.length ? 'the next 52 weeks' : 'no licence ends'}</span></div>
               {windows.length > 0
@@ -415,8 +449,9 @@ export const ContentDesk: React.FC<{
 
             {kept.length > 0 && (
               <section className={s.cdsec}>
-                <div className={s.cdhead}><h2>Kept for good</h2><span>no end date</span></div>
-                <KeptGrid titles={visibleTitles('kept', kept)} onOpen={onOpenTitle} />
+                <div className={s.cdhead}><h2>Kept for good</h2><span>{kept.length} title{kept.length === 1 ? '' : 's'} · no end date</span></div>
+                <p className={room.keptNote}>Your Originals, your studio's own titles and licences bought for good. They never leave the service and never need renewing.</p>
+                <KeptGrid titles={visibleTitles('kept', kept)} live={state.live} onOpen={onOpenTitle} />
                 {pagination('kept', kept.length)}
               </section>
             )}
@@ -444,7 +479,10 @@ export const ContentDesk: React.FC<{
         {/* ── SLATE — the release weeks ── */}
         {tab === 'SLATE' && (
           <section className={s.cdsec}>
-            <div className={s.cdhead}><h2>Release schedule</h2>{onOpenSlate && <button className={s.cdadd} onClick={onOpenSlate}>OPEN SLATE PLANNER</button>}</div>
+            {/* once live the schedule is planned right here; the opening slate before launch keeps its planner */}
+            <div className={s.cdhead}><h2>Release schedule</h2>{planning
+              ? <span>a year ahead · tap a week</span>
+              : onOpenSlate && <button className={s.cdadd} onClick={onOpenSlate}>OPEN SLATE PLANNER</button>}</div>
             {warnings.length > 0 && (
               <div className={s.warnlist}>
                 {warnings.map(w => (
@@ -454,45 +492,18 @@ export const ContentDesk: React.FC<{
                 ))}
               </div>
             )}
-            <SlateCalendar slate={state.slate} posters={titleById} />
+            {planning
+              ? <SlatePlanner slate={state.slate} titles={state.titles} scheduleFrom={state.scheduleFrom} autoFill={state.autoFill} autoFillFresh={state.autoFillFresh}
+                  onSchedule={onScheduleTitle} onUnschedule={onUnscheduleTitle} onAutoFill={onAutoFillSlate} onClearPlans={onClearSlatePlans} onOpen={onOpenTitle} />
+              : <SlateCalendar slate={state.slate} posters={titleById} />}
           </section>
         )}
 
-        {/* ── LOCALIZATION — tiers as rings, networks as cards ── */}
+        {/* ── LOCALIZATION — the week's language figures, the lab, the regions ── */}
         {tab === 'LOCALIZATION' && (
-          <section className={s.cdsec}>
-            <div className={s.cdhead}><h2>Languages</h2><span>one system, every title</span></div>
-            <div className={room.levels}>
-              <LevelRing label="SUBTITLES" name="Subtitle quality" level={localization?.subtitleLevel || 0} />
-              <LevelRing label="DUBBING" name="Dubbing quality" level={localization?.dubbingLevel || 0} />
-              <div className={cx(s.langStat)}>
-                <b>{localization?.activeLanguageCount || 0}</b>
-                <span>ACTIVE LANGUAGES</span>
-                <em className={localization?.simultaneousLocalization ? s.isReady : ''}>{localization?.simultaneousLocalization ? 'Day-one releases in every language' : 'Day-one releases locked'}</em>
-              </div>
-            </div>
-            <p className={s.localizationRule}>Research raises the tiers once, for the whole platform: every current and future title — {localization?.coveredTitleCount || state.titles.length} today — inherits them in each active language network.</p>
-            <div className={s.cdhead} style={{ marginTop: 16 }}><h2>Language networks</h2><span>{(localization?.packages || []).filter(item => item.active).length} active</span></div>
-            <div className={s.localizationPackages}>
-              {(localization?.packages || []).map(item => (
-                <article key={item.id} className={item.active ? s.isActive : item.locked ? s.isLocked : ''}>
-                  <div>
-                    <span>{item.active ? 'OPERATING' : item.locked ? 'NEEDS LOCALIZATION FOUNDATION' : 'READY TO OPEN'}</span>
-                    <b>{item.name}</b>
-                    <div className={room.langChips}>{item.languages.map(language => <i key={language}>{language}</i>)}</div>
-                  </div>
-                  {item.active || item.locked ? (
-                    <strong>{item.active ? 'ACTIVE' : 'LOCKED'}</strong>
-                  ) : (
-                    <button type="button" onClick={() => activate(item.id)}>
-                      ACTIVATE<br /><strong>{money(item.activationCost)}</strong>
-                    </button>
-                  )}
-                </article>
-              ))}
-            </div>
-            <button type="button" className={s.localizationAction} onClick={onOpenLocalization}>OPEN RESEARCH CAMPUS →</button>
-          </section>
+          localizationDesk
+            ? <LocalizationDesk desk={localizationDesk} posters={titleById} onFeedback={setFeedback} {...localizationActions} />
+            : <p className={s.empty}>Languages open once the service has a company behind it.</p>
         )}
 
         <div className={s.cdfoot} />

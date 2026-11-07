@@ -8,7 +8,11 @@ import { placeRegion } from '../components/studio-finance/finance/placer';
 const data = createLabBuildData(['US', 'CA', 'MX', 'BR', 'GB', 'DE']);
 const emptyDraft = createLabDraft();
 const network = renderToStaticMarkup(<BuildWizard data={data} initialStage="network" initialDraft={emptyDraft} />);
-assert.match(network, /class="kit-strip-measure"[^>]*>Capacity</, 'Network strip labels its own capacity measure.');
+/* #157: the plan strip and the Back | Next row became Define the Launch's HUD: the stage's figure, the money left, and
+   the next stage as the one big button */
+assert.match(network, /class="lw-hud[^"]*"/, 'The Build ends on the launch HUD.');
+assert.match(network, /class="lw-hud-next"[^>]*>[\s\S]*?<em>Next<\/em><b>Money<\/b>/, 'Network\'s big button goes to Money.');
+assert.match(network, /class="lw-seq"/, 'The stages ride the launch sequence rail.');
 
 // A long country list used to push the only actionable controls far below the map.
 assert.ok(network.indexOf('Your servers') >= 0 && network.indexOf('Your servers') < network.indexOf('Who you are serving'),
@@ -34,9 +38,9 @@ const once = placeRegion(data, emptyDraft, 'NORTH_AMERICA', {
 const launch = renderToStaticMarkup(<BuildWizard data={data} initialStage="launch" initialDraft={once} />);
 const moneyStage = renderToStaticMarkup(<BuildWizard data={data} initialStage="money" initialDraft={once} />);
 const testStage = renderToStaticMarkup(<BuildWizard data={data} initialStage="test" initialDraft={once} />);
-assert.match(moneyStage, /class="kit-strip-measure"[^>]*>Budget</, 'Money strip labels the budget measure.');
-assert.match(testStage, /class="kit-strip-measure"[^>]*>Rehearsal load</, 'Test strip labels rehearsal load.');
-assert.match(launch, /class="kit-strip-measure"[^>]*>Gates clear</, 'Launch strip labels readiness gates.');
+assert.match(moneyStage, /<em>Next<\/em><b>Test<\/b>/, 'Money\'s big button goes to Test.');
+assert.match(testStage, /<em>Next<\/em><b>Launch<\/b>/, 'Test\'s big button goes to Launch.');
+assert.match(launch, /class="lw-hud-next"[^>]*disabled=""[^>]*>[\s\S]*?<b>Commission/, 'Launch\'s big button commissions, and waits while gates are open.');
 assert.match(launch, /<details[^>]*class="bw-agreement-provider"[^>]*>/,
   'Agreement groups reveal their rooms on demand, not as an always-open wall.');
 assert.match(launch, /Due on execution/, 'The full canonical amount remains available.');

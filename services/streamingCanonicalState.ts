@@ -43,7 +43,9 @@ import type {
     StreamingCommercialOfferIntent,
     StreamingSoundIdentKey,
     StreamingTechnologyBranch,
+    OwnedStreamingPricingPlan,
 } from '../types';
+import { STREAMING_MAX_PLANS } from './streamingPlanOffer';
 
 const STREAMING_PLAN_COLOR_IDS: StreamingPricingPlanColorId[] = [
     'emerald', 'ocean', 'teal', 'rose', 'magenta', 'graphite',
@@ -57,11 +59,13 @@ import {
 } from './streamingDayOneMarkets';
 import { normalizeStreamingStorefrontLayoutId } from './streamingStorefront';
 import { normalizeStreamingLanguageId } from './streamingLocalizationCapabilities';
+import { normalizeStreamingLocalizationRegions } from './streamingLocalizationRegions';
 import {
     STREAMING_MAXIMUM_ANNUAL_DISCOUNT,
     STREAMING_MAXIMUM_INTRO_OFFER,
     normalizeStreamingPricingConfiguration,
 } from './streamingPricingEconomy';
+import { restoreStreamingDraftAdPlans } from './streamingCommercialOffers';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -503,8 +507,11 @@ const normalizePricingConfiguration = (root: UnknownRecord, source: UnknownRecor
             featureIds: stringList(plan.featureIds, 20),
             ads: plan.ads === true,
             colorId,
+            // Plans v2: checked by normalizeStreamingPricingConfiguration
+            adLevel: plan.adLevel as OwnedStreamingPricingPlan['adLevel'],
+            offer: plan.offer as OwnedStreamingPricingPlan['offer'],
         };
-    }).slice(0, 6);
+    }).slice(0, STREAMING_MAX_PLANS);
     const ads = asRecord(pricing.ads);
     const rentals = asRecord(pricing.rentals);
     const premium = asRecord(pricing.premium);
@@ -530,6 +537,10 @@ const normalizePricingConfiguration = (root: UnknownRecord, source: UnknownRecor
         metered: { perHour: decimal(metered.perHour, 1, 20) },
         patron: { monthly: decimal(patron.monthly, 10, 100) },
         commercialOffers: pricing.commercialOffers as StreamingCommercialOfferIntent | undefined,
+        // Free with ads' and Rent or buy's quality (#46, #47): checked by normalizeStreamingPricingConfiguration
+        freeAdOffer: pricing.freeAdOffer as OwnedStreamingPricingConfiguration['freeAdOffer'],
+        storeQuality: pricing.storeQuality as OwnedStreamingPricingConfiguration['storeQuality'],
+        storeTopEdition: pricing.storeTopEdition as OwnedStreamingPricingConfiguration['storeTopEdition'],
     });
 };
 
@@ -552,7 +563,8 @@ function normalizeDefineLaunchDraft(root: UnknownRecord, launchProgram: UnknownR
         packageId: text(source.packageId, '', 40) || null,
         customAudio,
         storefrontId: text(source.storefrontId, '', 80) || null,
-        pricing: normalizePricingConfiguration(root, { pricing: source.pricing }),
+        // #103: a draft's plans an earlier rule stripped of their ads get them back ("Basic with ads: None")
+        pricing: restoreStreamingDraftAdPlans(normalizePricingConfiguration(root, { pricing: source.pricing })),
         updatedAtAbsoluteWeek: number(source.updatedAtAbsoluteWeek),
     };
 }
@@ -743,6 +755,10 @@ const normalizeLocalization = (root: UnknownRecord): OwnedStreamingLocalizationO
             ...migrateLegacyGrants(root),
             ...asArray(source.legacyPackageGrants).map(normalizeLegacyGrant).filter((item): item is OwnedStreamingLegacyLocalizationGrant => Boolean(item)),
         ], item => item.id).slice(-120),
+        // Content Desk region levels and progress; an older save has none. A save
+        // from #23 kept levels "in the lab" (`research`): their energy becomes
+        // the track's progress here, and `research` is not written back.
+        regions: normalizeStreamingLocalizationRegions(source.regions, source.research),
     };
 };
 

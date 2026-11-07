@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { AudienceDesk, type AudienceState } from '../components/streaming-transplant/StreamingAudienceExperience';
+import { createEmptyAudienceRoom } from '../components/streaming-transplant/audienceRoomModel';
 import { getStreamingAudienceMarket } from '../services/streamingAudienceMarket';
 import { migratePlayerSave } from '../services/saveMigration';
 import { INITIAL_PLAYER, type Player } from '../types';
@@ -31,10 +32,7 @@ const market = getStreamingAudienceMarket({
     ...migrated,
     world: { ...migrated.world, worldStreamingCustomers: undefined },
 });
-const state: AudienceState = {
-    live: false, metrics: [], trend: [], trendLabel: 'Audience', chart: [], attribution: [], campaigns: [],
-    objective: 'BALANCED', regions: [], market,
-};
+const state: AudienceState = { live: false, market, room: createEmptyAudienceRoom(false) };
 const markup = renderToStaticMarkup(<AudienceDesk
     brand={{
         name: 'Empire+', markId: 'BOLT', customMark: null, hue: 252, sat: 84,
@@ -43,19 +41,19 @@ const markup = renderToStaticMarkup(<AudienceDesk
         ratingId: 'MATURE', lockupId: 'SIDE', serverCity: null,
     }}
     state={state}
-    initialTab="ANALYTICS"
+    initialTab="WORLD"
     onBack={() => undefined}
 />);
 
 assert.ok(market.streamingCompetition, 'Audience Market projects canonical WE4 competition');
 assert.equal(market.payingHouseholds, market.streamingCompetition.subscribingHouseholds, 'headline paying homes use WE4, not a parallel estimate');
 assert.equal(market.paidSubscriptions, market.streamingCompetition.totalSubscriptions, 'headline subscriptions use WE4');
-assert.match(markup, /HOMES WON/, 'WE4 UI shows player captured households');
-assert.match(markup, /UNCLAIMED HOMES/, 'WE4 UI shows demand that chose no service');
+assert.match(markup, /HOMES WON AT TODAY/, 'WE4 UI shows player captured households');
+assert.match(markup, /pay nobody/, 'WE4 UI shows demand that chose no service');
 assert.match(markup, /EFFECTIVE PRICE/, 'WE4 UI shows exact plan-weighted effective price');
 assert.match(markup, /Essential/, 'WE4 UI exposes exact player plan mix');
 assert.match(markup, /Premiere/, 'WE4 UI keeps expensive-plan demand visible');
-assert.match(markup, /Every active service competes/, 'Audience Market explains the finite all-operator model');
+assert.match(markup, /Every service competes for the same homes/, 'WORLD explains the finite all-operator model');
 assert.doesNotMatch(markup, /utility score/i, 'internal utility scores remain hidden');
 
 console.log('WE4 Audience Market UI audit passed.');

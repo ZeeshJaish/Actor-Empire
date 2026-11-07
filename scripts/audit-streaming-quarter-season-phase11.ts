@@ -222,7 +222,8 @@ assert(weeklySource.includes('commitStreamingQuarterSeasonCycle('), 'The existin
     'THE NEXT MANDATE',
     'market signal',
 ].forEach(fragment => assert(componentSource.includes(fragment) || serviceSource.includes(fragment), `Phase 11 experience should include ${fragment}.`));
-assert(hqSource.includes('<StreamingQuarterSeasonCycle'), 'Platform HQ should expose the quarter and season room after launch.');
+/* #176: the quarter's review is MONEY's report card; the weekly brief that held this room left the game */
+assert(!hqSource.includes('<StreamingQuarterSeasonCycle'), 'Platform HQ no longer mounts the quarter and season room (#176).');
 assert(styleSource.includes('@media (min-width: 620px)'), 'The season room should deliberately enhance larger displays.');
 assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'Boardroom motion should respect reduced-motion preferences.');
 

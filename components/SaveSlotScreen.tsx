@@ -125,7 +125,7 @@ export default function SaveSlotScreen({
                         Age <b>{slot.age}</b>
                       </span>
                       <span className="gold">
-                        ★ <b>{slot.fame}</b> Fame
+                        ★ <b>{Math.round(slot.fame)}</b> Fame
                       </span>
                       <span className="slot-time" title="Total time played">
                         <Clock3 size={13} strokeWidth={2.5} aria-hidden="true" />

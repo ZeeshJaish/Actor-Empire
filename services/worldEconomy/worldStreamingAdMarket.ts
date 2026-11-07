@@ -24,6 +24,10 @@ export interface StreamingAdMarketSupply {
     minutesPerHour: number;
     audienceQualityIndex: number;
     brandSafetyIndex: number;
+    /** #61, the player's New ad formats: slots an hour at the same ad minutes are multiplied by this */
+    slotFactor?: number;
+    /** #61, the player's Smarter ad breaks: the viewers lost per ad minute past six (0.05) are multiplied by this */
+    breakSlope?: number;
 }
 
 export interface StreamingAdMarketPoolInput {
@@ -70,8 +74,8 @@ export const clearStreamingAdMarket = (input: StreamingAdMarketPoolInput): Strea
         .map(supply => {
             const hours = clamp(supply.eligibleHours, 0, 1_000_000_000);
             const minutes = clamp(supply.minutesPerHour, 0, 30);
-            const tolerance = clamp(1 - Math.max(0, minutes - 6) * .05, .25, 1);
-            const inventory = whole(hours * minutes * 2 * tolerance);
+            const tolerance = clamp(1 - Math.max(0, minutes - 6) * .05 * (supply.breakSlope ?? 1), .25, 1);
+            const inventory = whole(hours * minutes * 2 * tolerance * (supply.slotFactor ?? 1));
             const quality = clamp(.65 + clamp(supply.audienceQualityIndex, 0, 100) / 250
                 + clamp(supply.brandSafetyIndex, 0, 100) / 500, .65, 1.25);
             return { platformId: supply.platformId, inventory, quality,

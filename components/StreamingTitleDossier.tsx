@@ -267,7 +267,7 @@ export default function StreamingTitleDossier({ player, onClose, onOpenPromotion
             <p><strong>Analysis before action.</strong> Phase 13 records where discovery came from. Phase 14 turns that evidence into an auditable next-week modifier.</p>
             {onOpenPromotionWarRoom ? (
               <button type="button" className="std-open-growth" onClick={() => onOpenPromotionWarRoom(title.entry.projectId)}>
-                Open Growth War Room <TrendingUp size={15} />
+                Open Campaign Studio <TrendingUp size={15} />
               </button>
             ) : null}
           </div>

@@ -35,13 +35,31 @@
   background:
     radial-gradient(ellipse 80% 60% at 50% -8%,color-mix(in srgb,var(--epx-hq-c) 20%,transparent),transparent 70%),
     linear-gradient(#0a0c11,#070810)}
-.hq .hqtop{display:flex;align-items:center;gap:10px}
-.hq .hqback{flex:0 0 auto;width:34px;height:34px;border-radius:11px;font-size:17px;color:#aeb6c4;
+/* #127: three columns, the back button's and an equal empty one either side of the brand, so the lockup, the level and
+   the territories line below share one centre */
+.hq .hqtop{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;column-gap:4px;align-items:start}
+.hq .hqback{grid-column:1;margin-top:3px;width:34px;height:34px;border-radius:11px;font-size:17px;color:#aeb6c4;
   display:flex;align-items:center;justify-content:center}
 .hq .hqback:active{background:rgba(255,255,255,.07)}
-.hq .hqname{flex:1;min-width:0;display:flex;align-items:center;gap:9px;justify-content:center}
-.hq .hqname h1{font-size:clamp(19px,6.2vw,26px);line-height:1.05;color:#fff;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* the service's name is never cut (#77): a very long name wraps; since #127 the level badge always sits under the
+   lockup, on its centre */
+/* #116: the real logo beside the name; a tap opens the brand studio (the pencil says so) */
+.hq .hqlogo{position:relative;flex:0 0 auto;display:block;width:40px;height:40px;padding:6px;border-radius:12px;color:var(--epx-hq-c);
+  background:color-mix(in srgb,var(--epx-hq-c) 12%,rgba(255,255,255,.03));border:1px solid color-mix(in srgb,var(--epx-hq-c) 40%,transparent);
+  box-shadow:0 0 16px color-mix(in srgb,var(--epx-hq-c) 22%,transparent)}
+.hq .hqlogo svg,.hq .hqlogo img{display:block;width:100%;height:100%;object-fit:contain}
+.hq .hqlogo i{position:absolute;right:-5px;bottom:-5px;display:grid;place-items:center;width:17px;height:17px;border-radius:50%;
+  background:var(--epx-hq-c);color:#07080c;font-size:9px;font-style:normal;font-weight:900;border:1.5px solid #090b11}
+.hq .hqwordmark{display:block;border-radius:8px}
+.hq .hqname{grid-column:2;min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+/* the lockup: the mark beside the name (Horizontal) or above it (Stacked), centred as one */
+.hq .hqlockup{display:flex;align-items:center;justify-content:center;gap:11px;min-width:0;max-width:100%}
+.hq .hqstack .hqlockup{flex-direction:column;gap:9px}
+.hq .hqlong .hqname h1{font-size:clamp(17px,5vw,21px)}
+/* a wordmark's line is shorter than the logo tile, so the back button rises to sit on it */
+.hq .hqwords .hqback{margin-top:-4px}
+.hq .hqname h1{min-width:0;font-size:clamp(19px,6.2vw,26px);line-height:1.05;color:#fff;
+  text-align:center;overflow-wrap:anywhere}
 .hq .tier{flex:0 0 auto;font-size:8.5px;font-weight:900;letter-spacing:.16em;color:var(--epx-hq-c);
   border:1px solid color-mix(in srgb,var(--epx-hq-c) 52%,transparent);
   background:color-mix(in srgb,var(--epx-hq-c) 13%,transparent);padding:4px 8px;border-radius:6px}
@@ -76,7 +94,8 @@
   border-left:8px solid rgba(255,255,255,.9);border-top:5px solid transparent;border-bottom:5px solid transparent}
 .hq .nowtxt{flex:1;min-width:0}
 .hq .nowtxt span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.18em;color:var(--epx-hq-c)}
-.hq .nowtxt b{display:block;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* a long title wraps rather than being cut (#77) */
+.hq .nowtxt b{display:block;font-size:12px;font-weight:800;overflow-wrap:anywhere}
 .hq .nowbar em{flex:0 0 auto;font-style:normal;font-size:10px;font-weight:800;color:#8b93a5}
 @keyframes epx-hqpulse{0%,100%{opacity:1}50%{opacity:.35}}
 .hq .chev{font-style:normal;font-size:17px;color:#5f6875;flex:0 0 auto}
@@ -114,20 +133,40 @@
 .hq .eventbar.hero .evtxt b{font-size:12px}
 .hq .eventbar.urgent.hero{border-color:#ff5a5f;background:rgba(255,90,95,.16);
   box-shadow:0 0 0 1px rgba(255,90,95,.35),0 6px 22px rgba(255,90,95,.2)}
+/* #76: an incident on STATUS as one slim line: a small dot, what it is, its title wrapping, STATUS */
+.hq .eventbar.compact{margin-top:10px;padding:8px 11px;gap:9px;border-radius:11px}
+.hq .eventbar.compact .evdot{width:7px;height:7px;animation:none}
+.hq .eventbar.compact.urgent .evdot{animation:epx-hqpulse 1.05s ease-in-out infinite}
+.hq .eventbar.compact .evtxt b{display:inline;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;margin-right:6px}
+.hq .eventbar.compact .evtxt span{display:inline;font-size:12px;color:#d6dae3;white-space:normal;overflow:visible;margin-top:0}
+.hq .eventbar.compact.warn{border-color:rgba(255,176,32,.26);background:rgba(255,176,32,.05)}
+.hq .eventbar.compact.urgent{border-color:rgba(255,90,95,.32);background:rgba(255,90,95,.06)}
+.hq .eventbar.compact.urgent .evtxt span{color:#ecd3d4}
 
-/* ── stat strip ── */
+/* ── stat strip: its cells share the full width (no empty end on a wide screen), scroll only when
+   they cannot fit, and write their numbers in the display face. The last 8px fade: that is inside the
+   last cell's padding when all fit, and the hint that there is more when they do not ── */
 .hq .statstrip{display:flex;gap:0;overflow-x:auto;scrollbar-width:none;
   border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07);
   background:#08090e;
-  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 90%,transparent 100%);
-  mask-image:linear-gradient(90deg,#000 0,#000 90%,transparent 100%)}
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 8px),transparent);
+  mask-image:linear-gradient(90deg,#000 calc(100% - 8px),transparent)}
 .hq .statstrip::-webkit-scrollbar{display:none}
-.hq .stat{flex:0 0 auto;padding:12px 17px;border-right:1px solid rgba(255,255,255,.06)}
+.hq .stat{flex:1 0 auto;padding:12px 13px;border-right:1px solid rgba(255,255,255,.06)}
+.hq .stat:last-child{border-right:none}
 .hq .stat span{display:block;font-size:8.5px;font-weight:900;letter-spacing:.14em;color:#6f7686;white-space:nowrap}
-.hq .stat b{display:block;margin-top:5px;font-size:16px;font-weight:800;white-space:nowrap}
+.hq .stat b{display:block;margin-top:5px;font:400 19px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;white-space:nowrap;
+  font-feature-settings:'tnum' 1}
 .hq .stat b.good{color:#4ade80}
 .hq .stat b.bad{color:#ff5a5f}
-.hq .stat b.pending{color:#5f6875;font-size:13px;font-weight:700;letter-spacing:.1em}
+.hq .stat b.pending{color:#5f6875;font:700 13px/1 'Inter',system-ui,sans-serif;letter-spacing:.1em}
+/* narrower than an iPhone (360px Androids, the first SE): tighter cells and smaller figures, so the
+   four still fit without scrolling */
+@media (max-width:374px){
+  .hq .stat{padding:11px 9px}
+  .hq .stat span{font-size:7.5px;letter-spacing:.12em}
+  .hq .stat b{font-size:16px}
+}
 
 /* ── sections & rails ── */
 .hq .hqsec{padding:20px 0 0}
@@ -200,8 +239,8 @@
 /* the same company from the outside — a lens, not a fifth division */
 .hq .viewerstrip{display:flex;align-items:center;gap:11px;width:100%;margin-top:12px;padding:11px 12px;
   border-radius:14px;background:linear-gradient(150deg,color-mix(in srgb,var(--epx-hq-c) 15%,#0b0d13),#0b0d13 70%);
-  border:1px solid color-mix(in srgb,var(--epx-hq-c) 38%,transparent)}
-.hq .viewerstrip:active{transform:scale(.99)}
+  border:1px solid color-mix(in srgb,var(--epx-hq-c) 38%,transparent);transition:transform .16s cubic-bezier(.3,1.5,.5,1)}
+.hq .viewerstrip:active{transform:scale(.97)}
 .hq .vsicon{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;align-items:center;
   justify-content:center;color:var(--epx-hq-c);background:color-mix(in srgb,var(--epx-hq-c) 16%,transparent)}
 .hq .vsicon svg{width:17px;height:17px}
@@ -222,8 +261,8 @@
 .hq .chiprail{display:flex;flex-wrap:wrap;gap:4px;padding:6px 2px 0}
 .hq .chip{position:relative;flex:0 0 auto;padding:5px 7px;border-radius:7px;
   font-size:7.5px;font-weight:900;letter-spacing:.1em;color:#7d8698;
-  background:rgba(255,255,255,.04)}
-.hq .chip:active{background:rgba(255,255,255,.1)}
+  background:rgba(255,255,255,.04);transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.hq .chip:active{background:rgba(255,255,255,.1);transform:scale(.92)}
 .hq .divwrap.content .chip{color:#7ab0ff}
 .hq .divwrap.platform .chip{color:#4fe0ac}
 .hq .divwrap.audience .chip{color:#cfa4ff}
@@ -233,14 +272,16 @@
   background:#ffb020;box-shadow:0 0 5px rgba(255,176,32,.9)}
 .hq .divcard{position:relative;padding:13px 11px 12px;border-radius:15px;background:#0b0d13;
   border:1px solid rgba(255,255,255,.09);min-height:118px;
-  display:flex;flex-direction:column;gap:9px}
-.hq .divcard:active{transform:scale(.985)}
+  display:flex;flex-direction:column;gap:9px;transition:transform .16s cubic-bezier(.3,1.5,.5,1)}
+/* a tap you can feel (Zeesh, 2026-10-23): the card squishes and its icon pops, then springs back */
+.hq .divcard:active{transform:scale(.95)}
+.hq .divcard:active .divicon{transform:scale(1.14) rotate(-8deg)}
 .hq .divcard.content{border-color:rgba(90,150,255,.3);background:linear-gradient(160deg,rgba(90,150,255,.09),#0b0d13 62%)}
 .hq .divcard.platform{border-color:rgba(52,211,153,.3);background:linear-gradient(160deg,rgba(52,211,153,.09),#0b0d13 62%)}
 .hq .divcard.audience{border-color:rgba(192,132,252,.3);background:linear-gradient(160deg,rgba(192,132,252,.09),#0b0d13 62%)}
 .hq .divcard.boardroom{border-color:rgba(240,178,48,.3);background:linear-gradient(160deg,rgba(240,178,48,.09),#0b0d13 62%)}
 .hq .divicon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.06);flex:0 0 auto}
+  background:rgba(255,255,255,.06);flex:0 0 auto;transition:transform .2s cubic-bezier(.3,1.7,.5,1)}
 .hq .divicon svg{width:19px;height:19px}
 .hq .divcard.content .divicon{color:#7ab0ff;background:rgba(90,150,255,.14)}
 .hq .divcard.platform .divicon{color:#4fe0ac;background:rgba(52,211,153,.14)}
@@ -250,8 +291,9 @@
 .hq .divtxt b{display:block;font-size:11.5px;font-weight:900;letter-spacing:.1em}
 .hq .divsub{display:block;font-size:8.5px;font-weight:700;letter-spacing:.08em;color:#7d8698;margin-top:2px}
 .hq .divstatlabel{display:block;font-size:7.5px;font-weight:900;letter-spacing:.14em;color:#6f7686;margin-top:9px}
-.hq .divstat{display:block;font-style:normal;font-size:14px;font-weight:800;margin-top:2px;
-  font-family:ui-monospace,Menlo,monospace}
+/* the stat keeps clear of the › and wraps at its space as the number grows (#77) */
+.hq .divstat{display:block;font-style:normal;font-size:clamp(12px,3.7vw,14px);font-weight:800;margin-top:2px;
+  font-family:ui-monospace,Menlo,monospace;padding-right:12px;overflow-wrap:anywhere}
 .hq .divcard.content .divstat{color:#7ab0ff}
 .hq .divcard.platform .divstat{color:#4fe0ac}
 .hq .divcard.audience .divstat{color:#cfa4ff}

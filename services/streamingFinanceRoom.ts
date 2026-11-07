@@ -7,7 +7,7 @@ import type {
 } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { STREAMING_CELEBRITY_INVESTOR_OFFERS } from './streamingLeadershipGovernance';
+import { getStreamingInvestorOfferCatalogue, getStreamingOpenInvestorOffers } from './streamingInvestorOffers';
 import { getStreamingAdditionalOperatingExpense } from './streamingOperatingExpenses';
 
 export type StreamingFinanceLedgerCategory =
@@ -69,6 +69,8 @@ export interface StreamingFinanceTitlePerformance {
     contentAmortization: number;
     contribution: number;
     viewingAccounts: number;
+    /** #163: the same title's revenue in the period before (0 when it had none) */
+    previousRevenue?: number;
 }
 
 export interface StreamingFinanceInvestorOffer {
@@ -248,6 +250,12 @@ const cashDecisionFromEvent = (
         case 'SERVICE_CONFIGURATION_COMMITTED': return expense('PRODUCT', 'Service identity commissioned', ['cost']);
         case 'RIVAL_MOVE_RESPONDED': return expense('GROWTH', 'Competitive response funded', ['cost', 'cashCost']);
         case 'EXECUTIVE_DEVELOPMENT_STARTED': return expense('PEOPLE', 'Executive development funded', ['capitalCost', 'cost']);
+        /* #181: a team job under or over budget, or padded expenses */
+        case 'TEAM_RESULT': return readNumber(entry.metadata, 'refund')
+            ? income('PEOPLE', 'Team came in under budget', ['refund'])
+            : expense('PEOPLE', 'Team went over budget', ['overrun']);
+        /* #180: a hire's signing bonus (no entry when there was none) */
+        case 'EXECUTIVE_APPOINTED': return expense('PEOPLE', 'Signing bonus', ['signingBonus']);
         case 'INFRASTRUCTURE_RESPONSE_LOCKED': return expense('RISK', 'Infrastructure response funded', ['netCost', 'cost']);
         case 'INFRASTRUCTURE_MAINTENANCE_COMPLETED': return expense('NETWORK', 'Infrastructure maintenance', ['cost']);
         case 'CRISIS_RESPONSE_LOCKED': return expense('RISK', 'Crisis response funded', ['responseCost', 'cost']);
@@ -310,7 +318,8 @@ const expenseGroups = (operations: OwnedStreamingWeeklyOperations[], additionalO
         {
             id: 'network',
             label: 'Network',
-            amount: scaled(sum(operations.map(item => item.infrastructureCost))) + additionalOperatingExpense,
+            // servers plus the bandwidth bill (Phase 2)
+            amount: scaled(sum(operations.map(item => item.infrastructureCost + (item.streamingDeliveryCost || 0)))) + additionalOperatingExpense,
         },
         {
             id: 'people',
@@ -371,14 +380,19 @@ const buildLedger = (
                 ? action.treasuryDelta > 0 ? 'Legacy company facility drawn' : 'Acquisition debt arranged'
                 : action.type === 'LOAN_REPAYMENT'
                     ? 'Company debt repaid'
-                    : 'Outside equity issued';
+                    /* #187 */
+                    : action.type === 'SHARE_BUYBACK'
+                        ? 'Shares bought back'
+                        : action.type === 'FOUNDER_SHARE_TRADE'
+                            ? action.personalCashDelta < 0 ? 'You bought shares on the market' : 'You sold shares on the market'
+                            : 'Outside equity issued';
         entries.push({
             id: action.id,
             absoluteWeek: action.absoluteWeek,
             label,
             detail: action.type === 'FOUNDER_CONTRIBUTION'
                 ? 'Personal cash moved into the company without debt or dilution.'
-                : action.type === 'EQUITY_ISSUANCE'
+                : action.type === 'EQUITY_ISSUANCE' || action.type === 'SHARE_BUYBACK' || action.type === 'FOUNDER_SHARE_TRADE'
                     ? `Founder ownership moved from ${action.ownershipBefore}% to ${action.ownershipAfter}%.`
                     : 'Recorded in the company capital book.',
             category: 'CAPITAL',
@@ -430,11 +444,16 @@ const buildLedger = (
         .reduce((total, entry) => total + entry.cashDelta, 0);
     const reconciliation = Math.round(platform.treasuryCash - knownTreasury);
     if (reconciliation !== 0) {
+        /* #163: the money the ledger cannot name (older or compacted lines) opens the books, at the earliest week it
+           knows, instead of landing in the current week: week 759 read −$35.5M although it earned +$47.5M */
+        const earliestWeek = entries.length
+            ? Math.min(...entries.map(entry => entry.absoluteWeek))
+            : getAbsoluteWeek(player.age, player.currentWeek);
         entries.push({
             id: `finance-history:${player.id}`,
-            absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
-            label: 'Historical treasury balance',
-            detail: 'Older or compacted transactions are represented by this reconciliation so the ledger closes exactly to the current treasury.',
+            absoluteWeek: earliestWeek,
+            label: 'Earlier balance',
+            detail: 'Older or compacted transactions, carried as one opening line so the ledger closes exactly to the current treasury.',
             category: 'ADJUSTMENT',
             source: 'HISTORY',
             cashDelta: reconciliation,
@@ -536,8 +555,10 @@ export const getStreamingFinanceRoom = (player: Player, requestedPeriod: 4 | 13 
             additionalOperatingExpense: extra,
         };
     });
-    const acceptedIds = new Set(platform.governance.celebrityInvestors.map(item => item.candidateId));
-    const investorOffers = STREAMING_CELEBRITY_INVESTOR_OFFERS.map(offer => ({
+    const acceptedIds = new Set(platform.governance.celebrityInvestors.filter(item => item.status === 'ACCEPTED').map(item => item.candidateId));
+    /* #172: the first three investors and those who called as the service grew: signed ones, and term sheets still open */
+    const openOfferIds = new Set(getStreamingOpenInvestorOffers(platform, getAbsoluteWeek(player.age, player.currentWeek)).map(offer => offer.id));
+    const investorOffers = getStreamingInvestorOfferCatalogue(platform).filter(offer => acceptedIds.has(offer.id) || openOfferIds.has(offer.id)).map(offer => ({
         id: offer.id,
         name: offer.name,
         initials: offer.initials,
@@ -581,6 +602,10 @@ export const getStreamingFinanceRoom = (player: Player, requestedPeriod: 4 | 13 
                 };
 
     const titlePerformance = aggregateTitlePerformance(period.flatMap(item => item.operations.titlePerformance || []));
+    /* #163: each title's own trend, against its revenue in the period before (every title read "+844.1%", the company's) */
+    const previousTitleRevenue = new Map(aggregateTitlePerformance(previousPeriod.flatMap(item => item.operations.titlePerformance || []))
+        .map(title => [title.projectId, title.revenue]));
+    titlePerformance.forEach(title => { title.previousRevenue = previousTitleRevenue.get(title.projectId) || 0; });
     // Weekly saves keep a bounded title breakdown. Preserve the known company
     // remainder explicitly rather than making omitted titles/costs disappear.
     const residualRevenue = Math.max(0, periodRevenue - titlePerformance.reduce((total, title) => total + title.revenue, 0));

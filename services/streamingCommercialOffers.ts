@@ -19,14 +19,13 @@ export interface StreamingCommercialOfferProjection {
 
 const noBenefit = (): StreamingCommercialOfferBenefit => ({ premiumAccess: false, earlyAccessWeeks: 0 });
 
-const rememberAdPlans = (pricing: OwnedStreamingPricingConfiguration) => ({
-    ...pricing.commercialOffers?.inactiveAdPlans,
-    ...Object.fromEntries(pricing.plans.filter(plan => plan.ads).map(plan => [plan.id, { monthly: plan.monthly }])),
-});
+/* #103 (plan §18.3): a plan keeps its own ads. While subscriptions are off its ads wait here with their level (the
+   normaliser keeps them), and they come back when subscriptions do; plans an earlier rule stripped (choosing a main
+   offer, or turning Free with ads off, took every plan's ads) come back the same way: "Basic with ads" reads ads again. */
 const restoreAdPlans = (pricing: OwnedStreamingPricingConfiguration) => pricing.plans.map(plan => {
     const saved = pricing.commercialOffers?.inactiveAdPlans?.[plan.id];
-    if (!saved || pricing.streams.includes('ads')) return plan;
-    return { ...plan, ads: true,
+    if (!saved || plan.ads) return plan;
+    return { ...plan, ads: true, ...(saved.adLevel ? { adLevel: saved.adLevel } : {}),
         // An intentional price edit while ads were off takes precedence.
         monthly: plan.monthly === normalizeStreamingPlanPrice(saved.monthly, false) ? saved.monthly : plan.monthly };
 });
@@ -62,32 +61,64 @@ export const projectStreamingCommercialOffers = (
     };
 };
 
-/** New setup choice; existing prices and custom plan definitions stay available for hybrids. */
+/** #103 (plan §18.3): a store open only to members of chosen plans sells to nobody while subscriptions are off, or
+    with no plan chosen; the pages say so (it sold nothing, silently). */
+export const streamingStoreSellsToNobody = (pricing: OwnedStreamingPricingConfiguration): boolean => {
+    const store = projectStreamingCommercialOffers(pricing).storeOffer;
+    return Boolean(store && store.eligibility.kind === 'MEMBERSHIP_PLANS'
+        && (!pricing.streams.includes('subs') || !store.eligibility.planIds.length));
+};
+
+/**
+ * The main offer (#103, plan §18.3): the front door, what a new viewer meets first. The first choice opens the
+ * service with that offer alone; after it, choosing a main offer only turns that offer on if it is off and moves the
+ * front door. The others stay as they are, with their plans, ads and levels (Make main reset the offer and switched the
+ * rest back on, and the wizard's "Change model" turned them off). `alone` builds a service with only that way to earn
+ * and no ads on its plans (the old reset, which the model audits' fixtures stand on).
+ */
 export const createStreamingPricingForCoreModel = (
     pricing: OwnedStreamingPricingConfiguration,
     coreModel: Exclude<StreamingCommercialCoreModel, 'LEGACY'>,
+    options: { alone?: boolean } = {},
 ): OwnedStreamingPricingConfiguration => {
     const normalized = normalizeStreamingPricingConfiguration(pricing);
-    const stream = coreModel === 'SUBSCRIPTION' ? 'subs' : coreModel === 'ADVERTISING' ? 'ads' : 'rentals';
+    const intent = normalized.commercialOffers!;
+    const first = options.alone || !intent.coreModelSelected;
+    const stream: StreamingRevenueStreamId = coreModel === 'SUBSCRIPTION' ? 'subs' : coreModel === 'ADVERTISING' ? 'ads' : 'rentals';
+    const streams: StreamingRevenueStreamId[] = first ? [stream] : [...new Set([...normalized.streams, stream])];
+    const subsBack = streams.includes('subs') && !normalized.streams.includes('subs');
     const plans = coreModel === 'SUBSCRIPTION' && !normalized.plans.length
         ? [{ id: 'ESSENTIAL', name: 'Essential', monthly: 7.99, featureIds: [], ads: false }]
-        : coreModel === 'ADVERTISING' ? restoreAdPlans(normalized) : normalized.plans;
+        : options.alone ? normalized.plans.map(plan => ({ ...plan, ads: false }))
+            : subsBack ? restoreAdPlans(normalized) : normalized.plans;
     return normalizeStreamingPricingConfiguration({
         ...normalized,
-        streams: [stream],
+        streams,
         plans,
         commercialOffers: {
-            ...normalized.commercialOffers!,
+            ...intent,
             coreModel,
             coreModelSelected: true,
-            inactiveAdPlans: coreModel === 'ADVERTISING' ? {} : rememberAdPlans(normalized),
-            freeAdAccess: coreModel === 'ADVERTISING',
+            inactiveAdPlans: options.alone || subsBack ? {} : intent.inactiveAdPlans,
+            freeAdAccess: coreModel === 'ADVERTISING' || (!first && intent.freeAdAccess),
         },
     });
 };
 
+/** A launch draft whose plans an earlier rule stripped of their ads, with subscriptions on, gets them back (#103):
+    the "Basic with ads: None" every new career met. Before launch only; a live service keeps its plans as they are. */
+export const restoreStreamingDraftAdPlans = (pricing: OwnedStreamingPricingConfiguration): OwnedStreamingPricingConfiguration => {
+    const remembered = pricing.commercialOffers?.inactiveAdPlans;
+    if (!pricing.streams.includes('subs') || !remembered || !Object.keys(remembered).length) return pricing;
+    return normalizeStreamingPricingConfiguration({
+        ...pricing,
+        plans: restoreAdPlans(pricing),
+        commercialOffers: { ...pricing.commercialOffers!, inactiveAdPlans: {} },
+    });
+};
+
 export type StreamingPricingOfferAction =
-    | { kind: 'CORE'; coreModel: Exclude<StreamingCommercialCoreModel, 'LEGACY'> }
+    | { kind: 'CORE'; coreModel: Exclude<StreamingCommercialCoreModel, 'LEGACY'>; alone?: boolean }
     | { kind: 'TOGGLE'; offer: 'SUBSCRIPTION' | 'ADS' | 'STORE'; enabled: boolean }
     | { kind: 'BENEFIT'; offer: 'PLAN' | 'FREE_AD' | 'STORE'; planId?: string;
         premiumAccess: boolean; earlyAccessWeeks: number }
@@ -99,7 +130,7 @@ export const configureStreamingPricingOffer = (
     pricing: OwnedStreamingPricingConfiguration,
     action: StreamingPricingOfferAction,
 ): OwnedStreamingPricingConfiguration => {
-    if (action.kind === 'CORE') return createStreamingPricingForCoreModel(pricing, action.coreModel);
+    if (action.kind === 'CORE') return createStreamingPricingForCoreModel(pricing, action.coreModel, { alone: action.alone });
     const current = normalizeStreamingPricingConfiguration(pricing);
     const intent = current.commercialOffers!;
     if (action.kind === 'STORE_ELIGIBILITY') return normalizeStreamingPricingConfiguration({ ...current,
@@ -110,21 +141,23 @@ export const configureStreamingPricingOffer = (
         if (!action.enabled && ((intent.coreModel === 'SUBSCRIPTION' && stream === 'subs')
             || (intent.coreModel === 'ADVERTISING' && stream === 'ads')
             || (intent.coreModel === 'STORE' && stream === 'rentals'))) return current;
+        /* #103 (§18.3): Free with ads is the free tier alone. Turning it on or off opens or closes the free tier and
+           leaves every plan's ads as they are; the ads stream follows in the normaliser. */
+        if (action.offer === 'ADS') return normalizeStreamingPricingConfiguration({
+            ...current,
+            streams: action.enabled ? [...new Set([...current.streams, stream])] : current.streams,
+            commercialOffers: { ...intent, freeAdAccess: action.enabled },
+        });
         const streams = action.enabled
             ? [...new Set([...current.streams, stream])]
             : current.streams.filter(value => value !== stream);
+        const subsBack = stream === 'subs' && action.enabled && !current.streams.includes('subs');
         const plans = stream === 'subs' && action.enabled && !current.plans.length
             ? [{ id: 'ESSENTIAL', name: 'Essential', monthly: 7.99, featureIds: [] as string[], ads: false }]
-            : stream === 'ads' && action.enabled ? restoreAdPlans(current)
-                : stream === 'ads' && !action.enabled
-                    ? current.plans.map(plan => ({ ...plan, ads: false })) : current.plans;
+            : subsBack ? restoreAdPlans(current) : current.plans;
         return normalizeStreamingPricingConfiguration({
             ...current, streams, plans,
-            commercialOffers: {
-                ...intent,
-                inactiveAdPlans: stream === 'ads' ? action.enabled ? {} : rememberAdPlans(current) : intent.inactiveAdPlans,
-                freeAdAccess: action.offer === 'ADS' ? action.enabled : intent.freeAdAccess,
-            },
+            commercialOffers: { ...intent, inactiveAdPlans: subsBack ? {} : intent.inactiveAdPlans },
         });
     }
     if (action.kind === 'PASS') {

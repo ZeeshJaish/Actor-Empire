@@ -154,7 +154,8 @@ assert(!viewerSource.includes('Continue Watching'), 'The customer home must not 
     'REPORT QUEUE',
     'Open live Viewer Home',
 ].forEach(fragment => assert(aftermathSource.includes(fragment), `HQ aftermath should include ${fragment}.`));
-assert(hqSource.includes('<StreamingLaunchAftermathPanel'), 'Platform HQ should surface the Phase 9 aftermath after launch.');
+/* #176: the aftermath panel lived in the weekly brief, which left the game */
+assert(!hqSource.includes('<StreamingLaunchAftermathPanel'), 'Platform HQ no longer mounts the Phase 9 aftermath (#176).');
 assert(viewerStyle.includes('.stream-viewer-opening-story'), 'Viewer Home needs a live opening-week visual treatment.');
 assert(viewerStyle.includes('.stream-viewer-live-pin'), 'Available titles should receive an honest live badge.');
 assert(hqStyle.includes('.hq-aftermath-signals'), 'HQ should visually separate committed launch signals.');

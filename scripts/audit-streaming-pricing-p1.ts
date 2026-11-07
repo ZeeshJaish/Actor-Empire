@@ -30,12 +30,13 @@ assert.equal(saveStreamingPricingPlan(founding, fresh.serviceConfiguration.prici
 const selected = configureStreamingPricingOffer(fresh.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'ADVERTISING' });
 assert.equal(saveStreamingPricingPlan(founding, selected).changed, true);
 assert.equal((normalizeStreamingPricingConfiguration(JSON.parse(JSON.stringify(selected))).commercialOffers as any)?.coreModelSelected, true);
-assert.match(render(selected), /aria-label="Edit Free with ads offer"[^>]*aria-expanded="false"/,
-    'ad configuration starts inside one collapsed offer card');
-assert.doesNotMatch(render(selected), /Target CPM|Optional ad-free passes|Also offer/,
-    'closed cards must not spill their controls onto the pricing page');
+// #107: the ad breaks, store and deals controls under the plans, each a cover with its editor attached, closed at first
+assert.match(render(selected), /aria-expanded="false"[^>]*aria-label="Edit ad breaks"/,
+    'ad configuration starts inside one collapsed control');
+assert.doesNotMatch(render(selected), /Target CPM|Ad-free passes|Show an ad every|Also offer/,
+    'closed controls must not spill their editors onto the pricing page');
 const store = configureStreamingPricingOffer(selected, { kind: 'CORE', coreModel: 'STORE' });
-assert.match(render(store), /aria-label="Edit Rent or buy offer"[^>]*aria-expanded="false"/);
+assert.match(render(store), /aria-expanded="false"[^>]*aria-label="Edit store"/);
 const legacy = { ...selected, commercialOffers: undefined };
 assert.equal((normalizeStreamingPricingConfiguration(legacy).commercialOffers as any)?.coreModelSelected, true,
     'older configured saves without the marker remain selected');

@@ -20,6 +20,8 @@ export interface ForbesStudioRecord {
     ownerName?: string;
     isNpcVenture?: boolean;
     isPlayerOwned?: boolean;
+    /** #184: a world studio's own books, when it keeps them (its real debt) */
+    ai?: { finance?: { debtPrincipalMillions?: number } };
 }
 
 export interface ForbesCatalogTitle {
@@ -217,7 +219,10 @@ export const buildForbesStudioProfile = (input: ForbesStudioProfileInput): Forbe
         ? 0
         : venture
             ? Math.max(0, -venture.cashReserve) * 1_000_000
-            : Math.round(valuation * debtRatio);
+            : studio.ai?.finance
+                /* #184: the studio's real debt, as the valuation engine reads it */
+                ? Math.max(0, studio.ai.finance.debtPrincipalMillions || 0) * 1_000_000
+                : Math.round(valuation * debtRatio);
     const ventureProfit = venture?.history.reduce((sum, entry) => sum + (entry.profit || 0), 0);
     const playerProfit = playerBusiness?.history.reduce((sum, entry) => sum + (entry.profit || 0), 0);
     const estimatedMargin = 0.035 + ((hash % 9) / 100);

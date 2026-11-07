@@ -56,7 +56,6 @@ interface Props {
   player: Player;
   onUpdatePlayer: (player: Player) => void;
   onClose: () => void;
-  onOpenPlatformWars?: () => void;
   onOpenFinance?: () => void;
 }
 
@@ -137,7 +136,6 @@ export default function StreamingAcquisitionCommand({
   player,
   onUpdatePlayer,
   onClose,
-  onOpenPlatformWars,
   onOpenFinance,
 }: Props) {
   const view = useMemo(() => getStreamingAcquisitionCommand(player), [player]);
@@ -586,7 +584,6 @@ export default function StreamingAcquisitionCommand({
       >
         <button type="button" className="acq-back" onClick={onClose}><ArrowLeft size={18} /> Streaming Hall</button>
         <div className="acq-scene-links">
-          {onOpenPlatformWars && <button type="button" onClick={onOpenPlatformWars}>Platform Wars</button>}
           {onOpenFinance && <button type="button" onClick={onOpenFinance}>Company finance</button>}
         </div>
       </StreamingVisualScene>

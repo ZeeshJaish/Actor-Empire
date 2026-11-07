@@ -86,13 +86,13 @@ const equityAttempt = commitStreamingRaise(player, {
     agenda: 'Growth discipline',
 });
 assert(!equityAttempt.changed && equityAttempt.reason === 'CFO_REQUIRED', 'Generic equity issuance should require an active CFO.');
-const celebrityAttempt = acceptStreamingCelebrityInvestment(player, 'investor-sofia-laurent');
+const celebrityAttempt = acceptStreamingCelebrityInvestment(player, 'investor-sofia-laurent', { founding: true });
 assert(!celebrityAttempt.changed && celebrityAttempt.reason === 'CFO_REQUIRED', 'Celebrity equity should use the same CFO gate.');
 
 const cfoAppointment = promoteStreamingInternalExecutive(player, 'internal-cfo');
 assert(cfoAppointment.changed, 'The game should provide a real internal CFO route.');
 player = cfoAppointment.player;
-const equity = acceptStreamingCelebrityInvestment(player, 'investor-sofia-laurent');
+const equity = acceptStreamingCelebrityInvestment(player, 'investor-sofia-laurent', { founding: true });
 assert(equity.changed, 'CFO-approved voluntary equity should be playable.');
 player = equity.player;
 assert(player.ownedStreamingPlatform.treasuryCash === 265_000_000, 'Accepted investor capital should enter the same treasury.');
@@ -132,12 +132,9 @@ const flagSource = readFileSync(resolve(process.cwd(), 'components/studio-financ
 const ledgerSource = readFileSync(resolve(process.cwd(), 'components/studio-finance/components/LedgerView.tsx'), 'utf8');
 const capitalSource = readFileSync(resolve(process.cwd(), 'components/studio-finance/components/CapitalView.tsx'), 'utf8');
 const roomStyles = readFileSync(resolve(process.cwd(), 'components/studio-finance/styles/studio-finance.css'), 'utf8');
-const boardroomSource = readFileSync(resolve(process.cwd(), 'components/studio-finance/components/Boardroom.tsx'), 'utf8');
 const boardroomAdapterSource = readFileSync(resolve(process.cwd(), 'components/streaming-transplant/StreamingBoardroomExperience.tsx'), 'utf8');
-const boardroomStyles = readFileSync(resolve(process.cwd(), 'components/studio-finance/styles/boardroom.css'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const appSource = readFileSync(resolve(process.cwd(), 'App.tsx'), 'utf8');
-const leadershipSource = readFileSync(resolve(process.cwd(), 'components/StreamingLeadershipSuite.tsx'), 'utf8');
 assert(roomSource.includes("'SNAPSHOT'") && roomSource.includes("'PERFORMANCE'") && roomSource.includes("'LEDGER'") && roomSource.includes("'CAPITAL'"), 'Studio Finance should use four focused views instead of one giant scroll.');
 assert(
     roomSource.includes('getStreamingStudioFinanceData')
@@ -170,13 +167,12 @@ assert(
     && roomStyles.includes('.sf-terrs'),
     'The revised market-performance desk should keep its flag-led territory cards and real Market Room handoff.',
 );
+/* #163/#166: the Boardroom's plaque is the company's own week, with live deltas */
 assert(
-    boardroomSource.includes('bd-stamp')
-    && boardroomSource.includes('bd-vital-delta')
-    && boardroomAdapterSource.includes('absoluteWeek')
+    boardroomAdapterSource.includes('companyWeek')
     && boardroomAdapterSource.includes('treasuryDelta')
-    && boardroomStyles.includes('.bd-anim'),
-    'The revised Boardroom should show the canonical books-open week, live deltas and staged room entry.',
+    && boardroomAdapterSource.includes('Books open'),
+    'The Boardroom should show the company\'s books-open week and live deltas.',
 );
 assert(roomStyles.includes('max-width: 430px') && roomStyles.includes('prefers-reduced-motion') && roomStyles.includes('@media (max-width: 359px)'), 'Finance should preserve the supplied mobile canvas, compact handling and reduced motion.');
 assert(!hqSource.includes('StreamingRaiseExperience') && hqSource.includes('StreamingFinanceRoom'), 'Headquarters should retire the duplicate Raise screen.');
@@ -201,6 +197,6 @@ assert(
     && appSource.includes("setInitialMobileAppMode('BANK')"),
     'Main dashboard should open the platform HQ while its Bank handoff remains connected at app level.',
 );
-assert(leadershipSource.includes('Open Studio Finance') && !leadershipSource.includes('Accept capital and dilution'), 'Leadership should own CFO governance but not duplicate term-sheet execution.');
+assert(hqSource.includes("openBoardroom('TABLE')"), 'Finance\'s CFO door leads to the Boardroom\'s TEAM (#166).');
 
 console.log('Streaming Finance Room audit passed.');

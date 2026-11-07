@@ -36,7 +36,7 @@ export function TitleSheet({ title, onClose, onOpenTitle }: Props) {
           <p className={`sf-sheet-figure ${totals.net >= 0 ? 'sf-tone-good' : 'sf-tone-bad'}`}>{money(totals.net, { sign: true })}</p>
           <p className="sf-sheet-tags">
             <Tag tone={status.tone}>{status.label}</Tag>
-            <TrendChip value={title.trend} label={signedPct(title.trend)} />
+            {title.isNew ? <Tag tone="gold">New</Tag> : <TrendChip value={title.trend} label={signedPct(title.trend)} />}
           </p>
         </div>
       </div>

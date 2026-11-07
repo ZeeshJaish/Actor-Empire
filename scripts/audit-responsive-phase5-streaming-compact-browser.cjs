@@ -13,19 +13,25 @@ const url = 'http://127.0.0.1:5178/scripts/fixtures/streaming-launch-surface.htm
         page.on('pageerror', error => errors.push(error.message));
         await page.goto(`${url}?step=blueprint`, { waitUntil: 'domcontentloaded' });
         await page.locator('.sf.lw').waitFor({ timeout: 15000 });
-        if (step !== 'blueprint') await page.locator('.lw-stop').nth(stepIndex).click();
-        assert.equal(await page.locator('.lw-stop').nth(stepIndex).getAttribute('aria-current'), 'step', `${step}: could not navigate to step`);
+        if (step !== 'blueprint') await page.locator('.lw-seq-stop').nth(stepIndex).click();
+        assert.equal(await page.locator('.lw-seq-stop').nth(stepIndex).getAttribute('aria-current'), 'step', `${step}: could not navigate to step`);
         await page.waitForTimeout(350);
         const result = await page.evaluate(() => {
           const root = document.querySelector('.sf.lw');
           const rect = root?.getBoundingClientRect();
           const title = root?.querySelector('.sf-head h1');
           const count = root?.querySelector('.lw-count');
-          const active = root?.querySelector('.lw-stop.is-now');
-          const activeName = active?.querySelector('.lw-stop-name');
+          // #110: the launch sequence — the current stage names itself underneath, inside the screen
+          const active = root?.querySelector('.lw-seq-stop.is-now');
+          const activeName = active?.querySelector('.lw-seq-name');
+          const stops = Array.from(root?.querySelectorAll('.lw-seq-stop') || []).map(stop => {
+            const box = stop.getBoundingClientRect();
+            return box.left + box.width / 2;
+          });
           const titleText = document.createRange();
           if (title) titleText.selectNodeContents(title);
-          const buttons = Array.from(root?.querySelectorAll('button') || []).filter(button => !button.disabled && button.offsetWidth > 0 && button.offsetHeight > 0);
+          // the sequence's 32px stops carry a 44px hit area (::before), checked by their spacing below
+          const buttons = Array.from(root?.querySelectorAll('button') || []).filter(button => !button.disabled && button.offsetWidth > 0 && button.offsetHeight > 0 && !button.classList.contains('lw-seq-stop'));
           const small = buttons.filter(button => {
             const box = button.getBoundingClientRect();
             return box.width < 44 || box.height < 44;
@@ -37,7 +43,9 @@ const url = 'http://127.0.0.1:5178/scripts/fixtures/streaming-launch-surface.htm
             rootClientWidth: root?.clientWidth,
             bottom: rect?.bottom,
             headerFits: !title || !count || titleText.getBoundingClientRect().right <= count.getBoundingClientRect().left + 1,
-            activeLabelFits: !active || !activeName || activeName.getBoundingClientRect().right <= active.getBoundingClientRect().right + 1,
+            activeLabelFits: !activeName || !rect || (activeName.getBoundingClientRect().left >= rect.left - 1 && activeName.getBoundingClientRect().right <= rect.right + 1),
+            seqStops: stops.length,
+            seqSpacing: Math.min(...stops.slice(1).map((x, i) => x - stops[i])),
             small,
           };
         });
@@ -47,6 +55,8 @@ const url = 'http://127.0.0.1:5178/scripts/fixtures/streaming-launch-surface.htm
         assert.ok(result.bottom >= viewport.height - 1, `${step}: wizard short of viewport`);
         assert.equal(result.headerFits, true, `${step}: title overlaps step counter`);
         assert.equal(result.activeLabelFits, true, `${step}: active step label clipped`);
+        assert.equal(result.seqStops, 7, `${step}: all seven stages on the launch sequence`);
+        assert.ok(result.seqSpacing >= 40, `${step}: launch sequence stops too close for their 44px hit areas`);
         assert.deepEqual(result.small, [], `${step}: undersized interactive targets`);
         assert.deepEqual(errors, [], `${step}: page errors`);
         if (viewport.width === 320 && (step === 'markets' || step === 'blueprint')) {

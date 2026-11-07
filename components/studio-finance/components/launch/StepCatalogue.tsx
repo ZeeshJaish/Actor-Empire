@@ -44,8 +44,9 @@ export function StepCatalogue({ data, handlers }: StepProps) {
           catalogue depth guide · {compactCount(c.hoursNeeded)} hours, not a launch requirement
         </p>
 
-        {/* The rail scrolls, so a hundred titles is a hundred titles. */}
-        <div className="cat-rail">
+        {/* The rail scrolls, so a hundred titles is a hundred titles. #113: the posters stand on a lit shelf, and an
+            empty shelf is not drawn. */}
+        {(c.anchors.length > 0 || c.titles > 0) && <div className="cat-rail">
           {c.anchors.map((title) => (
             <span key={title.id} className={title.linked ? 'cat-railitem' : 'cat-railitem is-off'}>
               <StreamingTitleArt id={title.posterSeed ?? title.id} title={title.name} genre={title.format} poster={title.poster} size={54} />
@@ -55,7 +56,7 @@ export function StepCatalogue({ data, handlers }: StepProps) {
           {c.titles > c.anchors.length && (
             <span className="cat-railmore">+{compactCount(c.titles - c.anchors.length)}<em>more</em></span>
           )}
-        </div>
+        </div>}
 
         <p className="lw-hero-note">{verdict}</p>
       </section>

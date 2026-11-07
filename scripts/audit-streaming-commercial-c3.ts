@@ -30,6 +30,8 @@ const baseOffer = (platformId: string): WorldStreamingPlatformOffer => ({
 });
 const paid: WorldStreamingPlatformOffer = {
     ...baseOffer('PLAYER'),
+    // its prices sell Pay yearly; since #71 who pays yearly follows the discount (at 0% nobody would)
+    annualDiscountPercent: 15,
     plans: [{ id: 'STANDARD', name: 'Standard', monthlyPrice: 12, effectiveMonthlyPrice: 12,
         monthlyBillingPrice: 12, annualBillingMonthlyPrice: 10, featureIds: ['hd'], ads: false, appealIndex: 60 }],
     commercialConfiguration: { ...pricing, streams: ['subs'] },

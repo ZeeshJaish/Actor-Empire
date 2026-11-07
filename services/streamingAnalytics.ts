@@ -382,7 +382,8 @@ const buildCapacityForecast = (
     snapshots: OwnedStreamingWeeklySnapshot[],
     contentGaps: StreamingContentGapCell[],
 ): StreamingAnalyticsPoint[] => {
-    const recentPeaks = snapshots.slice(-4).map(snapshot => snapshot.operations?.peakConcurrentStreams || 0);
+    // load units since Phase 2 (an HD stream is 1), the unit capacity is counted in
+    const recentPeaks = snapshots.slice(-4).map(snapshot => snapshot.operations?.peakLoadUnits ?? snapshot.operations?.peakConcurrentStreams ?? 0);
     const lastPeak = recentPeaks.at(-1) || platform.launchCommit?.forecastLikelyConcurrentStreams || 0;
     const trend = recentPeaks.length >= 2
         ? (recentPeaks.at(-1)! - recentPeaks[0]) / Math.max(1, recentPeaks.length - 1)

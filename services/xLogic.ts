@@ -5,6 +5,7 @@ import { getAwardGossipTemplate } from './awardLogic';
 import { getEnabledGlobalCreatorProfiles } from './youtubeLogic';
 import { normalizeUniverseMap } from './universeLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { getAbsoluteWeek } from './legacyLogic';
 
 // --- TWEET TEMPLATES ---
 
@@ -324,6 +325,34 @@ export const generateXFeed = (player: Player): XPost[] => {
     }
 
     return feed.sort((a, b) => b.likes - a.likes); // Sort by popularity
+};
+
+/* The saved feed's cap, as the weekly loop and the industry media keep it */
+const X_FEED_LIMIT = 80;
+
+/** A post from this week: most posts carry the week of the year, the industry media's the absolute week */
+export const isXPostThisWeek = (post: Pick<XPost, 'timestamp'>, player: Pick<Player, 'age' | 'currentWeek'>): boolean => (
+    post.timestamp === player.currentWeek || post.timestamp === getAbsoluteWeek(player.age, player.currentWeek)
+);
+
+/** The week of the year a post is from, whichever way it was stamped */
+export const xPostWeekOfYear = (timestamp: number): number => (timestamp > 52 ? (timestamp % 52) + 1 : timestamp);
+
+/**
+ * The feed the X app opens on (#65). Everything saved stays: the media's posts, release reactions
+ * and replies (opening X used to replace them with a fresh feed, and the first like saved that over
+ * them). The week's chatter is added once a week and is saved with the rest on the first like, repost
+ * or post, as before. This week's posts come first, most liked first, then the older saved ones.
+ */
+export const openXFeed = (player: Player): XPost[] => {
+    const saved = Array.isArray(player.x?.feed) ? player.x.feed : [];
+    /* this week's chatter was saved with the feed already */
+    if (saved.some(post => post.id.startsWith('x_post_') && !post.isPlayer && post.timestamp === player.currentWeek)) return saved;
+    const fresh = generateXFeed(player);
+    const freshIds = new Set(fresh.map(post => post.id));
+    const kept = saved.filter(post => !freshIds.has(post.id));
+    const thisWeek = [...fresh, ...kept.filter(post => isXPostThisWeek(post, player))].sort((a, b) => b.likes - a.likes);
+    return [...thisWeek, ...kept.filter(post => !isXPostThisWeek(post, player))].slice(0, X_FEED_LIMIT);
 };
 
 export const generateTrendingTopics = (player: Player): { tag: string, posts: string, category: string }[] => {

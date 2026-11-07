@@ -49,6 +49,8 @@ interface Props {
   onOpenProduction: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenTitleDossier: (projectId: string) => void;
   onOpenPromotion: (projectId: string) => void;
+  /** #150: open on the original of this title (its canonical project), from its title page */
+  initialProjectId?: string | null;
 }
 
 const money = (value: number) => value >= 1_000_000_000
@@ -90,9 +92,11 @@ export default function StreamingOriginalsStudio({
   onOpenProduction,
   onOpenTitleDossier,
   onOpenPromotion,
+  initialProjectId = null,
 }: Props) {
   const records = useMemo(() => getStreamingOriginalsStudio(player), [player]);
-  const [selectedId, setSelectedId] = useState(records[0]?.commission.id || '');
+  const [selectedId, setSelectedId] = useState(records.find(record => initialProjectId && record.commission.canonicalProjectId === initialProjectId)?.commission.id
+    || records[0]?.commission.id || '');
   const [localizationPackage, setLocalizationPackage] = useState<StreamingOriginalLocalizationPackage>('DOMESTIC');
   const [releaseScope, setReleaseScope] = useState<StreamingOriginalReleaseScope>('DOMESTIC');
   const [releasePattern, setReleasePattern] = useState<StreamingOriginalReleasePattern>('WEEKLY');
@@ -102,7 +106,6 @@ export default function StreamingOriginalsStudio({
   const commission = selected?.commission || null;
   const selectedLocalization = STREAMING_ORIGINAL_LOCALIZATION_PACKAGES.find(item => item.id === localizationPackage)
     || STREAMING_ORIGINAL_LOCALIZATION_PACKAGES[0];
-  const currentContentOps = player.ownedStreamingPlatform.technologyLevels.CONTENT_OPERATIONS;
   const canOpenAnotherPitch = !player.ownedStreamingPlatform.originalCommissions.some(item => !item.canonicalProjectId);
 
   const commitLocalization = () => {
@@ -113,7 +116,6 @@ export default function StreamingOriginalsStudio({
         UNKNOWN_ORIGINAL: 'That Original is no longer available.',
         NOT_GREENLIT: 'Greenlight the canonical production before opening localization.',
         ALREADY_PLANNED: 'This localization package is already committed.',
-        TECH_REQUIRED: `Content Operations ${selectedLocalization.contentOperationsRequired} is required for this package.`,
         INSUFFICIENT_TREASURY: 'Platform treasury cannot fund this localization package.',
       };
       setFeedback(messages[result.reason || 'UNKNOWN_ORIGINAL']);
@@ -310,13 +312,12 @@ export default function StreamingOriginalsStudio({
                         <span>{item.id.replace('_', ' ')}</span>
                         <strong>{item.label}</strong>
                         <small>{item.subtitleLanguageCount} subs · {item.dubbedLanguageCount} dubs · {money(item.cashCost)}</small>
-                        <em>Content Ops {item.contentOperationsRequired}</em>
                       </button>
                     ))}
                   </div>
                   <button
                     type="button"
-                    disabled={!commission.canonicalProjectId || currentContentOps < selectedLocalization.contentOperationsRequired}
+                    disabled={!commission.canonicalProjectId}
                     onClick={commitLocalization}
                   >Commit localization <Languages size={17} /></button>
                 </>
@@ -363,7 +364,7 @@ export default function StreamingOriginalsStudio({
               {commission.canonicalProjectId && selected.liveStatus === 'RELEASED' ? (
                 <div className="originals-inline-actions">
                   <button type="button" onClick={() => onOpenTitleDossier(commission.canonicalProjectId!)}>Open dossier <LineChart size={16} /></button>
-                  <button type="button" onClick={() => onOpenPromotion(commission.canonicalProjectId!)}>Growth room <Megaphone size={16} /></button>
+                  <button type="button" onClick={() => onOpenPromotion(commission.canonicalProjectId!)}>Campaign Studio <Megaphone size={16} /></button>
                 </div>
               ) : (
                 <small>Unknown performance stays unknown; no zero-filled report is shown.</small>

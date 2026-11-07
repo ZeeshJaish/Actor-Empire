@@ -26,6 +26,7 @@ import { getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView, ty
 import { projectStreamingCommercialOffers } from './streamingCommercialOffers';
 import { stageWorldStreamingOpeningOffer } from './worldEconomy/worldStreamingOpening';
 import { createOpeningWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
+import { resolveStreamingPlatformTechDebt } from './streamingTechTreeCatalogue';
 
 export type StreamingLaunchReadinessTone = 'READY' | 'WATCH' | 'BLOCKED';
 
@@ -416,7 +417,7 @@ export const commitOwnedStreamingLaunch = (
         : 1;
     const playbackSuccessRate = clamp(
         96.8 + pressure * 2.2 + (platform.infrastructureSetup?.reliabilityTarget || 99) * 0.01
-            - (platform.infrastructureSetup?.technicalDebt || 0) * 0.035,
+            - resolveStreamingPlatformTechDebt(platform) * 0.035,
         92,
         99.99,
     );

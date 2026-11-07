@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { assertDiscoveryPercentageTotal } from './helpers/streamingPercentageAssertions';
 import {
@@ -237,25 +237,14 @@ assert(!processOwnedStreamingPlatformWeek(promotedA.player).processed, 'Reopenin
 
 const serviceSource = readFileSync(resolve(process.cwd(), 'services/streamingPromotion.ts'), 'utf8');
 const weeklySource = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
-const componentSource = readFileSync(resolve(process.cwd(), 'components/StreamingPromotionWarRoom.tsx'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const dossierSource = readFileSync(resolve(process.cwd(), 'components/StreamingTitleDossier.tsx'), 'utf8');
-const styleSource = readFileSync(resolve(process.cwd(), 'styles/streaming-promotion.css'), 'utf8');
 
 assert(!serviceSource.includes('Math.random') && !weeklySource.includes('Math.random'), 'Growth outcomes must never use uncontrolled randomness.');
-[
-    'VIEWER HOME CONTROL WALL',
-    'PAID REACH MIX',
-    'RECOMMENDATION MANDATE',
-    'DISCOVERY TRADEOFF',
-    'ARTWORK EXPERIMENT',
-    'OBSERVED DISCOVERY MIX',
-    'No direct subscriber grants',
-].forEach(fragment => assert(componentSource.includes(fragment), `Phase 14 experience should include ${fragment}.`));
 ['TRAILER', 'BILLBOARD', 'SOCIAL', 'REGIONAL'].forEach(channel => assert(serviceSource.includes(`'${channel}'`), `Phase 14 should include the ${channel} channel.`));
-assert(hqSource.includes('<StreamingPromotionWarRoom') && hqSource.includes('onNewCampaign=') && hqSource.includes('openPromotionWarRoom()'), 'The live Audience campaign action must open the canonical Growth War Room.');
-assert(dossierSource.includes('Open Growth War Room'), 'Title discovery analysis should deep-link into the matching growth action.');
-assert(styleSource.includes('@media (min-width: 720px)') && styleSource.includes('@media (min-width: 1080px)'), 'The war room should scale deliberately across mobile, tablet and desktop.');
-assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'War-room motion should respect reduced-motion preferences.');
+/* #150: the War Room is gone; its doors open the Campaign Studio, and its growth actions stay as history */
+assert(!existsSync(resolve(process.cwd(), 'components/StreamingPromotionWarRoom.tsx')) && !existsSync(resolve(process.cwd(), 'styles/streaming-promotion.css')), 'The War Room is removed (#150).');
+assert(hqSource.includes('<CampaignStudio') && !hqSource.includes('StreamingPromotionWarRoom'), 'The HQ opens the Campaign Studio instead.');
+assert(dossierSource.includes('Open Campaign Studio'), 'Title discovery analysis should deep-link into the Campaign Studio.');
 
 console.log('Streaming Promotion, Marketing and Recommendations Phase 14 audit passed.');

@@ -1,0 +1,19 @@
+/* A title's picture (#123: the previous poster again, after #121's key art read as "gradient and flashy"): the title's
+   colour as a quiet two-tone gradient, its name as a large ghost, the service's mark on an Original, the name in a
+   caption bar on a poster. Fills its parent (position:relative); sized in container units so the 92px card and the
+   full-width banner keep the proportions the app always had (19px ghost and an 8px caption on a 92px card). */
+.art { position: absolute; inset: 0; z-index: 0; display: block; overflow: hidden; container-type: size; pointer-events: none;
+  background: linear-gradient(165deg, hsl(var(--h) 58% 36%), hsl(var(--h) 52% 13%)); }
+.wide { background: radial-gradient(120% 120% at 30% 20%, hsl(var(--h) 62% 40%), hsl(var(--h) 55% 12%) 72%); }
+
+.ghost { position: absolute; left: -4%; right: -4%; top: 10%; display: block; font-size: 19px; font-size: 20cqw; font-weight: 900; line-height: .92;
+  color: #fff; opacity: .13; text-transform: uppercase; word-break: break-word; }
+.wide .ghost { top: 18%; font-size: 40px; font-size: 12cqw; opacity: .12; }
+
+.orig { position: absolute; top: 5px; left: 5px; z-index: 2; display: block; width: 12px; height: 12px; width: clamp(10px, 12cqw, 16px); height: clamp(10px, 12cqw, 16px);
+  color: #fff; opacity: .95; font-style: normal; }
+.wide .orig { top: 10px; left: 10px; width: 16px; height: 16px; }
+.orig svg, .orig img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+.cap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: block; padding: 3px 6px 4px; font-size: 8px; font-size: clamp(7px, 8.4cqw, 11px);
+  font-weight: 700; line-height: 1.25; color: #dfe4ee; background: rgba(7, 8, 12, .86); overflow-wrap: anywhere; }

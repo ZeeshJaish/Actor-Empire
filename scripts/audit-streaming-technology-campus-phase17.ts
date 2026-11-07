@@ -6,9 +6,11 @@ import {
     createInitialOwnedStreamingPlatformState,
     type Player,
 } from '../types';
+import type { OwnedStreamingTechnologyProject } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 import {
+    STREAMING_CONTENT_OPERATIONS_RETIRED_BLOCKER,
     completeDueStreamingTechnologyProjects,
     getStreamingTechnologyCampus,
     getStreamingTechnologyWeeklyCost,
@@ -78,7 +80,10 @@ const createFixture = (): Player => {
                 DELIVERY_CAPACITY: 20,
                 RELIABILITY: 18,
                 PLAYBACK_QUALITY: 12,
-                CONTENT_OPERATIONS: 10,
+                // Content operations was the last line the campus built: since #86 nothing needs it, so the
+                // campus starts no new step of any line (Recommendations, Security, Reliability, Delivery and
+                // Playback moved to Platform › Tech); a build a save already has under way still finishes
+                CONTENT_OPERATIONS: 0,
             },
             treasuryCash: 500_000_000,
         },
@@ -97,23 +102,56 @@ assert(campus.availableEngineeringStaff === 24, 'Engineering capacity should der
 
 const edgeFacility = campus.facilities.find(item => item.definition.id === 'DELIVERY_CAPACITY')!;
 assert(edgeFacility.nodes[0].status === 'INSTALLED', 'Existing Phase 5 technology levels should count as installed campus foundations.');
-const dataFacility = campus.facilities.find(item => item.definition.id === 'DATA_RECOMMENDATIONS')!;
-assert(dataFacility.nodes[0].status === 'AVAILABLE', 'The founder should be able to approve a basic Tier 1 project without a CTO.');
+const opsFacility = campus.facilities.find(item => item.definition.id === 'CONTENT_OPERATIONS')!;
+assert(
+    opsFacility.nodes.every(node => node.status === 'LOCKED' && node.blockers.includes(STREAMING_CONTENT_OPERATIONS_RETIRED_BLOCKER)),
+    'Content operations builds no new step since #86: nothing waits on it.',
+);
+const refused = startStreamingTechnologyProject(fixture, opsFacility.nodes[0].definition.id, 'BALANCED');
+assert(
+    !refused.changed && refused.reason === 'NOT_NEXT'
+    && refused.player.ownedStreamingPlatform.treasuryCash === fixture.ownedStreamingPlatform.treasuryCash,
+    'A retired step must not start or charge.',
+);
+assert(campus.facilities.find(item => item.definition.id === 'DATA_RECOMMENDATIONS')!.nodes[0].status === 'LOCKED', 'Recommendations are built in Tech since #59.');
 
-const sprintPreview = previewStreamingTechnologyProject(dataFacility.nodes[0].definition, 'SPRINT');
-const hardenedPreview = previewStreamingTechnologyProject(dataFacility.nodes[0].definition, 'HARDENED');
+const sprintPreview = previewStreamingTechnologyProject(opsFacility.nodes[0].definition, 'SPRINT');
+const hardenedPreview = previewStreamingTechnologyProject(opsFacility.nodes[0].definition, 'HARDENED');
 assert(sprintPreview.constructionWeeks < hardenedPreview.constructionWeeks, 'Sprint doctrine should finish sooner than Hardened doctrine.');
 assert(sprintPreview.technicalDebtDelta > hardenedPreview.technicalDebtDelta, 'Faster construction should carry more technical debt.');
 
-const treasuryBefore = fixture.ownedStreamingPlatform.treasuryCash;
-const started = startStreamingTechnologyProject(fixture, dataFacility.nodes[0].definition.id, 'BALANCED');
-assert(started.changed && started.project?.status === 'UNDER_CONSTRUCTION', 'An available blueprint should create a persisted construction project.');
-fixture = started.player;
-assert(fixture.ownedStreamingPlatform.treasuryCash === treasuryBefore - started.project!.capitalCost, 'Project capital should debit company treasury exactly once.');
-assert(started.project!.staffRequired > 0 && started.project!.constructionWeeks > 0, 'Construction should persist its staff and game-week requirements.');
-assert(started.project!.risk && started.project!.riskNote && Number.isFinite(started.project!.technicalDebtDelta), 'Construction should persist risk and technical debt.');
+/* a build a save already had under way before #86, as startStreamingTechnologyProject wrote it, still finishes */
+const opsDefinition = opsFacility.nodes[0].definition;
+const opsPreview = previewStreamingTechnologyProject(opsDefinition, 'BALANCED');
+const startWeek = getAbsoluteWeek(45, 20);
+const underWay: OwnedStreamingTechnologyProject = {
+    id: 'phase17-content-operations-1',
+    idempotencyKey: `technology-project:${opsDefinition.id}`,
+    definitionId: opsDefinition.id,
+    branch: opsDefinition.branch,
+    title: opsDefinition.title,
+    targetLevel: opsDefinition.targetLevel,
+    buildMode: 'BALANCED',
+    status: 'UNDER_CONSTRUCTION',
+    capitalCost: opsPreview.capitalCost,
+    weeklyOperatingCostDelta: opsPreview.weeklyOperatingCostDelta,
+    staffRequired: opsPreview.staffRequired,
+    constructionWeeks: opsPreview.constructionWeeks,
+    benefit: opsDefinition.benefit,
+    risk: opsPreview.risk,
+    riskNote: opsPreview.riskNote,
+    technicalDebtDelta: opsPreview.technicalDebtDelta,
+    startedAtAbsoluteWeek: startWeek,
+    readyAtAbsoluteWeek: startWeek + opsPreview.constructionWeeks,
+    completedAtAbsoluteWeek: null,
+};
+fixture = { ...fixture, ownedStreamingPlatform: { ...fixture.ownedStreamingPlatform, technologyProjects: [underWay] } };
+const started = { project: underWay };
+assert(getStreamingTechnologyCampus(fixture).activeProject?.id === underWay.id, 'A build under way stays the campus project until it finishes.');
+assert(opsPreview.staffRequired > 0 && opsPreview.constructionWeeks > 0, 'Construction should carry its staff and game-week requirements.');
+assert(opsPreview.risk && opsPreview.riskNote && Number.isFinite(opsPreview.technicalDebtDelta), 'Construction should carry risk and technical debt.');
 
-const duplicate = startStreamingTechnologyProject(fixture, dataFacility.nodes[0].definition.id, 'BALANCED');
+const duplicate = startStreamingTechnologyProject(fixture, opsDefinition.id, 'BALANCED');
 assert(!duplicate.changed, 'The same technology order must not charge twice.');
 const secondProject = startStreamingTechnologyProject(fixture, 'security-1', 'BALANCED');
 assert(!secondProject.changed && secondProject.reason === 'PROJECT_ACTIVE', 'Only one campus construction project should use the build bay at a time.');
@@ -129,8 +167,8 @@ const completed = completeDueStreamingTechnologyProjects(
     started.project!.readyAtAbsoluteWeek,
 );
 assert(completed.completedProjects.length === 1, 'A due project should complete in the canonical weekly processor.');
-assert(completed.platform.technologyLevels.DATA_RECOMMENDATIONS === 10, 'Completion should advance the real technology branch.');
-assert(completed.platform.capacity.baselineConcurrentStreams === baselineBefore, 'A data project should not fabricate delivery capacity.');
+assert(completed.platform.technologyLevels.CONTENT_OPERATIONS === 10, 'Completion should advance the real technology branch.');
+assert(completed.platform.capacity.baselineConcurrentStreams === baselineBefore, 'An operations project should not fabricate delivery capacity.');
 assert(getStreamingTechnologyWeeklyCost(completed.platform) === started.project!.weeklyOperatingCostDelta, 'Completed projects should enter the weekly operating run rate.');
 assert(completed.ledgerEntries.length === 1 && completed.ledgerEntries[0].type === 'TECHNOLOGY_PROJECT_COMPLETED', 'Completion should create one auditable ledger fact.');
 
@@ -146,12 +184,12 @@ const frontierFixture: Player = {
         ...createFixture().ownedStreamingPlatform,
         technologyLevels: {
             ...createFixture().ownedStreamingPlatform.technologyLevels,
-            DATA_RECOMMENDATIONS: 24,
+            CONTENT_OPERATIONS: 22,
         },
     },
 };
 campus = getStreamingTechnologyCampus(frontierFixture);
-const frontier = campus.facilities.find(item => item.definition.id === 'DATA_RECOMMENDATIONS')!.nextNode!;
+const frontier = campus.facilities.find(item => item.definition.id === 'CONTENT_OPERATIONS')!.nextNode!;
 assert(frontier.definition.tier === 3 && frontier.status === 'LOCKED', 'Tier 3 frontier research should remain locked without a CTO.');
 assert(frontier.blockers.some(blocker => blocker.includes('CTO')), 'The frontier lock should name the missing CTO capability.');
 

@@ -17,12 +17,17 @@ interface Props {
   onClose: () => void;
   onInjectCapital: (amount: number) => ActionResult;
   onAcceptInvestment: (offerId: string) => ActionResult;
+  /** #163: Decline on an investor's term sheet */
+  onDeclineInvestment?: (offerId: string) => void;
   onOpenBuild: () => void;
   onOpenBank: () => void;
   onOpenLeadership: () => void;
   onOpenPublicMarkets: () => void;
   onOpenMarket?: (marketId: string) => void;
   onOpenTitle?: (titleId: string) => void;
+  /** #175: owners and investors, and the listing, live in the Boardroom */
+  onOpenOwnership?: () => void;
+  onOpenMarkets?: () => void;
 }
 
 const tabMap: Record<LegacyFinanceTab, FinanceTab> = {
@@ -40,11 +45,14 @@ export function StreamingFinanceRoom({
   onClose,
   onInjectCapital,
   onAcceptInvestment,
+  onDeclineInvestment,
   onOpenBank,
   onOpenLeadership,
   onOpenPublicMarkets,
   onOpenMarket,
   onOpenTitle,
+  onOpenOwnership,
+  onOpenMarkets,
 }: Props) {
   const brandHex = useMemo(() => hslHex(brand.hue, brand.sat, 58), [brand.hue, brand.sat]);
   const shellStyle = useMemo(() => ({
@@ -70,7 +78,10 @@ export function StreamingFinanceRoom({
         onOpenMarket={onOpenMarket}
         onFounderInjection={onInjectCapital}
         onAcceptOffer={onAcceptInvestment}
+        onRejectOffer={onDeclineInvestment}
         onOpenTitle={onOpenTitle}
+        onOpenOwnership={onOpenOwnership}
+        onOpenMarkets={onOpenMarkets}
       />
     </div>
   );

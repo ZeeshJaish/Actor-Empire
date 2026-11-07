@@ -20,7 +20,8 @@ import {
 } from './streamingFacilities';
 import { normalizeStreamingRackGroups } from './streamingRackGroups';
 
-export type StreamingFacilityListingStatus = 'OPEN' | 'LIMITED' | 'RESEARCH_REQUIRED';
+/* #109: a third status, RESEARCH_REQUIRED, was never assigned */
+export type StreamingFacilityListingStatus = 'OPEN' | 'LIMITED';
 
 export interface StreamingFacilityMarketplaceListing extends StreamingFacilityLeaseSnapshot {
     /** Every way this building can be held. A place with both is the same room
@@ -232,7 +233,7 @@ export const getRecommendedStreamingFacilityListing = (
     preferCloud = false,
 ): StreamingFacilityMarketplaceListing | null => {
     const listings = getStreamingFacilityMarketplace(cityId).filter(listing => (
-        listing.status !== 'RESEARCH_REQUIRED' && listing.rackPositions >= minimumRacks
+        listing.rackPositions >= minimumRacks
     ));
     if (preferCloud) {
         const cloud = listings.find(listing => listing.facilityType === 'CLOUD_ALLOCATION');

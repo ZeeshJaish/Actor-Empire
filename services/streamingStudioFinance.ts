@@ -61,7 +61,10 @@ const departmentLabel = (category: StreamingFinanceLedgerCategory): string => ({
     ADJUSTMENT: 'Adjustment',
 }[category]);
 
-const transactionsFrom = (model: StreamingFinanceRoomModel): Transaction[] => {
+/* #163: Finance speaks in the company's own weeks (W32, Year 1), everywhere: the head, the ledger, the chart, the events */
+type CompanyWeekOf = (absoluteWeek: number) => number;
+
+const transactionsFrom = (model: StreamingFinanceRoomModel, companyWeek: CompanyWeekOf): Transaction[] => {
     const settlementRank: Record<StreamingFinanceLedgerEntry['source'], number> = {
         FORMATION: 0,
         CAPITAL: 1,
@@ -81,8 +84,8 @@ const transactionsFrom = (model: StreamingFinanceRoomModel): Transaction[] => {
         if (entry.affectsTreasury) balance = Math.max(0, balance + entry.cashDelta);
         return {
             id: entry.id,
-            week: entry.absoluteWeek,
-            date: `W${entry.absoluteWeek}`,
+            week: companyWeek(entry.absoluteWeek),
+            date: `W${companyWeek(entry.absoluteWeek)}`,
             name: entry.label,
             category: ledgerCategory(entry),
             lane: ledgerLane(entry),
@@ -97,6 +100,7 @@ const transactionsFrom = (model: StreamingFinanceRoomModel): Transaction[] => {
 const weekPointsFrom = (
     model: StreamingFinanceRoomModel,
     player: Player,
+    companyWeek: CompanyWeekOf,
 ): WeekPoint[] => {
     const movementByWeek = new Map<number, number>();
     const cashEntries = model.ledger.filter(entry => entry.affectsTreasury && entry.source !== 'HISTORY');
@@ -109,8 +113,8 @@ const weekPointsFrom = (
         const closingCash = model.treasuryCash - cashEntries
             .filter(entry => entry.absoluteWeek > point.absoluteWeek).reduce((total, entry) => total + entry.cashDelta, 0);
         points.unshift({
-            week: point.absoluteWeek,
-            label: `W${point.absoluteWeek}`,
+            week: companyWeek(point.absoluteWeek),
+            label: `W${companyWeek(point.absoluteWeek)}`,
             revenue: point.revenue,
             expense: point.outflow,
             closingCash,
@@ -121,6 +125,40 @@ const weekPointsFrom = (
         });
     }
     return points;
+};
+
+/** #175: one runway for every money screen: the treasury ÷ the average operating net of the last 4 weeks (revenue less
+ *  the costs incurred, paid or not, as Studio Finance's burn counts them); null while the company makes money. MONEY,
+ *  its alerts and Studio Finance all read it. */
+const runwayOf = (treasury: number, points: WeekPoint[]) => {
+    const last = points.slice(-4);
+    const weeklyNet = last.length
+        ? last.reduce((sum, point) => sum + point.revenue - (point.incurredOperatingCost ?? point.expense), 0) / last.length : 0;
+    return { weeklyNet, runwayWeeks: weeklyNet >= 0 ? null : Math.floor(treasury / Math.abs(weeklyNet)) };
+};
+
+export interface StreamingCashSummary {
+    /** the treasury at the close of each of the last 12 weeks, oldest first, rebuilt from the books as Studio Finance draws them */
+    closes: Array<{ week: number; cash: number }>;
+    treasury: number;
+    /** the average operating net of the last 4 weeks */
+    weeklyNet: number;
+    runwayWeeks: number | null;
+}
+
+/** #175: what MONEY shows: the cash line, the pace and the runway, from the same books as Studio Finance */
+export const getStreamingCashSummary = (player: Player): StreamingCashSummary => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const foundedAt = platform.identity?.foundedAtAbsoluteWeek ?? absoluteWeek;
+    const companyWeek: CompanyWeekOf = (week) => Math.max(1, week - foundedAt + 1);
+    const model = getStreamingFinanceRoom(player, 13);
+    const points = weekPointsFrom(model, player, companyWeek);
+    return {
+        closes: points.slice(-12).map(point => ({ week: point.week, cash: point.closingCash })),
+        treasury: model.treasuryCash,
+        ...runwayOf(model.treasuryCash, points),
+    };
 };
 
 const titleFormat = (player: Player, projectId: string, genre: string): TitleFinance['format'] => {
@@ -152,7 +190,10 @@ const titlesFrom = (model: StreamingFinanceRoomModel, player: Player): TitleFina
         contentAmortization: title.contentAmortization,
         marketingCost: 0,
         infrastructureCost: 0,
-        trend: model.revenueChangePercent ?? 0,
+        trend: title.previousRevenue && title.previousRevenue > 0
+            ? Math.round(((title.revenue - title.previousRevenue) / title.previousRevenue) * 1000) / 10
+            : 0,
+        isNew: !title.previousRevenue && title.revenue > 0 && title.projectId !== 'streaming-unallocated-operations',
     }));
 };
 
@@ -188,6 +229,8 @@ export const getStreamingStudioFinanceData = (player: Player, brandHex?: string)
     const markets = getStreamingPublicMarkets(player);
     const foundedAt = platform.identity?.foundedAtAbsoluteWeek ?? absoluteWeek;
     const founderYear = Math.max(1, Math.floor(Math.max(0, absoluteWeek - foundedAt) / 52) + 1);
+    const companyWeek: CompanyWeekOf = (week) => Math.max(1, week - foundedAt + 1);
+    /* accepted or declined (#163): either way the investor has had their answer */
     const acceptedIds = new Set(platform.governance.celebrityInvestors.map((item) => item.candidateId));
     const offer = models.quarter.investorOffers.find((item) => (
         !item.accepted
@@ -200,10 +243,11 @@ export const getStreamingStudioFinanceData = (player: Player, brandHex?: string)
         label: holder.holderName,
         pct: holder.ownershipPercent,
         kind: 'investor' as const,
-    }));
+    })).sort((left, right) => right.pct - left.pct); /* #163: by size, like the Boardroom's cap table */
     const publicFloat = platform.publicCompany.listing
         ? Math.max(0, 100 - platform.founderOwnershipPercent - investors.reduce((sum, item) => sum + item.pct, 0))
         : 0;
+    const weekPoints = weekPointsFrom(models.all, player, companyWeek);
     const ownership: StudioFinanceData['capital']['ownership'] = [
         { label: 'Founder', pct: platform.founderOwnershipPercent, kind: 'founder' },
         ...investors,
@@ -214,16 +258,20 @@ export const getStreamingStudioFinanceData = (player: Player, brandHex?: string)
         company: {
             name: platform.identity?.name || 'EMPIRE+',
             year: founderYear,
-            week: absoluteWeek,
+            /* #163: the company's own week (31), not the career's (759) */
+            week: companyWeek(absoluteWeek),
             brandHex,
         },
         cash: models.all.treasuryCash,
-        weeks: weekPointsFrom(models.all, player),
+        weeks: weekPoints,
+        /* #175: the same runway as MONEY; owners, investors and the listing live in the Boardroom */
+        runwayWeeks: runwayOf(models.all.treasuryCash, weekPoints).runwayWeeks,
+        capitalScope: 'founder',
         events: models.all.ledger
             .filter((entry) => entry.source !== 'OPERATIONS')
             .slice(0, 24)
-            .map((entry) => ({ week: entry.absoluteWeek, kind: eventKind(entry), label: entry.label })),
-        transactions: transactionsFrom(models.all),
+            .map((entry) => ({ week: companyWeek(entry.absoluteWeek), kind: eventKind(entry), label: entry.label })),
+        transactions: transactionsFrom(models.all, companyWeek),
         ...cutFrom(models.all, player),
         windows: {
             '4W': cutFrom(models.four, player),

@@ -177,9 +177,9 @@ assert(!advisoryMotion.binding && advisoryMotion.status === 'APPROVED', 'At 100%
 assert(fixture.ownedStreamingPlatform.leadership.delegation.minimumCapacityHeadroomPercent >= 30, 'An approved motion should change the canonical mandate.');
 
 const cashBeforeInvestment = fixture.ownedStreamingPlatform.treasuryCash;
-const ungatedAttempt = acceptStreamingCelebrityInvestment(createFixture(), 'investor-sofia-laurent');
+const ungatedAttempt = acceptStreamingCelebrityInvestment(createFixture(), 'investor-sofia-laurent', { founding: true });
 assert(!ungatedAttempt.changed && ungatedAttempt.reason === 'CFO_REQUIRED', 'Outside equity must remain blocked until an active CFO signs off.');
-const investment = acceptStreamingCelebrityInvestment(fixture, 'investor-sofia-laurent');
+const investment = acceptStreamingCelebrityInvestment(fixture, 'investor-sofia-laurent', { founding: true });
 assert(investment.changed, 'Celebrity investment should be a playable voluntary equity decision.');
 fixture = investment.player;
 assert(fixture.ownedStreamingPlatform.treasuryCash === cashBeforeInvestment + 240_000_000, 'Accepted capital should enter company treasury.');
@@ -187,13 +187,13 @@ assert(fixture.ownedStreamingPlatform.founderOwnershipPercent === 86, 'Accepted 
 assert(fixture.ownedStreamingPlatform.finance.equityHolders.some(holder => holder.holderName === 'Sofia Laurent'), 'Outside ownership should enter the equity register.');
 assert(fixture.ownedStreamingPlatform.governance.directors.some(item => item.seatType === 'INVESTOR_NOMINEE'), 'A negotiated board seat should create a real investor nominee.');
 assert(fixture.ownedStreamingPlatform.cinematicQueue.filter(item => item.type === 'CELEBRITY_INVESTOR_REVEAL').length === 1, 'Accepted celebrity capital should queue one major reveal.');
-assert(!acceptStreamingCelebrityInvestment(fixture, 'investor-sofia-laurent').changed, 'The same equity offer must never issue twice.');
+assert(!acceptStreamingCelebrityInvestment(fixture, 'investor-sofia-laurent', { founding: true }).changed, 'The same equity offer must never issue twice.');
 suite = getStreamingLeadershipSuite(fixture);
 assert(suite.boardBinding && suite.outsideOwnershipPercent === 14, 'Voluntary dilution should be the only point where board governance becomes binding.');
 
 let vetoFixture = createFixture();
 vetoFixture = promoteStreamingInternalExecutive(vetoFixture, 'internal-cfo').player;
-vetoFixture = acceptStreamingCelebrityInvestment(vetoFixture, 'investor-sofia-laurent').player;
+vetoFixture = acceptStreamingCelebrityInvestment(vetoFixture, 'investor-sofia-laurent', { founding: true }).player;
 const bindingVote = callStreamingBoardVote(vetoFixture, 'TRUST_CHARTER');
 assert(bindingVote.changed, 'A diluted company should be able to call a binding board vote.');
 vetoFixture = bindingVote.player;
@@ -211,27 +211,17 @@ controlFixture = {
         founderOwnershipPercent: 55,
     },
 };
-const controlFloor = acceptStreamingCelebrityInvestment(controlFixture, 'investor-aarav-kapoor');
+const controlFloor = acceptStreamingCelebrityInvestment(controlFixture, 'investor-aarav-kapoor', { founding: true });
 assert(!controlFloor.changed && controlFloor.reason === 'CONTROL_LIMIT', 'Investor rounds must not silently push founder control below 51%.');
 
-const component = readFileSync(resolve(process.cwd(), 'components/StreamingLeadershipSuite.tsx'), 'utf8');
-const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-leadership-suite.css'), 'utf8');
+/* #166 (plan §21.17): the Leadership Suite's screens became the Boardroom's TEAM (hiring, training, letting go,
+   the in-tray, succession); its services above are unchanged. The screen is covered by audit:boardroom-team-ui. */
+const team = readFileSync(resolve(process.cwd(), 'components/streaming-transplant/BoardroomTeam.tsx'), 'utf8');
 const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const weekly = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
-assert(component.includes('Organization') && component.includes('Delegation') && component.includes('Investor Salon'), 'The Leadership Suite should expose all Phase 19 rooms.');
-assert(component.includes('Internal promotions') && component.includes('External market'), 'Talent should visibly support both promotion and outside hiring.');
-assert(component.includes('Open Studio Finance') && component.includes('CFO sign-off'), 'Leadership should prepare equity governance and hand the actual term sheet to Finance.');
-assert(component.includes('Voluntary dilution activated genuine governance'), 'The UI should explain when veto power begins.');
-assert(styles.includes('@media (max-width: 520px)') && styles.includes('prefers-reduced-motion'), 'Leadership UI should include explicit mobile and reduced-motion treatment.');
-/* Reached from the BOARDROOM division's LEADERSHIP chip and the Boardroom's
-   hire action, which replaced the retired Company Office. */
-assert(
-    hq.includes('showLeadershipSuite')
-    && hq.includes("chip === 'LEADERSHIP'")
-    && hq.includes('onHire={() => setShowLeadershipSuite(true)}'),
-    'The Leadership Suite must be reachable from the Boardroom division and its hire action.',
-);
+assert(team.includes('const Dossier') && team.includes('const Hire') && team.includes('const Tray') && team.includes('const Succession'), 'TEAM should hold the dossier, hiring, the in-tray and succession.');
+assert(hq.includes("chip === 'TEAM' || chip === 'LEADERSHIP'") && hq.includes("openBoardroom('TABLE')"), 'The LEADERSHIP and TEAM chips open the Boardroom on TEAM.');
+assert(!hq.includes('<StreamingLeadershipSuite'), 'The old Leadership Suite is no longer mounted.');
 assert(weekly.includes('completeDueStreamingExecutiveDevelopment') && weekly.includes('governanceCost'), 'The canonical weekly loop should complete development and reconcile governance costs.');
-assert(!component.includes('IPO') && !component.includes('Acquire rival'), 'Phase 19 must not leak future IPO or M&A phases.');
 
 console.log('✓ Streaming Executives, Promotions and Governance Phase 19 audit passed');

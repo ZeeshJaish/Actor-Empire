@@ -80,7 +80,6 @@ export const resolveCanonicalOwnedStreamingReach = (
     const baselineCapacity = platform.capacity.baselineConcurrentStreams;
     const delivery = platform.technologyLevels.DELIVERY_CAPACITY;
     const reliability = platform.technologyLevels.RELIABILITY;
-    const contentOperations = platform.technologyLevels.CONTENT_OPERATIONS;
     const productExperience = platform.technologyLevels.PRODUCT_EXPERIENCE;
 
     let level: StreamingReachLevel = 0;
@@ -88,7 +87,6 @@ export const resolveCanonicalOwnedStreamingReach = (
         baselineCapacity >= 5_000_000
         && delivery >= 35
         && reliability >= 30
-        && contentOperations >= 20
         && productExperience >= 20
     ) {
         level = 4;
@@ -130,7 +128,6 @@ export const resolveCanonicalOwnedStreamingReach = (
         if (baselineCapacity < 5_000_000) limitingFactors.push('Raise baseline concurrent-stream capacity to 5,000,000.');
         if (delivery < 35) limitingFactors.push('Advance delivery capacity technology to 35.');
         if (reliability < 30) limitingFactors.push('Advance reliability technology to 30.');
-        if (contentOperations < 20) limitingFactors.push('Build multi-region content operations to 20.');
         if (productExperience < 20) limitingFactors.push('Build the global product experience to 20.');
     }
 
@@ -151,7 +148,6 @@ export const resolveCanonicalOwnedStreamingReach = (
                 `${baselineCapacity.toLocaleString()} baseline concurrent streams`,
                 `Delivery technology ${delivery}`,
                 `Reliability technology ${reliability}`,
-                `Content operations ${contentOperations}`,
                 `Product experience ${productExperience}`,
             ]
             : [],

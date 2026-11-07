@@ -340,18 +340,25 @@ export const forecastStreamingLaunchMarketing = (
     };
 };
 
+/* #158: the most weeks a launch campaign runs before opening (the schedule's own limit) */
+export const LAUNCH_CAMPAIGN_MAX_WEEKS = 15;
+
+/** What the plan spends each week up to opening. #158: `openingNight`, the big moments' money (one night each), is paid
+    on the last week; the rest by the timeline. */
 export const getStreamingLaunchMarketingWeeklySchedule = (
     budgetCeiling: number,
     timeline: StreamingLaunchMarketingTimeline,
     buildWeeks: number,
+    openingNight = 0,
 ): number[] => {
-    const weeks = Math.max(1, Math.min(15, Math.round(buildWeeks) || 1));
+    const weeks = Math.max(1, Math.min(LAUNCH_CAMPAIGN_MAX_WEEKS, Math.round(buildWeeks) || 1));
+    const night = Math.min(safeMoney(budgetCeiling), safeMoney(openingNight));
     const weights = Array.from({ length: weeks }, (_, index) => {
         const progress = weeks === 1 ? 1 : index / (weeks - 1);
         if (timeline === 'FRONT_LOADED') return 1.8 - progress * 1.2;
         if (timeline === 'LAST_WEEK_PUSH') return .45 + progress * 1.55;
         return 1;
     });
-    const allocated = allocateIntegerMoney(budgetCeiling, weights.map((weight, index) => ({ id: String(index).padStart(2, '0'), weight })));
-    return weights.map((_, index) => allocated.get(String(index).padStart(2, '0')) || 0);
+    const allocated = allocateIntegerMoney(safeMoney(budgetCeiling) - night, weights.map((weight, index) => ({ id: String(index).padStart(2, '0'), weight })));
+    return weights.map((_, index) => (allocated.get(String(index).padStart(2, '0')) || 0) + (index === weeks - 1 ? night : 0));
 };

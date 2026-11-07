@@ -25,6 +25,8 @@ import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
 import { createStreamingCatalogueReadContext, createStreamingTitleRouteReadBatch, getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from '../streamingContentAvailability';
 import { getEligibleOwnedStreamingTitles } from '../streamingCatalog';
 import { streamingTitleQuality, streamingTitleWeeksAvailable } from './worldStreamingContentValue';
+import { resolveStreamingStoreEditions } from '../streamingStoreEditions';
+import { resolveStreamingTechTree, streamingTechAdEffects } from '../streamingTechTreeCatalogue';
 
 export interface WorldStreamingLaunchPricingForecast {
     reachableHouseholds: number;
@@ -132,6 +134,9 @@ const buildWorldStreamingLaunchPricing = (
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const pricing = normalizeStreamingPricingConfiguration(proposedPricing);
+    // Rent or buy's quality and editions (#47), as the weekly settlement reads them
+    const storeEditions = resolveStreamingStoreEditions(pricing, resolveStreamingTechTree(platform));
+    const playerAdTech = streamingTechAdEffects(resolveStreamingTechTree(platform));
     const passPrices = projectStreamingCommercialOffers(pricing).adFreePasses;
     const storeEligibility = projectStreamingCommercialOffers(pricing).storeOffer?.eligibility;
     const requestedCountryIds = [...new Set(proposedCountryIds.map(id => String(id || '').trim().toUpperCase()).filter(Boolean))].sort();
@@ -291,7 +296,8 @@ const buildWorldStreamingLaunchPricing = (
         const reservedStoreHomes = new Map<string,number>();
         const estimateStoreBuyers = (kind: 'RENTAL' | 'PURCHASE'): number => {
             if (!pricing.streams.includes('rentals')) return 0;
-            const price = kind === 'RENTAL' ? pricing.rentals.rent : pricing.rentals.buy;
+            const price = kind === 'RENTAL' ? storeEditions.hdRent : storeEditions.hdBuy;
+            const paid = kind === 'RENTAL' ? storeEditions.rentPrice : storeEditions.buyPrice;
             const titles = programEntries.filter(entry=>readTitleRoute(entry.projectId,countryId,{kind}).allowed);
             if(!titles.length) return 0;
             const quality=titles.reduce((sum,title)=>sum+streamingTitleQuality(previewPlayer,title.projectId,context),0)/titles.length;
@@ -307,7 +313,7 @@ const buildWorldStreamingLaunchPricing = (
             const pool=sources.reduce((sum,source)=>sum+source.households,0);
             const eligibleByTitle=titles.map(title=>sources.filter(source=>canBuyTitle(source,title.projectId)));
             const pools=eligibleByTitle.map(rows=>rows.reduce((sum,source)=>sum+source.households,0));
-            const wanted=calculateStreamingStoreConversion({buyerPool:pool,price,kind,quality,weeksAvailable});
+            const wanted=Math.round(calculateStreamingStoreConversion({buyerPool:pool,price,kind,quality,weeksAvailable})*storeEditions.qualityFactor);
             const byTitle=allocateStreamingStoreUnits(wanted,titles.map((title,index)=>
                 pools[index]*Math.max(1,streamingTitleQuality(previewPlayer,title.projectId,context))));
             return titles.reduce((sum,title,index)=>{
@@ -319,7 +325,7 @@ const buildWorldStreamingLaunchPricing = (
                 const counts=allocateStreamingStoreUnits(Math.min(byTitle[index],remaining),
                     eligibleByTitle[index].map(source=>source.households));
                 const settled=eligibleByTitle[index].reduce((total,source,i)=>total+spendStreamingCommerceSource(
-                    source,Math.min(counts[i],source.households),price),0);
+                    source,Math.min(counts[i],source.households),paid),0);
                 reservedStoreHomes.set(title.projectId,(reservedStoreHomes.get(title.projectId) || 0)+settled);
                 return sum+settled;
             },0);
@@ -346,9 +352,15 @@ const buildWorldStreamingLaunchPricing = (
                         minutesPerHour: candidate.commercialConfiguration.ads.minutesPerHour,
                         audienceQualityIndex: candidate.isPlayer
                             ? Math.max(0, Math.min(100, platform.technologyLevels.ADVERTISING_COMMERCE || 0))
-                            : Math.max(0, Math.min(100, candidate.reliabilityIndex * .55 + candidate.marketingIndex * .45)),
+                            : Math.max(0, Math.min(100, candidate.reliabilityIndex * .55 + candidate.marketingIndex * .45 + (candidate.adAudienceQualityBonus || 0))),
                         brandSafetyIndex: candidate.isPlayer
-                            ? platform.competitiveWorld.globalPrestige : candidate.reputationIndex }];
+                            ? platform.competitiveWorld.globalPrestige : candidate.reputationIndex,
+                        // the player's Ads tech (#61): more slots an hour, fewer viewers lost in long breaks
+                        ...(candidate.isPlayer && playerAdTech.slots !== 1 ? { slotFactor: playerAdTech.slots } : {}),
+                        ...(candidate.isPlayer && playerAdTech.breakSlope !== 1 ? { breakSlope: playerAdTech.breakSlope } : {}),
+                        // a rival's own ad tech (#69)
+                        ...(!candidate.isPlayer && candidate.adSlotFactor ? { slotFactor: candidate.adSlotFactor } : {}),
+                        ...(!candidate.isPlayer && candidate.adBreakSlope ? { breakSlope: candidate.adBreakSlope } : {}) }];
                 }),
             }).byPlatform.PLAYER || null : null;
         return {
@@ -366,8 +378,8 @@ const buildWorldStreamingLaunchPricing = (
             secondaryStoreOpportunities:storeSources.filter(source=>source.kind==='STORE').reduce((sum,source)=>sum+source.households,0)-storeHouseholds,
             estimatedWeeklyAdRevenueIfPlayable: adForecast?.revenue || 0,
             estimatedWeeklyPassRevenueIfPlayable: passes.oneHourRevenue + passes.dayRevenue,
-            estimatedWeeklyRentalRevenueIfPlayable: Math.round(rentalBuyers * pricing.rentals.rent),
-            estimatedWeeklyPurchaseRevenueIfPlayable: Math.round(purchaseBuyers * pricing.rentals.buy),
+            estimatedWeeklyRentalRevenueIfPlayable: Math.round(rentalBuyers * storeEditions.rentPrice),
+            estimatedWeeklyPurchaseRevenueIfPlayable: Math.round(purchaseBuyers * storeEditions.buyPrice),
             estimatedWeeklyPassBuyersIfPlayable: passes.oneHourTransactions + passes.dayTransactions,
             estimatedWeeklyRentalBuyersIfPlayable: rentalBuyers,
             estimatedWeeklyPurchaseBuyersIfPlayable: purchaseBuyers,

@@ -291,13 +291,15 @@ const cssSource = readFileSync(resolve(process.cwd(), 'styles/streaming-incident
 assert(componentSource.includes("type IncidentTab = 'COMMAND' | 'OPERATIONS' | 'DEFENCE' | 'SHADOW' | 'EVIDENCE' | 'OVERSIGHT'"), 'The UI should preserve all five crisis rooms and add connected Live Operations.');
 assert(componentSource.includes('ABSTRACT STRATEGY ONLY') && componentSource.includes('Clean play can win every objective'), 'The shadow experience should be explicitly abstract and clean play should remain equally competitive.');
 assert(!/\b(?:nmap|metasploit|sql injection|reverse shell|credential stuffing)\b/i.test(componentSource), 'The shadow UI must not contain operational attack instructions.');
-/* The launcher class belonged to the retired Tech room. Incident Command is
-   now reached from the NETWORK division's INCIDENTS chip and from the live
-   INCIDENT event on the Command Deck — both gated on an actual crisis. */
+/* The launcher class belonged to the retired Tech room. Since #49 the Platform
+   card's INCIDENTS chip (labelled STATUS) and the live INCIDENT event open the
+   Platform room's STATUS, where both incident lists meet; an open incident's
+   Respond opens Incident Command, gated on a live service. */
 assert(
     hqSource.includes('showIncidentCommand')
-    && hqSource.includes("chip === 'INCIDENTS' && incidentCommand.available")
-    && hqSource.includes("event.id === 'INCIDENT' && incidentCommand.available"),
+    && hqSource.includes("chip === 'INCIDENTS') return openPlatformTab('STATUS')")
+    && hqSource.includes("event.id === 'INCIDENT') return openPlatformTab('STATUS')")
+    && hqSource.includes('onRespondToIncident={incidentCommand().available ? () => setShowIncidentCommand(true) : undefined}'),
     'Incident Command must be reachable from the Network division and the live incident event.',
 );
 assert(cssSource.includes('@media (max-width: 640px)') && cssSource.includes('@media (prefers-reduced-motion: reduce)'), 'The war room should ship mobile and reduced-motion layouts.');

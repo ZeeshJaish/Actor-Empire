@@ -1,23 +1,38 @@
-import type { Player } from '../../types';
+import type { StreamingIdentPreviewId } from '../../services/streamingIdentAudio';
+import type { CustomPoster, Player } from '../../types';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
 import { getStreamingPlayableCatalogProjectIds, getStreamingContentAvailability, CONTENT_AVAILABILITY_LABELS,
   getStreamingCatalogueReadContext, resolveStreamingCatalogueReadTitle, type StreamingCatalogueReadContext } from '../../services/streamingContentAvailability';
 import { getOwnedPlatformPackageCountryIds } from '../../services/streamingContentAvailability';
 import { getStreamingPublicMarkets } from '../../services/streamingPublicMarkets';
+import { STREAMING_EXECUTIVE_ROLE_LABELS } from '../../services/streamingLeadershipGovernance';
 import { getStreamingAudienceMarket } from '../../services/streamingAudienceMarket';
+import { buildAudienceRoomModel } from './audienceRoomModel';
+import { getStreamingWeeklyChartView } from '../../services/streamingWeeklyChart';
 import { getProductionLocation } from '../../services/productionLocations';
 import type { ContentDeskState } from './StreamingContentExperience';
 import type { NetworkState } from './StreamingNetworkExperience';
-import type { AudienceState, RecObjective } from './StreamingAudienceExperience';
+import type { AudienceState } from './StreamingAudienceExperience';
 import type { BoardroomState } from './StreamingBoardroomExperience';
 import type { AppState } from './StreamingViewerExperience';
 import { readNetworkSignals } from '../../services/streamingNetworkSignals';
 import { normalizeStreamingRightsCalendarState } from '../../services/streamingRightsCalendar';
+import { getOwnedStreamingProgramEntries } from '../../services/streamingOriginals';
+import { planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
+import { getStreamingViewerPersonal, getStreamingViewerPlans, getStreamingViewerQuality, streamingNetworkPictureTier } from '../../services/streamingViewerQuality';
+import { getStreamingViewerOutage } from '../../services/streamingViewerOutage';
+import {
+  getStreamingOpenIncidents, getStreamingServiceStatus, STREAMING_STATUS_LINE_WEEKS, streamingStatusLineWeeks, type StreamingStatusLevel,
+} from '../../services/streamingStatusBoard';
+import { getStreamingInfrastructureOperationsEffects } from '../../services/streamingInfrastructureOperations';
+import { resolveStreamingPlatformTechDebt } from '../../services/streamingTechTreeCatalogue';
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const hueOf = (key: string) => [...key].reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) % 360, 53);
-const movement = (current: number, previous: number) => previous === 0 ? 0 : ((current - previous) / Math.abs(previous)) * 100;
+/* The Content Market's hue for the same id (content-market-exact adapter `hueFor`), so a
+   title wears one colour in every room. Taking the remainder only at the end spreads ids
+   that differ in one character; the old per-step `% 360` gave them neighbouring hues. */
+const hueOf = (key: string) => [...key].reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) >>> 0, 2166136261) % 360;
 
 export const createCanonicalContentDeskState = (player: Player, preparedContext?: StreamingCatalogueReadContext): ContentDeskState => {
   const context = getStreamingCatalogueReadContext(player, preparedContext);
@@ -27,12 +42,22 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
   const performanceByProject = new Map(latestPerformance.map(item => [item.projectId, item]));
   const projectIds = [...new Set([...platform.catalogProjectIds, ...platform.originalCommissions.flatMap(c => c.canonicalProjectId ? [c.canonicalProjectId] : [])])];
   const countries = getOwnedPlatformPackageCountryIds(platform);
-  /* the player's own production art, keyed by project, as the opening
-     catalogue desk reads it; everything else draws its generated one-sheet */
-  const posterById = new Map(
-    [...(player.pastProjects || []), ...player.businesses.flatMap(business => business.studioState?.scripts || [])]
-      .flatMap(source => source.customPoster ? [[String(source.id), source.customPoster] as const] : []),
-  );
+  /* The player's own art wins wherever they set it, read the way Viewer Mode
+     reads it: released and active films, productions still in the works, the
+     legacy studio list, and an Original's own script. Everything else draws
+     its generated one-sheet. */
+  const posterById = new Map<string, CustomPoster>();
+  const addPoster = (id: unknown, poster: CustomPoster | null | undefined) => {
+    if (poster && id !== undefined && id !== null && !posterById.has(String(id))) posterById.set(String(id), poster);
+  };
+  (player.pastProjects || []).forEach(project => addPoster(project.id, project.customPoster));
+  (player.activeReleases || []).forEach(release => addPoster(release.id, release.projectDetails?.customPoster));
+  (player.commitments || []).forEach(commitment => addPoster(commitment.id, commitment.projectDetails?.customPoster));
+  (Array.isArray(player.flags?.legacyStudioProjects) ? player.flags.legacyStudioProjects as Array<Record<string, any>> : [])
+    .forEach(project => addPoster(project.id, project.customPoster || project.projectDetails?.customPoster));
+  const scripts = new Map(player.businesses.flatMap(business => (business.studioState?.scripts || []).map(script => [String(script.id), script] as const)));
+  scripts.forEach((script, id) => addPoster(id, script.customPoster));
+  platform.originalCommissions.forEach(commission => addPoster(commission.canonicalProjectId, scripts.get(String(commission.scriptId))?.customPoster));
   /* renewal talks the rights calendar has open for this platform's licences */
   const renewalByProject = new Map(Object.values(normalizeStreamingRightsCalendarState(player.world.streamingRightsCalendar).renewalCases)
     .filter(item => item.incumbentBuyer.type === 'PLAYER_PLATFORM' && item.sourceExpiresAtAbsoluteWeek >= absoluteWeek)
@@ -42,13 +67,26 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
     WATCHING: 'TALKS', OFFER_AVAILABLE: 'OFFER', ACTION_REQUIRED: 'DECIDE', RENEWAL_SECURED: 'RENEWED',
     RETURNING_TO_MARKET: 'RETURNING', LETTING_EXPIRE: 'LETTING_GO', NO_OFFER: 'CLOSED', EXPIRED: 'CLOSED',
   } as const;
+  /* What the service streams: the programme (the slate, cleared Originals, and
+     licences bought after setup from their first rights week). */
+  const launchedAt = platform.launchCommit?.committedAtAbsoluteWeek ?? null;
+  const live = platform.lifecycle === 'ACTIVE';
+  const programme = new Map(launchedAt === null ? [] : getOwnedStreamingProgramEntries(player, context).map(entry => [entry.projectId, entry] as const));
   const titles = projectIds.flatMap(projectId => {
     const title = resolveStreamingCatalogueReadTitle(context, projectId);
     if (!title) return [];
     const license = platform.catalogLicenses.find(item => item.sourceProjectId === projectId && item.status === 'ACTIVE' && item.startsAtAbsoluteWeek <= absoluteWeek && item.expiresAtAbsoluteWeek > absoluteWeek);
     const performance = performanceByProject.get(projectId);
     const availability = getStreamingContentAvailability(player, projectId, countries, false, context);
-    const status = CONTENT_AVAILABILITY_LABELS[availability.status].toUpperCase() as ContentDeskState['titles'][number]['status'];
+    /* The availability label reads only the opening slate, so a licence bought
+       after setup, which the programme streams from its first rights week, read
+       "Ready to schedule" while it was being watched. The programme decides. */
+    const programmed = programme.get(projectId);
+    const premiered = Boolean(programmed && launchedAt !== null && launchedAt + programmed.launchWeek - 1 <= absoluteWeek);
+    const status = (availability.status === 'READY' && programmed ? (premiered ? 'LIVE' : 'SCHEDULED')
+      : CONTENT_AVAILABILITY_LABELS[availability.status].toUpperCase()) as ContentDeskState['titles'][number]['status'];
+    /* on the shelves, not on the service: the slate can give it a premiere week */
+    const schedulable = live && launchedAt !== null && availability.source !== 'ORIGINAL' && availability.status === 'READY' && !programmed;
     /* A permanent window or purchase is stored with an expiry of about 9e15
        weeks; it is a licence kept for good, not one ending in 9e15 weeks. */
     const perpetual = Boolean(license && (license.windowType === 'PERMANENT' || license.expiresAtAbsoluteWeek - absoluteWeek > 100_000));
@@ -69,6 +107,7 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       hue: hueOf(projectId),
       year: title.releaseYear,
       poster: posterById.get(projectId),
+      schedulable,
       /* Window: any title on a licence that runs out (an Original's own
          window included — it leaves when it ends). Kept: no licence end at
          all. Lapsed: a licensed title with no active licence — it was listed
@@ -93,6 +132,7 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
           expiresInWeeks: Math.max(0, renewal.proposedEconomics.offerExpiresAtAbsoluteWeek - absoluteWeek),
         } : undefined,
         deadlineInWeeks: Math.max(0, renewal.decisionDeadlineAbsoluteWeek - absoluteWeek),
+        ...(renewal.decidedBy ? { by: renewal.decidedBy.name, byWeeksAgo: Math.max(0, absoluteWeek - renewal.decidedBy.absoluteWeek) } : {}),
       } : undefined,
     }];
   });
@@ -102,7 +142,6 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
      at launch week + n − 1, and every Original with a premiere date, from
      this week on — the old view kept counting programme weeks from "now" and
      so placed every release, and its rights check, in the wrong week. */
-  const launchedAt = platform.launchCommit?.committedAtAbsoluteWeek ?? null;
   const slateEntries = platform.launchSlate?.entries ?? [];
   type SlateItem = ContentDeskState['slate'][number]['releases'][number] & { at: number };
   const kindOf = (source: string): 'ORIGINAL' | 'LICENSED' | 'OWNED' => (source === 'ORIGINAL' ? 'ORIGINAL' : source === 'OWNED_LIBRARY' ? 'OWNED' : 'LICENSED');
@@ -111,6 +150,15 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
     const licence = platform.catalogLicenses.find(item => item.sourceProjectId === projectId && item.status === 'ACTIVE');
     return Boolean(licence && licence.windowType !== 'PERMANENT' && licence.expiresAtAbsoluteWeek <= releaseWeek);
   };
+  const formatOf = (projectId: string, projectType?: string): 'Film' | 'Series' => ((projectType ?? resolveStreamingCatalogueReadTitle(context, projectId)?.projectType) === 'SERIES' ? 'Series' : 'Film');
+  /* a licensed title's window, so a premiere is only offered weeks its rights cover */
+  const windowOf = (projectId: string) => {
+    const licence = platform.catalogLicenses.filter(item => item.sourceProjectId === projectId && item.status === 'ACTIVE')
+      .sort((left, right) => right.startsAtAbsoluteWeek - left.startsAtAbsoluteWeek)[0];
+    if (!licence) return {};
+    const kept = licence.windowType === 'PERMANENT' || licence.permanentPurchase || licence.expiresAtAbsoluteWeek - absoluteWeek > 100_000;
+    return { rightsFrom: licence.startsAtAbsoluteWeek, ...(kept ? {} : { rightsUntil: licence.expiresAtAbsoluteWeek }) };
+  };
   const items: SlateItem[] = slateEntries.map(entry => {
     const at = launchedAt === null ? entry.launchWeek : launchedAt + entry.launchWeek - 1;
     return {
@@ -118,6 +166,10 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       marketing: entry.marketingPlan, hue: hueOf(entry.projectId), poster: posterById.get(entry.projectId),
       genre: resolveStreamingCatalogueReadTitle(context, entry.projectId)?.genre,
       rightsRisk: riskOf(entry.projectId, launchedAt === null ? null : at), at,
+      format: formatOf(entry.projectId, entry.projectType),
+      /* a premiere still ahead that the slate set can be moved or taken off (Originals premiere through their release) */
+      editable: launchedAt !== null && live && entry.source !== 'ORIGINAL' && at > absoluteWeek,
+      ...(entry.source === 'LICENSED_WINDOW' ? windowOf(entry.projectId) : {}),
     };
   });
   if (launchedAt !== null) {
@@ -129,22 +181,50 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       items.push({
         id: `original-${commission.id}`, projectId, title: commission.title, kind: 'ORIGINAL',
         marketing: commission.releasePlan!.marketingPlan, hue: hueOf(projectId), poster: posterById.get(projectId),
-        genre: commission.genre, rightsRisk: false, at: premiere,
+        genre: commission.genre, rightsRisk: false, at: premiere, format: formatOf(projectId, commission.projectType),
       });
+      scheduled.add(projectId);
+    });
+    /* a licence bought after setup goes on the service by itself when its rights
+       start (a renewal of a title already on the service is not a premiere) */
+    platform.catalogLicenses.forEach(licence => {
+      if (licence.status !== 'ACTIVE' || licence.origin === 'STARTER' || licence.startsAtAbsoluteWeek <= absoluteWeek
+        || scheduled.has(licence.sourceProjectId) || programme.has(licence.sourceProjectId)) return;
+      items.push({
+        id: `licence-${licence.id}`, projectId: licence.sourceProjectId, title: licence.titleAtSigning, kind: 'LICENSED',
+        marketing: 'LEAN', hue: hueOf(licence.sourceProjectId), poster: posterById.get(licence.sourceProjectId),
+        genre: licence.genre, rightsRisk: false, at: licence.startsAtAbsoluteWeek, format: formatOf(licence.sourceProjectId, licence.projectType), auto: true,
+        ...windowOf(licence.sourceProjectId),
+      });
+      scheduled.add(licence.sourceProjectId);
     });
   }
+  /* Before launch: the opening programme weeks. Once live: a year of the
+     calendar from this week, each week named the way the game names it. */
   const firstWeek = launchedAt === null ? 1 : absoluteWeek;
-  const lastWeek = Math.max(firstWeek + 11, ...items.map(item => item.at));
+  const lastWeek = launchedAt === null ? Math.max(firstWeek + 11, ...items.map(item => item.at)) : absoluteWeek + 51;
   const slate = Array.from({ length: Math.min(52, lastWeek - firstWeek + 1) }, (_, index) => {
     const week = firstWeek + index;
+    const year = Math.floor(week / 52) + 1;
+    const weekOfYear = (week % 52) + 1;
     return {
       week,
-      label: launchedAt === null ? (week === 1 ? 'Opening night' : `Week ${week}`) : index === 0 ? 'This week' : index === 1 ? 'Next week' : `Week ${week}`,
+      ...(launchedAt === null ? {} : { year, weekOfYear }),
+      label: launchedAt === null ? (week === 1 ? 'Opening night' : `Week ${week}`) : index === 0 ? 'This week' : index === 1 ? 'Next week' : `Week ${weekOfYear}`,
       now: launchedAt !== null && index === 0,
       releases: items.filter(item => item.at === week).map(({ at: _at, ...release }) => release),
     };
   });
-  return { live: platform.lifecycle === 'ACTIVE', titles, slate, calendar: launchedAt === null ? 'PROGRAMME' : 'WEEKS' };
+  return {
+    live, titles, slate, calendar: launchedAt === null ? 'PROGRAMME' : 'WEEKS',
+    /* the auto-fill plans: around the premieres already planned (only when the shelves
+       hold something), and fresh (only when something is planned to replace) */
+    ...(launchedAt !== null && live ? {
+      scheduleFrom: absoluteWeek + 1,
+      autoFill: titles.some(title => title.schedulable) ? planStreamingSlateAutoFill(player) : [],
+      autoFillFresh: items.some(item => item.editable) ? planStreamingSlateAutoFill(player, { fresh: true }) : [],
+    } : {}),
+  };
 };
 
 export const createCanonicalNetworkState = (player: Player): NetworkState => {
@@ -152,20 +232,25 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const latest = platform.weeklyHistory.at(-1);
   const peakLoad = clamp(Math.round(latest?.operations?.capacityUtilizationPercent ?? 0), 0, 140);
-  const activeCrisis = [...platform.crisisSecurity.crises].reverse().find(crisis => crisis.stage !== 'RESOLVED');
-  const history = platform.weeklyHistory.slice(-30).map(snapshot => {
-    const load = snapshot.operations?.capacityUtilizationPercent ?? 0;
-    const playback = snapshot.operations?.playbackSuccessRate ?? 100;
+  /* #102 (Zeesh: "service bhi launch se shuru karo"): a bar a week, from the launch while the service is younger than
+     the strip (the weeks before it were filled with green), each its own week's close; a week without one (the launch's
+     own) is green */
+  const weeks = streamingStatusLineWeeks(absoluteWeek, platform.launchCommit?.committedAtAbsoluteWeek ?? null);
+  const closes = new Map(platform.weeklyHistory.map(snapshot => [snapshot.absoluteWeek, snapshot]));
+  const history = weeks.map(week => {
+    const snapshot = closes.get(week);
+    const load = snapshot?.operations?.capacityUtilizationPercent ?? 0;
+    const playback = snapshot?.operations?.playbackSuccessRate ?? 100;
     return load >= 100 || playback < 92 ? 2 : load >= 82 || playback < 97 ? 1 : 0;
   });
-  while (history.length < 30) history.unshift(0);
-  const status = activeCrisis?.type === 'PLATFORM_OUTAGE'
-    ? 'outage' as const
-    : peakLoad >= 90
-      ? 'degraded' as const
-      : platform.infrastructureSetup
-        ? 'operational' as const
-        : 'maintenance' as const;
+  /* both incident systems (#49): a crisis and a server incident colour the strips alike */
+  const service = getStreamingServiceStatus(
+    getStreamingOpenIncidents(platform, absoluteWeek),
+    peakLoad,
+    Math.round((1 - getStreamingInfrastructureOperationsEffects(platform).capacityMultiplier) * 100),
+  );
+  const levelStatus = (level: StreamingStatusLevel) => (level === 'DOWN' ? 'outage' as const : level === 'SLOW' ? 'degraded' as const : 'operational' as const);
+  const status = platform.infrastructureSetup ? levelStatus(service.DELIVERY) : 'maintenance' as const;
   /* --- where the rooms you built actually reach ---------------------------
 
      This listed six services, one per rack duty, and went red for the duty
@@ -206,7 +291,7 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
     : signals.dark.length > 0 ? 'outage'
       : signals.thin.length > 0 ? 'degraded'
         : 'operational';
-  const crisisStatus = (crisis: boolean): CompStatus => (!hasNetwork ? 'maintenance' : crisis ? 'degraded' : status);
+  const serviceStatus = (id: 'ACCOUNTS' | 'RECOMMENDATIONS' | 'RIGHTS'): CompStatus => (!hasNetwork ? 'maintenance' : levelStatus(service[id]));
   const playback = latest?.operations?.playbackSuccessRate
     ?? platform.infrastructureSetup?.reliabilityTarget
     ?? 99.9;
@@ -222,10 +307,10 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
       history: historyFor(regionsStatus),
     },
     { id: 'DELIVERY', name: 'Video delivery', status: hasNetwork ? status : 'maintenance' as const, uptime: hasNetwork ? playback : 0, history: hasNetwork ? history : unknownHistory },
-    { id: 'ACCOUNTS', name: 'Accounts and payments', status: crisisStatus(activeCrisis?.type === 'ACCOUNT_BREACH' || status === 'outage'), uptime: hasNetwork ? Math.max(0, playback - .08) : 0, history: historyFor(crisisStatus(activeCrisis?.type === 'ACCOUNT_BREACH')) },
-    { id: 'RECOMMENDATIONS', name: 'Recommendations', status: crisisStatus(activeCrisis?.type === 'RECOMMENDATION_BACKLASH'), uptime: hasNetwork ? 99.92 : 0, history: historyFor(crisisStatus(activeCrisis?.type === 'RECOMMENDATION_BACKLASH')) },
-    { id: 'RIGHTS', name: 'Rights and publishing', status: crisisStatus(activeCrisis?.type === 'RIGHTS_COMPLIANCE'), uptime: hasNetwork ? 99.96 : 0, history: historyFor(crisisStatus(activeCrisis?.type === 'RIGHTS_COMPLIANCE')) },
-  ];
+    { id: 'ACCOUNTS', name: 'Accounts and payments', status: serviceStatus('ACCOUNTS'), uptime: hasNetwork ? Math.max(0, playback - .08) : 0, history: historyFor(serviceStatus('ACCOUNTS')) },
+    { id: 'RECOMMENDATIONS', name: 'Recommendations', status: serviceStatus('RECOMMENDATIONS'), uptime: hasNetwork ? 99.92 : 0, history: historyFor(serviceStatus('RECOMMENDATIONS')) },
+    { id: 'RIGHTS', name: 'Rights and publishing', status: serviceStatus('RIGHTS'), uptime: hasNetwork ? 99.96 : 0, history: historyFor(serviceStatus('RIGHTS')) },
+  ].map(comp => ({ ...comp, fromLaunch: hasNetwork && weeks.length < STREAMING_STATUS_LINE_WEEKS }));
   const placements = platform.infrastructureSetup?.networkPlacements || [];
   const weightedRacks = placements.reduce((sum, placement) => (
     sum + placement.racks * (placement.role === 'CORE_ORIGIN' ? 1 : placement.role === 'REGIONAL_HUB' ? .95 : .82)
@@ -264,7 +349,7 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
     RELIABILITY: 'Steadier playback; unlocks two screens per account at 10 and four at 35.',
     DATA_RECOMMENDATIONS: 'Better picks for every viewer, so more of the catalogue gets watched.',
     SECURITY: 'Protects accounts and titles from breaches and piracy.',
-    CONTENT_OPERATIONS: 'Unlocks the Editorial Index storefront at 12 and Chapters at 18.',
+    CONTENT_OPERATIONS: 'No longer needed: nothing waits on it (#86).',
   };
   const tech = Object.entries(branchNames).map(([branch, name]) => {
     const project = [...platform.technologyProjects].reverse().find(item => item.branch === branch);
@@ -283,11 +368,16 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
       debt: Boolean(project && project.technicalDebtDelta > 0),
     };
   });
+  /* #126: the products this save launched in the old Product Lab, which run on above the PRODUCT tab's showcase; named
+     as the product, not "EMPIRE+ …", and one still being built says when it is ready (it used to read "Needs" and
+     nothing after it) */
   const products = platform.productLines.map(product => ({
     id: product.id,
-    name: product.title,
+    lineId: product.lineId,
+    name: product.title.replace(/^EMPIRE\+\s*/, ''),
     note: product.strategicConsequence,
-    state: product.status === 'UNDER_DEVELOPMENT' ? 'LOCKED' as const : product.status,
+    state: product.status === 'UNDER_DEVELOPMENT' ? 'BUILDING' as const : product.status,
+    readyIn: product.status === 'UNDER_DEVELOPMENT' ? Math.max(1, product.readyAtAbsoluteWeek - absoluteWeek) : undefined,
     weeklyCost: product.weeklyOperatingCost,
     load: product.peakLoadPercent,
   }));
@@ -299,117 +389,27 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
     resolvedIn: crisis.resolvedAtAbsoluteWeek ? `${Math.max(0, crisis.resolvedAtAbsoluteWeek - crisis.detectedAtAbsoluteWeek)}w` : 'Open',
     note: crisis.outcomeNote || crisis.detail,
   }));
-  const technicalDebt = clamp(Math.round((platform.infrastructureSetup?.technicalDebt ?? 0) + platform.technologyProjects.reduce((sum, item) => sum + item.technicalDebtDelta, 0)), 0, 100);
+  /* The infrastructure's debt (a finished campus project's debt is already in it, so projects are not
+     added again) plus the tech tree's own, from pushing quality fast; Stabilization pays both down. */
+  const technicalDebt = clamp(Math.round(resolveStreamingPlatformTechDebt(platform)), 0, 100);
   return {
     live: platform.lifecycle === 'ACTIVE', components, cities, tech, products, incidents, peakLoad,
-    headroom: `${Math.max(0, platform.capacity.burstConcurrentStreams - (latest?.operations?.peakConcurrentStreams ?? 0)).toLocaleString()} streams free`,
+    /* #92: the room's BUILDING for a live company: regions with a network order under way (campus builds stay on TECH) */
+    networkBuilding: (platform.networkOrders ?? []).filter(order => order.status === 'BUILDING').length,
+    /* #97: the room strip's PLAYBACK, this week's share of plays that start and hold */
+    playbackSuccess: latest?.operations ? Math.round(latest.operations.playbackSuccessRate * 10) / 10 : null,
+    // capacity is counted in load units (an HD stream is 1, a 4K one 2.4), so headroom is in HD streams
+    headroom: `${Math.max(0, platform.capacity.burstConcurrentStreams - (latest?.operations?.peakLoadUnits ?? latest?.operations?.peakConcurrentStreams ?? 0)).toLocaleString()} HD streams free`,
     technicalDebt,
   };
 };
 
+/** #136: the Audience room reads the market and the room model; the old made-up metrics, trend, Top 10 (hash arrows,
+    random services), attribution, campaign ranges and region rows are gone. */
 export const createCanonicalAudienceState = (player: Player): AudienceState => {
   const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
   const livingMarket = getStreamingAudienceMarket(player);
-  const history = platform.weeklyHistory.slice(-90);
-  const latest = history.at(-1);
-  const previous = history.at(-2);
-  const sparkOf = (pick: (snapshot: typeof history[number]) => number) => {
-    const values = history.slice(-12).map(pick);
-    return values.length > 1 ? values : [0, values[0] ?? 0];
-  };
-  const metrics = [
-    { id: 'SUBS', label: 'SUBSCRIBERS', value: new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(platform.metrics.subscribers), delta: movement(latest?.subscribers ?? 0, previous?.subscribers ?? 0), spark: sparkOf(item => item.subscribers) },
-    { id: 'CHURN', label: 'CHURN', value: `${(platform.metrics.churnRate * 100).toFixed(1)}%`, delta: movement(latest?.churnRate ?? 0, previous?.churnRate ?? 0), inverse: true, spark: sparkOf(item => item.churnRate) },
-    { id: 'ENGAGE', label: 'ENGAGEMENT', value: `${Math.round(platform.metrics.engagementRate * 100)}%`, delta: movement(latest?.engagementRate ?? 0, previous?.engagementRate ?? 0), spark: sparkOf(item => item.engagementRate) },
-    { id: 'ARPU', label: 'ARPU', value: `$${platform.metrics.averageRevenuePerUser.toFixed(2)}`, delta: movement(latest?.averageRevenuePerUser ?? 0, previous?.averageRevenuePerUser ?? 0), spark: sparkOf(item => item.averageRevenuePerUser) },
-  ];
-  const trend = history.length
-    ? history.map(item => ({ label: `WK ${item.absoluteWeek}`, value: item.subscribers }))
-    : [{ label: 'PRE-LAUNCH', value: 0 }];
-  const titlePerformance = latest?.operations?.titlePerformance ?? [];
-  const strongestPlayerAudience = Math.max(1, ...titlePerformance.map(item => item.viewingAccounts));
-  const rivalPlatforms = livingMarket.platforms.filter(item => item.id !== 'PLAYER' && item.id !== 'REGIONAL');
-  const playerChartCandidates = titlePerformance.map(item => ({
-    id: item.projectId,
-    title: item.title,
-    platform: platform.identity?.name || 'Your platform',
-    mine: true,
-    hue: hueOf(item.projectId),
-    score: item.viewingAccounts / strongestPlayerAudience,
-  }));
-  const rivalChartCandidates = [...player.world.projects]
-    .filter(project => !titlePerformance.some(item => item.projectId === project.id))
-    .sort((left, right) => (right.year - left.year) || (right.weekReleased - left.weekReleased) || (right.quality - left.quality))
-    .slice(0, 20)
-    .map(project => {
-      const platformIndex = hueOf(`${project.id}-platform`) % Math.max(1, rivalPlatforms.length);
-      const chartPlatform = rivalPlatforms[platformIndex];
-      return {
-        id: project.id,
-        title: project.title,
-        platform: chartPlatform?.name || 'Rival platform',
-        mine: false,
-        hue: hueOf(project.id),
-        score: clamp(project.quality / 100 * .68 + (project.rating ?? project.quality / 10) / 10 * .2 + Math.min(1, project.boxOffice / 500) * .12, 0, 1.2),
-      };
-    });
-  const chart = [...playerChartCandidates, ...rivalChartCandidates]
-    .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title))
-    .slice(0, 10)
-    .map((item, index) => ({
-      rank: index + 1,
-      prevRank: index === 0 ? 1 : clamp(index + (hueOf(`${item.id}-movement`) % 3), 1, 10),
-      title: item.title,
-      platform: item.platform,
-      mine: item.mine,
-      hue: item.hue,
-    }));
-  const mix = titlePerformance[0]?.discoveryMix;
-  const netAdds = Math.max(0, latest?.netSubscriberMovement ?? platform.metrics.netSubscriberMovement);
-  const attribution = [
-    { id: 'HOME', label: 'Homepage', value: Math.round(netAdds * (mix?.homepagePercent ?? 0) / 100), note: 'Hero and curated placement' },
-    { id: 'REC', label: 'Recommendations', value: Math.round(netAdds * (mix?.recommendationsPercent ?? 0) / 100), note: 'Personalized discovery' },
-    { id: 'SEARCH', label: 'Search', value: Math.round(netAdds * (mix?.searchPercent ?? 0) / 100), note: 'Viewer intent' },
-    { id: 'DIRECT', label: 'Direct', value: Math.round(netAdds * (mix?.directPercent ?? 0) / 100), note: 'Known-title demand' },
-  ];
-  const campaigns = platform.growthActions.slice(-8).reverse().map(action => ({
-    id: action.id,
-    name: action.title,
-    channel: action.channels.join(' · '),
-    spend: action.cashCost,
-    reachLow: action.outcome ? Math.round(action.outcome.attributedViewingAccounts * .85) : 0,
-    reachHigh: action.outcome ? Math.round(action.outcome.attributedViewingAccounts * 1.15) : 0,
-    weeksLeft: action.status === 'LOCKED' ? Math.max(0, action.targetAbsoluteWeek - getAbsoluteWeek(player.age, player.currentWeek)) : 0,
-    live: action.status === 'LOCKED',
-  }));
-  const latestObjective = platform.growthActions.at(-1)?.recommendationObjective;
-  const objective: RecObjective = latestObjective === 'CATALOG_DISCOVERY' ? 'DISCOVERY' : latestObjective ?? 'BALANCED';
-  const selectedCountries = livingMarket.countries.filter(country => country.selectedForLaunch);
-  const regionGroups = new Map<string, typeof selectedCountries>();
-  selectedCountries.forEach(country => {
-    const group = regionGroups.get(country.regionId) || [];
-    group.push(country);
-    regionGroups.set(country.regionId, group);
-  });
-  const regions = Array.from(regionGroups.entries()).map(([regionId, countries]) => {
-    const totalViewers = countries.reduce((sum, country) => sum + country.activeViewers, 0);
-    const weightedShare = countries.reduce((sum, country) => sum + country.playerSharePercent * country.activeViewers, 0) / Math.max(1, totalViewers);
-    const weightedGrowth = countries.reduce((sum, country) => sum + country.annualGrowthPercent * country.activeViewers, 0) / Math.max(1, totalViewers);
-    const topRivals = Array.from(new Set(countries.map(country => country.topPlatformName))).slice(0, 3);
-    const subscriberShare = selectedCountries.reduce((sum, country) => sum + country.activeViewers, 0) > 0
-      ? totalViewers / selectedCountries.reduce((sum, country) => sum + country.activeViewers, 0)
-      : 0;
-    return {
-      id: regionId,
-      label: countries[0]?.regionName || regionId,
-      subs: countries.reduce((sum, country) => sum + (country.playerPaidAccounts || 0), 0),
-      sharePct: weightedShare,
-      growthPct: weightedGrowth,
-      latencyMs: Math.round(countries.reduce((sum, country) => sum + (country.selectedForLaunch ? 54 : 118), 0) / Math.max(1, countries.length)),
-      rivals: topRivals,
-    };
-  }).sort((left, right) => right.subs - left.subs);
-  return { live: platform.lifecycle === 'ACTIVE', metrics, trend, trendLabel: 'SUBSCRIBERS', chart, attribution, campaigns, objective, regions, market: livingMarket };
+  return { live: platform.lifecycle === 'ACTIVE', market: livingMarket, room: buildAudienceRoomModel(player, livingMarket) };
 };
 
 export const createCanonicalBoardroomState = (player: Player): BoardroomState => {
@@ -440,19 +440,27 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
     { id: 'PASSES', label: 'Ad-free passes and other viewing', amount: viewingOther },
     { id: 'PRODUCTS', label: 'Products', amount: latest.productRevenue || 0 },
   ].filter((line, index) => index === 0 || line.amount > 0) : [];
+  /* the bandwidth bill (Phase 2): every viewing hour by its picture, after Optimisation */
+  const delivery = latest?.streamingDeliveryCost ?? 0;
+  const phaseIn = latest?.streamingDeliveryPhaseIn ?? 1;
   const weeklyCosts = latest ? [
     { id: 'RIGHTS', label: 'Rights and partner share', amount: latest.partnerRevenueShareCost },
     { id: 'NETWORK', label: 'Infrastructure', amount: latest.infrastructureCost },
+    // a save from before Phase 2 pays it in eighths over 8 weeks
+    ...(delivery > 0 ? [{ id: 'DELIVERY', label: phaseIn < 1 ? `Streaming delivery · ${Math.round(phaseIn * 8)}/8` : 'Streaming delivery', amount: delivery }] : []),
     { id: 'LEADERSHIP', label: 'Leadership', amount: latest.leadershipCost },
+    /* #163: directors' pay and the investors' weekly profit share were hidden inside operations */
+    ...((latest.governanceCost || 0) > 0 ? [{ id: 'GOVERNANCE', label: 'Board and investors', amount: latest.governanceCost || 0 }] : []),
     { id: 'FINANCING', label: 'Financing', amount: latest.financingCost },
-    { id: 'OPERATIONS', label: 'Content, growth and operations', amount: Math.max(0, latest.totalCashCost - latest.partnerRevenueShareCost - latest.infrastructureCost - latest.leadershipCost - latest.financingCost), note: latest.headline },
+    { id: 'OPERATIONS', label: 'Content, growth and operations', amount: Math.max(0, latest.totalCashCost - latest.partnerRevenueShareCost - latest.infrastructureCost - delivery - latest.leadershipCost - (latest.governanceCost || 0) - latest.financingCost), note: latest.headline },
   ] : [
     { id: 'LEADERSHIP', label: 'Leadership', amount: executiveCosts + boardCosts },
     { id: 'NETWORK', label: 'Infrastructure', amount: platform.infrastructureSetup?.weeklyOperatingCost ?? 0 },
   ];
   const execs = activeExecutives.map(item => ({
     id: item.id,
-    role: item.role.replaceAll('_', ' '),
+    /* #163: "Chief Financial Officer", not "cfo" */
+    role: STREAMING_EXECUTIVE_ROLE_LABELS[item.role] || item.role.replaceAll('_', ' '),
     name: item.nameAtAppointment,
     loyalty: item.loyalty,
     salary: item.weeklyCompensation,
@@ -468,9 +476,13 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
     ...platform.finance.equityHolders.map(holder => ({ id: holder.id, name: holder.holderName, pct: holder.ownershipPercent, since: `WK ${holder.issuedAtAbsoluteWeek}` })),
   ];
   if (listing) holders.push({ id: 'PUBLIC', name: 'Public float', pct: Math.max(0, 100 - holders.reduce((sum, holder) => sum + holder.pct, 0)), since: `WK ${listing.listedAtAbsoluteWeek}` });
+  /* #163: the cap table by size */
+  holders.sort((left, right) => right.pct - left.pct);
   return {
     live: platform.lifecycle === 'ACTIVE',
     absoluteWeek,
+    /* #163: the company's own week (31), not the career's (759) */
+    companyWeek: Math.max(1, absoluteWeek - foundedAt + 1),
     companyYear: Math.max(1, Math.floor(Math.max(0, absoluteWeek - foundedAt) / 52) + 1),
     treasury: platform.treasuryCash,
     treasuryDelta: latest?.netCashContribution,
@@ -496,6 +508,9 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
   };
 };
 
+/** "Leaving Soon" lists licences ending within this many weeks. */
+const STREAMING_VIEWER_LEAVING_WEEKS = 8;
+
 export const createCanonicalViewerState = (player: Player, preparedContext?: StreamingCatalogueReadContext): AppState => {
   const context = getStreamingCatalogueReadContext(player, preparedContext);
   const { platform } = context;
@@ -503,6 +518,10 @@ export const createCanonicalViewerState = (player: Player, preparedContext?: Str
   const latest = platform.weeklyHistory.at(-1);
   const performance = latest?.operations?.titlePerformance ?? [];
   const ranked = performance.filter(item => item.viewingAccounts > 0).sort((a, b) => b.viewingAccounts - a.viewingAccounts);
+  /* #143: the app's "Top 10 on <service>" is the Audience room's own chart (#142), by views on your own hours; before a
+     week has settled, by the accounts watching */
+  const ownChart = getStreamingWeeklyChartView(player).own;
+  const chartRanks = new Map(ownChart.available ? ownChart.lists.ALL.map(row => [row.id, row.rank]) : []);
   const countries = getOwnedPlatformPackageCountryIds(platform);
   const titles = getStreamingPlayableCatalogProjectIds(player, context).flatMap(projectId => {
     const title = resolveStreamingCatalogueReadTitle(context, projectId);
@@ -520,9 +539,14 @@ export const createCanonicalViewerState = (player: Player, preparedContext?: Str
       genre: title.genre,
       hue: hueOf(projectId),
       logline: `${title.genre} ${title.projectType === 'SERIES' ? 'series' : 'film'} from ${title.studioName}.`,
-      progress: result && result.viewingAccounts > 0 ? clamp(Math.round(result.completionRate), 0, 99) : undefined,
-      leavingInWeeks: license ? Math.max(0, license.expiresAtAbsoluteWeek - absoluteWeek) : undefined,
-      rank: rank >= 0 && rank < 10 ? rank + 1 : undefined,
+      /* completionRate is a 0–1 share and the card draws progress × 100%: rounding it drew
+         every bar empty or full */
+      progress: result && result.viewingAccounts > 0 ? clamp(result.completionRate, .02, .98) : undefined,
+      /* only a licence that really ends soon: a permanent one never leaves (its expiry is
+         Number.MAX_SAFE_INTEGER), and one ending in a year is not "Leaving Soon" */
+      leavingInWeeks: license && license.expiresAtAbsoluteWeek - absoluteWeek <= STREAMING_VIEWER_LEAVING_WEEKS
+        ? Math.max(0, license.expiresAtAbsoluteWeek - absoluteWeek) : undefined,
+      rank: chartRanks.size ? chartRanks.get(projectId) : rank >= 0 && rank < 10 ? rank + 1 : undefined,
       newThisWeek: Boolean(slateEntry && latest?.operations?.programWeek === slateEntry.launchWeek),
       episodes: original?.projectType === 'SERIES'
         ? Array.from({ length: Math.max(1, original.episodes) }, (_, index) => ({ n: index + 1, title: `Episode ${index + 1}`, mins: 42 }))
@@ -530,17 +554,38 @@ export const createCanonicalViewerState = (player: Player, preparedContext?: Str
     }];
   });
   const peakLoad = clamp(Math.round(latest?.operations?.capacityUtilizationPercent ?? 0), 0, 140);
-  const reliability = platform.metrics.technologyHealth;
-  const tier = reliability >= 78 && peakLoad < 85 ? '4K' as const : reliability >= 45 ? 'HD' as const : 'SD' as const;
+  const tier = streamingNetworkPictureTier(platform.metrics.technologyHealth, peakLoad);
   const regional = platform.competitiveWorld.regionalLaunches;
   const latencyMs = regional.length
     ? Math.round(regional.reduce((sum, region) => sum + Math.max(18, 62 - region.localizationDepth * 2), 0) / regional.length)
     : 36;
+  const allocations = latest?.operations?.worldCompetitionPlanAllocations;
+  const viewerPlans = getStreamingViewerPlans(platform, absoluteWeek, allocations);
+  /* an open incident viewers would notice (#58): the banner, stalls, paused downloads */
+  const outage = getStreamingViewerOutage(platform);
+  const personal = getStreamingViewerPersonal(platform);
+  /* #115: the ident the service paid for opens the app, with its sound (an uploaded one where it uses it) and its length */
+  const config = platform.serviceConfiguration;
+  const opening = config.identPackageId && config.soundIdentKey ? {
+    sound: (config.customIdentAudio ? 'custom' : config.soundIdentKey.toLowerCase()) as StreamingIdentPreviewId,
+    seconds: config.identDurationSeconds || 3,
+    packageId: config.identPackageId,
+    customAudio: config.customIdentAudio ? { dataUrl: config.customIdentAudio.dataUrl } : null,
+  } : null;
   return {
     live: platform.lifecycle === 'ACTIVE',
     layoutId: platform.serviceConfiguration.storefrontLayoutId || 'cinema',
     titles,
     watchingNow: Math.max(0, Math.round((latest?.operations?.peakConcurrentStreams ?? 0) * .72)),
     network: { peakLoad, tier, latencyMs },
+    /* the tech tree, as a subscriber meets it: badges, the player's quality menu, "Now in 4K" */
+    quality: getStreamingViewerQuality(platform, absoluteWeek, allocations),
+    /* the plans, as a viewer meets them (#48): the plan picker, each plan's view, ad breaks */
+    plans: viewerPlans.plans,
+    currentPlanId: viewerPlans.currentId,
+    ...(outage ? { outage } : {}),
+    /* Because you watched rows and "Who's watching?" (#63); neither: as before */
+    ...(personal ? { personal } : {}),
+    ...(opening ? { opening } : {}),
   };
 };

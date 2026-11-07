@@ -13,7 +13,7 @@ import { rankStreamingLaunchAnchors } from '../services/streamingCatalogueAnchor
 const fixture = (count: number) => {
     const player = filedMarketFixture();
     player.ownedStreamingPlatform.serviceConfiguration.pricing = configureStreamingPricingOffer(
-        player.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'SUBSCRIPTION' });
+        player.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'SUBSCRIPTION', alone: true });
     for (let index = 0; index < count; index++) {
         const id = `catalogue-context-${index}`;
         addStreamingAuditCatalogueTitle(player, getAbsoluteWeek(player.age, player.currentWeek), id);
@@ -96,11 +96,11 @@ check('fresh reads honor in-place pricing, canonical grants, territory, and week
     assert.equal(allowed(), true);
     createContext(player); // An unused or previously consumed UI context must not install a hidden global cache.
     player.ownedStreamingPlatform.serviceConfiguration.pricing = configureStreamingPricingOffer(
-        player.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'STORE' });
+        player.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'STORE', alone: true });
     assert.equal(allowed(), false);
     assert.equal(read(player, id, ['US'], true, createContext(player)).routesByCountry.US.SUBSCRIPTION.allowed, false);
     player.ownedStreamingPlatform.serviceConfiguration.pricing = configureStreamingPricingOffer(
-        player.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'SUBSCRIPTION' });
+        player.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'SUBSCRIPTION', alone: true });
     contract.accessGrant!.modes = ['RENTAL'];
     assert.equal(allowed(), false);
     contract.accessGrant!.modes = ['SUBSCRIPTION'];

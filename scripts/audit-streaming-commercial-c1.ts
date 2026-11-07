@@ -17,7 +17,8 @@ assert.deepEqual(normalizeStreamingPricingConfiguration(adsOnly), adsOnly, 'norm
 const malformed = normalizeStreamingPricingConfiguration({
     ...base,
     streams: ['subs'],
-    plans: Array.from({ length: 8 }, (_, index) => ({
+    // Plans v2 (#43): twelve plans at most, so the fourteenth and its benefit are dropped
+    plans: Array.from({ length: 14 }, (_, index) => ({
         id: `P${index}`, name: `Plan ${index}`, monthly: 10 + index, featureIds: [], ads: false,
     })),
     commercialOffers: {
@@ -26,13 +27,13 @@ const malformed = normalizeStreamingPricingConfiguration({
         freeAdAccess: false,
         adFreePasses: { oneHourPrice: 5, dayPrice: 12 },
         benefits: {
-            plans: { P0: { premiumAccess: true, earlyAccessWeeks: 99 }, P7: { premiumAccess: true, earlyAccessWeeks: 2 } },
+            plans: { P0: { premiumAccess: true, earlyAccessWeeks: 99 }, P13: { premiumAccess: true, earlyAccessWeeks: 2 } },
             freeAds: { premiumAccess: true, earlyAccessWeeks: 3 },
             store: { premiumAccess: true, earlyAccessWeeks: 3 },
         },
     },
 });
-assert.equal(malformed.plans.length, 6);
+assert.equal(malformed.plans.length, 12);
 assert.equal(malformed.commercialOffers?.coreModel, 'SUBSCRIPTION');
 assert.deepEqual(Object.keys(malformed.commercialOffers?.benefits.plans || {}), ['P0']);
 assert.equal(malformed.commercialOffers?.benefits.plans.P0.earlyAccessWeeks, 4);
@@ -91,14 +92,20 @@ assert.deepEqual([storeOffers.storeOffer?.rent, storeOffers.storeOffer?.buy], [b
 for (const [model, stream] of [
     ['SUBSCRIPTION', 'subs'], ['ADVERTISING', 'ads'], ['STORE', 'rentals'],
 ] as const) {
+    /* #103 (plan §18.3): after the first choice a main offer is the front door only, so every offer the hybrid ran
+       stays on (it reset the service to the one stream); `alone` still builds the one-stream service */
     const started = createStreamingPricingForCoreModel(custom, model);
-    assert.deepEqual(started.streams, [stream]);
+    assert.deepEqual([...started.streams].sort(), [...custom.streams].sort());
     assert.equal(started.commercialOffers?.coreModel, model);
-    assert.deepEqual(started.plans.map(plan => plan.id), ['MY_PLAN'], 'inactive custom plans must survive strategy changes');
+    assert.deepEqual(started.plans.map(plan => [plan.id, plan.ads]), [['MY_PLAN', true]], 'custom plans keep their ads through strategy changes');
     assert.deepEqual(started.rentals, custom.rentals, 'uniform store prices must survive strategy changes');
     assert.deepEqual(started.commercialOffers?.benefits.store, custom.commercialOffers?.benefits.store,
         'inactive store benefits must survive strategy changes');
-    assert.equal(projectStreamingCommercialOffers(started).subscriptions.length, model === 'SUBSCRIPTION' ? 1 : 0);
+    assert.equal(projectStreamingCommercialOffers(started).subscriptions.length, 1);
+    const alone = createStreamingPricingForCoreModel(custom, model, { alone: true });
+    assert.deepEqual(alone.streams, [stream]);
+    assert.deepEqual(alone.plans.map(plan => plan.id), ['MY_PLAN'], 'inactive custom plans must survive strategy changes');
+    assert.equal(projectStreamingCommercialOffers(alone).subscriptions.length, model === 'SUBSCRIPTION' ? 1 : 0);
 }
 const switchedToSubscription = createStreamingPricingForCoreModel(adsOnly, 'SUBSCRIPTION');
 assert.equal(switchedToSubscription.commercialOffers?.coreModel, 'SUBSCRIPTION');
@@ -120,7 +127,7 @@ for (const [core, streams] of [
     ['SUBSCRIPTION', ['subs']], ['ADVERTISING', ['ads']], ['STORE', ['rentals']],
 ] as const) {
     const fixture = structuredClone(INITIAL_PLAYER);
-    fixture.ownedStreamingPlatform.serviceConfiguration.pricing = createStreamingPricingForCoreModel(custom, core);
+    fixture.ownedStreamingPlatform.serviceConfiguration.pricing = createStreamingPricingForCoreModel(custom, core, { alone: true });
     const once = migratePlayerSave(fixture);
     const twice = migratePlayerSave(JSON.parse(JSON.stringify(once)));
     const savedPricing = twice.ownedStreamingPlatform.serviceConfiguration.pricing;

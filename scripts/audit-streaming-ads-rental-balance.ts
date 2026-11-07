@@ -37,7 +37,7 @@ function fixture(c:Config){
   s.launchSlate!.entries.push({...licensedSlate,id:'balance-slate-'+i,projectId:id,title,genre} as any);
  }
  s.starterCatalog={...s.starterCatalog!,ownedProjectIds:[],licensedProjectIds:[...s.catalogProjectIds]};
- s.serviceConfiguration.pricing=configureStreamingPricingOffer(s.serviceConfiguration.pricing,{kind:'CORE',coreModel:c.core});
+ s.serviceConfiguration.pricing=configureStreamingPricingOffer(s.serviceConfiguration.pricing,{kind:'CORE',coreModel:c.core,alone:true});
  const pricing=s.serviceConfiguration.pricing;
  if(c.core==='SUBSCRIPTION')pricing.plans.forEach(x=>{x.monthly=c.price??7.99;});
  if(c.core==='ADVERTISING')pricing.ads.minutesPerHour=c.price??4;

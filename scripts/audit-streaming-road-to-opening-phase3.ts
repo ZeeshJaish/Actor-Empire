@@ -7,6 +7,7 @@ import {
 } from '../services/streamingFounding';
 import { contributeStreamingFounderCapital } from '../services/streamingCompany';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
+import { resolveStreamingTechTree } from '../services/streamingTechTreeCatalogue';
 import {
     commitStreamingLaunchCost,
     getStreamingIdentPurchaseView,
@@ -15,6 +16,8 @@ import {
     removeStreamingCustomIdentAudio,
     saveStreamingPricingPlan,
     saveStreamingServiceIdent,
+    chargeStreamingIdentAtLaunch,
+    getStreamingIdentDueAtLaunch,
     saveStreamingStorefrontPlan,
 } from '../services/streamingLaunchProgram';
 import { advanceStreamingMarketClearances, beginStreamingMarketClearance, saveStreamingMarketPlan } from '../services/streamingMarkets';
@@ -62,8 +65,10 @@ assert(opening.budget.availableTreasury === 0 && opening.budget.shortfall === 0,
 assert(opening.warnings.some(warning => warning.id === 'launch-warning:unfunded'), 'The campaign must explain that planning is open while commitments are locked.');
 assert(!opening.milestones.find(item => item.id === 'PRICING')?.complete, 'A fresh company must not silently inherit a completed commercial offer.');
 
-const lockedStorefront = saveStreamingStorefrontPlan(incorporated, { storefrontLayoutId: 'vertical-feed' });
-assert(!lockedStorefront.changed && lockedStorefront.reason === 'INVALID_STATE', 'Research-gated storefronts must not bypass Technology through a direct service call.');
+// #109 (plan §18.5): front pages are unlocked by a Tech step; Vertical Feed comes with the starter Phone and web apps,
+// Marquee needs Smart TV apps
+const lockedStorefront = saveStreamingStorefrontPlan(incorporated, { storefrontLayoutId: 'marquee' });
+assert(!lockedStorefront.changed && lockedStorefront.reason === 'INVALID_STATE', 'Tech-gated storefronts must not bypass Technology through a direct service call.');
 const baselineStorefront = saveStreamingStorefrontPlan(incorporated, { storefrontLayoutId: 'cinema' });
 assert(baselineStorefront.changed, 'A baseline editorial storefront must remain available to a zero-technology company.');
 const lockedIdent = saveStreamingServiceIdent(incorporated, { soundIdentKey: 'CHOIR', identPackageId: 'ADAPTIVE' });
@@ -86,42 +91,52 @@ const premiumIdentBase: Player = {
 const premiumIdent = saveStreamingServiceIdent(premiumIdentBase, {
     soundIdentKey: 'PULSE', identPackageId: 'FULL', customIdentAudio: customAudio,
 });
-assert(premiumIdent.changed && premiumIdent.player.ownedStreamingPlatform.treasuryCash === 5_500_000, 'The paid ident package must debit its $4.5M exactly when commissioned.');
+// #112 (plan §18.11): a kit is charged at launch (the Opening Programme commission), not when it is chosen
+assert(premiumIdent.changed && premiumIdent.player.ownedStreamingPlatform.treasuryCash === 10_000_000, 'Choosing the paid ident package must charge nothing until launch.');
+assert(getStreamingIdentDueAtLaunch(premiumIdent.player) === 4_500_000, 'and owe its $4.5M at launch.');
 assert(premiumIdent.player.ownedStreamingPlatform.serviceConfiguration.customIdentAudio?.fingerprint === customAudio.fingerprint, 'Optimized custom audio must persist with the commissioned ident.');
 const repeatedPremiumIdent = saveStreamingServiceIdent(premiumIdent.player, {
     soundIdentKey: 'PULSE', identPackageId: 'FULL', customIdentAudio: customAudio,
 });
-assert(!repeatedPremiumIdent.changed && repeatedPremiumIdent.player.ownedStreamingPlatform.treasuryCash === 5_500_000, 'Reopening a paid custom ident must never charge it again.');
+assert(!repeatedPremiumIdent.changed && repeatedPremiumIdent.player.ownedStreamingPlatform.treasuryCash === 10_000_000, 'Reopening a chosen custom ident must never charge it.');
 const cinematicIdentBase: Player = {
     ...incorporated,
     ownedStreamingPlatform: { ...incorporated.ownedStreamingPlatform, treasuryCash: 7_000_000 },
 };
 const cinematicIdent = saveStreamingServiceIdent(cinematicIdentBase, { soundIdentKey: 'PREMIERE', identPackageId: 'CINEMATIC' });
-assert(cinematicIdent.changed && cinematicIdent.player.ownedStreamingPlatform.treasuryCash === 500_000, 'Cinematic identities must charge their canonical $6.5M production cost.');
-assert(getStreamingIdentPurchaseView(cinematicIdent.player).purchasedPackageIds.includes('CINEMATIC'), 'Cinematic package ownership must persist within the launch campaign.');
+assert(cinematicIdent.changed && cinematicIdent.player.ownedStreamingPlatform.treasuryCash === 7_000_000 && getStreamingIdentDueAtLaunch(cinematicIdent.player) === 6_500_000, 'Cinematic identities owe their canonical $6.5M production cost at launch.');
+const cinematicPaid = chargeStreamingIdentAtLaunch(cinematicIdent.player);
+assert(cinematicPaid.charged === 6_500_000 && cinematicPaid.player.ownedStreamingPlatform.treasuryCash === 500_000, 'The launch commission pays it, once.');
+assert(getStreamingIdentPurchaseView(cinematicPaid.player).purchasedPackageIds.includes('CINEMATIC') && chargeStreamingIdentAtLaunch(cinematicPaid.player).charged === 0, 'Cinematic package ownership must persist within the launch campaign.');
 const removedCustomIdent = removeStreamingCustomIdentAudio(premiumIdent.player);
 assert(removedCustomIdent.changed, 'Removing uploaded Ident audio must update the canonical save.');
 assert(!removedCustomIdent.player.ownedStreamingPlatform.serviceConfiguration.customIdentAudio, 'Removing uploaded Ident audio must delete the stored audio payload.');
 assert(removedCustomIdent.player.ownedStreamingPlatform.serviceConfiguration.soundIdentKey === null, 'Removing active custom audio must leave the Ident incomplete until recommissioned.');
-assert(removedCustomIdent.player.ownedStreamingPlatform.treasuryCash === 5_500_000, 'Deleting custom audio must never refund the package purchase.');
-assert(getStreamingIdentPurchaseView(removedCustomIdent.player).purchasedPackageIds.includes('FULL'), 'Deleting custom audio must preserve the paid package receipt for this campaign.');
+assert(removedCustomIdent.player.ownedStreamingPlatform.treasuryCash === 10_000_000, 'Deleting custom audio moves no money.');
+const paidFull = chargeStreamingIdentAtLaunch(premiumIdent.player).player;
+assert(getStreamingIdentPurchaseView(removeStreamingCustomIdentAudio(paidFull).player).purchasedPackageIds.includes('FULL'), 'Deleting custom audio must preserve the paid package receipt for this campaign.');
+// #109 (plan §18.5): the Adaptive ident is unlocked by Smart AI's Personal artwork and trailers, not Product Experience 35
+const multiPackageTree = resolveStreamingTechTree(incorporated.ownedStreamingPlatform);
+const ownedStep = { version: 1 as const, progress: 0, unlockedAtAbsoluteWeek: 1, versionReachedAtAbsoluteWeek: 1 };
 const multiPackageBase: Player = {
     ...incorporated,
     ownedStreamingPlatform: {
         ...incorporated.ownedStreamingPlatform,
         treasuryCash: 30_000_000,
-        technologyLevels: {
-            ...incorporated.ownedStreamingPlatform.technologyLevels,
-            PRODUCT_EXPERIENCE: 35,
-        },
+        techTree: { ...multiPackageTree, techs: { ...multiPackageTree.techs, AI_BECAUSE: ownedStep, AI_ARTWORK: ownedStep } },
     },
 };
 const boughtFull = saveStreamingServiceIdent(multiPackageBase, { soundIdentKey: 'PULSE', identPackageId: 'FULL' });
 const boughtAdaptive = saveStreamingServiceIdent(boughtFull.player, { soundIdentKey: 'ORBIT', identPackageId: 'ADAPTIVE' });
-assert(boughtAdaptive.changed && boughtAdaptive.player.ownedStreamingPlatform.treasuryCash === 16_500_000, 'Buying Adaptive after Full must charge the full $9M with no trade-in or refund.');
-assert(getStreamingIdentPurchaseView(boughtAdaptive.player).purchasedPackageIds.includes('FULL') && getStreamingIdentPurchaseView(boughtAdaptive.player).purchasedPackageIds.includes('ADAPTIVE'), 'Each Ident package bought in this opening campaign must remain owned independently.');
+assert(boughtAdaptive.changed && boughtAdaptive.player.ownedStreamingPlatform.treasuryCash === 30_000_000 && getStreamingIdentDueAtLaunch(boughtAdaptive.player) === 9_000_000, 'Switching from Full to Adaptive before launch charges nothing; Adaptive owes its $9M at launch.');
 const returnToFull = saveStreamingServiceIdent(boughtAdaptive.player, { soundIdentKey: 'EMBER', identPackageId: 'FULL' });
-assert(returnToFull.changed && returnToFull.player.ownedStreamingPlatform.treasuryCash === 16_500_000, 'Switching back to a package already bought in this wizard must be free.');
+assert(returnToFull.changed && returnToFull.player.ownedStreamingPlatform.treasuryCash === 30_000_000 && getStreamingIdentDueAtLaunch(returnToFull.player) === 4_500_000, 'Switching back is free too.');
+/* a save from before #112 paid Full when it was chosen: switching away before launch refunds it */
+const legacyPaidFull = chargeStreamingIdentAtLaunch(boughtFull.player).player;
+const refundedFull = saveStreamingServiceIdent(legacyPaidFull, { soundIdentKey: 'ORBIT', identPackageId: 'ADAPTIVE' });
+assert(refundedFull.changed && refundedFull.player.ownedStreamingPlatform.treasuryCash === 30_000_000, 'A kit already paid for is refunded when another replaces it before launch.');
+assert(!getStreamingIdentPurchaseView(refundedFull.player).purchasedPackageIds.includes('FULL')
+    && refundedFull.player.ownedStreamingPlatform.costCommitments.some(item => item.status === 'REFUNDED' && item.paidAmount === 4_500_000), 'Its receipt is marked refunded.');
 const stalePremiumIdent: Player = {
     ...incorporated,
     ownedStreamingPlatform: {
@@ -133,9 +148,9 @@ const stalePremiumIdent: Player = {
         },
     },
 };
-assert(!getStreamingLaunchProgramView(stalePremiumIdent).milestones.find(item => item.id === 'SERVICE_IDENT')?.complete, 'A stale package field without a paid commitment must never impersonate a commission.');
-const stalePremiumAttempt = saveStreamingServiceIdent(stalePremiumIdent, { soundIdentKey: 'CHOIR', identPackageId: 'FULL' });
-assert(!stalePremiumAttempt.changed && stalePremiumAttempt.reason === 'INSUFFICIENT_TREASURY' && stalePremiumAttempt.shortfall === 4_500_000, 'A stale paid-looking config must still require the real $4.5M commission payment.');
+// #112: before the commission a chosen kit completes the milestone; without a receipt it still owes its $4.5M at launch
+assert(getStreamingLaunchProgramView(stalePremiumIdent).milestones.find(item => item.id === 'SERVICE_IDENT')?.complete, 'A chosen kit completes the ident before launch.');
+assert(getStreamingIdentDueAtLaunch(stalePremiumIdent) === 4_500_000, 'A stale paid-looking config without a receipt still owes the real $4.5M at launch.');
 const pricing = saveStreamingPricingPlan(incorporated, {
     streams: ['subs', 'ads', 'rentals', 'premium', 'daypass', 'sponsor', 'metered', 'patron'],
     plans: [{ id: 'BASIC', name: 'Opening', monthly: 9, featureIds: ['hd', 'uhd', 'spatial', 'downloads', 'live', 'noads', 'catalogue'], ads: true }],

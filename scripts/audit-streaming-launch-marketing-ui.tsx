@@ -23,13 +23,15 @@ const html = renderToStaticMarkup(React.createElement(StageMoney, {
   },
   draft: { campaignId: 'none' },
   patch: () => undefined,
-  plan: { lines: [{ id: 'infra', label: 'Infrastructure commissioning', amount: 12_000_000, timing: 'COMMISSION' }, { id: 'campaign', label: 'Launch marketing ceiling', amount: 8_000_000, timing: 'OPENING_NIGHT' }], total: 20_000_000, commissionNow: 12_000_000, deferred: 8_000_000, available: 50_000_000, headroom: 30_000_000, shortfall: 0 },
+  plan: { lines: [{ id: 'infra', label: 'Infrastructure commissioning', amount: 12_000_000, timing: 'COMMISSION' }, { id: 'campaign', label: 'Launch campaign', amount: 8_000_000, timing: 'OPENING_NIGHT' }], total: 20_000_000, commissionNow: 12_000_000, deferred: 8_000_000, available: 50_000_000, headroom: 30_000_000, shortfall: 0 },
   handlers: { onChangeMarketing: () => undefined },
 } as never));
 
 assert.ok(html.includes('Launch allocation'));
-assert.ok(html.includes('Marketing ceiling'));
-assert.ok(html.includes('Campaign plan'));
+/* #158: the marketing ceiling is gone; the launch campaign's card is the launch marketing */
+assert.equal(/marketing ceiling/i.test(html), false, 'The marketing ceiling is gone (#158).');
+assert.ok(html.includes('aria-label="Launch campaign"'));
+assert.ok(html.includes('Edit the launch campaign'));
 assert.ok(html.includes('Country forecast'));
 assert.ok(html.includes('74% · medium confidence'), 'The forecast must show the live score behind its confidence label.');
 assert.ok(html.includes('Before campaign'));

@@ -14,7 +14,12 @@
      - enforcement scales piracy everywhere (the policy is world-wide)
      - Household only and Aggressive each add 0.4% a week to your cancellations
      - enforcement costs a fixed team plus a little per account of load
-   It does NOT turn sharers into payers, change prices or touch reputation.
+   Sharing control in Tech (Trust and safety, #56) changes three of these for the player:
+     - Household detection leaves 50 / 40 / 30% of the extra cancellations
+     - Device check multiplies the outside homes by 0.75 / 0.7 / 0.65
+     - Paid extra member: on plans selling Extra member, 35 / 40 / 45% of the sharers the rules turn
+       away pay 40% of the plan's price to stay (they watch, and load the network, as shared homes)
+   Without it, sharing never turns into paying customers. Prices and reputation are untouched.
 
    Extracted from those two files without changing a single value.
    ========================================================================== */
@@ -70,6 +75,8 @@ export interface StreamingSharingPolicyFigures {
     /** People watching your titles through piracy. */
     piracyReach: number;
     accessLoadAccounts: number;
+    /** Sharers paying to stay as extra members (#56). */
+    extraMembers?: number;
 }
 export interface StreamingSharingPolicyOutlook {
     sharedHomes: number;
@@ -78,7 +85,21 @@ export interface StreamingSharingPolicyOutlook {
     /** Extra weekly cancellation rate (0.004 = 0.4% a week). */
     extraWeeklyCancellation: number;
     piracyReach: number;
+    /** Sharers paying to stay as extra members (#56). */
+    extraMembers: number;
 }
+/** What the player's Sharing control in Tech does to the policy (#56); none owned, all neutral. */
+export interface StreamingSharingControl {
+    /** Household detection: the share of the extra cancellations left */
+    crackdownFactor: number;
+    /** Device check: what outside homes are multiplied by */
+    sharingCheck: number;
+    /** Paid extra member: of the sharers turned away, the share who pay to stay (0 without it) */
+    extraMemberShare: number;
+    /** whether any plan sells Extra member */
+    sellsExtraMember: boolean;
+}
+export const STREAMING_NO_SHARING_CONTROL: StreamingSharingControl = { crackdownFactor: 1, sharingCheck: 1, extraMemberShare: 0, sellsExtraMember: false };
 type PolicyLevers = Pick<WorldStreamingCustomerAccessPolicy, 'sharingPosture' | 'enforcementInvestment'>;
 
 /** From last week's settled figures under the current policy, what the next
@@ -91,10 +112,17 @@ export const previewStreamingSharingPolicy = (
     settled: StreamingSharingPolicyFigures,
     current: PolicyLevers,
     next: PolicyLevers,
+    /** the player's Sharing control in Tech (#56); without it, as before */
+    control: StreamingSharingControl = STREAMING_NO_SHARING_CONTROL,
 ): { now: StreamingSharingPolicyOutlook; next: StreamingSharingPolicyOutlook } => {
     const sharingFactor = (policy: PolicyLevers) => streamingSharingPostureFactor(policy.sharingPosture) * streamingSharingEnforcementFactor(policy.enforcementInvestment);
     const sharedNext = Math.round(settled.sharedHomes * sharingFactor(next) / Math.max(1e-6, sharingFactor(current)));
-    const loadNext = settled.paidAccounts + Math.round(sharedNext * STREAMING_SHARING_POLICY_EFFECTS.sharedLoadPerHome);
+    // extra members (#56) are the turned-away sharers who pay: they follow how many the rules turn away
+    const openest = STREAMING_SHARING_POLICY_EFFECTS.sharingPosture.REACH_FIRST * STREAMING_SHARING_POLICY_EFFECTS.sharingEnforcement.LIGHT;
+    const turnedAway = (policy: PolicyLevers) => Math.max(0, openest - sharingFactor(policy) * control.sharingCheck);
+    const extraNow = Math.max(0, Math.round(settled.extraMembers || 0));
+    const extraNext = turnedAway(current) > 0 ? Math.round(extraNow * turnedAway(next) / turnedAway(current)) : extraNow;
+    const loadNext = settled.paidAccounts + Math.round((sharedNext + extraNext) * STREAMING_SHARING_POLICY_EFFECTS.sharedLoadPerHome);
     const piracyNext = Math.round(settled.piracyReach * streamingPiracyEnforcementFactor(next.enforcementInvestment)
         / Math.max(1e-6, streamingPiracyEnforcementFactor(current.enforcementInvestment)));
     return {
@@ -102,15 +130,17 @@ export const previewStreamingSharingPolicy = (
             sharedHomes: settled.sharedHomes,
             accessLoadAccounts: settled.accessLoadAccounts,
             weeklyEnforcementCost: streamingSharingEnforcementWeeklyCost(current.enforcementInvestment, settled.accessLoadAccounts),
-            extraWeeklyCancellation: streamingPolicyWeeklyCancellationRate(current),
+            extraWeeklyCancellation: streamingPolicyWeeklyCancellationRate(current) * control.crackdownFactor,
             piracyReach: settled.piracyReach,
+            extraMembers: extraNow,
         },
         next: {
             sharedHomes: sharedNext,
             accessLoadAccounts: loadNext,
             weeklyEnforcementCost: streamingSharingEnforcementWeeklyCost(next.enforcementInvestment, loadNext),
-            extraWeeklyCancellation: streamingPolicyWeeklyCancellationRate(next),
+            extraWeeklyCancellation: streamingPolicyWeeklyCancellationRate(next) * control.crackdownFactor,
             piracyReach: piracyNext,
+            extraMembers: extraNext,
         },
     };
 };

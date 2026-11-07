@@ -13,6 +13,8 @@ import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPla
 import { commitStreamingInfrastructureSetup, getStreamingInfrastructureDraftFacilities, getStreamingInfrastructureForecast } from './streamingInfrastructure';
 import { deriveStreamingNetworkCoverage, formatStreamingCoveragePercent, STREAMING_SERVED_COVERAGE_SHARE } from './streamingNetworkCoverage';
 import {
+    chargeStreamingIdentAtLaunch,
+    getStreamingIdentDueAtLaunch,
     getStreamingLaunchDefinitionSignature,
     getStreamingLaunchProgramView,
     getStreamingOpeningMarketDecisionState,
@@ -85,6 +87,8 @@ export interface StreamingOpeningCommissionQuote {
     infrastructureDueNow: number;
     marketFilingDueNow: number;
     marketingReservation: number;
+    /** #112: the chosen ident package, paid at launch (0 when included or already paid) */
+    identDueNow: number;
     filingEnergy: number;
     totalCashRequired: number;
     ready: boolean;
@@ -153,6 +157,7 @@ export const getStreamingOpeningCommissionQuote = (
     }
     const marketFilingDueNow = unfiled.reduce((sum, operation) => sum + operation.plannedCosts.total, 0);
     const marketingReservation = Math.max(0, Math.round(platform.launchMarketingDraft?.budgetCeiling || 0));
+    const identDueNow = getStreamingIdentDueAtLaunch(player);
     const idempotencyKey = [
         'opening-programme',
         platform.identity?.slug || player.id,
@@ -169,8 +174,9 @@ export const getStreamingOpeningCommissionQuote = (
         infrastructureDueNow: forecast.transactionCost,
         marketFilingDueNow,
         marketingReservation,
+        identDueNow,
         filingEnergy: quoteStreamingMarketFilingEnergy(unfiled.map(operation => operation.countryId!)),
-        totalCashRequired: forecast.transactionCost + marketFilingDueNow + marketingReservation,
+        totalCashRequired: forecast.transactionCost + marketFilingDueNow + marketingReservation + identDueNow,
         ready: blockers.length === 0,
         blockers,
     };
@@ -221,6 +227,8 @@ export const commissionStreamingOpeningProgramme = (
         return { player, changed: false, reason: 'MARKETING_REJECTED', quote, message: 'Launch marketing could not be reserved.' };
     }
     candidate = marketing.changed ? marketing.player : candidate;
+    /* #112: the chosen ident package is paid here, with the launch's other money */
+    candidate = chargeStreamingIdentAtLaunch(candidate).player;
     const absoluteWeek = getAbsoluteWeek(candidate.age, candidate.currentWeek);
     const current = normalizeOwnedStreamingPlatformState(candidate.ownedStreamingPlatform, candidate.id);
     const commission: OwnedStreamingOpeningProgrammeCommission = {
@@ -235,6 +243,7 @@ export const commissionStreamingOpeningProgramme = (
         infrastructureDueNow: quote.infrastructureDueNow,
         marketFilingDueNow: quote.marketFilingDueNow,
         marketingReservation: quote.marketingReservation,
+        identDueNow: quote.identDueNow,
         totalCashRequired: quote.totalCashRequired,
         revision: 1,
     };

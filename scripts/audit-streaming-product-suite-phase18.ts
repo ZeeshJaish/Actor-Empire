@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
     INITIAL_PLAYER,
@@ -195,22 +195,20 @@ assert(!pausedEffects.activeProductIds.includes('KIDS') && pausedEffects.weeklyO
 const sameWeekResume = setStreamingProductLinePaused(paused.player, 'KIDS', false);
 assert(!sameWeekResume.changed && sameWeekResume.reason === 'SAME_WEEK', 'Pause and resume should not be exploitable in the same game week.');
 
-const component = readFileSync(resolve(process.cwd(), 'components/StreamingProductLab.tsx'), 'utf8');
-const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-product-lab.css'), 'utf8');
+/* #126 (Zeesh, 2026-11-02: products as "कमिंग इन द फ्यूचर अपडेट" on the product page): the old Product Lab is gone.
+   Every product shows on the Platform room's PRODUCT tab as coming in a future update, and a save's launched lines
+   run on there with Pause and Resume (above); the engine checked above is unchanged. */
 const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const viewer = readFileSync(resolve(process.cwd(), 'components/StreamingViewerMode.tsx'), 'utf8');
 const weeklyLoop = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
-assert(component.includes('One platform. Seven reasons to return.') && component.includes('PUBLIC PRODUCT PORTFOLIO'), 'Product Lab should present the suite as a cinematic operating campus.');
-assert(component.includes('VALIDATED') && component.includes('FIRST_TO_MARKET'), 'Product approval should expose delivery strategy instead of a cosmetic unlock button.');
-assert(component.includes('no real-world timers or paid skips'), 'Product development should use canonical game weeks without monetized skips.');
-assert(styles.includes('@media (max-width: 640px)') && styles.includes('prefers-reduced-motion'), 'Product Lab should include explicit mobile and motion-safe treatment.');
-/* Reached from the NETWORK division's PRODUCTS chip and the Network Desk's
-   product toggle. */
+assert(!existsSync(resolve(process.cwd(), 'components/StreamingProductLab.tsx'))
+    && !existsSync(resolve(process.cwd(), 'styles/streaming-product-lab.css')), 'The old Product Lab is removed (#126).');
 assert(
-    hq.includes('showProductLab')
-    && hq.includes("chip === 'PRODUCTS'")
-    && hq.includes('onToggleProduct={() => setShowProductLab(true)}'),
-    'The Product Lab must be reachable from the Network division and the Network Desk.',
+    !hq.includes('showProductLab')
+    && hq.includes("if (chip === 'PRODUCTS') return openPlatformTab('PRODUCTS');")
+    && hq.includes('onPauseProduct={runProductPause}')
+    && hq.includes('setStreamingProductLinePaused('),
+    'The PRODUCTS chip opens the PRODUCT tab, where a launched product is paused or resumed.',
 );
 assert(viewer.includes('stream-viewer-product-dock') && viewer.includes('productSuite.activeProductIds'), 'Viewer Mode should expose only genuinely active product lines.');
 assert(weeklyLoop.includes('completeDueStreamingProductDevelopments') && weeklyLoop.includes('productSuiteCost') && weeklyLoop.includes('productRevenue'), 'The canonical weekly processor should launch products and apply their costs and revenue.');

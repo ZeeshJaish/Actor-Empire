@@ -1554,3 +1554,104 @@
 .bld .rhkeys{flex-wrap:wrap;row-gap:6px}
 
 .bld .rhcapacitynote{margin:0 0 10px;font-size:var(--epx-t-micro);line-height:1.4;color:#7d8698}
+
+/* #98 (Zeesh, 2026-11-01): every market at once is the viewer check's first choice ("entire country, har jagah open
+   market … select kar sakoon") */
+.bld .marketAll { width:100%; display:flex; align-items:center; gap:12px; margin:4px 0 10px; padding:12px; text-align:left; border-radius:12px; border:1px solid rgba(255,255,255,.13); background:rgba(255,255,255,.035); color:#f0f2f7; font:inherit; cursor:pointer; transition:transform .12s cubic-bezier(.3,1.5,.5,1),border-color .2s ease,background .2s ease; }
+.bld .marketAll:active { transform:scale(.985); }
+.bld .marketAll[aria-pressed=true] { border-color:var(--epx-bld-c); background:color-mix(in srgb,var(--epx-bld-c) 12%,transparent); }
+.bld .marketAll>i { flex:none; width:38px; height:38px; border-radius:12px; display:grid; place-items:center; color:var(--epx-bld-c); background:color-mix(in srgb,var(--epx-bld-c) 14%,transparent); }
+.bld .marketAll>span { flex:1; min-width:0; }
+.bld .marketAll b,.bld .marketAll small { display:block; }
+.bld .marketAll b { font-size:var(--epx-t-caption); }
+.bld .marketAll small { font-size:var(--epx-t-micro); color:#97a1b1; margin-top:3px; line-height:1.4; }
+.bld .marketAll em { flex:none; font-style:normal; font-size:var(--epx-t-micro); font-weight:800; }
+.bld .marketAll em.good { color:#37d67a; }
+.bld .marketAll em.warn { color:#ffb020; }
+.bld .marketAll:focus-visible { outline:2px solid var(--epx-bld-c); outline-offset:2px; }
+
+/* #98 the program monitor plays ("aisa bana ki lage ki video chal raha hai non-stop"): a picture that drifts under
+   grain and a light sweep, LIVE, a ticking count, a running clock, a playhead that never stops, sound bars. Buffering
+   dims and stalls it; a stream that is gone is static. */
+.bld .rhwlivefeed { justify-content:space-between; padding:11px 12px 10px; background:#04060a; isolation:isolate; }
+.bld .rhwscene { position:absolute; inset:-12%; z-index:0; overflow:hidden; filter:saturate(1.15); transition:filter .4s ease,opacity .4s ease; }
+.bld .rhwscene i { position:absolute; border-radius:50%; filter:blur(26px); opacity:.85; mix-blend-mode:screen; }
+.bld .rhwscene i:nth-child(1) { width:62%; height:70%; left:-6%; top:6%; background:radial-gradient(circle,color-mix(in srgb,var(--epx-bld-c) 85%,#fff),transparent 68%); animation:rhw-drift-a 13s ease-in-out infinite alternate; }
+.bld .rhwscene i:nth-child(2) { width:55%; height:62%; right:-4%; top:-6%; background:radial-gradient(circle,rgba(255,140,90,.75),transparent 66%); animation:rhw-drift-b 17s ease-in-out infinite alternate; }
+.bld .rhwscene i:nth-child(3) { width:50%; height:58%; left:30%; bottom:-14%; background:radial-gradient(circle,rgba(150,110,255,.7),transparent 66%); animation:rhw-drift-c 11s ease-in-out infinite alternate; }
+.bld .rhwscene i:nth-child(4) { width:120%; height:30%; left:-10%; top:35%; border-radius:0; filter:blur(18px); opacity:.35; mix-blend-mode:overlay; background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent); animation:rhw-sweep 6.5s ease-in-out infinite; }
+.bld .rhwgrain { position:absolute; inset:-50%; z-index:0; opacity:.16; pointer-events:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='.9'/></svg>"); animation:rhw-grain .9s steps(4) infinite; }
+.bld .rhwvignette { position:absolute; inset:0; z-index:0; pointer-events:none; background:radial-gradient(120% 90% at 50% 45%,transparent 45%,rgba(0,0,0,.72) 100%),linear-gradient(180deg,rgba(0,0,0,.45),transparent 26%,transparent 58%,rgba(0,0,0,.8)); }
+.bld .rhwlivefeed .viewerSignal { z-index:0; opacity:.22; }
+.bld .rhwlivefeed .rhwtop { position:relative; z-index:2; }
+.bld .rhwlive { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; background:#e5323b; color:#fff; font-size:var(--epx-t-micro); font-weight:950; letter-spacing:.14em; }
+.bld .rhwlive i { width:6px; height:6px; border-radius:50%; background:#fff; animation:rhw-blink 1.2s ease-in-out infinite; }
+.bld .rhwwatchers { font-size:var(--epx-t-micro); color:#e6eaf2; letter-spacing:.06em; text-shadow:0 1px 6px rgba(0,0,0,.8); }
+.bld .rhwwatchers b { font-weight:900; font-variant-numeric:tabular-nums; }
+.bld .rhwcenter { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; color:#fff; }
+.bld .rhwcenter b { font-size:var(--epx-t-micro); font-weight:950; letter-spacing:.16em; text-shadow:0 1px 8px rgba(0,0,0,.9); }
+.bld .rhwoff { position:relative; width:30px; height:30px; border-radius:50%; border:2px solid #ff5a5f; }
+.bld .rhwoff::after { content:''; position:absolute; left:50%; top:4px; bottom:4px; width:2px; margin-left:-1px; background:#ff5a5f; transform:rotate(45deg); }
+.bld .rhwnote { position:absolute; z-index:2; left:50%; top:42%; transform:translate(-50%,-50%); max-width:86%; padding:5px 10px; border-radius:99px; background:rgba(10,12,18,.72); border:1px solid rgba(255,176,32,.5); color:#ffcf73; font-size:var(--epx-t-micro); font-weight:800; text-align:center; backdrop-filter:blur(6px); }
+.bld .rhwfoot { position:relative; z-index:2; display:flex; flex-direction:column; gap:7px; }
+.bld .rhwcap span { display:block; font-size:var(--epx-t-micro); letter-spacing:.14em; color:rgba(230,234,242,.72); text-transform:uppercase; }
+.bld .rhwcap b { display:block; margin-top:3px; font-size:clamp(16px,5vw,22px); font-weight:950; line-height:1.05; letter-spacing:-.02em; color:#fff; text-shadow:0 2px 12px rgba(0,0,0,.7); overflow-wrap:anywhere; }
+.bld .rhwcontrols { display:flex; align-items:center; gap:8px; color:#fff; }
+.bld .rhwplaybtn { flex:none; width:20px; height:20px; display:grid; place-items:center; }
+.bld .rhwplaybtn svg { width:16px; height:16px; }
+.bld .rhwtime { flex:none; font-size:10px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.04em; color:#e6eaf2; }
+.bld .rhwtrack { position:relative; flex:1; min-width:30px; height:3px; border-radius:3px; background:rgba(255,255,255,.22); overflow:hidden; }
+.bld .rhwbuffered,.bld .rhwplayed { position:absolute; left:0; top:0; bottom:0; width:100%; transform-origin:left; }
+.bld .rhwbuffered { background:rgba(255,255,255,.3); animation:rhw-buffer 24s linear infinite; }
+.bld .rhwplayed { background:var(--epx-bld-c); animation:rhw-play 24s linear infinite; }
+.bld .rhweq { flex:none; display:flex; align-items:flex-end; gap:2px; height:12px; }
+.bld .rhweq i { width:2.5px; height:100%; border-radius:1px; background:#fff; opacity:.85; transform-origin:bottom; animation:rhw-eq .9s ease-in-out infinite; }
+.bld .rhweq i:nth-child(2) { animation-delay:.18s; }
+.bld .rhweq i:nth-child(3) { animation-delay:.36s; }
+.bld .rhweq i:nth-child(4) { animation-delay:.09s; }
+.bld .rhwq { flex:none; padding:2px 5px; border-radius:4px; border:1px solid rgba(255,255,255,.4); font-size:9px; font-weight:900; letter-spacing:.04em; }
+.bld .rhwlivefeed.burst .rhwscene { filter:brightness(.5) saturate(.55) blur(2px); }
+.bld .rhwlivefeed.burst .rhwscene i,.bld .rhwlivefeed.burst .rhwplayed,.bld .rhwlivefeed.burst .rhwbuffered,.bld .rhwlivefeed.burst .rhweq i { animation-play-state:paused; }
+.bld .rhwlivefeed.burst .rhwq { border-color:#ffb020; color:#ffcf73; }
+.bld .rhwlivefeed.broke .rhwscene { opacity:0; }
+.bld .rhwlivefeed.broke .rhwgrain { opacity:.55; animation-duration:.35s; }
+.bld .rhwlivefeed.broke .rhwlive { background:#3a1418; color:#ff8a8f; }
+.bld .rhwlivefeed.broke .rhwlive i,.bld .rhwlivefeed.broke .rhwplayed,.bld .rhwlivefeed.broke .rhwbuffered,.bld .rhwlivefeed.broke .rhweq i { animation:none; }
+.bld .rhwlivefeed.broke .rhwplayed { transform:scaleX(.34); background:#ff5a5f; }
+/* every market as a lamp, lit by what it is getting right now */
+.bld .rhwlamps { display:flex; flex-wrap:wrap; gap:5px; margin:2px 0 0; }
+.bld .rhwlamps i { width:9px; height:9px; border-radius:50%; transition:background .3s ease,box-shadow .3s ease; }
+.bld .rhwlamps i.good { background:#37d67a; box-shadow:0 0 6px rgba(55,214,122,.45); }
+.bld .rhwlamps i.warn { background:#ffb020; box-shadow:0 0 6px rgba(255,176,32,.5); }
+.bld .rhwlamps i.bad { background:#ff5a5f; box-shadow:0 0 6px rgba(255,90,95,.5); }
+@keyframes rhw-drift-a { from { transform:translate(0,0) scale(1); } to { transform:translate(18%,8%) scale(1.15); } }
+@keyframes rhw-drift-b { from { transform:translate(0,0) scale(1.05); } to { transform:translate(-16%,12%) scale(.92); } }
+@keyframes rhw-drift-c { from { transform:translate(0,0) scale(.95); } to { transform:translate(-10%,-14%) scale(1.12); } }
+@keyframes rhw-sweep { from { transform:translateX(-60%) rotate(-8deg); } to { transform:translateX(60%) rotate(-8deg); } }
+@keyframes rhw-grain { 0% { transform:translate(0,0); } 25% { transform:translate(-4%,3%); } 50% { transform:translate(3%,-5%); } 75% { transform:translate(-2%,4%); } 100% { transform:translate(0,0); } }
+@keyframes rhw-blink { 0%,100% { opacity:1; } 50% { opacity:.25; } }
+@keyframes rhw-play { from { transform:scaleX(.02); } to { transform:scaleX(1); } }
+@keyframes rhw-buffer { from { transform:scaleX(.18); } to { transform:scaleX(1); } }
+@keyframes rhw-eq { 0%,100% { transform:scaleY(.3); } 50% { transform:scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .bld .rhwscene i,.bld .rhwgrain,.bld .rhwlive i,.bld .rhwplayed,.bld .rhwbuffered,.bld .rhweq i { animation:none !important; }
+  .bld .rhwplayed { transform:scaleX(.6); }
+}
+/* #98: the badges over the picture keep their own colours (the brand line under .rhwtop span is the old top's) */
+.bld .rhwtop .rhwlive { color:#fff; letter-spacing:.14em; }
+.bld .rhwtop .rhwwatchers { color:#e6eaf2; text-transform:none; letter-spacing:.04em; font-weight:600; }
+.bld .rhwlivefeed.broke .rhwtop .rhwlive { color:#ff8a8f; }
+/* a slow camera move over the whole picture, and brighter light, so it reads as a film playing */
+.bld .rhwscene { animation:rhw-camera 18s ease-in-out infinite alternate; }
+.bld .rhwscene i { opacity:.95; filter:blur(20px); }
+.bld .rhwscene i:nth-child(4) { opacity:.5; filter:blur(14px); }
+.bld .rhwlivefeed.burst .rhwscene { animation-play-state:paused; }
+@keyframes rhw-camera { from { transform:scale(1.04) translate(0,0); } to { transform:scale(1.14) translate(-3%,2%); } }
+@media (prefers-reduced-motion: reduce) { .bld .rhwscene { animation:none !important; } }
+/* the word over the picture sizes to itself (an absolute box centred by translate shrank to half the width) */
+.bld .rhwnote { width:max-content; }
+/* the spinner or the "off" mark sits between the top badges and the caption, never on the title */
+.bld .rhwcenter { inset:16% 0 48% 0; gap:6px; }
+.bld .rhwcenter .viewerSpinner,.bld .rhwcenter .rhwoff { width:26px; height:26px; }
+.bld .rhwlivefeed.broke .rhweq,.bld .rhwlivefeed.burst .rhweq { opacity:.35; }
+.bld .rhwnote { top:34%; }

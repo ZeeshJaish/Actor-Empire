@@ -1,5 +1,6 @@
 import { getStreamingServerSite } from '../../services/streamingServerSites';
-import { RehearsalMarkets } from './RehearsalMarkets';
+import { RehearsalMarkets, REHEARSAL_ALL_MARKETS } from './RehearsalMarkets';
+import { RehearsalMonitor } from './RehearsalMonitor';
 /**
  * EMPIRE+ v2 — THE BUILD
  *
@@ -134,6 +135,9 @@ export interface BuildSel {
 export interface BuildInputs {
   /** Current game week, used for maintenance history in persistent drafts. */
   absoluteWeek?: number;
+  /** #91: a live network's load per viewer (Optimisation's codecs cut it; 1080p = 1). The rehearsal then weighs a
+      night as the weekly close does, viewers × their load against capacity. Absent at founding (1). */
+  viewerLoad?: number;
   /** The platform's installed fibre generation and tuning. Coverage, the map,
       rehearsal and the status desk must all grade the same physical network. */
   fibreState?: StreamingFibreState;
@@ -1557,7 +1561,7 @@ const FacilityMarketplace: React.FC<{
           <div className={css.marketTitle}>
             <span>LIVE SPACE MARKET · {city.region.replace('_', ' ')}</span>
             <b>{city.label}</b>
-            <p>{listings.filter(listing => listing.status !== 'RESEARCH_REQUIRED').length} contracts available · each room has a fixed physical limit</p>
+            <p>{listings.length} contracts available · each room has a fixed physical limit</p>
           </div>
           <div className={css.marketPulse}>
             <i />
@@ -1575,16 +1579,16 @@ const FacilityMarketplace: React.FC<{
 
         <div className={css.facilityoptions}>
           {listings.map((listing, listingIndex) => {
-            const locked = listing.status === 'RESEARCH_REQUIRED';
+            // #109: no listing is ever research-locked (RESEARCH_REQUIRED was never assigned)
             return (
-              <article key={listing.listingId} className={cx(css.marketListing, locked ? css.locked : '')}>
+              <article key={listing.listingId} className={css.marketListing}>
                 <div className={css.listingTop}>
                   <div>
                     <span>LISTING {String(listingIndex + 1).padStart(2, '0')} · {listing.providerName}</span>
                     <b>{listing.facilityName}</b>
                   </div>
                   <em className={css[listing.status.toLowerCase()] || ''}>
-                    {listing.status === 'RESEARCH_REQUIRED' ? 'RESEARCH' : listing.status}
+                    {listing.status}
                   </em>
                 </div>
 
@@ -1621,8 +1625,8 @@ const FacilityMarketplace: React.FC<{
                     : 'no adjacent expansion'}</span>
                 </div>
 
-                <button className={css.leaseButton} disabled={locked} onClick={() => onLease(listing)}>
-                  {locked ? 'RESEARCH CAMPUS CONSTRUCTION' : `LEASE ${listing.shortName.toUpperCase()} →`}
+                <button className={css.leaseButton} onClick={() => onLease(listing)}>
+                  {`LEASE ${listing.shortName.toUpperCase()} →`}
                 </button>
               </article>
             );
@@ -1900,12 +1904,18 @@ const Rehearsal: React.FC<{
   /** Saved careers inject the canonical Phase 3 bridge. Omitted only by legacy labs. */
   forecastFor?: (scenario: StreamingRehearsalScenario) => RunResult;
   onOpenNetwork?: (regionId?: string) => void;
-}> = ({ brand, d, inp, sel, onClose, onResult, onRepair, onOpenContent, forecastFor, onOpenNetwork }) => {
-  const [scenario, setScenario] = useState<Scenario>('LIKELY');
+  /** #91: a live company's load test (Platform › Network): its own nights, named and in order, the one tapped first;
+      no premiere, commissioning or founder override, and the way back is to the network */
+  live?: { scenarios: Array<{ id: Scenario; name: string; sub: string }>; initialScenario?: Scenario };
+}> = ({ brand, d, inp, sel, onClose, onResult, onRepair, onOpenContent, forecastFor, onOpenNetwork, live: liveMode }) => {
+  const [scenario, setScenario] = useState<Scenario>(liveMode?.initialScenario || 'LIKELY');
+  const scenarios = liveMode?.scenarios || SCENARIOS;
+  const nightName = scenarios.find(item => item.id === scenario)?.name || 'the night';
   const [running, setRunning] = useState(false);
   const [t, setT] = useState(0);
   const [result, setResult] = useState<RunResult | null>(null);
-  const [viewerMarketId, setViewerMarketId] = useState<string | null>(null);
+  /* #98 (Zeesh: "entire country, har jagah open market … select kar sakoon"): the viewer check starts on every market */
+  const [viewerMarketId, setViewerMarketId] = useState<string | null>(REHEARSAL_ALL_MARKETS);
 
   const raf = useRef(0);
   const monitorRef = useRef<HTMLDivElement>(null);
@@ -1967,14 +1977,30 @@ const Rehearsal: React.FC<{
   const yOf = (v: number) => H - (v / top) * H;
   const commandStep = result ? 5 : running ? Math.min(5, Math.floor(t * 5) + 1) : 0;
 
-  // Start on the largest audience; selecting a country pins that monitor.
-  const watching = useMemo(() => forecast.countries.find(country => country.marketId === viewerMarketId)
-    || [...forecast.countries].sort((a, b) => b.demand - a.demand)[0] || null, [forecast, viewerMarketId]);
+  // Every market at once by default (#98); selecting a country pins that monitor to it.
+  const allView = viewerMarketId === REHEARSAL_ALL_MARKETS;
+  const watching = useMemo(() => (allView ? null : forecast.countries.find(country => country.marketId === viewerMarketId)
+    || [...forecast.countries].sort((a, b) => b.demand - a.demand)[0] || null), [allView, forecast, viewerMarketId]);
   const pickMarket = useCallback((id: string) => { setViewerMarketId(id); monitorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, []);
   const watchingDiagnosis = watching ? diagnoseStreamingRehearsalMarket(forecast, watching) : null;
   const marketTally = result ? summarizeStreamingRehearsalMarkets(result) : null;
   const stressedFacilities = useMemo(() => [...forecast.facilities].sort((a, b) => b.loadPercent - a.loadPercent).slice(0, 4), [forecast]);
   const playback = watching ? streamingRehearsalPlayback(watching, forecast, result ? 1 : curveAt(t)) : 'PLAYING';
+  /* every market at this moment of the night: how many play, stutter or are gone, and the monitor's one state for all of
+     them (half or more gone or stuttering says so; fewer is a word over a playing picture) */
+  const everyMarket = useMemo(() => {
+    const at = result ? 1 : curveAt(t);
+    const states = forecast.countries.map(country => ({ country, state: streamingRehearsalPlayback(country, forecast, at) }));
+    const down = states.filter(entry => entry.state === 'DOWN').length;
+    const buffering = states.filter(entry => entry.state === 'BUFFERING').length;
+    const total = states.length;
+    const state: 'PLAYING' | 'BUFFERING' | 'DOWN' = total && down / total >= .5 ? 'DOWN' : total && (down + buffering) / total >= .5 ? 'BUFFERING' : 'PLAYING';
+    const struggling = states.filter(entry => entry.state !== 'PLAYING')
+      .sort((a, b) => (a.state === 'DOWN' ? 0 : 1) - (b.state === 'DOWN' ? 0 : 1) || b.country.demand - a.country.demand);
+    return { states, down, buffering, total, state, struggling };
+  }, [forecast, result, t]);
+  /* people watching what the monitor shows: the load over viewers' own load (Optimisation) on the Network tab */
+  const viewersNow = ((allView ? live : watching ? watching.demand * (result ? 1 : curveAt(t)) : live) / Math.max(.01, inp.viewerLoad ?? 1));
   // This gauge describes total capacity, not a country's delivery failure.
   const capacityDemand = result ? result.peakConcurrentStreams : live;
   const capacityClass = capacityDemand > forecast.burstCapacity ? css.bad
@@ -2022,7 +2048,7 @@ const Rehearsal: React.FC<{
       <div className={css.rhtop}>
         <button className={css.rhx} onClick={onClose} aria-label="Close">✕</button>
         <div className={css.rhtitle}>
-          <b>LOAD REHEARSAL</b>
+          <b>{liveMode ? 'LOAD TEST' : 'LOAD REHEARSAL'}</b>
           <span>SIMULATED · CHANGES NOTHING</span>
         </div>
         <span className={css.rhmark}><Mark brand={brand} /></span>
@@ -2046,14 +2072,21 @@ const Rehearsal: React.FC<{
         </div>
         {!running && !result && (
           <>
-            <p className={css.rhlead}>
-              We push a fake premiere night of <b>{inp.premiereTitle}</b> through the
-              halls you have built, and watch which city gives first.
-            </p>
+            {liveMode ? (
+              <p className={css.rhlead}>
+                We push <b>{nightName.toLowerCase()}</b> through the network as it stands, and watch which
+                city gives first.
+              </p>
+            ) : (
+              <p className={css.rhlead}>
+                We push a fake premiere night of <b>{inp.premiereTitle}</b> through the
+                halls you have built, and watch which city gives first.
+              </p>
+            )}
 
             <p className={css.rhsub}>Choose the audience</p>
             <div className={css.rhscen}>
-              {SCENARIOS.map(s => (
+              {scenarios.map(s => (
                 <button key={s.id} className={cx(css.scen, (scenario === s.id ? css.on : ''))}
                   onClick={() => setScenario(s.id)}>
                   <b>{s.name}</b>
@@ -2063,7 +2096,7 @@ const Rehearsal: React.FC<{
               ))}
             </div>
 
-            <RehearsalMarkets result={forecast} selected={watching?.marketId} onSelect={pickMarket}/>
+            <RehearsalMarkets result={forecast} selected={allView ? REHEARSAL_ALL_MARKETS : watching?.marketId} onSelect={pickMarket}/>
 
           </>
         )}
@@ -2078,7 +2111,7 @@ const Rehearsal: React.FC<{
                   percentage used to float beside a 42px number and read as an
                   afterthought pinned to the wrong baseline. */}
               <div className={css.rhreadout} role="status" aria-live="polite">
-                <span>{result ? 'PEAK VIEWERS TOGETHER' : 'VIEWERS WATCHING NOW'}</span>
+                <span>{liveMode ? (result ? 'PEAK LOAD OF THE NIGHT' : 'LOAD ON THE NETWORK NOW') : result ? 'PEAK VIEWERS TOGETHER' : 'VIEWERS WATCHING NOW'}</span>
                 <b className={capacityClass}>{conc(result ? result.peakConcurrentStreams : live)}</b>
                 <em>
                   <u className={capacityClass}>{Math.round(result ? result.peakLoadPercent : loadPct)}%</u>
@@ -2098,7 +2131,7 @@ const Rehearsal: React.FC<{
               <div className={css.rhkeys}>
                 {ceilingFits
                   ? <span><i className={css.kc} />owned capacity</span>
-                  : <span>Audience over time · scaled to this rehearsal</span>}
+                  : <span>{liveMode ? 'Load over the night · viewers × their load (Optimisation)' : 'Audience over time · scaled to this rehearsal'}</span>}
                 {ceilingFits && forecast.burstCapacity > forecast.steadyCapacity && <span><i className={css.kb} />protected burst {conc(forecast.burstCapacity)}</span>}
               </div>
               {/* A solid colour that changes, not a gradient that always shows
@@ -2113,27 +2146,38 @@ const Rehearsal: React.FC<{
               </div>
             </div>
 
-            {watching && (
+            {(watching || allView) && (
               <div ref={monitorRef} className={css.rhwatch} aria-label="What a viewer is getting">
-                <div className={cx(css.rhwscreen, playback === 'DOWN' ? css.broke : playback === 'BUFFERING' ? css.burst : css.held)}>
-                  <i className={css.viewerSignal} aria-hidden="true" />
-                  <div className={css.rhwtop}>
-                    <span>{brand.name}</span>
-                    <em className={playback === 'DOWN' ? css.bad : playback === 'BUFFERING' ? css.warn : css.good}>● LIVE</em>
-                  </div>
-                  <div className={css.rhwtitle}>
-                    <span>PREMIERE NIGHT</span>
-                    <b>{inp.premiereTitle}</b>
-                  </div>
-                  <div className={css.rhwstate}>
-                    {playback === 'PLAYING'
-                      ? <><i className={css.viewerPlay}><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor" /></svg></i><b>PLAYING</b></>
-                      : <><i className={css.viewerSpinner} /><b>{playback === 'DOWN' ? 'STREAM UNAVAILABLE' : 'PLAYBACK DEGRADED'}</b></>}
-                  </div>
-                  <div className={css.rhwbar}>
-                    <i style={{ width: `${Math.round((playback === 'DOWN' ? Math.min(t, .34) : t) * 100)}%` }} />
-                  </div>
-                </div>
+                <RehearsalMonitor
+                  brand={brand.name}
+                  label={liveMode ? nightName.toUpperCase() : 'PREMIERE NIGHT'}
+                  title={inp.premiereTitle}
+                  state={allView ? everyMarket.state : playback}
+                  viewers={viewersNow}
+                  note={allView && everyMarket.down + everyMarket.buffering > 0 ? `${everyMarket.down + everyMarket.buffering} of ${everyMarket.total} markets struggling` : null}
+                />
+                {allView ? (
+                  <>
+                    <div className={css.rhwwhere}>
+                      <span>VIEWER CHECK</span><b>All {everyMarket.total} markets</b>
+                      <em className={everyMarket.down ? css.bad : everyMarket.buffering ? css.warn : css.good}>
+                        {everyMarket.down ? `${everyMarket.down} unavailable` : everyMarket.buffering ? `${everyMarket.buffering} degraded` : 'All playing smoothly'}
+                      </em>
+                    </div>
+                    {/* every market as a lamp, lit by what it is getting right now */}
+                    <div className={css.rhwlamps} aria-hidden="true">
+                      {everyMarket.states.map(entry => (
+                        <i key={entry.country.marketId} className={entry.state === 'DOWN' ? css.bad : entry.state === 'BUFFERING' ? css.warn : css.good} />
+                      ))}
+                    </div>
+                    <div className={css.rhwatchreason}>
+                      <p>{everyMarket.struggling.length === 0
+                        ? 'Every market is playing smoothly.'
+                        : `Struggling: ${everyMarket.struggling.slice(0, 3).map(entry => entry.country.country).join(', ')}${everyMarket.struggling.length > 3 ? ` and ${everyMarket.struggling.length - 3} more` : ''}. Pick one below the test to inspect its stream.`}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
                 <div className={css.rhwwhere}>
                   <span>VIEWER CHECK</span><b>{watching.country}</b>
                   <em className={playback === 'DOWN' ? css.bad : playback === 'BUFFERING' ? css.warn : css.good}>{playback === 'DOWN' ? 'Unavailable' : playback === 'BUFFERING' ? 'Degraded' : 'Playing smoothly'}</em>
@@ -2151,7 +2195,9 @@ const Rehearsal: React.FC<{
                     <p>{watchingDiagnosis.repair}</p>
                   </details>}
                 </div>}
-                {marketTally && (
+                  </>
+                )}
+                {marketTally && !allView && (
                   <p className={css.rhmarketcount} aria-label={`All ${marketTally.total} opening markets`}>
                     <b>ALL {marketTally.total} MARKETS</b>
                     <span className={css.good}>{marketTally.playing} playing</span>
@@ -2227,7 +2273,7 @@ const Rehearsal: React.FC<{
               })()}
             </div>
 
-            <RehearsalMarkets result={result} selected={watching?.marketId} onSelect={pickMarket}/>
+            <RehearsalMarkets result={result} selected={allView ? REHEARSAL_ALL_MARKETS : watching?.marketId} onSelect={pickMarket}/>
 
             <div className={css.fixes}>
               <span className={css.fixhead}>REPAIR THE PLAN</span>
@@ -2254,7 +2300,7 @@ const Rehearsal: React.FC<{
                     group.limits ? 'Physical room limits reduce usable compute.' : null,
                     group.overload ? 'A local route needs more capacity.' : null,
                     group.single ? 'A second serving city improves resilience.' : null,
-                    group.affected ? `${group.affected} markets need attention at peak.` : 'Playback is healthy; review these room limits before commissioning.',
+                    group.affected ? `${group.affected} markets need attention at peak.` : liveMode ? 'Playback is healthy; review these room limits.' : 'Playback is healthy; review these room limits before commissioning.',
                   ].filter(Boolean).join(' ')} Review the setup, then rehearse again.</span><i>OPEN →</i></button>)}
                   {optional.length > 0 && <details className={css.fixmore}><summary>Optional headroom and backup · {optional.length} regions</summary>{optional.map(([id, group]) => <button type="button" className={css.fixaction} key={id} onClick={() => onOpenNetwork(id)}><span><b>{group.name}</b>Playback clears this scenario. Add steady compute or a second delivery city if you want less reliance on burst and more resilience.</span><i>OPEN →</i></button>)}</details>}
                   {missing.length > 0 && <button type="button" className={css.fixaction} onClick={() => { onClose(); onOpenContent?.(); }}><span><b>REVIEW CATALOGUE RIGHTS</b>{missing.length} markets have incomplete opening-catalogue clearance.</span><i>OPEN →</i></button>}
@@ -2262,7 +2308,7 @@ const Rehearsal: React.FC<{
                 </>;
               })() : result.repairActions.map(action => <button type="button" className={css.fixaction} key={action.id} onClick={() => applyRehearsalRepair(action)}><span><b>{action.label}</b>{action.detail}</span><i>OPEN →</i></button>)}
             </div>
-            {result.verdict !== 'HELD' && (
+            {result.verdict !== 'HELD' && !liveMode && (
               <div className={css.overridecopy}>
                 <b>FOUNDER OVERRIDE AVAILABLE</b>
                 <span>This warning will remain on the launch record, but it will not stop you from commissioning the network.</span>
@@ -2275,13 +2321,13 @@ const Rehearsal: React.FC<{
 
       <div className={css.rhfoot}>
         {!running && !result && (
-          <button className={css.rhrun} onClick={() => { setT(0); setRunning(true); }}>RUN THE REHEARSAL</button>
+          <button className={css.rhrun} onClick={() => { setT(0); setRunning(true); }}>{liveMode ? 'RUN THE NIGHT' : 'RUN THE REHEARSAL'}</button>
         )}
         {running && <div className={css.rhwait}><i />PUSHING TRAFFIC…</div>}
         {result && (
           <>
             <button className={css.rhagain} onClick={() => { setResult(null); setT(0); }}>RUN AGAIN</button>
-            <button className={css.rhrun} onClick={onClose}>BACK TO THE BUILD</button>
+            <button className={css.rhrun} onClick={onClose}>{liveMode ? 'BACK TO THE NETWORK' : 'BACK TO THE BUILD'}</button>
           </>
         )}
       </div>

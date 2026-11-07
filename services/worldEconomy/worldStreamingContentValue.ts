@@ -1,18 +1,29 @@
 import type { OwnedStreamingSlateEntry, Player } from '../../types';
 import { resolveHistoricalCatalogueTitle } from '../historicalCatalogue';
 import type { StreamingCatalogueReadContext } from '../streamingContentAvailability';
+import { normalizeStreamingLanguageId } from '../streamingLocalizationCapabilities';
 
 const bounded = (n:number, lo:number, hi:number) => Math.max(lo,Math.min(hi,Number.isFinite(n)?n:lo));
 
-/** Authored title quality is a simulation input, not a measured audience rating. */
-export const streamingTitleQuality = (player: Player, projectId: string, preparedContext?: StreamingCatalogueReadContext): number => {
+const rawTitle = (player: Player, projectId: string, preparedContext?: StreamingCatalogueReadContext): any => {
     const index = preparedContext?.player === player ? preparedContext.titleIndex : undefined;
-    const raw = index ? index.worldProjects.get(projectId) || index.pastProjects.get(projectId) || index.historicalTitle(projectId) || {} : (player.world.projects || []).find(project => String(project.id) === projectId) as any
+    return index ? index.worldProjects.get(projectId) || index.pastProjects.get(projectId) || index.historicalTitle(projectId) || {} : (player.world.projects || []).find(project => String(project.id) === projectId) as any
         || (player.pastProjects || []).find(project => String(project.id) === projectId) as any
         || resolveHistoricalCatalogueTitle(player, projectId) || {};
+};
+
+/** Authored title quality is a simulation input, not a measured audience rating. */
+export const streamingTitleQuality = (player: Player, projectId: string, preparedContext?: StreamingCatalogueReadContext): number => {
+    const raw = rawTitle(player, projectId, preparedContext);
     const quality = Number(raw.quality ?? raw.finalQuality);
     const rating = Number(raw.rating ?? raw.imdbRating);
     return bounded(Number.isFinite(quality) ? quality : Number.isFinite(rating) ? rating * 10 : 60,0,100);
+};
+
+/** The title's original language, read the way the viewing engine reads it (English when unset). */
+export const streamingTitleLanguageId = (player: Player, projectId: string, preparedContext?: StreamingCatalogueReadContext): string => {
+    const raw = rawTitle(player, projectId, preparedContext);
+    return normalizeStreamingLanguageId(raw.originalLanguageId || raw.language || 'english');
 };
 
 /** Prior settled age anchors a title: editing its slate date cannot mint another premiere. */

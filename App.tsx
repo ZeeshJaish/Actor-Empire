@@ -12,6 +12,7 @@ import { BottomNav } from './components/BottomNav';
 import { NewPlayerTutorialOverlay } from './components/NewPlayerTutorialOverlay';
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
+import { StreamingIncidentEventModal } from './components/StreamingIncidentEventModal';
 import { StockControlEventModal } from './components/StockControlEventModal';
 import { SaveRecoveryModal } from './components/SaveRecoveryModal';
 import { WeekProcessingRecoveryModal } from './components/WeekProcessingRecoveryModal';
@@ -487,7 +488,7 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
-  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | null>(null);
+  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
   const [streamingContentOfferId, setStreamingContentOfferId] = useState<string | null>(null);
   const [studioContinuationTarget, setStudioContinuationTarget] = useState<{ studioId: string; scriptId: string } | null>(null);
@@ -1967,7 +1968,7 @@ export const App: React.FC = () => {
   };
 
   const handleStreamingLaunchQa = async (
-    action: 'READY' | 'COMPLETE_BUILD', report: (message: string) => void,
+    action: 'READY' | 'COMPLETE_BUILD' | 'FULL_PLATFORM', report: (message: string) => void,
   ): Promise<{ok:boolean;message:string}> => {
     if(weekProcessingLockRef.current||isProcessing) return {ok:false,message:'Wait for current processing to finish.'};
     weekProcessingLockRef.current=true;
@@ -1979,7 +1980,6 @@ export const App: React.FC = () => {
       // Preserve pending career edits as the recoverable pre-cheat generation.
       const checkpoint=await persistCurrentSlotSnapshot(player);
       latest=checkpoint;
-      const qa=await import('./services/streamingLaunchQa');
       const publish=async(candidate:Player)=>{
         const saved=await persistCurrentSlotSnapshot(candidate);
         suppressNextAutosaveRef.current=true;
@@ -1987,14 +1987,26 @@ export const App: React.FC = () => {
         latest=saved;
         return saved;
       };
-      if(action==='READY') await publish(qa.prepareStreamingCommissionQa(checkpoint));
-      else await qa.advanceStreamingCommissionQa(checkpoint,{
-        processWeek: candidate=>processGameWeek(candidate),persistWeek:publish,
-        onProgress:(done,total)=>report(`Saved ${done} of ${total} weeks. Opening Night remains manual.`),
-        yieldToUi:yieldForWeekProcessingPaint,
-      });
+      if(action==='FULL_PLATFORM') {
+        const full=await import('./services/streamingFullPlatformQa');
+        await full.buildStreamingFullPlatformQa(checkpoint,{
+          processWeek: candidate=>processGameWeek(candidate),persistWeek:publish,
+          onProgress:report,yieldToUi:yieldForWeekProcessingPaint,
+        });
+      } else {
+        const qa=await import('./services/streamingLaunchQa');
+        if(action==='READY') await publish(qa.prepareStreamingCommissionQa(checkpoint));
+        else await qa.advanceStreamingCommissionQa(checkpoint,{
+          processWeek: candidate=>processGameWeek(candidate),persistWeek:publish,
+          onProgress:(done,total)=>report(`Saved ${done} of ${total} weeks. Opening Night remains manual.`),
+          yieldToUi:yieldForWeekProcessingPaint,
+        });
+      }
       if(latest.flags?.isDead){setGameStatus('DEATH_SCREEN');return {ok:false,message:'Career ended during fast-forward. Completed weeks are saved.'};}
-      const message=action==='READY'?'Both wizards prepared for 197 markets. Open Streaming and press Commission.':`Build time processed and saved through week ${latest.currentWeek}. Open Streaming to review the Opening Programme.`;
+      const company=latest.ownedStreamingPlatform;
+      const message=action==='FULL_PLATFORM'
+        ? `${company.identity?.name || 'The test company'} is live: ${company.catalogProjectIds.length} titles, ${company.marketOperations.filter(row=>row.status==='ACTIVE').length} markets, ${company.weeklyHistory.length} weeks of history.`
+        : action==='READY'?'Both wizards prepared for 197 markets. Open Streaming and press Commission.':`Build time processed and saved through week ${latest.currentWeek}. Open Streaming to review the Opening Programme.`;
       setLifestyleInitialView('STREAMING_PLATFORM');
       setActivePage(Page.LIFESTYLE);
       return {ok:true,message};
@@ -3399,6 +3411,21 @@ export const App: React.FC = () => {
                   const currentEvent = player.pendingEvents![0];
                   const { updatedPlayer, log } = applyCrisisImpact(player, currentEvent, idx);
                   resolveQueuedEventSafely(player, updatedPlayer, currentEvent.id, log);
+              }}
+          />
+      )}
+
+      {player.pendingEvents && player.pendingEvents.length > 0 && player.pendingEvents[0].type === 'STREAMING_INCIDENT' && (
+          <StreamingIncidentEventModal
+              key={player.pendingEvents[0].id}
+              player={player}
+              event={player.pendingEvents[0]}
+              onResolve={(updatedPlayer, log) => resolveQueuedEventSafely(player, updatedPlayer, player.pendingEvents?.[0]?.id, log)}
+              onOpenStatus={() => {
+                  /* #75: the popup leads to STATUS; the incident stays open there */
+                  resolveQueuedEventSafely(player, player, player.pendingEvents?.[0]?.id, `${player.pendingEvents?.[0]?.title || 'An incident'}: opened STATUS.`);
+                  setLifestyleInitialView('STREAMING_STATUS');
+                  setActivePage(Page.LIFESTYLE);
               }}
           />
       )}

@@ -187,8 +187,10 @@ export function FlagField({ code, src, variant = 'icon' }: Props) {
       <span className="sf-flag-composite" aria-hidden="true">
         {/* Large cards use the original cinematic field only. The supplied SVG
             is deliberately reserved for compact selectors and Language, where
-            its native flag-card proportions belong. */}
-        {key === 'PK' || key === 'BD' ? (
+            its native flag-card proportions belong. #139: a country with no
+            field of its own shows its real flag, never a made-up field (the
+            card is shared with Enter new markets, which offers every country). */}
+        {key === 'PK' || key === 'BD' || !FIELDS[key] ? (
           <CountryFlagSvg code={key} className="sf-flag sf-flag--field-base" fit="stretch" />
         ) : needsWideField ? (
           <span className={`sf-flag-wide-field sf-flag-wide-field--${key.toLowerCase()}`}>

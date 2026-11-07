@@ -65,7 +65,7 @@ await check('zero-backend unsigned draft survives normalization',()=>{
 await check('ads and rental switching stops future payables without resetting balances',async()=>{
  let p=fixture('STORE');p=(await processGameWeek(p)).player;
  const before=new Map(p.ownedStreamingPlatform.catalogLicenses.map(row=>[row.id,p.world.streamingRightsContracts[row.id].cumulativeRoyaltyPaid]));
- p.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(p.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'SUBSCRIPTION'});
+ p.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(p.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'SUBSCRIPTION',alone:true});
  for(let i=0;i<3;i++){p=(await processGameWeek(p)).player;assert.deepEqual(p.ownedStreamingPlatform.serviceConfiguration.pricing.streams,['subs'])}
  assert.equal(p.ownedStreamingPlatform.weeklyHistory.at(-1)!.operations!.partnerRevenueShareCost,0);
  for(const [id,paid] of before)assert.equal(p.world.streamingRightsContracts[id].cumulativeRoyaltyPaid,paid);

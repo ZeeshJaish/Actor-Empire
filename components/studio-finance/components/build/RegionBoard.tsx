@@ -42,7 +42,7 @@ const CLOUD_POSITION: Record<CloudProviderId, string> = {
   ATLAS: 'GLOBAL', NORTHWIND: 'VALUE', MERIDIAN: 'EDGE',
 };
 
-export function RegionBoard({ data, draft, patch, totals, services, onStartOver, focusRegionId, selectedRegionId, onSelectRegion, handlers }: StageProps) {
+export function RegionBoard({ data, draft, patch, totals, services, onStartOver, focusRegionId, selectedRegionId, onSelectRegion, handlers, live = false, renderRegionExtra, afterMap, liveDesk }: StageProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [tucked, setTucked] = useState(false);
@@ -103,6 +103,12 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver,
   /* One write path. A setup goes to the placer; what comes back is the draft
      with that region redrawn, and one line if something could not be placed. */
   const write = (regionId: string, setup: RegionSetup) => {
+    /* #96: a live network's desk sells back below what stands and builds above it, in one write */
+    if (liveDesk) {
+      const text = liveDesk.write(regionId, setup);
+      setNote(text ? { regionId, text } : null);
+      return;
+    }
     const placed = placeRegion(data, draft, regionId, setup);
     patch({ facilities: placed.draft.facilities, rehearsal: null });
     setNote(placed.note ? { regionId, text: placed.note } : null);
@@ -124,13 +130,18 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver,
         onSelectRegion={selectRegion}
         onShowWorld={showWorld}
         onShowRegion={showRegion}
+        live={live}
       />
-      <button type="button" className="bw-suggest-entry" onClick={() => setSuggesting(true)}><span><b>Suggest network</b><small>Find a setup for your budget</small></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></button>
-      {suggesting && <NetworkSuggestionSheet data={data} draft={draft} onApply={patch} onClose={() => setSuggesting(false)} />}
-      <p className="bw-rg-footprint-note">
-        Green is network reach, even in unopened countries. Only entered markets count toward viewers and revenue.
-        A service gap can remain where signal quality or capacity is short.
-      </p>
+      {!live && <button type="button" className="bw-suggest-entry" onClick={() => setSuggesting(true)}><span><b>Suggest network</b><small>Find a setup for your budget</small></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></button>}
+      {!live && suggesting && <NetworkSuggestionSheet data={data} draft={draft} onApply={patch} onClose={() => setSuggesting(false)} />}
+      {live ? (
+        <p className="bw-rg-footprint-note">Green is where your servers reach; only the markets you sell in count.</p>
+      ) : (
+        <p className="bw-rg-footprint-note">
+          Green is network reach, even in unopened countries. Only entered markets count toward viewers and revenue.
+          A service gap can remain where signal quality or capacity is short.
+        </p>
+      )}
 
       {handlers.onRepairRoom && data.repairs.filter(repair => !draft.repairIds.includes(repair.id)).length > 0 && <details className="bw-room-repairs">
         <summary>Room limits to review <span>Power, delivery capacity and equipment</span></summary>
@@ -139,14 +150,16 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver,
       </details>}
       {scouted && (
         <p className="bw-rg-scouted" role="status">
-          <b>You are not opening in {scouted}.</b>
-          <em>Choose a market there in Define the Launch and it appears here as a region to serve.</em>
+          <b>{live ? `You do not sell in ${scouted} yet.` : `You are not opening in ${scouted}.`}</b>
+          <em>{live ? 'A region you launch in appears here, ready for servers.' : 'Choose a market there in Define the Launch and it appears here as a region to serve.'}</em>
         </p>
       )}
 
+      {afterMap}
+
       <p className="bw-rg-title">
-        <b>Regions you open in</b>
-        <em>{regions.length === 0 ? 'none yet' : `${regions.length} · ${compactCount(totals.capacity + totals.burst)} carried`}</em>
+        <b>{live ? 'Your regions' : 'Regions you open in'}</b>
+        <em>{regions.length === 0 ? 'none yet' : live ? `${regions.length} ${regions.length === 1 ? 'region' : 'regions'}` : `${regions.length} · ${compactCount(totals.capacity + totals.burst)} carried`}</em>
       </p>
 
       {regions.length === 0 && (
@@ -171,16 +184,19 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver,
             onCloudGesture={setCloudDragging}
             nextName={nextUnset(report.region.id)?.name}
             onDone={() => setOpenId(nextUnset(report.region.id)?.id ?? null)}
+            live={live}
+            liveDesk={liveDesk}
+            extra={report.region.id === openId ? renderRegionExtra?.(report.region.id) : undefined}
           />
         ))}
       </ul>
 
       {/* The estate, every week, in one line — it was a panel of tiles under a
           dial; the facts stay, the furniture went. */}
-      {draft.facilities.length > 0 && (
+      {!live && draft.facilities.length > 0 && (
         <p className="bw-rg-estate">
-          <b>Every week, once it runs</b>
-          <em>{money(shownWeekly)} · {totals.energy} MWh · {totals.water} m³ · {totals.weeks} weeks to build</em>
+          <b>{live ? 'Every week' : 'Every week, once it runs'}</b>
+          <em>{money(shownWeekly)} · {totals.energy} MWh · {totals.water} m³{live ? '' : ` · ${totals.weeks} weeks to build`}</em>
         </p>
       )}
       {onStartOver && draft.facilities.length > 0 && (
@@ -192,7 +208,7 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver,
 
 /* --- one region ----------------------------------------------------------------- */
 
-function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloudGesture, nextName, onDone, rowRef }: {
+function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloudGesture, nextName, onDone, rowRef, live = false, extra, liveDesk }: {
   /* No `@types/react` in this project, so a value-based element rejects `key`.
      Declaring it is the house workaround. */
   key?: Key;
@@ -208,8 +224,21 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
   /** The next region nothing is set in, if any — where Done goes. */
   nextName?: string;
   onDone: () => void;
+  /** #90: a live network (see StageProps.live), and the Network tab's controls under the open region */
+  live?: boolean;
+  extra?: React.ReactNode;
+  /** #96: the desk's view of what stands here (see StageProps.liveDesk) */
+  liveDesk?: StageProps['liveDesk'];
 }) {
   const { region, setup, peak, served, cloudServed, once, weekly, readyWeeks, word, tone, landed, countries, unservable, coverageAvailable } = report;
+  /* #96: what stands here, against which − sells back and + builds */
+  const standing = liveDesk?.standing(region.id) ?? null;
+  const resale = liveDesk ? Math.round(liveDesk.resaleRate(region.id) * 100) : 0;
+  /* a live region building rests its levers until the build lands (one build a region at a time) */
+  const locked = Boolean(liveDesk?.locked?.(region.id));
+  const standingServers = standing ? OPEN_TIERS.reduce((sum, tier) => sum + standing.servers[tier], 0) : 0;
+  const newServers = standing ? OPEN_TIERS.reduce((sum, tier) => sum + Math.max(0, setup.servers[tier] - standing.servers[tier]), 0) : 0;
+  const soldServers = standing ? OPEN_TIERS.reduce((sum, tier) => sum + Math.max(0, standing.servers[tier] - setup.servers[tier]), 0) : 0;
   const rooms = landed.flatMap(entry => entry.rooms);
   const cloudRooms = rooms.filter(room => room.tenure === 'CLOUD');
   const cloudWeekly = cloudRooms.reduce((sum, room) => sum + cloudWeeklyCost(room), 0);
@@ -349,12 +378,13 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
       <button type="button" className="bw-rg-head" aria-expanded={open} onClick={onToggle}>
         <span className="bw-rg-who">
           <b>{region.name}</b>
-          <em>{region.opening.length} {region.opening.length === 1 ? 'country' : 'countries'} · {coverageAvailable ? compactCount(peak) : '—'} on the night</em>
+          <em>{region.opening.length} {region.opening.length === 1 ? 'country' : 'countries'} · {coverageAvailable ? compactCount(peak) : '—'} {live ? 'at peak' : 'on the night'}</em>
+          {liveDesk?.badge?.(region.id)}
         </span>
         <span className={stamp ? 'bw-rg-word is-stamp' : 'bw-rg-word'}><i aria-hidden="true" />{word}{countries.some(country => country.state !== 'READY') && rooms.length > 0 && <small>{countries.filter(country => country.state !== 'READY').length} need attention</small>}</span>
         <span className="bw-rg-cost">
           <b>{rooms.length === 0 ? '—' : `${money(Math.round(weeklyShown))}/wk`}</b>
-          <em>{rooms.length === 0 ? 'nothing here yet' : once > 0 ? `${money(Math.round(onceShown))} ${data.operationalRevision ? 'asset value' : 'once'}` : 'nothing once'}</em>
+          <em>{rooms.length === 0 ? 'nothing here yet' : live ? 'a week' : once > 0 ? `${money(Math.round(onceShown))} ${data.operationalRevision ? 'asset value' : 'once'}` : 'nothing once'}</em>
         </span>
         {/* A closed row used to say only a word and a price (#119). It carries
             its own coverage along the bottom now, and the kit standing in it,
@@ -386,12 +416,13 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
           {/* --- the served bar: yours, rented, and what is still short ------- */}
           {coverageAvailable ? <ServedBar
             regionName={region.name}
+            live={live}
             peak={peak}
             served={served}
             ownServed={ownServed}
             cloudServed={cloudServed}
             unservablePeak={unservable.peak}
-          /> : <p className="bw-rg-dead" role="status">Coverage unavailable. Verify the network before rehearsing or commissioning.</p>}
+          /> : <p className="bw-rg-dead" role="status">{live ? 'Coverage unavailable.' : 'Coverage unavailable. Verify the network before rehearsing or commissioning.'}</p>}
           {/* A market nothing here can serve is said once, under the bar it
               is missing from — not left for the player to infer from a share
               that will not climb. */}
@@ -401,18 +432,23 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               {` ${unservable.markets.length === 1 ? 'insists' : 'insist'} on rooms inside ${unservable.markets.length === 1 ? 'its' : 'their'} borders, and nobody rents there — ${pct(share(unservable.peak, peak) * 100, 0)} of the night cannot be served from anywhere.`}
             </p>
           )}
+          {/* #96: a live region's own controls (Suggest, or the build under way) sit above its levers, not under them */}
+          {live && extra}
 
           {/* --- your servers: three machines, three cards (#119) ------------- */}
           <section className="bw-rg-block">
             <p className="bw-rg-block-head">
               <b>Your servers</b>
-              <em>{servers === 0 ? 'none yet' : `${servers} standing`}</em>
+              <em>{standing
+                ? [standingServers === 0 ? 'none standing' : `${standingServers} standing`, newServers > 0 && `+${newServers} new`, soldServers > 0 && `−${soldServers} sold`].filter(Boolean).join(' · ')
+                : servers === 0 ? 'none yet' : `${servers} standing`}</em>
             </p>
             <ul className="bw-net-duties bw-rg-tiers">
               {OPEN_TIERS.map(tier => {
                 const spec = SERVER_TIERS[tier];
                 const count = setup.servers[tier];
                 const addable = servers < serverCeiling && canAddServer(data, draft, region.id, tier);
+                const delta = standing ? count - standing.servers[tier] : 0;
                 return (
                   <li key={tier} className={count > 0 ? `bw-net-duty is-on is-${tier.toLowerCase()}` : `bw-net-duty is-${tier.toLowerCase()}`}>
                     <ServerMark tier={tier} />
@@ -420,21 +456,25 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                     <s className="bw-rg-tier-reach">{compactCount(tierCapacity(tier, 1))}<small>viewers per rack</small></s>
                     <span className="bw-rg-tier-coverage">{SERVER_COVERAGE[tier]} coverage</span>
                     <span className="bw-net-duty-set">
-                      <button type="button" disabled={count === 0} onClick={() => setTier(tier, count - 1)} aria-label={`One fewer ${spec.name} in ${region.name}`}>−</button>
+                      <button type="button" disabled={locked || count === 0} onClick={() => setTier(tier, count - 1)} aria-label={`One fewer ${spec.name} in ${region.name}`}>−</button>
                       <b key={count} aria-live="polite">{count}</b>
-                      <button type="button" disabled={!addable} onClick={() => setTier(tier, count + 1)} aria-label={`One more ${spec.name} in ${region.name}`}>+</button>
+                      <button type="button" disabled={locked || !addable} onClick={() => setTier(tier, count + 1)} aria-label={`One more ${spec.name} in ${region.name}`}>+</button>
                     </span>
-                    <s className="bw-net-duty-price">{money(rackBuildCost(tier))} each</s>
-                    {count > 0 && <em className="bw-net-duty-carry">{compactCount(tierCapacity(tier, count))} carried</em>}
+                    <s className="bw-net-duty-price">{standing && count < standing.servers[tier] ? `sells at ${resale}%` : `${money(rackBuildCost(tier))} each`}</s>
+                    {standing ? (
+                      <em key={delta} className={delta > 0 ? 'bw-rg-delta is-add' : delta < 0 ? 'bw-rg-delta is-sell' : 'bw-rg-delta'}>
+                        {delta > 0 ? `+${delta} new` : delta < 0 ? `−${-delta} sold` : standing.servers[tier] > 0 ? `${standing.servers[tier]} standing` : 'none yet'}
+                      </em>
+                    ) : count > 0 && <em className="bw-net-duty-carry">{compactCount(tierCapacity(tier, count))} carried</em>}
                   </li>
                 );
               })}
             </ul>
-            <p className="bw-rg-tier-line">{SERVER_TIERS[leaning].line}</p>
+            {!live && <p className="bw-rg-tier-line">{SERVER_TIERS[leaning].line}</p>}
             <p className="bw-rg-landed">
               {servers === 0
                 ? 'Nothing of yours here yet.'
-                : `Landed in ${landed.filter(entry => entry.rooms.some(room => room.tenure !== 'CLOUD')).map(entry => entry.city.name).join(', ')} · ready week ${Math.max(1, readyWeeks)}`}
+                : `Landed in ${landed.filter(entry => entry.rooms.some(room => room.tenure !== 'CLOUD')).map(entry => entry.city.name).join(', ')}${live ? '' : ` · ready week ${Math.max(1, readyWeeks)}`}`}
             </p>
           </section>
 
@@ -456,7 +496,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                     type="button"
                     className={id === providerId ? `bw-rg-prov-btn is-on is-${id.toLowerCase()}` : `bw-rg-prov-btn is-${id.toLowerCase()}`}
                     data-cloud-provider-card={id}
-                    disabled={!here}
+                    disabled={locked || !here}
                     aria-pressed={id === providerId}
                     onClick={() => pickProvider(id)}
                   >
@@ -469,10 +509,10 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                 );
               })}
             </div>
-            <p className="bw-rg-prov-detail" data-cloud-provider-detail={providerId}>
+            {!live && <p className="bw-rg-prov-detail" data-cloud-provider-detail={providerId}>
               <b>{provider.name}</b>
               <span>{cloudCeiling} compute at the standard rate · {provider.line}</span>
-            </p>
+            </p>}
             <input
               type="range"
               className="sf-slider bw-cloud-slider"
@@ -480,7 +520,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               max={sliderMax}
               step={1}
               value={Math.min(sliderMax, cloudDraft)}
-              disabled={sliderMax === 0}
+              disabled={locked || sliderMax === 0}
               aria-label={`Cloud compute in ${region.name}`}
               aria-valuetext={cloudDraft > 0 ? `${cloudDraft} compute selected${draggingCloud.current ? ', map preview updating' : `, ${money(cloudWeekly)} a week`}` : 'Nothing bought yet'}
               style={{ ['--sf-fill' as string]: `${sliderMax > 0 ? Math.round((Math.min(sliderMax, cloudDraft) / sliderMax) * 100) : 0}%` }}
@@ -499,22 +539,29 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               <span><b>{Math.round(shownCloudCities)}</b><em>{cloudRooms.length === 1 ? 'city' : 'cities'}</em></span>
               <span><b>{money(shownCloudWeekly)}</b><em>a week</em></span>
             </p>
-            {sliderMax > 0 && <p className="bw-cloud-footprint">
+            {standing && (standing.cloud > 0 || setup.cloud.compute > 0) && (
+              <p key={setup.cloud.compute - standing.cloud} className={setup.cloud.compute > standing.cloud ? 'bw-rg-delta is-add' : setup.cloud.compute < standing.cloud ? 'bw-rg-delta is-sell' : 'bw-rg-delta'}>
+                {setup.cloud.compute > standing.cloud ? `+${setup.cloud.compute - standing.cloud} compute new`
+                  : setup.cloud.compute < standing.cloud ? `−${standing.cloud - setup.cloud.compute} compute dropped · its weekly price stops`
+                    : `${standing.cloud} compute standing`}
+              </p>
+            )}
+            {!live && sliderMax > 0 && <p className="bw-cloud-footprint">
               <span>{cloudDraft >= fullRegionCompute ? 'Full regional signal target' : `Full regional signal target · ${fullRegionCompute} compute`}</span>
               <small>Physical reach includes unopened countries. Only entered markets can earn viewers or revenue.</small>
             </p>}
             {/* One line, not a paragraph (#119): who carries it, and the one
                 thing that is unusual about this plan if anything is. */}
-            <p className="bw-rg-tier-line">
+            {(!live || extended > 0) && <p className="bw-rg-tier-line">
               {extended > 0
                 ? `${extended} compute above ${provider.name}'s ceiling here, at the step-up rate. A limit is a cost, not a wall.`
                 : `${provider.name}: ${provider.line}`}
-            </p>
+            </p>}
           </section>
 
           {/* These searches simulate many placements. Only run them when the
               player asks for a priced alternative, not after every + tap. */}
-          <details className="bw-rg-alternatives" open={alternativesOpen} onToggle={event => setAlternativesOpen(event.currentTarget.open)}>
+          {!live && <details className="bw-rg-alternatives" open={alternativesOpen} onToggle={event => setAlternativesOpen(event.currentTarget.open)}>
             <summary>Compare paths to Strong <span>Provider-by-provider quotes and own-versus-cloud alternatives</span></summary>
             {alternativesOpen && (
               <>
@@ -533,7 +580,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                 {whatIfs.length > 0 && strip}
               </>
             )}
-          </details>
+          </details>}
 
           {/* The regional answer remains above the controls; country detail is
               here on demand so a 23-country opening does not bury the levers. */}
@@ -543,7 +590,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               <ul className="bw-rg-countries">
                 {[...countries].sort((a, b) => a.share - b.share || b.peak - a.peak).map(country => (
                   <li key={country.id} className={country.share >= 0.9 ? 'is-good' : country.share >= 0.6 ? 'is-warn' : 'is-bad'}>
-                    <span className="bw-rg-country-who"><b>{country.name}</b><em>{country.coverageAvailable ? compactCount(country.peak) : '—'} on the night</em></span>
+                    <span className="bw-rg-country-who"><b>{country.name}</b><em>{country.coverageAvailable ? compactCount(country.peak) : '—'} {live ? 'at peak' : 'on the night'}</em></span>
                     <span className="bw-rg-country-bar" aria-hidden="true">{country.coverageAvailable && <i style={{ width: `${Math.round(country.share * 100)}%` }} />}</span>
                     <strong>{country.coverageAvailable ? pct(country.share * 100, 0) : 'Unavailable'}</strong>
                   </li>
@@ -559,19 +606,23 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
             <details className="bw-rg-rooms">
               <summary>Where they landed · {rooms.length} {rooms.length === 1 ? 'room' : 'rooms'}</summary>
               <ul>
-                {landed.map(entry => entry.rooms.map(room => <RoomLine key={room.id} data={data} room={room} cityName={entry.city.name} />))}
+                {landed.map(entry => entry.rooms.map(room => <RoomLine key={room.id} data={data} room={room} cityName={entry.city.name} live={live} />))}
               </ul>
             </details>
           )}
 
-          {/* --- done with this region, or not (#108) --------------------------- */}
-          {rooms.length > 0 && (
+          {!live && extra}
+
+          {/* --- done with this region, or not (#108); a live region's Done, Undo and Build it are the desk's bar (#96) */}
+          {!live && rooms.length > 0 && (
             <div className="bw-rg-foot">
               <button type="button" className="bw-rg-done" onClick={onDone}>
                 {nextName ? `Done · next: ${nextName}` : 'Done'}
               </button>
               <button type="button" className={clearing ? 'bw-rg-clear is-armed' : 'bw-rg-clear'} onClick={clear} aria-live="polite">
-                {clearing ? `Clear ${region.name}? Tap again` : `Clear ${region.name}`}
+                {live
+                  ? (clearing ? `Undo the changes in ${region.name}? Tap again` : `Undo the changes in ${region.name}`)
+                  : (clearing ? `Clear ${region.name}? Tap again` : `Clear ${region.name}`)}
               </button>
             </div>
           )}
@@ -585,8 +636,9 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
    rolls up from nothing to where the region stands, and after that both move
    only when the region does (#107). The label carries the true value for a
    screen reader whatever the meter is doing. */
-function ServedBar({ regionName, peak, served, ownServed, cloudServed, unservablePeak }: {
+function ServedBar({ regionName, peak, served, ownServed, cloudServed, unservablePeak, live = false }: {
   regionName: string;
+  live?: boolean;
   peak: number;
   served: number;
   ownServed: number;
@@ -599,7 +651,7 @@ function ServedBar({ regionName, peak, served, ownServed, cloudServed, unservabl
     <div
       className="bw-rg-served"
       role="img"
-      aria-label={`${Math.round(share(served, peak) * 100)} percent of ${regionName} served on the night`}
+      aria-label={`${Math.round(share(served, peak) * 100)} percent of ${regionName} served ${live ? 'at peak' : 'on the night'}`}
     >
       <span className="bw-rg-served-track">
         <i className="is-own" style={{ width: `${Math.round(share(ownServed, peak) * 100)}%` }} />
@@ -629,7 +681,7 @@ function serverWords(room: Facility): string {
   return parts.length > 0 ? parts.join(' · ') : 'Empty';
 }
 
-function RoomLine({ data, room, cityName }: { key?: Key; data: StageProps['data']; room: Facility; cityName: string }) {
+function RoomLine({ data, room, cityName, live = false }: { key?: Key; data: StageProps['data']; room: Facility; cityName: string; live?: boolean }) {
   const listing = listingFor(data, room);
   const cloud = room.tenure === 'CLOUD';
   const racks = facilityRacks(room);
@@ -640,7 +692,7 @@ function RoomLine({ data, room, cityName }: { key?: Key; data: StageProps['data'
         <em>
           {cloud
             ? `${computeRacks(room)} compute · ${CLOUD_PROVIDERS[room.provider ?? 'ATLAS'].name}`
-            : `${serverWords(room)} · ${racks} of ${listing?.rackPositions ?? racks} positions · ready week ${listing?.provisioningWeeks ?? 1}`}
+            : `${serverWords(room)} · ${racks} of ${listing?.rackPositions ?? racks} positions${live ? (room.built ? '' : ' · new') : ` · ready week ${listing?.provisioningWeeks ?? 1}`}`}
         </em>
       </span>
       <strong>{cloud ? `${money(cloudWeeklyCost(room))}/wk` : `${money((listing?.weeklyRent ?? 0) + room.opCost)}/wk`}</strong>

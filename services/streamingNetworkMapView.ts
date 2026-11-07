@@ -104,13 +104,16 @@ export const getStreamingNetworkMapView = (player: Player): StreamingNetworkMapV
         sites,
         markets: signals.markets.map(market => ({
             ...market,
+            /* #92: SERVED is the engine's 80% rule, as the live Network desk counts markets (the signals' own cut is half) */
+            state: market.served >= .8 ? 'SERVED' as const : market.reached > 0 ? 'THIN' as const : 'DARK' as const,
             audience: STREAMING_WORLD_MARKETS.find(candidate => candidate.id === market.countryId)?.streamingAudience ?? 0,
         })),
         reached: signals.reached,
         served: signals.served,
         revision: setup?.revision ?? null,
         pending: pending ? { revision: pending.revision, weeksLeft: Math.max(0, pending.readyAtAbsoluteWeek - absoluteWeek) } : null,
-        peakStreams: latest?.operations?.peakConcurrentStreams ?? 0,
+        // load units since Phase 2 (an HD stream is 1, a 4K one 2.4), as capacity is counted
+        peakStreams: latest?.operations?.peakLoadUnits ?? latest?.operations?.peakConcurrentStreams ?? 0,
         capacityStreams: platform.capacity.burstConcurrentStreams,
         weeklyOperatingCost: setup?.weeklyOperatingCost ?? 0,
     };

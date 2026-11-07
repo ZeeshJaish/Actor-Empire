@@ -466,7 +466,9 @@ assert(service.includes('signStreamingPlatformAcquisition') && service.includes(
 assert(component.includes('Target room') && component.includes('Data room') && component.includes('Regulatory review') && component.includes('Capital stack'), 'The playable command should cover scouting, diligence, clearance and financing.');
 assert(component.includes('ACQUISITION_SIGNING') && component.includes('Skip ceremony'), 'The signing cinematic should be fact-backed, skippable and replay-safe.');
 assert(styles.includes('@media (max-width: 640px)') && styles.includes('prefers-reduced-motion'), 'The acquisition command should include explicit mobile and reduced-motion treatment.');
-assert(hq.includes('showAcquisitionCommand') && hq.includes('StreamingAcquisitionCommand'), 'Market HQ should launch Acquisition Command as a first-class room.');
+/* #166 (plan §21.16, Zeesh: "m&a chupa dete better say coming in future update"): the room is kept for a future
+   update but not mounted; the Boardroom's M&A tab says so */
+assert(!hq.includes('<StreamingAcquisitionCommand') && hq.includes('mnaComingSoon'), 'M&A is "coming in a future update" in the Boardroom.');
 assert(weekly.includes('getStreamingAcquisitionWeeklyEffects') && weekly.includes('acquisitionIntegrationCost'), 'The canonical weekly loop should reconcile integration consequences.');
 assert(!component.includes('IPO') && !component.includes('server hack') && !component.includes('Buy acquisition'), 'Phase 21 must not leak IPO, shadow-operations or monetized-win systems.');
 

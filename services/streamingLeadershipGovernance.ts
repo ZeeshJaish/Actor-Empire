@@ -430,6 +430,13 @@ export const completeDueStreamingExecutiveDevelopment = (
         if (!programsForExecutive.length) return appointment;
         let next = { ...appointment };
         programsForExecutive.forEach(program => {
+            /* #164: the team's Train is one level up (and a little skill); experience catches up to the level */
+            if (program.track === 'LEVEL_UP') {
+                next.level = Math.min(5, next.level + 1) as 1 | 2 | 3 | 4 | 5;
+                next.skill = clamp(next.skill + 4, 0, 100);
+                next.experience = Math.max(next.experience, 18 * (next.level - 1));
+                return;
+            }
             if (program.track === 'ROLE_MASTERY') {
                 next.skill = clamp(next.skill + 8, 0, 100);
                 next.performance = clamp(next.performance + 6, 0, 100);
@@ -559,12 +566,24 @@ export const appointStreamingIndependentDirector = (
     };
 };
 
+/** #172: one of the first three investors, or one who called as the service grew whose term sheet still stands */
+const streamingInvestorOfferById = (platform: OwnedStreamingPlatformState, offerId: string, absoluteWeek: number, founding = false): (StreamingCelebrityInvestorOffer & { roundId?: string }) | null => (
+    /* #174: once listed, no private term sheet can be signed (new money comes from the market);
+       #186: only a round's offers stand; the three founding offers no longer stand forever (the dev tool's full test
+       company still signs them, `founding`) */
+    platform.publicCompany.lifecycle === 'PUBLIC' ? null
+    : (founding ? STREAMING_CELEBRITY_INVESTOR_OFFERS.find(item => item.id === offerId) : null)
+    || (platform.governance.investorOffers || []).find(item => item.id === offerId && item.expiresAtAbsoluteWeek >= absoluteWeek)
+    || null
+);
+
 export const acceptStreamingCelebrityInvestment = (
     player: Player,
     offerId: string,
+    options: { founding?: boolean } = {},
 ): StreamingLeadershipActionResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const offer = STREAMING_CELEBRITY_INVESTOR_OFFERS.find(item => item.id === offerId);
+    const offer = streamingInvestorOfferById(platform, offerId, getAbsoluteWeek(player.age, player.currentWeek), options.founding);
     if (!offer) return { player, changed: false, reason: 'NOT_FOUND' };
     if (platform.governance.celebrityInvestors.some(item => item.candidateId === offerId)) {
         return { player, changed: false, reason: 'ALREADY_DECIDED' };
@@ -572,12 +591,18 @@ export const acceptStreamingCelebrityInvestment = (
     if (!activeExecutives(platform).some(item => item.role === 'CFO')) {
         return { player, changed: false, reason: 'CFO_REQUIRED' };
     }
-    if (platform.founderOwnershipPercent - offer.ownershipPercent < 51) {
+    /* #186: new shares: every holder keeps (1 − stake) of what they had, the founder included */
+    const keep = 1 - offer.ownershipPercent / 100;
+    if (platform.founderOwnershipPercent * keep < 51) {
         return { player, changed: false, reason: 'CONTROL_LIMIT' };
+    }
+    const round = offer.roundId && platform.governance.investorRound?.id === offer.roundId ? platform.governance.investorRound : null;
+    if (round && round.soldPercent + offer.ownershipPercent > round.upToPercent + 1e-9) {
+        return { player, changed: false, reason: 'ROUND_FULL' };
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const idempotencyKey = `celebrity-investment:${offer.id}`;
-    const ownershipAfter = platform.founderOwnershipPercent - offer.ownershipPercent;
+    const ownershipAfter = Math.round(platform.founderOwnershipPercent * keep * 100) / 100;
     const investor: OwnedStreamingCelebrityInvestor = {
         id: createDeterministicId('streaming_celebrity_investor', platform.simulationSeed, offer.id),
         candidateId: offer.id,
@@ -659,10 +684,14 @@ export const acceptStreamingCelebrityInvestment = (
                 finance: {
                     ...platform.finance,
                     capitalActions: [...platform.finance.capitalActions, capitalAction],
-                    equityHolders: [...platform.finance.equityHolders, equityPosition],
+                    equityHolders: [
+                        ...platform.finance.equityHolders.map(holder => ({ ...holder, ownershipPercent: Math.round(holder.ownershipPercent * keep * 10_000) / 10_000 })),
+                        equityPosition,
+                    ],
                 },
                 governance: {
                     ...platform.governance,
+                    ...(round ? { investorRound: { ...round, soldPercent: Math.round((round.soldPercent + offer.ownershipPercent) * 10) / 10 } } : {}),
                     boardConfidence: clamp(platform.governance.boardConfidence + 4, 0, 100),
                     celebrityInvestors: [...platform.governance.celebrityInvestors, investor],
                     directors: director ? [...platform.governance.directors, director] : platform.governance.directors,
@@ -670,6 +699,43 @@ export const acceptStreamingCelebrityInvestment = (
                 eventLedger: [...platform.eventLedger, ledger],
                 cinematicQueue: [...platform.cinematicQueue, cinematic],
                 milestoneKeys: Array.from(new Set([...platform.milestoneKeys, 'outside-ownership-accepted'])),
+            }, player.id),
+        },
+    };
+};
+
+/** #163: "Decline" on an investor's term sheet. The record keeps the offer's terms with status DECLINED, so the same
+    investor is not offered again; nothing else changes (no cash, no stake, no seat). */
+export const declineStreamingCelebrityInvestment = (
+    player: Player,
+    offerId: string,
+): StreamingLeadershipActionResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const offer = streamingInvestorOfferById(platform, offerId, getAbsoluteWeek(player.age, player.currentWeek));
+    if (!offer) return { player, changed: false, reason: 'NOT_FOUND' };
+    if (platform.governance.celebrityInvestors.some(item => item.candidateId === offerId)) {
+        return { player, changed: false, reason: 'ALREADY_DECIDED' };
+    }
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const declined: OwnedStreamingCelebrityInvestor = {
+        id: createDeterministicId('streaming_celebrity_investor', platform.simulationSeed, offer.id),
+        candidateId: offer.id,
+        name: offer.name,
+        status: 'DECLINED',
+        investedCapital: offer.investedCapital,
+        ownershipPercent: offer.ownershipPercent,
+        boardSeatGranted: false,
+        profitParticipationPercent: offer.profitParticipationPercent,
+        influenceDemand: offer.influenceDemand,
+        decisionAtAbsoluteWeek: absoluteWeek,
+    };
+    return {
+        changed: true,
+        player: {
+            ...player,
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                ...platform,
+                governance: { ...platform.governance, celebrityInvestors: [...platform.governance.celebrityInvestors, declined] },
             }, player.id),
         },
     };

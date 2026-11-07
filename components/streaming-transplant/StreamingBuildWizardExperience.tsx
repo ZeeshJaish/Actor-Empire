@@ -63,6 +63,7 @@ import {
   projectFacilityNetworkRole,
 } from '../../services/streamingRackGroups';
 import { reconstructStreamingRegionPlans } from '../../services/streamingRegionalNetworkPlan';
+import { NetworkDeskBoard, STREAMING_NETWORK_NIGHTS, type StreamingNetworkDeskHooks } from './NetworkDeskBoard';
 import {
   createCanonicalBuildData,
   type StreamingCanonicalBuildData,
@@ -130,6 +131,9 @@ export interface StreamingBuildWizardExperienceProps {
   onChangeMarketing?: BuildHandlers['onChangeMarketing'];
   /** Explicitly allows isolated fixture data. Saved careers never use UI fallbacks. */
   canonicalSource?: StreamingCanonicalBuildSource;
+  /** #90: the Platform room's Network tab of a live company: the network changed region by region (orders, not the
+      wizard's commission), drawn with Build's own map and region board */
+  desk?: StreamingNetworkDeskHooks;
   /** Read-only S0 audit tap; omitted in normal gameplay. */
   onProjectionDiagnostic?: (snapshot: {
     coverage: StreamingCanonicalBuildData['coverage']['countries'];
@@ -267,8 +271,7 @@ export const listingToBuild = (listing: StreamingFacilityMarketplaceListing): Fa
   contractMonths: Math.max(1, Math.round(listing.contractWeeks / 4.33)),
   expansion: listing.expansionRackPositions,
   note: listing.marketNote,
-  availability: listing.status === 'RESEARCH_REQUIRED' ? 'RESEARCH'
-    : listing.status === 'LIMITED' ? 'LIMITED' : 'AVAILABLE',
+  availability: listing.status === 'LIMITED' ? 'LIMITED' : 'AVAILABLE',
   engineering: engineeringFromListing(listing),
 });
 
@@ -587,6 +590,9 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
   const absoluteWeek = inputs.absoluteWeek || 0;
   const [networkRequest, setNetworkRequest] = useState<{ id: number; regionId?: string }>();
   const [rehearsalRun, setRehearsalRun] = useState<{ draft: BuildDraft; selection: BuildSel; forecasts: Record<Scenario, RunResult> } | null>(null);
+  /* #91: the Network tab's load test: the night tapped, and a region its repairs ask the desk to open */
+  const [deskNight, setDeskNight] = useState<Scenario>('LIKELY');
+  const [deskRegion, setDeskRegion] = useState<{ id: number; regionId: string } | null>(null);
   const baseFacilities = useMemo(() => facilitiesOf(sel), [sel]);
   const builtIds = useMemo(() => new Set((builtFacilities || []).map(facility => facility.id)), [builtFacilities]);
 
@@ -869,6 +875,8 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       const operationalQuote = revisionQuoteFor(draft);
       const infrastructure = operationalQuote?.dueNow ?? build.quote.totals.dueNow;
       const campaign = props.isLive ? 0 : marketing?.draft.budgetCeiling || 0;
+      /* #160: a launch campaign built with its weeks (#158) is paid in full at commission; one from before is reserved */
+      const campaignNow = Boolean(marketing?.draft.weeks);
       const lines = [
         ...(inputs.defineLaunchPaid || []).map(item => ({ ...item, locked: true, timing: 'SETTLED' as const })),
         ...(operationalQuote ? [{ id: 'network-revision', label: 'Network revision', amount: infrastructure, note: 'Incremental construction and migration charge', timing: 'COMMISSION' as const }] : [
@@ -876,7 +884,10 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         { id: 'network-deposits', label: 'Facility deposits', amount: build.quote.totals.deposits, note: `${build.quote.totals.rooms} rooms · ${build.quote.totals.cities} cities`, timing: 'COMMISSION' as const },
         { id: 'network-setup', label: 'Commissioning and setup', amount: build.quote.totals.setup, note: `${build.schedule.weeks} weeks to build`, timing: 'COMMISSION' as const },
         ]),
-        { id: 'campaign', label: 'Launch marketing ceiling', amount: campaign, note: campaign ? 'Reserved and spent across construction' : 'Organic launch', timing: 'OPENING_NIGHT' as const },
+        /* #158: the launch campaign, a week of what it runs × its weeks before opening, and its nights */
+        { id: 'campaign', label: 'Launch campaign', amount: campaign, note: !campaign ? 'Organic launch'
+          : marketing?.draft.weeks ? `${marketing.draft.weeks} ${marketing.draft.weeks === 1 ? 'week' : 'weeks'} before opening, paid in full at commission` : 'Reserved and spent across construction',
+          timing: campaignNow ? 'COMMISSION' as const : 'OPENING_NIGHT' as const },
         { id: 'catalogue', label: 'Catalogue licences already signed', amount: inputs.catalogueSpend, note: `${inputs.catalogueTitles} titles · already settled`, locked: true, timing: 'SETTLED' as const },
         { id: 'originals', label: 'Originals already funded', amount: inputs.originalsSpend, note: `${inputs.originalsCount} commissions · already settled`, locked: true, timing: 'SETTLED' as const },
       ].filter(line => line.amount > 0 || line.id === 'campaign');
@@ -884,8 +895,8 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       return {
         lines,
         total,
-        commissionNow: infrastructure,
-        deferred: campaign,
+        commissionNow: infrastructure + (campaignNow ? campaign : 0),
+        deferred: campaignNow ? 0 : campaign,
         available: inputs.treasury,
         headroom: Math.max(0, inputs.treasury - total),
         shortfall: Math.max(0, total - inputs.treasury),
@@ -914,7 +925,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
             country: service.name,
             regionId: market?.region || '',
             regionLabel: STREAMING_DAY_ONE_REGION_LABELS[market?.region || 'NORTH_AMERICA'],
-            demand: Math.round(service.peak * scenarioMultiplier),
+            demand: Math.round(service.peak * scenarioMultiplier * (inputs.viewerLoad ?? 1)),
             latencyMs: service.networkLatencyMs ?? null,
             cacheHitPercent: Math.round((coverage?.reachedShare || 0) * 100),
             baseBufferingRiskPercent: service.buffering,
@@ -1123,12 +1134,62 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
     onResult?.(null);
     onChange(next);
   }, [canonicalFor, inputs.marketPlanning?.editable, onChange, onResult]);
+  /* #90: the desk's way between Build's drawing and the save's rooms */
+  const deskToSave = useCallback((draft: BuildDraft) => facilitiesOf(canonicalFor(draft)), [canonicalFor]);
+  const deskToDraft = useCallback((facilities: OwnedStreamingFacility[]) => facilities.map(facility => facilityToBuild(facility, true)), []);
+  const deskRegionPlan = useCallback((facilities: OwnedStreamingFacility[], regionId: string): OwnedStreamingRegionNetworkPlan => (
+    reconstructStreamingRegionPlans(facilities).find(plan => plan.regionId === regionId)
+      || { regionId, serverCounts: { SCOUT: 0, WORKHORSE: 0, TITAN: 0 }, cloudProvider: null, cloudCompute: 0 }
+  ), []);
   const rehearsalForecastFor = useCallback((scenario: Scenario) => {
     if (!rehearsalRun) throw new Error('Career Build rehearsal opened without a draft.');
     const run = rehearsalRun.forecasts[scenario];
     if (!run) throw new Error('Career Build is missing its canonical rehearsal handlers.');
     return run;
   }, [rehearsalRun]);
+
+  if (props.desk) {
+    return (
+      <>
+        <NetworkDeskBoard
+          data={data}
+          initialDraft={initialDraft}
+          built={builtFacilities || []}
+          toSave={deskToSave}
+          toDraft={deskToDraft}
+          regionPlanOf={deskRegionPlan}
+          desk={props.desk}
+          requestedRegion={deskRegion}
+          onWatchNight={(draft, scenario) => {
+            const rehearse = data.canonical?.runRehearsal;
+            if (!rehearse) return;
+            setDeskNight(scenario);
+            setRehearsalRun({ draft, selection: canonicalFor(draft), forecasts: {
+              QUIET: rehearse(draft, 'QUIET'), LIKELY: rehearse(draft, 'LIKELY'), SURGE: rehearse(draft, 'SURGE'),
+            } });
+          }}
+        />
+        {rehearsalRun && (
+          <StreamingLoadRehearsalExperience
+            brand={brand}
+            d={derive(rehearsalRun.selection, { ...inputs, homeCityId: rehearsalRun.selection.placements[0]?.cityId || null })}
+            inp={inputs}
+            sel={rehearsalRun.selection}
+            forecastFor={rehearsalForecastFor}
+            live={{ scenarios: STREAMING_NETWORK_NIGHTS, initialScenario: deskNight }}
+            onClose={() => setRehearsalRun(null)}
+            onResult={() => undefined}
+            onOpenContent={onOpenContent}
+            onOpenNetwork={regionId => {
+              setRehearsalRun(null);
+              if (regionId) setDeskRegion(previous => ({ id: (previous?.id || 0) + 1, regionId }));
+            }}
+            onRepair={() => setRehearsalRun(null)}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <>

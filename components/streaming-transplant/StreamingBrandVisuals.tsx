@@ -206,25 +206,6 @@ export const PROMISES: Promise[] = [
   },
 ];
 
-/* --- app layout formats (advanced ones gated by tech) --- */
-export interface LayoutFormat { id: string; label: string; note: string; lock?: string; }
-export const LAYOUTS: LayoutFormat[] = [
-  /* --- available at founding --- */
-  { id: 'ROWS', label: 'Rows Only', note: 'Classic shelves. Cheap to serve, easy to scan.' },
-  { id: 'HERO_IMG', label: 'Image Hero', note: 'One big poster on top, shelves below.' },
-  { id: 'GRID', label: 'Poster Grid', note: 'Everything visible at once. Catalogue-forward.' },
-  { id: 'RESUME', label: 'Continue Watching', note: 'Half-finished titles come first. Habit over discovery.' },
-  /* --- unlocked by research, post-founding --- */
-  { id: 'HERO_VIDEO', label: 'Video Hero', note: 'Autoplaying trailer takes the screen.', lock: 'Playback Tech II' },
-  { id: 'SPOTLIGHT', label: 'Spotlight Carousel', note: 'Rotating full-bleed features.', lock: 'Product Tech I' },
-  { id: 'EDITORIAL', label: 'Editorial Collections', note: 'Human-curated shelves with cover art and copy.', lock: 'Editorial Desk' },
-  { id: 'TRAILER', label: 'Auto-Trailer Wall', note: 'Every tile plays silently on hover.', lock: 'Playback Tech III' },
-  { id: 'PERSONAL', label: 'Personalised Rows', note: 'Every subscriber gets a different home.', lock: 'Recommendation Engine' },
-  { id: 'PROFILES', label: 'Multi-Profile Home', note: 'One household, many fronts. Kids mode included.', lock: 'Household Accounts' },
-  { id: 'LIVE', label: 'Live Rail', note: 'A live channel strip above everything.', lock: 'EMPIRE+ Live' },
-  { id: 'CINEMA', label: 'Cinematic Fullscreen', note: 'No chrome at all. The catalogue becomes the wallpaper.', lock: 'Frontier UI' },
-];
-
 /* ============================================================
    DOT-MATRIX WORLD MAP
    ============================================================ */

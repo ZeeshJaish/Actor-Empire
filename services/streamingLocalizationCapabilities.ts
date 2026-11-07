@@ -16,7 +16,6 @@ export interface StreamingLocalizationCapabilityDefinition {
     prerequisiteIds: StreamingLocalizationCapabilityId[];
     subtitleLevel: 0 | 1 | 2 | 3;
     dubbingLevel: 0 | 1 | 2 | 3;
-    contentOperationsFloor: number;
 }
 
 export interface StreamingLanguagePackage {
@@ -37,23 +36,31 @@ export const normalizeStreamingLanguageId = (value: unknown): string => String(v
     .replace(/^-+|-+$/g, '');
 
 export const STREAMING_LOCALIZATION_CAPABILITY_DEFINITIONS: StreamingLocalizationCapabilityDefinition[] = [
-    { id: 'LOCALIZATION_FOUNDATION', prerequisiteIds: [], subtitleLevel: 0, dubbingLevel: 0, contentOperationsFloor: 10 },
-    { id: 'SUBTITLE_OPERATIONS_L1', prerequisiteIds: ['LOCALIZATION_FOUNDATION'], subtitleLevel: 1, dubbingLevel: 0, contentOperationsFloor: 10 },
-    { id: 'SUBTITLE_OPERATIONS_L2', prerequisiteIds: ['SUBTITLE_OPERATIONS_L1'], subtitleLevel: 2, dubbingLevel: 0, contentOperationsFloor: 22 },
-    { id: 'SUBTITLE_OPERATIONS_L3', prerequisiteIds: ['SUBTITLE_OPERATIONS_L2'], subtitleLevel: 3, dubbingLevel: 0, contentOperationsFloor: 40 },
-    { id: 'DUBBING_OPERATIONS_L1', prerequisiteIds: ['LOCALIZATION_FOUNDATION'], subtitleLevel: 0, dubbingLevel: 1, contentOperationsFloor: 22 },
-    { id: 'DUBBING_OPERATIONS_L2', prerequisiteIds: ['DUBBING_OPERATIONS_L1'], subtitleLevel: 0, dubbingLevel: 2, contentOperationsFloor: 40 },
-    { id: 'DUBBING_OPERATIONS_L3', prerequisiteIds: ['DUBBING_OPERATIONS_L2'], subtitleLevel: 0, dubbingLevel: 3, contentOperationsFloor: 65 },
-    { id: 'SIMULTANEOUS_LOCALIZATION', prerequisiteIds: ['SUBTITLE_OPERATIONS_L3', 'DUBBING_OPERATIONS_L2'], subtitleLevel: 3, dubbingLevel: 2, contentOperationsFloor: 65 },
+    { id: 'LOCALIZATION_FOUNDATION', prerequisiteIds: [], subtitleLevel: 0, dubbingLevel: 0 },
+    { id: 'SUBTITLE_OPERATIONS_L1', prerequisiteIds: ['LOCALIZATION_FOUNDATION'], subtitleLevel: 1, dubbingLevel: 0 },
+    { id: 'SUBTITLE_OPERATIONS_L2', prerequisiteIds: ['SUBTITLE_OPERATIONS_L1'], subtitleLevel: 2, dubbingLevel: 0 },
+    { id: 'SUBTITLE_OPERATIONS_L3', prerequisiteIds: ['SUBTITLE_OPERATIONS_L2'], subtitleLevel: 3, dubbingLevel: 0 },
+    { id: 'DUBBING_OPERATIONS_L1', prerequisiteIds: ['LOCALIZATION_FOUNDATION'], subtitleLevel: 0, dubbingLevel: 1 },
+    { id: 'DUBBING_OPERATIONS_L2', prerequisiteIds: ['DUBBING_OPERATIONS_L1'], subtitleLevel: 0, dubbingLevel: 2 },
+    { id: 'DUBBING_OPERATIONS_L3', prerequisiteIds: ['DUBBING_OPERATIONS_L2'], subtitleLevel: 0, dubbingLevel: 3 },
+    { id: 'SIMULTANEOUS_LOCALIZATION', prerequisiteIds: ['SUBTITLE_OPERATIONS_L3', 'DUBBING_OPERATIONS_L2'], subtitleLevel: 3, dubbingLevel: 2 },
 ];
 
+/**
+ * The seven language groups. Every language spoken first somewhere in the
+ * game's world belongs to exactly one, so every one of its 197 countries has a
+ * group (Zeesh, 2026-10-23: "7 groups bana do, prices theek hain"). Ids are
+ * kept from the first six so saves keep their set-up groups; India's group now
+ * reaches all of South Asia and East Asia reaches China.
+ */
 export const STREAMING_LANGUAGE_PACKAGES: StreamingLanguagePackage[] = [
-    { id: 'INDIA_CORE', name: 'India Core Languages', languageIds: ['hindi', 'tamil', 'telugu', 'bengali'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 9_000_000, weeklyOperatingCost: 145_000 },
-    { id: 'EAST_ASIA_CORE', name: 'East Asia Core Languages', languageIds: ['japanese', 'korean'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 8_000_000, weeklyOperatingCost: 120_000 },
-    { id: 'LATIN_AMERICA_CORE', name: 'Latin America Core Languages', languageIds: ['spanish', 'portuguese'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 6_500_000, weeklyOperatingCost: 95_000 },
-    { id: 'WESTERN_EUROPE_CORE', name: 'Western Europe Core Languages', languageIds: ['english', 'french', 'german', 'italian'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 7_500_000, weeklyOperatingCost: 110_000 },
-    { id: 'SOUTHEAST_ASIA_CORE', name: 'Southeast Asia Core Languages', languageIds: ['indonesian', 'thai', 'filipino'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 7_000_000, weeklyOperatingCost: 105_000 },
-    { id: 'MIDDLE_EAST_AFRICA_CORE', name: 'Middle East and Africa Core Languages', languageIds: ['arabic', 'swahili', 'hausa', 'yoruba', 'igbo'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 8_500_000, weeklyOperatingCost: 125_000 },
+    { id: 'INDIA_CORE', name: 'South Asia Core Languages', languageIds: ['hindi', 'tamil', 'telugu', 'bengali', 'urdu', 'nepali', 'sinhala', 'dari', 'pashto', 'dzongkha', 'dhivehi'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 9_000_000, weeklyOperatingCost: 145_000 },
+    { id: 'EAST_ASIA_CORE', name: 'East Asia Core Languages', languageIds: ['japanese', 'korean', 'mandarin', 'cantonese', 'mongolian'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 12_000_000, weeklyOperatingCost: 120_000 },
+    { id: 'LATIN_AMERICA_CORE', name: 'Latin America Core Languages', languageIds: ['spanish', 'portuguese', 'haitian-creole'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 6_500_000, weeklyOperatingCost: 95_000 },
+    { id: 'WESTERN_EUROPE_CORE', name: 'Europe and English Core Languages', languageIds: ['english', 'french', 'german', 'italian', 'dutch', 'swedish', 'danish', 'norwegian', 'finnish', 'icelandic', 'greek', 'maltese', 'luxembourgish', 'catalan', 'samoan', 'tongan', 'marshallese', 'nauruan', 'palauan', 'tuvaluan', 'bislama'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 7_500_000, weeklyOperatingCost: 110_000 },
+    { id: 'SOUTHEAST_ASIA_CORE', name: 'Southeast Asia Core Languages', languageIds: ['indonesian', 'thai', 'filipino', 'vietnamese', 'burmese', 'malay', 'khmer', 'lao', 'tetum'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 7_000_000, weeklyOperatingCost: 105_000 },
+    { id: 'MIDDLE_EAST_AFRICA_CORE', name: 'Middle East and Africa Core Languages', languageIds: ['arabic', 'swahili', 'hausa', 'yoruba', 'igbo', 'persian', 'turkish', 'hebrew', 'amharic', 'somali', 'malagasy', 'kinyarwanda', 'kirundi', 'tigrinya', 'sesotho', 'swazi', 'comorian', 'seychellois-creole'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 8_500_000, weeklyOperatingCost: 125_000 },
+    { id: 'EASTERN_EUROPE_CENTRAL_ASIA_CORE', name: 'Eastern Europe and Central Asia Core Languages', languageIds: ['russian', 'polish', 'ukrainian', 'romanian', 'czech', 'hungarian', 'belarusian', 'bulgarian', 'serbian', 'croatian', 'bosnian', 'slovak', 'slovenian', 'albanian', 'macedonian', 'montenegrin', 'lithuanian', 'latvian', 'estonian', 'georgian', 'armenian', 'azerbaijani', 'kazakh', 'uzbek', 'kyrgyz', 'tajik', 'turkmen'], prerequisiteCapabilityIds: ['LOCALIZATION_FOUNDATION'], activationCost: 8_000_000, weeklyOperatingCost: 120_000 },
 ];
 
 export const STREAMING_LANGUAGE_PACKAGE_CAPABILITY_PREFIX = 'LANGUAGE_PACKAGE:';

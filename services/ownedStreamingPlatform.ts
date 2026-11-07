@@ -16,6 +16,11 @@ import {
     type OwnedStreamingBoardDirector,
     type OwnedStreamingBoardMotion,
     type OwnedStreamingCelebrityInvestor,
+    type OwnedStreamingInvestorOffer,
+    type OwnedStreamingInvestorRound,
+    type OwnedStreamingCompanySale,
+    type OwnedStreamingSaleBid,
+    type OwnedStreamingBuybackProgram,
     type OwnedStreamingCompetitiveWorldState,
     type OwnedStreamingCorporateDevelopmentState,
     type OwnedStreamingPublicCompanyState,
@@ -25,6 +30,7 @@ import {
     type OwnedStreamingCompanyEra,
     type OwnedStreamingLegacyMontage,
     type OwnedStreamingCrisis,
+    type StreamingIncidentStatusRepair,
     type OwnedStreamingShadowOperation,
     type OwnedStreamingTrustInitiative,
     type OwnedStreamingRegulatoryCase,
@@ -170,6 +176,8 @@ import {
     type StreamingLegacyIdentity,
     type StreamingEraMandate,
     type StreamingFounderOfficeRole,
+    type OwnedStreamingNetworkOrder,
+    type StreamingServerTier,
 } from '../types';
 import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInfrastructureManagement';
 import {
@@ -196,7 +204,13 @@ import {
     projectFacilityNetworkRole,
 } from './streamingRackGroups';
 import { normalizeStreamingFibreState } from './streamingFibreLadder';
+import { isStreamingTechId, normalizeStreamingTechTreeState, streamingPlatformSellsExtraMember } from './streamingTechTreeCatalogue';
+import { normalizeStreamingDeliveryEconomics } from './streamingDeliveryLoad';
+import { normalizeCampaignBook } from './campaigns/campaignBook';
+import { CAMPAIGN_FORMATS } from './campaigns/campaignFormats';
+import { LAUNCH_CAMPAIGN_MAX_WEEKS } from './streamingLaunchMarketing';
 import { getProductionLocation } from './productionLocations';
+import { normalizeStreamingTeamState } from './team/teamState';
 
 export { OWNED_STREAMING_PLATFORM_SCHEMA_VERSION };
 export const OWNED_STREAMING_WEEKLY_HISTORY_LIMIT = 104;
@@ -235,7 +249,7 @@ export const OWNED_STREAMING_OVERSIGHT_CASE_LIMIT = 16;
 export const OWNED_STREAMING_CLOSED_ERA_LIMIT = 24;
 export const OWNED_STREAMING_LEGACY_MONTAGE_LIMIT = 12;
 
-const LIFECYCLES: OwnedStreamingPlatformLifecycle[] = ['LOCKED', 'ELIGIBLE', 'FOUNDING', 'ACTIVE', 'SUSPENDED'];
+const LIFECYCLES: OwnedStreamingPlatformLifecycle[] = ['LOCKED', 'ELIGIBLE', 'FOUNDING', 'ACTIVE', 'SUSPENDED', 'SOLD'];
 const INFRASTRUCTURE_STRATEGIES: StreamingInfrastructureStrategy[] = ['UNDECIDED', 'CLOUD_FIRST', 'OWNED_INFRASTRUCTURE', 'HYBRID'];
 const LOGO_KEYS: StreamingLogoKey[] = ['FRAME_PLAY', 'SIGNAL_RING', 'SPOTLIGHT', 'WORDMARK'];
 const SOUND_IDENT_KEYS: StreamingSoundIdentKey[] = [
@@ -280,6 +294,7 @@ const EXECUTIVE_DEVELOPMENT_TRACKS: StreamingExecutiveDevelopmentTrack[] = [
     'FOUNDER_ALIGNMENT',
     'ETHICS_TRUST',
     'PERFORMANCE_COACHING',
+    'LEVEL_UP',
 ];
 const BOARD_MOTION_IDS: StreamingBoardMotionId[] = [
     'RIGHTS_AUTHORITY',
@@ -314,6 +329,11 @@ const CAPITAL_ACTION_TYPES: StreamingCapitalActionType[] = [
     'LOAN_DRAW',
     'LOAN_REPAYMENT',
     'EQUITY_ISSUANCE',
+    /* #187 */
+    'SHARE_BUYBACK',
+    'FOUNDER_SHARE_TRADE',
+    /* #190 */
+    'COMPANY_SALE',
 ];
 const HQ_SECTIONS: StreamingHqSection[] = ['HOME', 'CONTENT', 'TECH', 'MARKET', 'COMPANY'];
 const HQ_TOUR_STATUSES: StreamingHqTourStatus[] = ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'];
@@ -345,8 +365,21 @@ const RESEARCH_INSTALL_TARGET_TYPES: StreamingResearchInstallTargetType[] = [
     'FACILITY',
     'RACK_GROUP',
     'PRODUCT_LINE',
+    'LOCALIZATION_CAPABILITY',
     'CONSTRUCTION_PROGRAM',
+    'NETWORK_FIBRE',
 ];
+/* Localization and fibre programmes can only install into their own targets.
+   The list above used to omit both, so every load rewrote them to
+   TECHNOLOGY_PROJECT and their installation could never finish. A stored
+   TECHNOLOGY_PROJECT on one of these programmes is that damage, repaired here
+   from the definition id (the definitions live in streamingResearchLifecycle,
+   which imports this module). */
+const intrinsicResearchInstallTarget = (definitionId: string): StreamingResearchInstallTargetType | null => (
+    /^(localization-foundation|subtitle-operations-l\d|dubbing-operations-l\d|simultaneous-localization)$/.test(definitionId)
+        ? 'LOCALIZATION_CAPABILITY'
+        : /^fibre-/.test(definitionId) ? 'NETWORK_FIBRE' : null
+);
 const CAMPUS_SCALES: StreamingCampusScale[] = ['OWNED_DATA_CENTRE', 'GIGA_CAMPUS'];
 const CAMPUS_STAGES: StreamingCampusConstructionStage[] = ['PERMITS', 'UTILITIES', 'DESIGN', 'SYSTEMS', 'DATA_HALLS', 'RACK_INSTALLATION', 'COMMISSIONING'];
 const CAMPUS_PROJECT_STATUSES: StreamingCampusProjectStatus[] = ['AWAITING_DECISION', 'IN_PROGRESS', 'DELAYED', 'READY_TO_OPEN', 'OPEN'];
@@ -530,7 +563,10 @@ const LEDGER_EVENT_TYPES: OwnedStreamingLedgerEventType[] = [
     'SEASON_REVIEW_COMMITTED',
     'CINEMATIC_QUEUED',
     'MILESTONE_REACHED',
+    'PRICING_CHANGED',
     'SYSTEM_REPAIR',
+    /* #181: a team job's result against its budget */
+    'TEAM_RESULT',
 ];
 const CINEMATIC_TYPES: OwnedStreamingCinematicType[] = [
     'FOUNDING_KEYNOTE',
@@ -773,6 +809,17 @@ const normalizeExecutiveAppointment = (
         performance: Math.round(clamp(source.performance, 0, 100, 60)),
         level: Math.round(clamp(source.level, 1, 5, source.origin === 'INTERNAL_PROMOTION' ? 1 : 2)) as 1 | 2 | 3 | 4 | 5,
         experience: Math.round(clamp(source.experience, 0, Number.MAX_SAFE_INTEGER, 0)),
+        /* #180: options granted on hiring, and the signing bonus */
+        ...(source.options && typeof source.options === 'object' && !Array.isArray(source.options) ? (() => {
+            const options = asRecord(source.options);
+            const settled = options.settledAtAbsoluteWeek;
+            return { options: {
+                percent: Math.max(0, Math.round(clamp(options.percent, 0, 10, 0) * 1000) / 1000),
+                grantedAtAbsoluteWeek: Math.max(0, Math.round(clamp(options.grantedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER, appointedAtAbsoluteWeek))),
+                ...(settled === null || settled === undefined ? {} : { settledAtAbsoluteWeek: Math.max(0, Math.round(clamp(settled, 0, Number.MAX_SAFE_INTEGER))) }),
+            } };
+        })() : {}),
+        ...(typeof source.signingBonus === 'number' && Number.isFinite(source.signingBonus) ? { signingBonus: Math.max(0, Math.round(source.signingBonus)) } : {}),
     };
 };
 
@@ -862,6 +909,14 @@ const normalizeLeadership = (
         program => program.idempotencyKey,
     ).slice(-OWNED_STREAMING_EXECUTIVE_DEVELOPMENT_LIMIT);
     const delegationSource = asRecord(source.delegation);
+    const delegation: OwnedStreamingLeadershipState['delegation'] = {
+        maximumRightsBid: Math.round(clamp(delegationSource.maximumRightsBid, 1_000_000, 1_000_000_000, 50_000_000)),
+        minimumCapacityHeadroomPercent: Math.round(clamp(delegationSource.minimumCapacityHeadroomPercent, 5, 80, 20)),
+        weeklyCampaignLimit: Math.round(clamp(delegationSource.weeklyCampaignLimit, 1_000_000, 250_000_000, 10_000_000)),
+        renewalMinimumMarginPercent: Math.round(clamp(delegationSource.renewalMinimumMarginPercent, 0, 60, 15)),
+        incidentPolicy: isOneOf(delegationSource.incidentPolicy, ['CONTAIN_FIRST', 'TRANSPARENT_FIRST', 'SERVICE_FIRST'] as const, 'SERVICE_FIRST'),
+        updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(delegationSource.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+    };
     return {
         currentCeo: {
             holderType: holderType === 'EXECUTIVE' && hasActiveExecutiveCeo ? 'EXECUTIVE' : 'FOUNDER',
@@ -878,14 +933,9 @@ const normalizeLeadership = (
         },
         appointments,
         developmentPrograms,
-        delegation: {
-            maximumRightsBid: Math.round(clamp(delegationSource.maximumRightsBid, 1_000_000, 1_000_000_000, 50_000_000)),
-            minimumCapacityHeadroomPercent: Math.round(clamp(delegationSource.minimumCapacityHeadroomPercent, 5, 80, 20)),
-            weeklyCampaignLimit: Math.round(clamp(delegationSource.weeklyCampaignLimit, 1_000_000, 250_000_000, 10_000_000)),
-            renewalMinimumMarginPercent: Math.round(clamp(delegationSource.renewalMinimumMarginPercent, 0, 60, 15)),
-            incidentPolicy: isOneOf(delegationSource.incidentPolicy, ['CONTAIN_FIRST', 'TRANSPARENT_FIRST', 'SERVICE_FIRST'] as const, 'SERVICE_FIRST'),
-            updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(delegationSource.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
-        },
+        delegation,
+        /* #164: the six-seat team; an older save gets six seats, every job at Ask me, the mandate's limits */
+        team: normalizeStreamingTeamState(source.team, delegation),
     };
 };
 
@@ -1103,7 +1153,9 @@ const normalizeCelebrityInvestor = (value: unknown): OwnedStreamingCelebrityInve
         id: cleanText(source.id, createDeterministicId('streaming_celebrity_investor', candidateId), 120),
         candidateId,
         name: cleanText(source.name, 'Celebrity investor', 120),
-        status: isOneOf(source.status, ['ACCEPTED', 'DECLINED'] as const, 'DECLINED'),
+        status: isOneOf(source.status, ['ACCEPTED', 'DECLINED', 'BOUGHT_OUT'] as const, 'DECLINED'),
+        ...(typeof source.boughtOutAtAbsoluteWeek === 'number' ? { boughtOutAtAbsoluteWeek: Math.max(0, Math.round(source.boughtOutAtAbsoluteWeek)) } : {}),
+        ...(typeof source.buyoutPrice === 'number' ? { buyoutPrice: Math.max(0, Math.round(source.buyoutPrice)) } : {}),
         investedCapital: Math.round(clamp(source.investedCapital, 0, Number.MAX_SAFE_INTEGER)),
         ownershipPercent: clamp(source.ownershipPercent, 0, 49),
         boardSeatGranted: Boolean(source.boardSeatGranted),
@@ -1129,12 +1181,115 @@ const normalizeGovernance = (value: unknown): OwnedStreamingGovernanceState => {
                 .filter((motion): motion is OwnedStreamingBoardMotion => Boolean(motion)),
             motion => motion.idempotencyKey,
         ).slice(-OWNED_STREAMING_BOARD_MOTION_LIMIT),
-        celebrityInvestors: dedupeByKey(
+        /* #172: every investor who signed stays (their profit share is paid weekly); the last declines are kept */
+        celebrityInvestors: keepSignedInvestors(dedupeByKey(
             asArray<unknown>(source.celebrityInvestors)
                 .map(normalizeCelebrityInvestor)
                 .filter((investor): investor is OwnedStreamingCelebrityInvestor => Boolean(investor)),
             investor => investor.candidateId,
-        ).slice(-OWNED_STREAMING_CELEBRITY_INVESTOR_LIMIT),
+        )),
+        ...(Array.isArray(source.investorOffers) ? { investorOffers: asArray<unknown>(source.investorOffers)
+            .map(normalizeInvestorOffer)
+            .filter((offer): offer is OwnedStreamingInvestorOffer => Boolean(offer))
+            .slice(-12) } : {}),
+        ...(source.investorOfferMilestone !== undefined ? { investorOfferMilestone: Math.max(0, Math.round(clamp(source.investorOfferMilestone, 0, Number.MAX_SAFE_INTEGER))) } : {}),
+        ...(source.investorRound !== undefined ? { investorRound: normalizeInvestorRound(source.investorRound) } : {}),
+        ...(source.sale !== undefined ? { sale: normalizeCompanySale(source.sale) } : {}),
+    };
+};
+
+/** #190: selling the company */
+const SALE_STATUSES: OwnedStreamingCompanySale['status'][] = ['BANKERS', 'BIDS', 'CLOSING', 'SOLD', 'REJECTED'];
+const BID_KINDS: OwnedStreamingSaleBid['buyerKind'][] = ['RIVAL', 'MEDIA', 'TECH', 'PRIVATE_EQUITY'];
+const BID_STATUSES: OwnedStreamingSaleBid['status'][] = ['OPEN', 'ACCEPTED', 'VOTED_DOWN', 'LAPSED'];
+const weekOrNull = (value: unknown) => (value === null || value === undefined ? null : Math.max(0, Math.round(clamp(value, 0, Number.MAX_SAFE_INTEGER))));
+const normalizeSaleBid = (value: unknown): OwnedStreamingSaleBid | null => {
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 120);
+    if (!id) return null;
+    return {
+        id,
+        buyerName: cleanText(source.buyerName, 'A buyer', 120),
+        buyerKind: isOneOf(source.buyerKind, BID_KINDS, 'PRIVATE_EQUITY'),
+        price: Math.max(0, Math.round(clamp(source.price, 0, Number.MAX_SAFE_INTEGER))),
+        premium: clamp(source.premium, 1, 2, 1.1),
+        payment: isOneOf(source.payment, ['CASH', 'SHARES', 'MIXED'] as const, 'CASH'),
+        brand: isOneOf(source.brand, ['KEEP', 'MERGE'] as const, 'KEEP'),
+        team: isOneOf(source.team, ['KEEP', 'REPLACE'] as const, 'KEEP'),
+        status: isOneOf(source.status, BID_STATUSES, 'OPEN'),
+    };
+};
+const normalizeCompanySale = (value: unknown): OwnedStreamingCompanySale | null => {
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 120);
+    if (!id) return null;
+    const started = Math.max(0, Math.round(clamp(source.startedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    return {
+        id,
+        status: isOneOf(source.status, SALE_STATUSES, 'REJECTED'),
+        startedAtAbsoluteWeek: started,
+        bidsAtAbsoluteWeek: Math.max(started, Math.round(clamp(source.bidsAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        bidsCloseAtAbsoluteWeek: weekOrNull(source.bidsCloseAtAbsoluteWeek),
+        bids: asArray<unknown>(source.bids).map(normalizeSaleBid).filter((bid): bid is OwnedStreamingSaleBid => Boolean(bid)).slice(0, 8),
+        acceptedBidId: source.acceptedBidId ? cleanText(source.acceptedBidId, '', 120) || null : null,
+        closesAtAbsoluteWeek: weekOrNull(source.closesAtAbsoluteWeek),
+        soldAtAbsoluteWeek: weekOrNull(source.soldAtAbsoluteWeek),
+        rejectedAtAbsoluteWeek: weekOrNull(source.rejectedAtAbsoluteWeek),
+        founderCash: source.founderCash === null || source.founderCash === undefined ? null : Math.max(0, Math.round(clamp(source.founderCash, 0, Number.MAX_SAFE_INTEGER))),
+        founderPercentAtSale: source.founderPercentAtSale === null || source.founderPercentAtSale === undefined ? null : clamp(source.founderPercentAtSale, 0, 100, 0),
+    };
+};
+
+/** #186: the latest round the founder called */
+const ROUND_SIZES = ['SMALL', 'GROWTH', 'BIG'] as const;
+const normalizeInvestorRound = (value: unknown): OwnedStreamingInvestorRound | null => {
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 120);
+    if (!id) return null;
+    const called = Math.max(0, Math.round(clamp(source.calledAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    return {
+        id,
+        size: isOneOf(source.size, ROUND_SIZES, 'GROWTH'),
+        upToPercent: clamp(source.upToPercent, 1, 25, 10),
+        calledAtAbsoluteWeek: called,
+        offersAtAbsoluteWeek: Math.max(called, Math.round(clamp(source.offersAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        closesAtAbsoluteWeek: source.closesAtAbsoluteWeek === null || source.closesAtAbsoluteWeek === undefined
+            ? null : Math.max(called, Math.round(clamp(source.closesAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        offerCount: Math.max(0, Math.round(clamp(source.offerCount, 0, 12))),
+        soldPercent: clamp(source.soldPercent, 0, 25, 0),
+    };
+};
+
+const keepSignedInvestors = (investors: OwnedStreamingCelebrityInvestor[]): OwnedStreamingCelebrityInvestor[] => {
+    const declined = investors.filter(investor => investor.status === 'DECLINED').slice(-OWNED_STREAMING_CELEBRITY_INVESTOR_LIMIT * 2);
+    /* #187: a bought-out investor stays on record too */
+    return investors.filter(investor => investor.status === 'ACCEPTED' || investor.status === 'BOUGHT_OUT' || declined.includes(investor));
+};
+
+const INVESTOR_KINDS = ['CELEBRITY', 'FUND', 'FAMILY', 'SOVEREIGN', 'FOUNDER'] as const;
+const normalizeInvestorOffer = (value: unknown): OwnedStreamingInvestorOffer | null => {
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 120);
+    if (!id) return null;
+    const created = Math.max(0, Math.round(clamp(source.createdAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    return {
+        id,
+        name: cleanText(source.name, 'Investor', 120),
+        initials: cleanText(source.initials, 'IN', 4),
+        publicIdentity: cleanText(source.publicIdentity, 'Investor', 120),
+        kind: isOneOf(source.kind, INVESTOR_KINDS, 'FUND'),
+        investedCapital: Math.round(clamp(source.investedCapital, 0, Number.MAX_SAFE_INTEGER)),
+        ownershipPercent: clamp(source.ownershipPercent, 0, 49),
+        boardSeat: Boolean(source.boardSeat),
+        profitParticipationPercent: clamp(source.profitParticipationPercent, 0, 25),
+        preferredStrategy: isOneOf(source.preferredStrategy, EXECUTIVE_STRATEGIES, 'BALANCED'),
+        influenceDemand: cleanText(source.influenceDemand, '', 260),
+        attentionEffect: cleanText(source.attentionEffect, '', 260),
+        caution: cleanText(source.caution, '', 260),
+        milestoneSubscribers: Math.max(0, Math.round(clamp(source.milestoneSubscribers, 0, Number.MAX_SAFE_INTEGER))),
+        createdAtAbsoluteWeek: created,
+        expiresAtAbsoluteWeek: Math.max(created, Math.round(clamp(source.expiresAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        ...(cleanText(source.roundId, '', 120) ? { roundId: cleanText(source.roundId, '', 120) } : {}),
     };
 };
 
@@ -1625,6 +1780,20 @@ const normalizeCorporateDevelopment = (value: unknown): OwnedStreamingCorporateD
     };
 };
 
+/** STATUS's answer to an incident (#50): kept only when it is one of the three paths. */
+const normalizeIncidentStatusRepair = (value: unknown): { statusRepair?: StreamingIncidentStatusRepair } => {
+    const item = asRecord(value);
+    if (!['ENERGY', 'FIX', 'WAIT'].includes(item.path as string)) return {};
+    return { statusRepair: {
+        path: item.path as StreamingIncidentStatusRepair['path'],
+        atAbsoluteWeek: Math.max(0, Math.round(clamp(item.atAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        cash: Math.max(0, Math.round(clamp(item.cash, 0, Number.MAX_SAFE_INTEGER))),
+        energy: Math.max(0, Math.round(clamp(item.energy, 0, 1_000))),
+        ...(item.paidBy === 'AD' ? { paidBy: 'AD' as const } : {}),
+        ...(typeof item.by === 'string' && item.by.trim() ? { by: cleanText(item.by, '', 80) } : {}),
+    } };
+};
+
 const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecurityState => {
     const source = asRecord(value);
     const crises = asArray<unknown>(source.crises).map(value => {
@@ -1636,7 +1805,8 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         return {
             id: cleanText(item.id, createDeterministicId('streaming_crisis', idempotencyKey), 120),
             idempotencyKey,
-            type: isOneOf(item.type, ['PLATFORM_OUTAGE', 'ACCOUNT_BREACH', 'CONTENT_LEAK', 'RECOMMENDATION_BACKLASH', 'RIGHTS_COMPLIANCE', 'EMPLOYEE_ALLEGATION'] as const, 'PLATFORM_OUTAGE'),
+            type: isOneOf(item.type, ['PLATFORM_OUTAGE', 'ACCOUNT_BREACH', 'CONTENT_LEAK', 'RECOMMENDATION_BACKLASH', 'RIGHTS_COMPLIANCE', 'EMPLOYEE_ALLEGATION',
+                'APP_CRASH', 'FEATURE_BROKEN', 'SLOW_STREAMING'] as const, 'PLATFORM_OUTAGE'),
             severity: isOneOf(item.severity, ['MINOR', 'SERIOUS', 'MAJOR', 'CRITICAL'] as const, 'SERIOUS'),
             stage,
             title: cleanText(item.title, 'Platform incident', 120),
@@ -1663,6 +1833,10 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
                 ? Math.max(detectedAtAbsoluteWeek, Math.round(clamp(item.resolvedAtAbsoluteWeek, detectedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER, detectedAtAbsoluteWeek)))
                 : null,
             outcomeNote: item.outcomeNote === null ? null : cleanText(item.outcomeNote, '', 320),
+            ...normalizeIncidentStatusRepair(item.statusRepair),
+            /* the app or Playback feature that broke (#53), the title on pirate sites (#55) */
+            ...(isStreamingTechId(item.techId) ? { techId: item.techId } : {}),
+            ...(typeof item.projectId === 'string' && item.projectId.trim() ? { projectId: cleanText(item.projectId, '', 160) } : {}),
         } satisfies OwnedStreamingCrisis;
     }).filter((item): item is OwnedStreamingCrisis => Boolean(item)).slice(-OWNED_STREAMING_CRISIS_LIMIT);
 
@@ -1791,6 +1965,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
             publicReaction: cleanText(item.publicReaction, 'The public is monitoring recovery.', 240),
             subscriberReaction: cleanText(item.subscriberReaction, 'Affected subscribers expect stable service.', 240),
             outcomeNote: item.outcomeNote === null || item.outcomeNote === undefined ? null : cleanText(item.outcomeNote, '', 320),
+            ...normalizeIncidentStatusRepair(item.statusRepair),
         } satisfies OwnedStreamingInfrastructureIncident;
     }).filter((item): item is OwnedStreamingInfrastructureIncident => Boolean(item)).slice(-OWNED_STREAMING_INFRASTRUCTURE_INCIDENT_LIMIT);
 
@@ -2023,7 +2198,8 @@ const normalizePublicCompany = (value: unknown): OwnedStreamingPublicCompanyStat
         lastProcessedAbsoluteWeek: Math.max(0, Math.round(clamp(journeySource.lastProcessedAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         scene: cleanText(journeySource.scene, 'RESOLUTION', 40),
         ask: Math.round(clamp(journeySource.ask, 1, Number.MAX_SAFE_INTEGER, 180_000_000)),
-        shares: Math.round(clamp(journeySource.shares, 250_000, 40_000_000, 5_000_000)),
+        /* #189: the float is a % of the company now; a big company sells more than 40M new shares */
+        shares: Math.round(clamp(journeySource.shares, 250_000, 500_000_000, 5_000_000)),
         revision: Math.round(clamp(journeySource.revision, 1, 100, 1)),
         bankId: cleanText(journeySource.bankId, '', 40) || null,
         marks: asArray<unknown>(journeySource.marks).map(value => {
@@ -2106,6 +2282,11 @@ const normalizePublicCompany = (value: unknown): OwnedStreamingPublicCompanyStat
                 playbackActual: clamp(item.playbackActual, 0, 100),
                 stockReactionPercent: clamp(item.stockReactionPercent, -40, 40),
                 headline: cleanText(item.headline, 'Quarter reported.', 220),
+                ...(item.callHeldAtAbsoluteWeek !== undefined && item.callHeldAtAbsoluteWeek !== null ? {
+                    callHeldAtAbsoluteWeek: Math.max(0, Math.round(clamp(item.callHeldAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+                    callEffectPercent: clamp(item.callEffectPercent, -20, 20),
+                    callAppliedAtAbsoluteWeek: item.callAppliedAtAbsoluteWeek === null || item.callAppliedAtAbsoluteWeek === undefined ? null : Math.max(0, Math.round(clamp(item.callAppliedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+                } : {}),
             };
         }).filter(item => item.id).slice(-24),
         shareholderVotes: asArray<unknown>(source.shareholderVotes).map(value => {
@@ -2123,6 +2304,11 @@ const normalizePublicCompany = (value: unknown): OwnedStreamingPublicCompanyStat
                 founderVote: item.founderVote === 'FOR' || item.founderVote === 'AGAINST' ? item.founderVote : null,
                 finalSupport: item.finalSupport === null || item.finalSupport === undefined ? null : clamp(item.finalSupport, 0, 100),
                 consequence: cleanText(item.consequence, '', 260) || null,
+                ...(item.decidedBy === 'FOUNDER' || item.decidedBy === 'PUBLIC' ? { decidedBy: item.decidedBy } : {}),
+                ...(item.priceEffectPercent !== undefined ? {
+                    priceEffectPercent: clamp(item.priceEffectPercent, -10, 10),
+                    priceAppliedAtAbsoluteWeek: item.priceAppliedAtAbsoluteWeek === null || item.priceAppliedAtAbsoluteWeek === undefined ? null : Math.max(0, Math.round(clamp(item.priceAppliedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+                } : {}),
             };
         }).filter(item => item.id).slice(-32),
         activistCampaigns: asArray<unknown>(source.activistCampaigns).map(value => {
@@ -2161,6 +2347,19 @@ const normalizePublicCompany = (value: unknown): OwnedStreamingPublicCompanyStat
                 consequence: cleanText(item.consequence, '', 260) || null,
             };
         }).filter(item => item.id).slice(-12),
+        /* #187 */
+        ...(Array.isArray(source.buybacks) ? { buybacks: asArray<unknown>(source.buybacks).map((value): OwnedStreamingBuybackProgram => {
+            const item = asRecord(value);
+            return {
+                id: cleanText(item.id, '', 120),
+                startedAtAbsoluteWeek: Math.max(0, Math.round(clamp(item.startedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+                percent: clamp(item.percent, 0, 10),
+                weeksLeft: Math.max(0, Math.round(clamp(item.weeksLeft, 0, 4))),
+                boughtPercent: clamp(item.boughtPercent, 0, 10),
+                spent: Math.max(0, Math.round(clamp(item.spent, 0, Number.MAX_SAFE_INTEGER))),
+                status: isOneOf(item.status, ['RUNNING', 'DONE', 'HELD'] as const, 'DONE'),
+            };
+        }).filter(item => item.id).slice(-12) } : {}),
     };
 };
 
@@ -2447,12 +2646,12 @@ const normalizeLaunchMarketingDraft = (
         return defaultLaunchMarketingDraft();
     }
     const rawBudget = Number(source.budgetCeiling);
+    const budgetCeiling = Number.isFinite(rawBudget) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(rawBudget))) : 0;
     return {
         schemaVersion: 1,
         objective: isOneOf(source.objective, LAUNCH_MARKETING_OBJECTIVES, 'PLATFORM_INTRODUCTION'),
         timeline: isOneOf(source.timeline, LAUNCH_MARKETING_TIMELINES, 'BALANCED'),
-        budgetCeiling: Number.isFinite(rawBudget)
-            ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.round(rawBudget))) : 0,
+        budgetCeiling,
         allocationMode: isOneOf(source.allocationMode, ['AUTO', 'MANUAL'] as const, 'AUTO'),
         countryWeights: normalizePositiveRecord(source.countryWeights),
         channelAllocations: normalizePositiveRecord(
@@ -2461,6 +2660,26 @@ const normalizeLaunchMarketingDraft = (
         ) as OwnedStreamingLaunchMarketingDraft['channelAllocations'],
         updatedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.updatedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         revision: Math.max(0, Math.round(clamp(source.revision, 0, Number.MAX_SAFE_INTEGER))),
+        /* #151: the formats picked in the launch builder, their uploaded art and the opening night's picture */
+        ...(Array.isArray(source.formatIds) && source.formatIds.some(id => typeof id === 'string' && id in CAMPAIGN_FORMATS)
+            ? { formatIds: [...new Set(source.formatIds.filter((id: unknown) => typeof id === 'string' && id in CAMPAIGN_FORMATS))] as OwnedStreamingLaunchMarketingDraft['formatIds'] } : {}),
+        ...(() => {
+            const creativeIds = Object.fromEntries(Object.entries(asRecord(source.creativeIds))
+                .filter(([id, mediaId]) => id in CAMPAIGN_FORMATS && typeof mediaId === 'string' && mediaId.length > 0 && mediaId.length <= 120));
+            return Object.keys(creativeIds).length ? { creativeIds: creativeIds as OwnedStreamingLaunchMarketingDraft['creativeIds'] } : {};
+        })(),
+        ...(typeof source.pictureMediaId === 'string' && source.pictureMediaId.length > 0 && source.pictureMediaId.length <= 120
+            ? { pictureMediaId: source.pictureMediaId } : {}),
+        /* #158: its weeks before opening, how hard, where its nights happen and what they cost */
+        ...(Number(source.weeks) >= 1 ? { weeks: Math.min(LAUNCH_CAMPAIGN_MAX_WEEKS, Math.round(Number(source.weeks))) } : {}),
+        ...([1, 1.5, 2].includes(Number(source.strength)) ? { strength: Number(source.strength) } : {}),
+        ...(() => {
+            const places = Object.fromEntries(Object.entries(asRecord(source.places))
+                .filter(([id, countryId]) => (CAMPAIGN_FORMATS as Record<string, { group: string }>)[id]?.group === 'BIG_MOMENT'
+                    && typeof countryId === 'string' && /^[A-Z]{2,3}$/.test(countryId)));
+            return Object.keys(places).length ? { places: places as OwnedStreamingLaunchMarketingDraft['places'] } : {};
+        })(),
+        ...(Number(source.openingNight) > 0 ? { openingNight: Math.min(budgetCeiling, Math.round(Number(source.openingNight))) } : {}),
     };
 };
 
@@ -2504,6 +2723,8 @@ const normalizeLaunchMarketingPlan = (value: unknown): OwnedStreamingLaunchMarke
         endsAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.endsAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         spentAmount: Math.max(0, Math.round(clamp(source.spentAmount, 0, Number.MAX_SAFE_INTEGER))),
         returnedAmount: Math.max(0, Math.round(clamp(source.returnedAmount, 0, Number.MAX_SAFE_INTEGER))),
+        /* #160: paid in full at commission */
+        ...(source.prepaid === true ? { prepaid: true } : {}),
         lastProcessedAbsoluteWeek: source.lastProcessedAbsoluteWeek === null || source.lastProcessedAbsoluteWeek === undefined ? null
             : Math.max(0, Math.round(clamp(source.lastProcessedAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         forecastSnapshot: {
@@ -2612,7 +2833,8 @@ const normalizeInfrastructureSetup = (
         weeklyOperatingCost: Math.round(clamp(source.weeklyOperatingCost, 0, Number.MAX_SAFE_INTEGER)),
         staffRequired: Math.round(clamp(source.staffRequired, 0, 100_000)),
         capitalInvested: Math.round(clamp(source.capitalInvested, 0, Number.MAX_SAFE_INTEGER)),
-        technicalDebt: Math.round(clamp(source.technicalDebt, 0, 10_000)),
+        // two decimals: Stabilization pays debt down by fractions a week (streamingTechTreeCatalogue)
+        technicalDebt: Math.round(clamp(source.technicalDebt, 0, 10_000) * 100) / 100,
         networkPlacements: facilities.length ? aggregateStreamingFacilities(facilities) : networkPlacements,
         regionPlans,
         facilities,
@@ -2628,7 +2850,56 @@ const normalizeInfrastructureSetup = (
         revision: Math.max(1, Math.round(clamp(source.revision, 1, 10_000, 1))),
         committedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.committedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         loadTest,
+        ...(source.capacityModel === 'TIERED' ? { capacityModel: 'TIERED' as const } : {}),
     };
+};
+
+const NETWORK_ORDER_TIERS: StreamingServerTier[] = ['SCOUT', 'WORKHORSE', 'TITAN'];
+/** #89: a network order; a done one keeps its numbers but not its rooms (they are in the setup by then) */
+const normalizeNetworkOrder = (value: unknown): OwnedStreamingNetworkOrder | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const source = asRecord(value);
+    const id = cleanText(source.id, '', 140);
+    const regionId = cleanText(source.regionId, '', 40);
+    if (!id || !regionId) return null;
+    const status = source.status === 'DONE' ? 'DONE' as const : 'BUILDING' as const;
+    const plans = normalizeStreamingRegionPlans([source.regionPlan]);
+    const regionPlan = plans.find(plan => plan.regionId === regionId)
+        || { regionId, serverCounts: { SCOUT: 0, WORKHORSE: 0, TITAN: 0 }, cloudProvider: null, cloudCompute: 0 };
+    const delta = asRecord(source.racksDelta);
+    const orderedAtAbsoluteWeek = Math.max(0, Math.round(clamp(source.orderedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
+    return {
+        id,
+        idempotencyKey: cleanText(source.idempotencyKey, id, 180),
+        regionId,
+        status,
+        facilities: status === 'DONE' ? [] : normalizeStreamingFacilities(source.facilities, []),
+        regionPlan,
+        racksDelta: Object.fromEntries(NETWORK_ORDER_TIERS.map(tier => [tier, Math.round(clamp(delta[tier], -100_000, 100_000, 0))])) as Record<StreamingServerTier, number>,
+        cloudDelta: Math.round(clamp(source.cloudDelta, -100_000, 100_000, 0)),
+        newCityIds: uniqueStrings(source.newCityIds, 64),
+        capitalCost: Math.round(clamp(source.capitalCost, 0, Number.MAX_SAFE_INTEGER)),
+        refund: Math.round(clamp(source.refund, 0, Number.MAX_SAFE_INTEGER)),
+        buildWeeks: Math.round(clamp(source.buildWeeks, 1, 52, 1)),
+        orderedAtAbsoluteWeek,
+        readyAtAbsoluteWeek: Math.max(orderedAtAbsoluteWeek + 1, Math.round(clamp(source.readyAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
+        energySpent: Math.round(clamp(source.energySpent, 0, Number.MAX_SAFE_INTEGER)),
+        weeksCut: Math.round(clamp(source.weeksCut, 0, 52)),
+        completedAtAbsoluteWeek: source.completedAtAbsoluteWeek === null || source.completedAtAbsoluteWeek === undefined
+            ? null : Math.round(clamp(source.completedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)),
+        ...(asRecord(source.orderedBy).name ? { orderedBy: { name: cleanText(asRecord(source.orderedBy).name, 'Your team', 80), seatId: cleanText(asRecord(source.orderedBy).seatId, 'TECHNOLOGY', 40) } } : {}),
+    };
+};
+/** every order under way, and the last twelve done */
+const normalizeNetworkOrders = (value: unknown): OwnedStreamingNetworkOrder[] => {
+    if (!Array.isArray(value)) return [];
+    const orders = value.map(normalizeNetworkOrder).filter((order): order is OwnedStreamingNetworkOrder => Boolean(order));
+    const building = orders.filter(order => order.status === 'BUILDING');
+    /* #93: a year of finished orders (the Network desk's "paid up front this year"), at least the last 12, at most 60 */
+    const newest = orders.reduce((latest, order) => Math.max(latest, order.orderedAtAbsoluteWeek), 0);
+    const finished = orders.filter(order => order.status === 'DONE');
+    const done = finished.filter((order, index) => index >= finished.length - 12 || order.orderedAtAbsoluteWeek >= newest - 52).slice(-60);
+    return [...done, ...building];
 };
 
 const normalizeTechnologyProject = (value: unknown): OwnedStreamingTechnologyProject | null => {
@@ -2714,7 +2985,8 @@ const normalizeResearchProgram = (value: unknown): OwnedStreamingResearchProgram
             Number.MAX_SAFE_INTEGER,
             stageStartedAtAbsoluteWeek + 1,
         ))),
-        installationTargetType: isOneOf(source.installationTargetType, RESEARCH_INSTALL_TARGET_TYPES, 'TECHNOLOGY_PROJECT'),
+        installationTargetType: intrinsicResearchInstallTarget(definitionId)
+            ?? isOneOf(source.installationTargetType, RESEARCH_INSTALL_TARGET_TYPES, 'TECHNOLOGY_PROJECT'),
         installationTargetId: source.installationTargetId == null ? null : cleanText(source.installationTargetId, '', 160) || null,
         installationTargetLabel: source.installationTargetLabel == null ? null : cleanText(source.installationTargetLabel, '', 160) || null,
         rivalInterestPercent: Math.round(clamp(source.rivalInterestPercent, 0, 100)),
@@ -3382,6 +3654,10 @@ const normalizeOriginalCommission = (value: unknown): OwnedStreamingOriginalComm
     };
 };
 
+/* Premiered entries stay on the slate (they are what keeps a setup title on the
+   service), so the slate grows with a career: room for a long one. */
+const MAX_SLATE_PROGRAMME_WEEK = 5_200;
+const MAX_SLATE_ENTRIES = 1_000;
 const normalizeLaunchSlate = (value: unknown): OwnedStreamingLaunchSlate | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const source = asRecord(value);
@@ -3397,11 +3673,14 @@ const normalizeLaunchSlate = (value: unknown): OwnedStreamingLaunchSlate | null 
             source: isOneOf(entry.source, SLATE_ENTRY_SOURCES, 'OWNED_LIBRARY'),
             projectType: isOneOf(entry.projectType, PROJECT_TYPES, 'MOVIE'),
             genre: cleanText(entry.genre, 'DRAMA', 40),
-            launchWeek: Math.round(clamp(entry.launchWeek, 1, 12, 1)),
+            /* the opening slate is weeks 1–12; once live the slate keeps programming
+               premieres up to a year ahead (streamingSlateProgramming), counted
+               in the same programme weeks */
+            launchWeek: Math.round(clamp(entry.launchWeek, 1, MAX_SLATE_PROGRAMME_WEEK, 1)),
             releasePattern: isOneOf(entry.releasePattern, ORIGINAL_RELEASE_PATTERNS, 'SINGLE_PREMIERE'),
             marketingPlan: isOneOf(entry.marketingPlan, SLATE_MARKETING_PLANS, 'STANDARD'),
         }];
-    }), entry => entry.id).slice(0, 36);
+    }), entry => entry.id).slice(0, MAX_SLATE_ENTRIES);
     return {
         entries,
         programmedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.programmedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -3590,6 +3869,11 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
         worldCustomerMonthlySubscriptionRevenue: source.worldCustomerMonthlySubscriptionRevenue === undefined
             ? undefined
             : clamp(source.worldCustomerMonthlySubscriptionRevenue, 0, Number.MAX_SAFE_INTEGER),
+        // #56: paying extra members, only once there are any
+        ...(Number(source.worldCustomerExtraMemberHouseholds) > 0
+            ? { worldCustomerExtraMemberHouseholds: Math.round(clamp(source.worldCustomerExtraMemberHouseholds, 0, Number.MAX_SAFE_INTEGER)) } : {}),
+        ...(Number(source.worldCustomerExtraMemberRevenue) > 0
+            ? { worldCustomerExtraMemberRevenue: clamp(source.worldCustomerExtraMemberRevenue, 0, Number.MAX_SAFE_INTEGER) } : {}),
         worldCustomerPlanAllocations: asArray<unknown>(source.worldCustomerPlanAllocations).slice(0, 12).flatMap(item => {
             const allocation = asRecord(item);
             const planId = cleanText(allocation.planId, '', 80);
@@ -3629,6 +3913,8 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
         financingCost: Math.round(clamp(source.financingCost, 0, Number.MAX_SAFE_INTEGER)),
         weeklyPlanCost: Math.round(clamp(source.weeklyPlanCost, 0, Number.MAX_SAFE_INTEGER)),
         growthPlanCost: Math.round(clamp(source.growthPlanCost, 0, Number.MAX_SAFE_INTEGER)),
+        /* #145: the campaign engine's week, where it spent */
+        ...(Number(source.campaignCost) > 0 ? { campaignCost: Math.round(clamp(source.campaignCost, 0, Number.MAX_SAFE_INTEGER)) } : {}),
         rightsComplianceCost: Math.round(clamp(source.rightsComplianceCost, 0, Number.MAX_SAFE_INTEGER)),
         marketPolicyCost: Math.round(clamp(source.marketPolicyCost, 0, Number.MAX_SAFE_INTEGER)),
         marketIncomeTax: source.marketIncomeTax === undefined ? undefined : Math.round(clamp(source.marketIncomeTax, 0, Number.MAX_SAFE_INTEGER)),
@@ -3672,6 +3958,12 @@ const normalizeWeeklyOperations = (value: unknown): OwnedStreamingWeeklyOperatio
             0,
         )),
         peakConcurrentStreams: Math.round(clamp(source.peakConcurrentStreams, 0, Number.MAX_SAFE_INTEGER)),
+        peakLoadUnits: source.peakLoadUnits === undefined ? undefined : Math.round(clamp(source.peakLoadUnits, 0, Number.MAX_SAFE_INTEGER)),
+        viewerLoad: source.viewerLoad === undefined ? undefined : Math.round(clamp(source.viewerLoad, 0, 1_000) * 10_000) / 10_000,
+        streamingDeliveryCost: source.streamingDeliveryCost === undefined ? undefined
+            : Math.round(clamp(source.streamingDeliveryCost, 0, Number.MAX_SAFE_INTEGER)),
+        streamingDeliveryPhaseIn: source.streamingDeliveryPhaseIn === undefined ? undefined
+            : Math.round(clamp(source.streamingDeliveryPhaseIn, 0, 1) * 1_000) / 1_000,
         capacityUtilizationPercent: clamp(source.capacityUtilizationPercent, 0, 10_000),
         playbackSuccessRate: clamp(source.playbackSuccessRate, 0, 100),
         appliedDecisionId: cleanText(source.appliedDecisionId, '', 100) || null,
@@ -3959,6 +4251,7 @@ const normalizeOpeningProgrammeCommission = (
         infrastructureDueNow: Math.round(clamp(source.infrastructureDueNow, 0, Number.MAX_SAFE_INTEGER)),
         marketFilingDueNow: Math.round(clamp(source.marketFilingDueNow, 0, Number.MAX_SAFE_INTEGER)),
         marketingReservation: Math.round(clamp(source.marketingReservation, 0, Number.MAX_SAFE_INTEGER)),
+        ...(source.identDueNow ? { identDueNow: Math.round(clamp(source.identDueNow, 0, Number.MAX_SAFE_INTEGER)) } : {}),
         totalCashRequired: Math.round(clamp(source.totalCashRequired, 0, Number.MAX_SAFE_INTEGER)),
         revision: Math.max(1, Math.round(clamp(source.revision, 1, Number.MAX_SAFE_INTEGER, 1))),
     };
@@ -4044,6 +4337,11 @@ export const normalizeOwnedStreamingPlatformState = (
     if (normalizedIdentity && legacyDayOneMarketIds.length) normalizedIdentity.dayOneMarketIds = legacyDayOneMarketIds;
     const legacyLaunchServerCityId = cleanText(identitySource.launchServerCityId, '', 24) || null;
     if (normalizedIdentity && legacyLaunchServerCityId) normalizedIdentity.launchServerCityId = legacyLaunchServerCityId;
+    /* #116: when the brand studio last changed the look and the ident */
+    for (const key of ['lookChangedAtAbsoluteWeek', 'identChangedAtAbsoluteWeek'] as const) {
+        const week = Number(identitySource[key]);
+        if (normalizedIdentity && Number.isFinite(week) && week >= 0) normalizedIdentity[key] = Math.round(week);
+    }
 
     // Acquired rights are durable records rather than rolling UI/history data.
     // Keep every valid entitlement, including expired/transferred records used
@@ -4176,8 +4474,17 @@ export const normalizeOwnedStreamingPlatformState = (
         subscriptionPrices: normalizeSubscriptionPrices(source.subscriptionPrices),
         founderOwnershipPercent,
         fibre: normalizeStreamingFibreState(source.fibre),
+        /* A save from before the tech tree gets one built from its Playback Quality level
+           (streamingTechTreeCatalogue.convertStreamingTechTreeFromLevels). Levels are not
+           raised here: the tree feeds them only when the player unlocks or upgrades. */
+        techTree: normalizeStreamingTechTreeState(source.techTree, technologySource, { sellsExtraMember: streamingPlatformSellsExtraMember(source) }),
+        networkOrders: normalizeNetworkOrders(source.networkOrders),
+        deliveryEconomics: normalizeStreamingDeliveryEconomics(source.deliveryEconomics),
         serviceStandardFromWeek: Number.isFinite(Number(source.serviceStandardFromWeek))
             ? Math.max(0, Math.round(Number(source.serviceStandardFromWeek)))
+            : undefined,
+        rivalTechFromWeek: Number.isFinite(Number(source.rivalTechFromWeek)) && source.rivalTechFromWeek !== null
+            ? Math.max(0, Math.round(Number(source.rivalTechFromWeek)))
             : undefined,
         treasuryCash: Math.round(clamp(source.treasuryCash, 0, Number.MAX_SAFE_INTEGER)),
         debtPrincipal,
@@ -4211,6 +4518,8 @@ export const normalizeOwnedStreamingPlatformState = (
             action => action.idempotencyKey,
         ).sort((a, b) => a.targetAbsoluteWeek - b.targetAbsoluteWeek)
             .slice(-OWNED_STREAMING_GROWTH_ACTION_LIMIT),
+        /* #145: the campaign engine's book, once there is one */
+        ...(source.campaignBook ? { campaignBook: normalizeCampaignBook(source.campaignBook) } : {}),
         lastAcknowledgedWeeklyReportAbsoluteWeek:
             source.lastAcknowledgedWeeklyReportAbsoluteWeek === null
             || source.lastAcknowledgedWeeklyReportAbsoluteWeek === undefined
@@ -4335,8 +4644,10 @@ const ALLOWED_LIFECYCLE_TRANSITIONS: Record<OwnedStreamingPlatformLifecycle, Own
     LOCKED: ['ELIGIBLE'],
     ELIGIBLE: ['FOUNDING'],
     FOUNDING: ['ACTIVE'],
-    ACTIVE: ['SUSPENDED'],
+    ACTIVE: ['SUSPENDED', 'SOLD'],
     SUSPENDED: ['ACTIVE'],
+    /* #190: two years after a sale the founding starts again */
+    SOLD: ['ELIGIBLE'],
 };
 
 export const transitionOwnedStreamingLifecycle = (

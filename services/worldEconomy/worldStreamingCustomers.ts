@@ -8,6 +8,7 @@ import type {
     WorldStreamingCustomerPlanCell,
     WorldStreamingCustomerPlanSummary,
     WorldStreamingCustomerPlatformSummary,
+    WorldStreamingCustomerReasonId,
     WorldStreamingCustomerSnapshot,
     WorldStreamingCustomerState,
     WorldStreamingPlatformOffer,
@@ -23,7 +24,9 @@ import {
 } from './worldStreamingCompetition';
 import { getWorldStreamingOffers } from './worldStreamingOffers';
 import { allocateStreamingAudienceChoice } from './worldStreamingAudienceChoice';
-import { STREAMING_ANNUAL_BILLING_SHARE } from '../streamingPricingEconomy';
+import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
+import { streamingFreeTierPiracyCut } from '../streamingPlanOffer';
+import { STREAMING_ANNUAL_BILLING_SHARE, STREAMING_REFERENCE_ANNUAL_DISCOUNT } from '../streamingPricingEconomy';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
 import {
     STREAMING_SHARING_POLICY_EFFECTS,
@@ -35,6 +38,8 @@ import {
 
 export const WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION = 2 as const;
 const MAX_SNAPSHOTS = 52;
+/** What an extra member pays (#56), against the plan's price. */
+export const STREAMING_EXTRA_MEMBER_PRICE_SHARE = .4;
 const MAX_RECENT_MOVEMENTS = 624;
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
@@ -258,6 +263,14 @@ const applyAccessPaths = (
     if (!audience || !participation || !population) return cohort;
     const offerMap = new Map(offers.offers.map(offer => [offer.platformId, offer]));
     const nonPayingHouseholds = Math.max(0, cohort.reachableHouseholds - cohort.payingHouseholds);
+    /* Sharing control (#56): Device check thins the outside homes on the player's accounts, and
+       with Paid extra member a plan selling Extra member keeps a share of the sharers its rules
+       turn away as paying extra members. Neither owned: as before. */
+    const playerOffer = offerMap.get('PLAYER');
+    const sharingCheck = clamp(playerOffer?.sharingCheckFactor ?? 1, 0, 1);
+    const extraMemberShare = clamp(playerOffer?.extraMemberShare ?? 0, 0, 1);
+    const openestSharing = STREAMING_SHARING_POLICY_EFFECTS.sharingPosture.REACH_FIRST * STREAMING_SHARING_POLICY_EFFECTS.sharingEnforcement.LIGHT;
+    const extraMemberWeights: number[] = [];
     const sharingWeights = cohort.planCells.map(cell => {
         const plan = offerMap.get(cell.platformId)?.plans.find(item => item.id === cell.planId);
         /* Rival services always sit at Balanced + Standard (streamingSharingPolicy.ts). */
@@ -267,12 +280,20 @@ const applyAccessPaths = (
         const enforcementFactor = cell.platformId !== 'PLAYER'
             ? STREAMING_SHARING_POLICY_EFFECTS.sharingEnforcement.STANDARD
             : streamingSharingEnforcementFactor(policy.enforcementInvestment);
-        const planFactor = plan?.featureIds.includes('streams4') ? 1.25 : plan?.featureIds.includes('downloads') ? 1.05 : .82;
-        return cell.paidAccounts * audience.sharingTendencyIndex / 100 * .3 * postureFactor * enforcementFactor * planFactor;
+        const planFactor = plan?.featureIds.includes('streams6') ? 1.35 : plan?.featureIds.includes('streams4') ? 1.25 : plan?.featureIds.includes('downloads') ? 1.05 : .82;
+        const check = cell.platformId === 'PLAYER' ? sharingCheck : 1;
+        extraMemberWeights.push(cell.platformId === 'PLAYER' && extraMemberShare > 0 && plan?.featureIds.includes('extraseat')
+            ? cell.paidAccounts * audience.sharingTendencyIndex / 100 * .3 * planFactor
+                * Math.max(0, openestSharing - postureFactor * enforcementFactor * check) * extraMemberShare
+            : 0);
+        // the same order of operations as before #56, so without Device check every figure is exactly what it was
+        return cell.paidAccounts * audience.sharingTendencyIndex / 100 * .3 * postureFactor * enforcementFactor * planFactor * check;
     });
     const desiredShared = Math.min(nonPayingHouseholds, Math.round(sharingWeights.reduce((sum, value) => sum + value, 0)));
     const sharedByCell = distributeInteger(desiredShared, sharingWeights);
-    const remainingHouseholds = Math.max(0, nonPayingHouseholds - desiredShared);
+    const extraMembers = Math.min(nonPayingHouseholds - desiredShared, Math.round(extraMemberWeights.reduce((sum, value) => sum + value, 0)));
+    const extraByCell = extraMembers > 0 ? distributeInteger(extraMembers, extraMemberWeights) : cohort.planCells.map(() => 0);
+    const remainingHouseholds = Math.max(0, nonPayingHouseholds - desiredShared - extraMembers);
     const affordabilityPressure = clamp(
         1 - participation.totalMonthlyStreamingBudget / Math.max(1, cohort.reachableHouseholds * Math.max(1, audience.monthlyEntertainmentBudgetPerHousehold)),
         0,
@@ -286,16 +307,27 @@ const applyAccessPaths = (
         .52,
     )));
     const piracyPeople = Math.round(piracyHouseholds * population.averageHouseholdSize * .72);
-    const piracyByCell = distributeInteger(piracyPeople, cohort.planCells.map(cell => cell.paidAccounts));
+    /* Content protection (#55): of the people pirating the player's titles, the share it stops never get a copy;
+       a free tier (#57) takes 16–32% of the rest, who watch it instead */
+    const protection = clamp((offerMap.get('PLAYER')?.protectionIndex || 0) / 100, 0, .95);
+    const freeCut = playerOffer && projectStreamingCommercialOffers(playerOffer.commercialConfiguration).freeAdOffer
+        ? streamingFreeTierPiracyCut(playerOffer.freeAdQualityIndex) : 0;
+    const piracyByCell = distributeInteger(piracyPeople, cohort.planCells.map(cell => cell.paidAccounts))
+        .map((value, index) => ((protection > 0 || freeCut > 0) && cohort.planCells[index].platformId === 'PLAYER'
+            ? Math.round(value * (1 - protection) * (1 - freeCut)) : value));
     const cells = cohort.planCells.map((cell, index) => {
         const externalSharedHouseholds = sharedByCell[index] || 0;
-        const sharedActiveViewers = Math.round(externalSharedHouseholds * population.averageHouseholdSize * .64);
+        // an extra member watches on the account like a shared home, and pays 40% of the plan's price
+        const extra = extraByCell[index] || 0;
+        const sharedActiveViewers = Math.round((externalSharedHouseholds + extra) * population.averageHouseholdSize * .64);
+        const { extraMemberHouseholds: _households, extraMemberMonthlyRevenue: _revenue, ...rest } = cell;
         return {
-            ...cell,
+            ...rest,
             externalSharedHouseholds,
             sharedActiveViewers,
             piracyReach: piracyByCell[index] || 0,
-            accessLoadAccounts: cell.paidAccounts + Math.round(externalSharedHouseholds * STREAMING_SHARING_POLICY_EFFECTS.sharedLoadPerHome),
+            accessLoadAccounts: cell.paidAccounts + Math.round((externalSharedHouseholds + extra) * STREAMING_SHARING_POLICY_EFFECTS.sharedLoadPerHome),
+            ...(extra > 0 ? { extraMemberHouseholds: extra, extraMemberMonthlyRevenue: round2(extra * cell.effectiveMonthlyPrice * STREAMING_EXTRA_MEMBER_PRICE_SHARE) } : {}),
         };
     });
     return {
@@ -489,6 +521,8 @@ const advanceCohort = (
     averageHouseholdSize: number,
     policy: WorldStreamingCustomerAccessPolicy,
     playerWeeklyChurnRate = 0,
+    /** Household detection (#56): the share of the policy's crackdown cancellations left */
+    playerCrackdownFactor = 1,
 ): { cohort: WorldStreamingCustomerCohortState; movements: WorldStreamingCustomerMovement[] } => {
     const prior = cellMap(previous);
     const target = new Map(desired.cells.map(cell => [cell.platformId, cell]));
@@ -503,7 +537,7 @@ const advanceCohort = (
         const weeklyRate = goal >= starting ? .14 : wanted ? .18 : .55;
         const convergence = 1 - Math.pow(1 - weeklyRate, Math.max(1, elapsedWeeks));
         const policyCancellationRate = platformId === 'PLAYER'
-            ? streamingPolicyWeeklyCancellationRate(policy)
+            ? streamingPolicyWeeklyCancellationRate(policy) * playerCrackdownFactor
             : 0;
         const elapsed = Math.max(1, elapsedWeeks);
         const departures = platformId === 'PLAYER'
@@ -664,6 +698,57 @@ const advanceCohort = (
     };
 };
 
+/* Pay yearly (#71): the week the player's discount changes, its subscribers switch to the billing it now
+   draws (the split the competition gives each cohort), tenure and all, rather than cancelling on one path
+   and joining on the other. */
+const switchPlayerBilling = (
+    previous: WorldStreamingCustomerCohortState[],
+    desired: DesiredCohort[],
+): WorldStreamingCustomerCohortState[] => {
+    const cohorts = previous.map(cohort => ({ ...cohort, planCells: cohort.planCells.map(cell => ({ ...cell })) }));
+    const mine = (cohort: WorldStreamingCustomerCohortState) => cohort.planCells.find(cell => cell.platformId === 'PLAYER');
+    [...new Set(cohorts.map(cohort => cohort.cohortId))].forEach(cohortId => {
+        const monthly = cohorts.find(cohort => cohort.cohortId === cohortId && cohort.billingPath === 'MONTHLY');
+        const annual = cohorts.find(cohort => cohort.cohortId === cohortId && cohort.billingPath === 'ANNUAL');
+        const wanted = (path: StreamingBillingPath) => desired.find(row => row.cohortId === cohortId && row.billingPath === path)
+            ?.cells.find(cell => cell.platformId === 'PLAYER');
+        const want = (wanted('MONTHLY')?.paidAccounts || 0) + (wanted('ANNUAL')?.paidAccounts || 0);
+        if (!monthly || !annual || !want) return;
+        const yearly = mine(annual)?.paidAccounts || 0;
+        const had = (mine(monthly)?.paidAccounts || 0) + yearly;
+        const shift = Math.round(had * (wanted('ANNUAL')?.paidAccounts || 0) / want) - yearly;
+        if (!shift) return;
+        const [from, to] = shift > 0 ? [monthly, annual] : [annual, monthly];
+        const source = mine(from)!;
+        let target = mine(to);
+        if (!target) {
+            const template = wanted(to.billingPath);
+            if (!template) return;
+            target = { ...template, paidAccounts: 0, primaryHouseholds: 0, monthlySubscriptionRevenue: 0, tenureNewAccounts: 0,
+                tenureEstablishedAccounts: 0, tenureLoyalAccounts: 0, externalSharedHouseholds: 0, sharedActiveViewers: 0,
+                piracyReach: 0, accessLoadAccounts: 0 };
+            to.planCells.push(target);
+        }
+        const moved = Math.min(Math.abs(shift), source.paidAccounts);
+        const tenure = annualTenureCounts([source.tenureNewAccounts, source.tenureEstablishedAccounts, source.tenureLoyalAccounts], moved);
+        const homes = Math.min(source.primaryHouseholds, Math.round(moved * source.primaryHouseholds / Math.max(1, source.paidAccounts)));
+        source.paidAccounts -= moved;
+        target.paidAccounts += moved;
+        source.primaryHouseholds -= homes;
+        target.primaryHouseholds += homes;
+        source.tenureNewAccounts -= tenure[0];
+        target.tenureNewAccounts += tenure[0];
+        source.tenureEstablishedAccounts -= tenure[1];
+        target.tenureEstablishedAccounts += tenure[1];
+        source.tenureLoyalAccounts -= tenure[2];
+        target.tenureLoyalAccounts += tenure[2];
+        source.monthlySubscriptionRevenue = round2(source.paidAccounts * source.effectiveMonthlyPrice);
+        target.monthlySubscriptionRevenue = round2(target.paidAccounts * target.effectiveMonthlyPrice);
+        if (!source.paidAccounts) from.planCells.splice(from.planCells.indexOf(source), 1);
+    });
+    return cohorts;
+};
+
 const advanceCountries = (
     player: Player,
     desired: DesiredCohort[],
@@ -671,6 +756,7 @@ const advanceCountries = (
     absoluteWeek: number,
     offers: ReturnType<typeof getWorldStreamingOffers>,
     policy: WorldStreamingCustomerAccessPolicy,
+    switchBilling = false,
 ): { countries: Record<string, WorldStreamingCustomerCountryState>; movements: WorldStreamingCustomerMovement[] } => {
     const elapsedWeeks = Math.max(1, absoluteWeek - previous.lastProcessedAbsoluteWeek);
     const allMovements: WorldStreamingCustomerMovement[] = [];
@@ -678,14 +764,16 @@ const advanceCountries = (
         const previousCountry = previous.countries[countryId];
         const population = player.world.worldPopulation!.countries[countryId];
         const rows = desired.filter(item => item.countryId === countryId);
+        const billed = switchBilling && previousCountry ? switchPlayerBilling(previousCountry.cohorts, rows) : previousCountry?.cohorts;
         const results = rows.map(row => advanceCohort(
             row,
-            previousCountry?.cohorts.find(cohort => cohort.cohortId === row.cohortId && cohort.billingPath === row.billingPath),
+            billed?.find(cohort => cohort.cohortId === row.cohortId && cohort.billingPath === row.billingPath),
             absoluteWeek,
             elapsedWeeks,
             population.averageHouseholdSize,
             policy,
             offers.offers.find(offer => offer.isPlayer)?.customerExperienceByCountry?.[countryId]?.weeklyChurnRate || 0,
+            offers.offers.find(offer => offer.isPlayer)?.crackdownFactor ?? 1,
         ));
         const movements = results.flatMap(result => result.movements);
         allMovements.push(...movements);
@@ -764,6 +852,11 @@ const createGlobal = (
         playerPiracyReach: playerRows.reduce((sum, row) => sum + row.piracyReach, 0),
         playerAccessLoadAccounts: playerRows.reduce((sum, row) => sum + row.accessLoadAccounts, 0),
         playerMonthlySubscriptionRevenue: round2(playerRows.reduce((sum, row) => sum + row.monthlySubscriptionRevenue, 0)),
+        // Sharing control (#56): sharers paying to stay; only once there are any
+        ...(playerCells.some(cell => (cell.extraMemberHouseholds || 0) > 0) ? {
+            playerExtraMemberHouseholds: playerCells.reduce((sum, cell) => sum + (cell.extraMemberHouseholds || 0), 0),
+            playerExtraMemberMonthlyRevenue: round2(playerCells.reduce((sum, cell) => sum + (cell.extraMemberMonthlyRevenue || 0), 0)),
+        } : {}),
         playerPlanAllocations: planSummaries(playerCells),
         playerOfferPresent,
         countryCount: values.length,
@@ -771,15 +864,39 @@ const createGlobal = (
     };
 };
 
-const createSnapshot = (absoluteWeek: number, global: WorldStreamingCustomerGlobalSummary): WorldStreamingCustomerSnapshot => ({
-    absoluteWeek,
-    endingPaidAccounts: global.endingPaidAccounts,
-    payingHouseholds: global.payingHouseholds,
-    externalSharedHouseholds: global.externalSharedHouseholds,
-    piracyReach: global.piracyReach,
-    playerEndingPaidAccounts: global.playerEndingPaidAccounts,
-    playerMonthlySubscriptionRevenue: global.playerMonthlySubscriptionRevenue,
-});
+/** #128: the week's movements into and out of the player's service, summed by reason. The world keeps only
+    its twelve largest movements a week (`recentMovements`), so the player's own reasons are kept here. */
+const playerFlowsOf = (movements: WorldStreamingCustomerMovement[]): WorldStreamingCustomerSnapshot['playerFlows'] => {
+    const inbound: Partial<Record<WorldStreamingCustomerReasonId, number>> = {};
+    const outbound: Partial<Record<WorldStreamingCustomerReasonId, number>> = {};
+    let any = false;
+    movements.forEach(movement => {
+        if (movement.households <= 0 || movement.sourcePlatformId === movement.destinationPlatformId) return;
+        const side = movement.destinationPlatformId === 'PLAYER' ? inbound : movement.sourcePlatformId === 'PLAYER' ? outbound : null;
+        if (!side) return;
+        side[movement.reasonId] = (side[movement.reasonId] || 0) + movement.households;
+        any = true;
+    });
+    return any ? { in: inbound, out: outbound } : undefined;
+};
+
+const createSnapshot = (
+    absoluteWeek: number,
+    global: WorldStreamingCustomerGlobalSummary,
+    movements: WorldStreamingCustomerMovement[] = [],
+): WorldStreamingCustomerSnapshot => {
+    const playerFlows = playerFlowsOf(movements);
+    return {
+        absoluteWeek,
+        endingPaidAccounts: global.endingPaidAccounts,
+        payingHouseholds: global.payingHouseholds,
+        externalSharedHouseholds: global.externalSharedHouseholds,
+        piracyReach: global.piracyReach,
+        playerEndingPaidAccounts: global.playerEndingPaidAccounts,
+        playerMonthlySubscriptionRevenue: global.playerMonthlySubscriptionRevenue,
+        ...(playerFlows ? { playerFlows } : {}),
+    };
+};
 
 const structurallyValid = (input: unknown, schemaVersion: 1 | 2 = WORLD_STREAMING_CUSTOMER_SCHEMA_VERSION): input is WorldStreamingCustomerState => {
     if (!input || typeof input !== 'object') return false;
@@ -914,6 +1031,11 @@ const migrateLegacyCustomerState = (
     };
 };
 
+/** Pay yearly (#71): the discount the player's subscribers are billed at, kept once the player sells one */
+const billedAt = (discount: number | undefined): Pick<WorldStreamingCustomerState, 'playerAnnualDiscount'> => (
+    discount === undefined ? {} : { playerAnnualDiscount: discount }
+);
+
 export const createWorldStreamingCustomerState = (player: Player, absoluteWeek: number): WorldStreamingCustomerState => {
     const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
     const prepared = preparePlayer(player, week);
@@ -931,6 +1053,7 @@ export const createWorldStreamingCustomerState = (player: Player, absoluteWeek: 
         lastProcessedAbsoluteWeek: week,
         sourceFingerprint: createDeterministicId('world-streaming-customers-source', week, prepared.world.worldStreamingCompetition!.sourceFingerprint, offers.fingerprint, policy.sharingPosture, policy.enforcementInvestment),
         playerAccessPolicy: policy,
+        ...billedAt(offers.offers.find(offer => offer.isPlayer)?.annualDiscountPercent),
         countries,
         global,
         recentMovements: [],
@@ -1012,6 +1135,7 @@ export const createOpeningWorldStreamingCustomerState = (
     }));
     const global = createGlobal(countries, offers.offers.some(offer => offer.isPlayer));
     return { ...baseline, countries, global, playerAccessPolicy: policy,
+        ...billedAt(offers.offers.find(offer => offer.isPlayer)?.annualDiscountPercent ?? baseline.playerAnnualDiscount),
         sourceFingerprint: createDeterministicId('world-streaming-opening-customers', baseline.sourceFingerprint, offers.fingerprint),
         snapshots: [...baseline.snapshots.filter(snapshot => snapshot.absoluteWeek !== absoluteWeek), createSnapshot(absoluteWeek, global)].slice(-MAX_SNAPSHOTS),
     };
@@ -1044,7 +1168,9 @@ export const normalizeWorldStreamingCustomerState = (
     if (compatible.lastProcessedAbsoluteWeek === week) return compatible;
     const desired = createDesiredCohorts(prepared, offers);
     markStage('desired_ready');
-    const advanced = advanceCountries(prepared, desired, compatible, week, offers, policy);
+    const discount = offers.offers.find(offer => offer.isPlayer)?.annualDiscountPercent;
+    const advanced = advanceCountries(prepared, desired, compatible, week, offers, policy,
+        discount !== undefined && discount !== (compatible.playerAnnualDiscount ?? STREAMING_REFERENCE_ANNUAL_DISCOUNT));
     markStage('countries_advanced');
     const global = createGlobal(advanced.countries, offers.offers.some(offer => offer.isPlayer));
     markStage('global_ready');
@@ -1058,9 +1184,10 @@ export const normalizeWorldStreamingCustomerState = (
         lastProcessedAbsoluteWeek: week,
         sourceFingerprint,
         playerAccessPolicy: policy,
+        ...billedAt(discount ?? compatible.playerAnnualDiscount),
         countries: advanced.countries,
         global,
-        snapshots: [...compatible.snapshots, createSnapshot(week, global)].slice(-MAX_SNAPSHOTS),
+        snapshots: [...compatible.snapshots, createSnapshot(week, global, advanced.movements)].slice(-MAX_SNAPSHOTS),
         recentMovements: [...compatible.recentMovements, ...recentForWeek].slice(-MAX_RECENT_MOVEMENTS),
     };
 };
@@ -1126,6 +1253,9 @@ export const getWorldStreamingPlayerCustomerOutcome = (
         accessLoadAccounts: number;
         monthlySubscriptionRevenue: number;
         planAllocations: WorldStreamingCustomerPlanSummary[];
+        /** #56: sharers paying to stay as extra members, and what they pay a month; absent when none */
+        extraMemberHouseholds?: number;
+        extraMemberMonthlyRevenue?: number;
     }) | null => {
     if (!state || !structurallyValid(state) || (!state.global.playerOfferPresent && !includeUnavailableOffer)) return null;
     return {
@@ -1161,5 +1291,9 @@ export const getWorldStreamingPlayerCustomerOutcome = (
         accessLoadAccounts: state.global.playerAccessLoadAccounts,
         monthlySubscriptionRevenue: state.global.playerMonthlySubscriptionRevenue,
         planAllocations: state.global.playerPlanAllocations.map(row => ({ ...row })),
+        ...((state.global.playerExtraMemberHouseholds || 0) > 0 ? {
+            extraMemberHouseholds: state.global.playerExtraMemberHouseholds,
+            extraMemberMonthlyRevenue: state.global.playerExtraMemberMonthlyRevenue || 0,
+        } : {}),
     };
 };

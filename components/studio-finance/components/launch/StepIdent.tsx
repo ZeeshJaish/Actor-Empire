@@ -20,7 +20,7 @@ import {
   playStreamingIdentPreview,
   type StreamingIdentPreviewId,
 } from '../../../../services/streamingIdentAudio';
-import { ResearchLockMark } from './ResearchLockMark';
+import { TechLockMark } from './TechLockMark';
 
 /* Each sound has a rhythm the preview animates to — that is the only honest
    way to show sound on a screen that cannot play it. */
@@ -55,6 +55,8 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
   const pack = data.identPackages.find((p) => p.id === draft.packageId);
   const previewPack = data.identPackages.find((p) => p.id === previewPackageId) || pack;
   const previewLock = previewPack ? data.capabilityLocks[`ident:${previewPack.id}`] : undefined;
+  /* #109: the Tech step (Smart AI) a locked kit needs */
+  const previewTech = previewPack ? data.capabilityLockTech?.[`ident:${previewPack.id}`] : undefined;
   const full = Boolean(previewPack && !previewPack.included);
   const cost = pack && !pack.included ? pack.cost : 0;
   const packagePurchased = Boolean(pack && data.ident.purchasedPackageIds.includes(pack.id));
@@ -172,7 +174,7 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
             />
           </span>
           <span className="id-word">{data.company.name}</span>
-          {previewLock && <span className="id-research-stamp">Research preview</span>}
+          {previewLock && <span className="id-research-stamp">Preview · unlock in Tech</span>}
           <span className="id-sweep" aria-hidden="true" />
           {rhythm.beats.map((at, i) => (
             <span key={i} className="id-beat" style={{ ['--at' as string]: `${at}` }} aria-hidden="true" />
@@ -180,7 +182,9 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
         </div>
         <div className="id-stagefoot">
           <span>{previewLock ? `Prototype · ${previewPack?.name}` : `${rhythm.feel}${full ? ` · ${previewPack?.name}` : ''}`}</span>
-          <button type="button" className="id-replay" onClick={replay}>Play again</button>
+          <button type="button" className="id-replay" onClick={replay}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6L12.6 8z" fill="currentColor" /></svg>Play again
+          </button>
         </div>
       </section>
 
@@ -260,8 +264,8 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
         {/* The single way to open research on this screen, at the top of the kit
             it refers to rather than below the fold. */}
         {previewLock && previewPack ? (
-          <button type="button" className="sf-btn sf-btn--research" onClick={() => handlers.onOpenTechnology?.()}>
-            Research {previewPack.name}
+          <button type="button" className="sf-btn sf-btn--research" onClick={() => handlers.onOpenTechnology?.(previewTech?.techId)}>
+            Unlock {previewPack.name}{previewTech ? `: ${previewTech.tech}` : ''} ›
           </button>
         ) : null}
         {/* Four kits would be four tall cards. They are a picker, and only the
@@ -277,16 +281,19 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
                 key={option.id}
                 type="button"
                 title={lock || undefined}
-                aria-label={lock ? `Preview ${option.name}. Research required: ${lock}` : option.name}
+                aria-label={lock ? `Preview ${option.name}. ${lock}` : option.name}
                 aria-pressed={previewing}
                 className={`${on ? 'id-kit is-on' : 'id-kit'}${lock ? ' is-locked' : ''}${previewing && lock ? ' is-preview' : ''}${purchased ? ' is-purchased' : ''}`}
                 onClick={() => previewPackage(option.id, Boolean(lock))}
               >
                 <b>{option.name}</b>
-                <em>{option.included ? 'Included' : `${money(option.cost)}${purchased ? ' · Bought' : ''}`}</em>
+                <em>{option.included ? 'Included' : money(option.cost)}</em>
                 {lock
-                  ? <ResearchLockMark reason={lock} />
+                  ? <TechLockMark tech={data.capabilityLockTech?.[`ident:${option.id}`]?.tech} />
                   : <s>{option.frames.length} surface{option.frames.length > 1 ? 's' : ''}</s>}
+                {/* #112: the kit in use is equipped; a kit already paid for says so (switching before launch refunds it) */}
+                {on && !lock && <i className="id-kit-tag">Equipped</i>}
+                {!on && purchased && !option.included && <i className="id-kit-tag is-paid">Paid</i>}
               </button>
             );
           })}
@@ -331,12 +338,21 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
           chosen until the player chooses it, and a locked kit can be previewed
           without ever becoming the selection — so this reports the real state
           rather than whatever is on screen. */}
-      <p className="id-commissioned" role="status">
-        {!pack
-          ? 'No ident selected yet.'
-          : dueNow
-            ? `Selected · ${money(dueNow)} added to the launch plan, payable at launch.`
-            : 'Selected · included at no cost.'}
+      {/* #112: the kit is paid at launch, with the launch's other money, and a kit already paid for (a save from before
+          #112) is refunded when another replaces it before launch. */}
+      <p className={`id-commissioned${!pack ? ' is-empty' : ''}`} role="status">
+        {!pack ? 'No ident selected yet.' : (
+          <>
+            <b>{pack.name}</b>
+            <span>
+              {dueNow
+                ? `${money(dueNow)} in the launch plan, payable at launch`
+                : packagePurchased && !pack.included
+                  ? `Paid ${money(cost)} · switching before launch refunds it`
+                  : 'Included at no cost'}
+            </span>
+          </>
+        )}
       </p>
     </>
   );

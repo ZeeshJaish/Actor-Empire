@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
     INITIAL_PLAYER,
@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
+import { getStreamingLegacyMilestones } from '../services/streamingLegacy';
 import { appointStreamingExternalExecutive } from '../services/streamingLeadershipGovernance';
 import { normalizeWorldPlatformAi } from '../services/platformAi/platformAiState';
 import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLoop';
@@ -151,7 +152,7 @@ assert(
     'The projected rival cash is disclosure-only and must remain a projection of canonical world cash.',
 );
 assert(actingRival.cooldownUntilAbsoluteWeek > absoluteWeek, 'A rival move should create a real cooldown.');
-assert(committed.cinematicQueue.filter(event => event.type === 'PLATFORM_WAR_DECLARATION').length === 1, 'The first funded move should queue one declaration cinematic.');
+assert(committed.cinematicQueue.filter(event => event.type === 'PLATFORM_WAR_DECLARATION').length === 0 && committed.eventLedger.some(entry => entry.type === 'RIVAL_MOVE_COMMITTED'), '#141: the first funded move is recorded, and no Platform Wars scene is queued.');
 const committedAgain = commitStreamingCompetitiveWorldWeek(committed, fixture, absoluteWeek);
 assert(committedAgain.competitiveWorld.moves.length === committed.competitiveWorld.moves.length, 'Reprocessing the same week must not create another rival move.');
 
@@ -339,24 +340,19 @@ const awardsCommitted = commitStreamingCompetitiveWorldWeek(
 const awardSeason = awardsCommitted.competitiveWorld.awardSeasons[0];
 assert(awardSeason?.results.length === 5, 'The annual jury should resolve all five award categories.');
 assert(awardSeason.results.every(result => result.nominees.length === 3 && result.nominees.every(nominee => nominee.evidence)), 'Every award should retain a top-three evidence-backed nominee list.');
-assert(awardsCommitted.cinematicQueue.filter(event => event.type === 'STREAMING_AWARDS_CEREMONY').length === 1, 'A resolved award season should queue one fact-backed ceremony.');
+assert(awardsCommitted.cinematicQueue.filter(event => event.type === 'STREAMING_AWARDS_CEREMONY').length === 0 && awardsCommitted.eventLedger.some(entry => entry.type === 'STREAMING_AWARDS_RESOLVED'), '#141: the awards are off for the player: the season is recorded and no ceremony is queued.');
 assert(commitStreamingCompetitiveWorldWeek(awardsCommitted, awardsFixture, awardsWeek).competitiveWorld.awardSeasons.length === 1, 'The same annual season must never resolve twice.');
+const prestigeBefore = awardsFixture.ownedStreamingPlatform.competitiveWorld.globalPrestige;
+assert(awardsCommitted.competitiveWorld.globalPrestige === Math.min(100, prestigeBefore + awardSeason.playerWins * 5 + awardSeason.playerNominations), '#141: the season still moves prestige quietly (+5 a win, +1 a nomination).');
+assert(!getStreamingLegacyMilestones(awardsCommitted).some(item => item.title === 'The industry notices'), '#141: the Legacy room shows no awards moment.');
 const share = awardsCommitted.competitiveWorld.marketShareHistory.at(-1)!;
 assert(Math.abs(share.entries.reduce((sum, entry) => sum + entry.sharePercent, 0) - 100) < 0.1, 'Canonical market-share entries should reconcile to 100%.');
 
-const component = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformWars.tsx'), 'utf8');
-const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-platform-wars-v2.css'), 'utf8');
 const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const analytics = readFileSync(resolve(process.cwd(), 'services/streamingAnalytics.ts'), 'utf8');
 const weekly = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
-assert(component.includes('PLATFORM WAR') && component.includes('CEO INTELLIGENCE') && component.includes('GLOBAL FOOTPRINT'), 'The playable surface should include the war room, persistent CEO dossiers and global map.');
-assert(component.includes('TECHNOLOGY') && component.includes('onOpenTechnology'), 'Technology-copy and sabotage pressure should route into the canonical Technology Campus.');
-assert(component.includes('There is no spend button') && !component.includes('Buy award'), 'Awards must explicitly remain evidence-only and unpurchasable.');
-assert(component.includes('fictional characters') && component.includes('Rivals cannot create actions without enough cash'), 'The UI should disclose fictional CEO identity and resource fairness.');
-assert(styles.includes('@media (max-width: 600px)') && styles.includes('prefers-reduced-motion'), 'Platform Wars should include explicit mobile and reduced-motion treatment.');
-assert(hq.includes('showPlatformWars') && hq.includes('StreamingPlatformWars'), 'Market HQ should launch the complete Platform Wars suite.');
+assert(!hq.includes('showPlatformWars') && !hq.includes('StreamingPlatformWars') && !existsSync(resolve(process.cwd(), 'components/StreamingPlatformWars.tsx')), '#141: Platform Wars is removed.');
 assert(analytics.includes('competitiveWorld.marketShareHistory'), 'Analytics should consume the same canonical market-share record.');
 assert(weekly.includes('getStreamingCompetitiveWeeklyEffects') && weekly.includes('competitiveOperationsCost'), 'The canonical weekly loop should reconcile rivalry and regional operating consequences.');
-assert(!component.includes('Acquire platform') && !component.includes('IPO') && !component.includes('server hack'), 'Phase 20 must not leak M&A, IPO or shadow-operations phases.');
 
 console.log('✓ Streaming Rivals, Global Expansion and Awards Phase 20 audit passed');

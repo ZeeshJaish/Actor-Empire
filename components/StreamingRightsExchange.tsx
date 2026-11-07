@@ -495,7 +495,7 @@ export default function StreamingRightsExchange({
                       <div><span>{obligation.type === 'MARKETING_SPEND' ? 'MARKETING GUARANTEE' : 'VIEWERSHIP THRESHOLD'}</span><strong>{obligation.title}</strong><small>Due week {obligation.dueAtAbsoluteWeek} • {obligation.status.replace('_', ' ')}</small></div>
                       <div className="rights-progress"><i style={{ width: `${progress}%` }} /><span>{Math.round(progress)}%</span></div>
                       <button type="button" onClick={() => obligation.type === 'MARKETING_SPEND' ? onOpenPromotion?.(obligation.sourceProjectId) : onOpenTitleDossier?.(obligation.sourceProjectId)}>
-                        {obligation.type === 'MARKETING_SPEND' ? 'Open campaign room' : 'Open title evidence'} <ChevronRight size={15} />
+                        {obligation.type === 'MARKETING_SPEND' ? 'Open Campaign Studio' : 'Open title evidence'} <ChevronRight size={15} />
                       </button>
                     </article>
                   );

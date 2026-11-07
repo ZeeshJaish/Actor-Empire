@@ -1,15 +1,20 @@
 /**
  * EMPIRE+ v2 — THE LISTING
  *
- *   CHAPTER 01   THE ASK        you name a number, and four gates argue with it
+ *   CHAPTER 01   THE ASK        the ticker, the worth and the float; the table argues; the banks bid
  *   CHAPTER 02  THE SCRUTINY   strangers audit your life, then the state does
- *   CHAPTER 03 THE SELL       price band, anchors, and one live interview
- *   CHAPTER 04  THE VERDICT    three days where you can do nothing at all
- *   CHAPTER 05   AFTER          what you own, and what you now owe
+ *   CHAPTER 03 THE OFFER      price band, anchors, and one live interview
+ *   CHAPTER 04  THE MARKET     three days where you can do nothing at all, then the closing bell
+ *   CHAPTER 05   PUBLIC LIFE    MARKETS (#188), where the listing lands
+ *
+ * #189 (plan §22.4): fewer, bigger scenes, each with one decision. The ask holds the ticker and the float (the only
+ * place they are chosen) and starts from our value; your CFO, your CTO and the board sit at one table with their
+ * faces; the cover's stamps and the after-bill are gone (the marks show at the table; public life is MARKETS).
  *
  * ── THE DRAWING RULE ──────────────────────────────────────────────────────
- * Never draw the thing. Draw what the thing produces. No buildings, no faces,
- * no perspective. Type, paper, light, and numbers moving.
+ * Never draw the thing. Draw what the thing produces. No buildings, no
+ * perspective; people appear as their own faces. Type, paper, light, and
+ * numbers moving.
  *
  * ── ONE REGISTER PER MOMENT ───────────────────────────────────────────────
  * The first pass put every screen on cream paper, which made a legal
@@ -38,24 +43,27 @@ import {
   streamingTickerOptions as tickerOptions,
 } from './streamingIpoPresentationModel';
 import { MarketDesk, Segment } from './StreamingMarketDesk';
+import { PersonFace } from './PersonFace';
 
 /* ============================================================
    THE SHAPE
    ============================================================ */
 export type Scene =
-  | 'RESOLUTION' | 'ASK' | 'CFO' | 'CTO' | 'BOARD' | 'SYNDICATE' | 'STANDS'
+  | 'RESOLUTION' | 'ASK' | 'CFO' | 'CTO' | 'BOARD' | 'TABLE' | 'SYNDICATE' | 'STANDS'
   | 'DILIGENCE' | 'FILING' | 'REGULATOR'
   | 'BAND' | 'ANCHOR' | 'INTERVIEW'
   | 'BOOK' | 'ALLOT' | 'LISTING'
   | 'AFTER';
 
 const CHAPTER_OF: Record<Scene, 1 | 2 | 3 | 4 | 5> = {
-  RESOLUTION: 1, ASK: 1, CFO: 1, CTO: 1, BOARD: 1, SYNDICATE: 1, STANDS: 1,
+  RESOLUTION: 1, ASK: 1, CFO: 1, CTO: 1, BOARD: 1, TABLE: 1, SYNDICATE: 1, STANDS: 1,
   DILIGENCE: 2, FILING: 2, REGULATOR: 2,
   BAND: 3, ANCHOR: 3, INTERVIEW: 3,
   BOOK: 4, ALLOT: 4, LISTING: 4,
   AFTER: 5,
 };
+/* #189: a listing saved at a scene that no longer exists resumes at the one that took its place */
+const RESUME_AT: Partial<Record<Scene, Scene>> = { RESOLUTION: 'ASK', CFO: 'TABLE', CTO: 'TABLE', BOARD: 'TABLE', STANDS: 'DILIGENCE', AFTER: 'LISTING' };
 const CHAPTERS = [
   { n: '01', t: 'THE ASK' }, { n: '02', t: 'SCRUTINY' }, { n: '03', t: 'THE OFFER' },
   { n: '04', t: 'THE MARKET' }, { n: '05', t: 'PUBLIC LIFE' },
@@ -99,7 +107,8 @@ export const fundamentalsOf = (inp: IpoInputs): Fundamentals => {
   const revenue = Math.max(1, inp.subscribers * inp.arpu * 12);
   const churnPenalty = Math.max(.45, 1 - (inp.churnPct - 2) * .11);
   const debtPenalty = Math.max(.7, 1 - (inp.techDebt / 100) * .32);
-  const fair = revenue * 7.2 * churnPenalty * debtPenalty;
+  /* #184: the valuation engine's value when the game passes it (the CFO, the board, the banks and MARKETS agree) */
+  const fair = inp.fairValue && inp.fairValue > 0 ? inp.fairValue : revenue * 7.2 * churnPenalty * debtPenalty;
   return {
     revenue, fair, ceiling: fair * 1.72,
     perSub: fair / Math.max(1, inp.subscribers),
@@ -266,306 +275,274 @@ const What: React.FC<{ label: string; children: React.ReactNode }> = ({ label, c
 );
 
 /* ============================================================
-   CHAPTER 01 · 1 — THE RESOLUTION                          PAPER
+   CHAPTER 01 · 1 — THE ASK                                  TERMINAL
+   #189 (plan §22.4): the one place the listing is shaped, and nothing else
+   on it: the ticker on the exchange's plate, what you say the company is
+   worth (the dial starts at our value, the valuation engine's), and how much
+   of it you sell, as a float. The share price, the raise and the stake you
+   keep fall out of them.
    ============================================================ */
-const Resolution: React.FC<{
-  brand: Brand; inputs: IpoInputs; f: Fundamentals; onGo: () => void;
-}> = ({ brand, inputs, f, onGo }) => {
-  const execs = useMemo(() => execsOf(inputs, f), [inputs, f]);
-  const [open, setOpen] = useState<string | null>('cfo');
-  const [moved, setMoved] = useState(false);
-  const against = execs.filter(e => e.stance === 'AGAINST').length;
-  /* the stamp lands, holds for a beat, and carries you through — asking for a
-     second tap to leave made one action into two decisions */
-  useEffect(() => {
-    if (!moved) return;
-    const id = window.setTimeout(onGo, 1250);
-    return () => clearTimeout(id);
-  }, [moved]);
+export const FLOAT_MIN = 10;
+export const FLOAT_MAX = 30;
+/** the new shares that make a float of `floatPct`% after listing */
+export const sharesForFloat = (preIpoShares: number, floatPct: number) =>
+  Math.max(250_000, Math.round(preIpoShares * floatPct / (100 - floatPct) / 250_000) * 250_000);
 
-  return (
-    <div className={cx(css.lsscene, css.paper)}>
-      <div className={css.lssheet}>
-        <div className={css.lsletterhead}>
-          <b>{(brand.name || 'EMPIRE+').toUpperCase()}</b>
-          <span>MINUTES OF THE BOARD · CONFIDENTIAL</span>
-        </div>
-        <h1 className={css.lsdoctitle}>Resolution to proceed with an<br />initial public offering</h1>
-        <p className={css.lsdocbody}>
-          It is proposed that the Company apply for the admission of its ordinary shares to
-          trading, and that new shares be issued for that purpose in a number to be
-          determined by the founder.
-        </p>
-        <div className={css.lsdocrule} />
-        <span className={css.lsdoclabel}>POSITIONS RECORDED</span>
-        <div className={css.lstable}>
-          {execs.map(e => (
-            <button className={cx(css.lsrow, css[e.stance.toLowerCase()], (open === e.id ? css.open : ''))}
-              key={e.id} onClick={() => setOpen(o => o === e.id ? null : e.id)}>
-              <div className={css.lsrowtop}>
-                <div><b>{e.name}</b><span>{e.role}</span></div>
-                <i className={css.lsstance}>{e.stance}</i>
-              </div>
-              {open === e.id && <p className={css.lsrowsaid}>“{e.line}”</p>}
-            </button>
-          ))}
-        </div>
-        <div className={css.lsdocrule} />
-        <div className={css.lscarry}>
-          <div><span>THE FOUNDER HOLDS</span><b>{inputs.founderPct.toFixed(1)}% OF VOTES</b></div>
-          <p>
-            {against > 0
-              ? `The resolution carries whatever the room thinks. ${against === 1 ? 'One objection is' : `${against} objections are`} recorded in the minutes, and the minutes are filed.`
-              : `The resolution carries with no objection recorded.`}
-          </p>
-        </div>
-        {moved && (
-          <div className={css.lssignedby}>
-            <Signature name={inputs.founderName || 'The Founder'} on />
-            <b>CHAIR · MOVED AND CARRIED</b>
-          </div>
-        )}
-        <Stamp text="CARRIED" on={moved} />
-      </div>
-      <Foot label={moved ? 'CARRIED' : 'MOVE THE RESOLUTION'} disabled={moved}
-        note={moved ? 'Recorded in the minutes.' : 'Tap a name to hear their position before you move it.'}
-        onGo={() => setMoved(true)} />
-    </div>
-  );
-};
-
-/* ============================================================
-   CHAPTER 01 · 2 — THE ASK                                 TERMINAL
-   Two dials, because an offering is two decisions: what you say you are
-   worth, and how much of yourself you sell. The share price falls out of
-   them, and it is the number everything afterwards runs on.
-   ============================================================ */
-const Ask: React.FC<{
-  inputs: IpoInputs; f: Fundamentals;
+const ListingAsk: React.FC<{
+  brand: Brand; inputs: IpoInputs; f: Fundamentals;
+  ticker: string; setTicker: (ticker: string) => void;
   ask: number; setAsk: (n: number) => void;
   shares: number; setShares: (n: number) => void;
-  revision: number; onGo: () => void;
-}> = ({ inputs, f, ask, setAsk, shares, setShares, revision, onGo }) => {
+  onGo: () => void;
+}> = ({ brand, inputs, f, ticker, setTicker, ask, setAsk, shares, setShares, onGo }) => {
   const total = inputs.preIpoShares + shares;
   const price = ask / total;
   const raise = shares * price;
   const floatPct = (shares / total) * 100;
   const founderAfter = inputs.founderPct * (inputs.preIpoShares / total);
   const overFair = ask / f.fair;
-  const perSub = ask / Math.max(1, inputs.subscribers);
-  const xRev = ask / f.revenue;
-  const vsLeader = (perSub / f.leaderPerSub - 1) * 100;
-
   const band = overFair < .74 ? 'low' : overFair <= 1.25 ? 'ok' : overFair <= 1.42 ? 'warn' : 'bad';
-  const floatBand = floatPct < 14 ? 'warn' : floatPct <= 32 ? 'ok' : 'bad';
-  const tone = band === 'ok' && floatBand === 'ok' ? 'ok'
-    : band === 'bad' || floatBand === 'bad' ? 'bad' : 'warn';
+  const floatBand = floatPct < 14 ? 'warn' : floatPct <= 26 ? 'ok' : 'warn';
+  const tone = band === 'ok' && floatBand === 'ok' ? 'ok' : band === 'bad' ? 'bad' : 'warn';
   const verdict =
-    band === 'bad' ? 'Not defensible. Expect this taken apart in public.'
-      : floatBand === 'bad' ? 'You are selling a third of the company in one morning.'
-        : band === 'warn' ? 'A stretch. Somebody in your own building will refuse to sign it.'
-          : band === 'low' ? 'Below what your own numbers support. The board will call it a gift.'
-            : floatBand === 'warn' ? 'A float this thin will not hold a price on day one.'
-              : 'Defensible on both counts. Every signature you need is available here.';
-
-  /* eleven numbers at once was unreadable — the two you set, the one that
-     falls out of them, and the diagnostics only when you ask for them */
-  const [open, setOpen] = useState(false);
+    band === 'bad' ? 'Not defensible. Expect it taken apart in public.'
+      : band === 'warn' ? 'A stretch. Somebody at the table will refuse to sign it.'
+        : band === 'low' ? 'Below what our own numbers support. The board will call it a gift.'
+          : floatPct < 14 ? 'A float this thin will not hold a price on day one.'
+            : floatPct > 26 ? 'A big slice in one morning: the market will make you pay for it.'
+              : 'Defensible on both counts. Every signature you need is at the table.';
+  /* the suggestions stay put while you pick; your own typed one joins them */
+  const [options, setOptions] = useState(() => [...new Set([ticker, ...tickerOptions(brand.name)])].slice(0, 4));
+  const [typing, setTyping] = useState(false);
+  const [draft, setDraft] = useState('');
+  const commitTicker = () => {
+    const clean = draft.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+    if (clean.length >= 2) {
+      setTicker(clean);
+      setOptions(list => (list.includes(clean) ? list : [...list.slice(0, 3), clean]));
+    }
+    setTyping(false); setDraft('');
+  };
+  const worthMin = Math.round(f.fair * .4);
+  const worthMax = Math.round(f.fair * 2.4);
+  const fairAt = ((f.fair - worthMin) / (worthMax - worthMin)) * 100;
 
   return (
     <div className={cx(css.lsscene, css.term)}>
-      <div className={css.lstermwrap}>
-        <What label="THE MODEL">
-          Two decisions, and everything else follows from them: what you say the company
-          is worth, and how much of it you sell. Tap either figure to type it exactly.
-        </What>
+      <div className={css.akwrap}>
+        <div className={css.akhead}>
+          <span className={css.lseyebrow}>CHAPTER 01 · THE ASK</span>
+          <h2>Shape the listing</h2>
+          <p>Three choices. Everything after this runs on them.</p>
+        </div>
 
-        <div className={css.lsdials}>
-          <Figure className={cx(css.lsdialbox, css[band])} label="WORTH" value={ask}
-            min={Math.round(f.fair * .2)} max={Math.round(f.fair * 5)} format={money} onSet={setAsk}>
-            <input className={css.lstermdial} type="range"
-              min={Math.round(f.fair * .4)} max={Math.round(f.fair * 2.4)}
-              step={Math.round(f.fair / 300)}
-              value={Math.min(Math.round(f.fair * 2.4), Math.max(Math.round(f.fair * .4), ask))}
-              onChange={e => setAsk(+e.target.value)} />
+        <section className={css.aksec}>
+          <div className={css.aklabel}><b>1</b><span>THE TICKER</span></div>
+          <div className={css.akplate} aria-label={`Ticker ${ticker}`}>
+            <span>{ticker.split('').map((letter, index) => <i key={`${letter}${index}`}>{letter}</i>)}</span>
+            <em>EMPIRE EXCHANGE</em>
+          </div>
+          <div className={css.akchips}>
+            {options.map(option => (
+              <button key={option} type="button" className={cx(css.akchip, option === ticker && css.on)} onClick={() => setTicker(option)}>{option}</button>
+            ))}
+            {typing ? (
+              <input className={css.akchipin} autoFocus maxLength={5} value={draft} placeholder="ABCD"
+                onChange={e => setDraft(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                onBlur={commitTicker} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+            ) : (
+              <button type="button" className={cx(css.akchip, css.aktype)} onClick={() => setTyping(true)}>TYPE</button>
+            )}
+          </div>
+        </section>
+
+        <section className={css.aksec}>
+          <div className={css.aklabel}><b>2</b><span>WHAT IT IS WORTH</span><em className={css[band]}>{overFair.toFixed(2)}× our value</em></div>
+          <Figure className={css.akfig} label="" value={ask} min={Math.round(f.fair * .2)} max={Math.round(f.fair * 5)} format={money} onSet={setAsk}>
+            <div className={css.akdial}>
+              <input className={css.lstermdial} type="range" min={worthMin} max={worthMax} step={Math.max(1, Math.round(f.fair / 300))}
+                value={Math.min(worthMax, Math.max(worthMin, ask))} onChange={e => setAsk(+e.target.value)} aria-label="What it is worth" />
+              <i className={css.akmark} style={{ left: `${fairAt}%` }} aria-hidden="true" />
+            </div>
+            <small className={css.akfair}>Our value: {money(f.fair)}</small>
           </Figure>
-          <Figure className={cx(css.lsdialbox, css[floatBand])} label="SELLING" value={shares}
-            min={250_000} max={40_000_000} format={mn} onSet={setShares}>
-            <input className={css.lstermdial} type="range"
-              min={1_000_000} max={30_000_000} step={100_000}
-              value={Math.min(30_000_000, Math.max(1_000_000, shares))}
-              onChange={e => setShares(+e.target.value)} />
-          </Figure>
-        </div>
+        </section>
 
-        <div className={css.lsout}>
-          <div className={css.lsoutmain}>
-            <span>SO THE SHARE PRICE IS</span>
-            <b>{dollars(price)}</b>
-            <i>{mn(shares)} shares · raising {money(raise)}</i>
+        <section className={css.aksec}>
+          <div className={css.aklabel}><b>3</b><span>HOW MUCH YOU SELL</span><em>{mn(shares)} new shares</em></div>
+          <div className={css.akfloat}>
+            <b className={css[floatBand]}>{Math.round(floatPct)}%</b>
+            <span>of the company<br />to the public</span>
           </div>
-          <div className={css.lsoutgrid}>
-            <div><span>YOU KEEP</span><b>{founderAfter.toFixed(1)}%</b></div>
-            <div><span>PUBLIC OWNS</span><b className={css[floatBand] ?? floatBand}>{floatPct.toFixed(1)}%</b></div>
-          </div>
+          <input className={css.lstermdial} type="range" min={FLOAT_MIN} max={FLOAT_MAX} step={1}
+            value={Math.min(FLOAT_MAX, Math.max(FLOAT_MIN, Math.round(floatPct)))}
+            onChange={e => setShares(sharesForFloat(inputs.preIpoShares, +e.target.value))} aria-label="How much you sell" />
+        </section>
+
+        <div className={css.akout}>
+          <div><span>A SHARE</span><b>{dollars(price)}</b></div>
+          <div><span>RAISES</span><b>{money(raise)}</b></div>
+          <div><span>YOU KEEP</span><b>{founderAfter.toFixed(1)}%</b></div>
         </div>
-
-        <div className={cx(css.lstermnote, css[tone])}>
-          <p>{verdict}</p>
-        </div>
-
-        <button className={cx(css.lsmore, (open ? css.on : ''))} onClick={() => setOpen(o => !o)}>
-          {open ? 'HIDE THE WORKINGS' : 'HOW DOES THAT COMPARE?'}<i>{open ? '−' : '+'}</i>
-        </button>
-
-        {open && (
-          <div className={css.lsrows}>
-            <div className={xRev >= 12 ? css.bad : xRev >= 9 ? css.warn : css.ok}>
-              <b>× ANNUAL REVENUE</b><em>{xRev.toFixed(1)}×</em><i>on {money(f.revenue)}</i>
-            </div>
-            <div className={perSub / f.leaderPerSub >= 1.35 ? css.bad : perSub / f.leaderPerSub >= 1.05 ? css.warn : css.ok}>
-              <b>PER SUBSCRIBER</b><em>${Math.round(perSub)}</em>
-              <i>{inputs.subscribers.toLocaleString()} paying</i>
-            </div>
-            <div className={vsLeader > 30 ? css.bad : vsLeader > 5 ? css.warn : css.ok}>
-              <b>VS MARKET LEADER</b><em>{pctS(vsLeader)}</em>
-              <i>they trade at ${Math.round(f.leaderPerSub)}</i>
-            </div>
-            <div className={band === 'ok' ? css.ok : band === 'bad' ? css.bad : css.warn}>
-              <b>VS WHAT IT DEFENDS</b><em>{overFair.toFixed(2)}×</em><i>{money(f.fair)} supported</i>
-            </div>
-          </div>
-        )}
+        <p className={cx(css.akverdict, css[tone])}>{verdict}</p>
+        {/* #192: control, said where the float is chosen */}
+        {founderAfter < 51 && <p className={cx(css.akverdict, css.warn)}>You would keep {founderAfter.toFixed(1)}%: under 51% the board can outvote you.</p>}
       </div>
-
-      <Foot label="SUBMIT FOR SIGN-OFF →" onGo={onGo}
-        note="Four people have to live with these two numbers." />
+      <Foot label="TAKE IT TO THE TABLE →" onGo={onGo} note="Your CFO, your CTO and the board each get a say." />
     </div>
   );
 };
 
 /* ============================================================
-   CHAPTER 01 · 3 — THE CERTIFICATION                       PAPER
+   CHAPTER 01 · 2 — THE TABLE                                DIVISION BOARD
+   #189: the people who must live with the number, at one table, with their
+   faces. Your CFO certifies it or will not; your CTO signs the platform's
+   risk or insists on a line; the board votes, seat by seat, after your one
+   call to one director. Then one decision.
    ============================================================ */
-const Cfo: React.FC<{
-  ask: number; f: Fundamentals; name: string; onPass: () => void; onRevise: () => void; onForce: () => void;
-}> = ({ ask, f, name, onPass, onRevise, onForce }) => {
-  const r = useReading();
+const faceOf = (inputs: IpoInputs, name: string) => inputs.people?.[name] ?? null;
+
+const ListingTable: React.FC<{
+  inputs: IpoInputs; f: Fundamentals; ask: number; marks: number;
+  onPass: () => void; onRevise: () => void; onForce: (objections: { cfo: boolean; board: boolean }) => void;
+}> = ({ inputs, f, ask, marks, onPass, onRevise, onForce }) => {
   const over = ask / f.fair;
-  const passed = over <= 1.25;
+  const cfoOk = over <= 1.25;
+  const ctoInsists = inputs.techDebt > 38;
+  const cfoName = inputs.executiveNames?.cfo || 'Your CFO';
+  const ctoName = inputs.executiveNames?.cto || 'Your CTO';
+  const base = useMemo(() => seatsOf(ask, f, marks, inputs), [ask, f, marks, inputs]);
+  const [heard, setHeard] = useState(0);
+  const [lobbied, setLobbied] = useState<Record<string, number>>({});
+  const [target, setTarget] = useState<string | null>(null);
+  const [used, setUsed] = useState(false);
+  const [resolved, setResolved] = useState(-1);
+  const [reply, setReply] = useState<string | null>(null);
 
-  return (
-    <div className={cx(css.lsscene, css.paper)}>
-      <GateCount at={0} />
-      <div className={cx(css.lssheet, css.lsgate)}>
-        <div className={css.lsletterhead}>
-          <b>CERTIFICATION OF FINANCIAL STATEMENTS</b>
-          <span>{name.toUpperCase()} · CHIEF FINANCIAL OFFICER</span>
+  const seats = base.map(seat => ({ ...seat, lean: seat.lean + (lobbied[seat.id] ?? 0) }));
+  const listening = heard > 0 && heard < 3;
+  const voting = resolved >= 0;
+  const shown = seats.slice(0, Math.max(0, resolved));
+  const forCount = shown.filter(seat => seat.lean > 0).length;
+  const againstCount = shown.length - forCount;
+  const finished = resolved >= seats.length;
+  const carried = seats.filter(seat => seat.lean > 0).length >= 4;
+
+  /* the CFO answers, then the CTO */
+  useEffect(() => {
+    if (!listening) return;
+    const id = window.setTimeout(() => setHeard(n => n + 1), 900);
+    return () => clearTimeout(id);
+  }, [listening, heard]);
+  /* the seats are counted one at a time */
+  useEffect(() => {
+    if (!voting || finished) return;
+    const id = window.setTimeout(() => setResolved(n => n + 1), 560);
+    return () => clearTimeout(id);
+  }, [voting, resolved, finished]);
+
+  const lobby = (arg: typeof ARGUMENTS[number]) => {
+    if (!target) return;
+    const seat = base.find(item => item.id === target)!;
+    /* you cannot argue a hard no into a yes, only somebody already close */
+    const swayable = seat.lean > -1.5 && seat.lean < 1;
+    const moved = swayable ? arg.w : arg.w * .2;
+    setLobbied(list => ({ ...list, [seat.id]: moved }));
+    setUsed(true);
+    setReply(swayable && seat.lean + moved > 0
+      ? `${seat.name.split(' ')[0]}: “All right. I will vote for it. Put the window in the minutes as the reason.”`
+      : seat.lean >= 1
+        ? `${seat.name.split(' ')[0]}: “You already had me. You spent your call on the wrong person.”`
+        : `${seat.name.split(' ')[0]}: “I have read the same numbers you have. It does not change my vote.”`);
+    setTarget(null);
+  };
+
+  const exec = (who: 'cfo' | 'cto') => {
+    const name = who === 'cfo' ? cfoName : ctoName;
+    const face = faceOf(inputs, name);
+    /* heard: 1 the CFO is reading, 2 the CFO has spoken and the CTO is reading, 3 both have spoken */
+    const spoke = heard >= (who === 'cfo' ? 2 : 3);
+    const reading = heard === (who === 'cfo' ? 1 : 2);
+    const ok = who === 'cfo' ? cfoOk : !ctoInsists;
+    const chip = !spoke ? (reading ? 'READING' : 'WAITING') : who === 'cfo' ? (cfoOk ? 'CERTIFIED' : 'WON’T CERTIFY') : (ctoInsists ? 'ADDS A LINE' : 'SIGNED');
+    const line = who === 'cfo'
+      ? (cfoOk ? `“${money(ask)} is ${over.toFixed(2)}× what our numbers support. I can put my name to that.”`
+        : `“${money(ask)} is ${over.toFixed(2)}× what our numbers support. I will not certify assumptions I do not hold.”`)
+      : (ctoInsists ? '“Parts of the platform were built at speed and are not finished. That line goes in, in my words.”'
+        : `“Platform risk disclosed as drafted: ${Math.round(inputs.techDebt)} points of debt, peak load ${Math.round(inputs.peakLoad)}%.”`);
+    return (
+      <div className={cx(css.tbexec, spoke && (ok ? css.ok : who === 'cfo' ? css.bad : css.warn))}>
+        <div className={css.tbexectop}>
+          <PersonFace className={css.tbface} name={name} gender={face?.gender} src={face?.avatar} />
+          <div><b>{name}</b><span>{who === 'cfo' ? 'CHIEF FINANCIAL OFFICER' : 'CHIEF TECHNOLOGY OFFICER'}</span></div>
         </div>
-        {!r.reading && (
-          <p className={css.lsdocbody}>
-            The document is with her. It comes back signed, or it comes back with a problem.
-          </p>
-        )}
-        {r.reading && !r.done && <Reading />}
-        {r.done && (
-          <>
-            {passed && <div className={cx(css.lsverdictline, css.ok)}>CERTIFIED</div>}
-            <p className={cx(css.lsdocbody, css.quote)}>
-              {passed
-                ? `“A valuation of ${money(ask)} is ${over.toFixed(2)}× the figure supported by audited revenue. That is within the range I can put my name to.”`
-                : `“A valuation of ${money(ask)} is ${over.toFixed(2)}× the figure supported by audited revenue of ${money(f.revenue)}. I am not able to certify assumptions I do not hold.”`}
-            </p>
-            {passed
-              ? <Signature name={name} on />
-              : <div className={css.lsstampwrap}><Stamp text="UNABLE TO CERTIFY" kind="bad" on /></div>}
-          </>
-        )}
+        <i className={css.tbchip}>{chip}</i>
+        {spoke && <p>{line}</p>}
       </div>
-      {!r.reading && <Foot label="SEND IT UP" onGo={r.start} />}
-      {r.done && (passed
-        ? <Foot label="NEXT GATE →" onGo={onPass} />
-        : <Choice
-          a={{ title: 'LOWER THE ASK', note: 'Back to the model. Nothing is recorded.', onPick: onRevise }}
-          b={{ title: 'OVERRULE', note: 'Management has adopted valuation assumptions which the Chief Financial Officer declined to certify.', onPick: onForce }} />
-      )}
-    </div>
-  );
-};
-
-/* ============================================================
-   CHAPTER 01 · 4 — ANNEXURE C                              RISK REGISTER
-   His objection is about the platform, so the screen is the platform.
-   ============================================================ */
-const Cto: React.FC<{
-  inputs: IpoInputs; onPass: () => void; onForce: () => void;
-}> = ({ inputs, onPass, onForce }) => {
-  const r = useReading(1400);
-  const rows = useMemo(() => [
-    {
-      id: 'TD-01', label: 'Carried technical debt', v: inputs.techDebt, max: 100,
-      sev: inputs.techDebt > 38 ? 'HIGH' : inputs.techDebt > 20 ? 'MED' : 'LOW',
-      note: 'Modules shipped at speed and never finished.',
-    },
-    {
-      id: 'LD-02', label: 'Peak load reached', v: inputs.peakLoad, max: 100,
-      sev: inputs.peakLoad > 85 ? 'HIGH' : inputs.peakLoad > 60 ? 'MED' : 'LOW',
-      note: 'Headroom on the busiest night of the year.',
-    },
-    {
-      id: 'CH-03', label: 'Subscriber churn', v: inputs.churnPct * 10, max: 100,
-      sev: inputs.churnPct > 4.4 ? 'HIGH' : inputs.churnPct > 3 ? 'MED' : 'LOW',
-      note: `${inputs.churnPct.toFixed(1)}% leaving every month.`,
-    },
-  ], [inputs]);
-  const insists = inputs.techDebt > 38;
+    );
+  };
 
   return (
-    <div className={cx(css.lsscene, css.reg)}>
-      <GateCount at={1} />
-      <div className={css.lsregwrap}>
-        <div className={css.lsreghead}>
-          <div><b>ANNEXURE C</b><span>TECHNOLOGY &amp; PLATFORM RISK</span></div>
-          <i className={r.done ? (insists ? css.bad : css.ok) : css.live}>
-            {r.done ? (insists ? 'DISPUTED' : 'AGREED') : 'DRAFT'}
-          </i>
+    <div className={cx(css.lsscene, css.div)}>
+      <div className={css.tbwrap}>
+        <div className={css.tbhead}>
+          <span className={css.lseyebrow}>CHAPTER 01 · THE TABLE</span>
+          <b>{money(ask)}</b>
+          <em className={over <= 1.25 && over >= .74 ? css.ok : css.warn}>{over.toFixed(2)}× our value</em>
         </div>
 
-        <div className={css.lsregrows}>
-          {rows.map((x, i) => (
-            <div className={cx(css.lsregrow, css[x.sev.toLowerCase()])} key={x.id}
-              style={{ ['--epx-ls-i' as string]: `${i * .09}s` }}>
-              <div className={css.lsregtop}>
-                <b>{x.id}</b><span>{x.label}</span><i>{x.sev}</i>
-              </div>
-              <div className={css.lsregbar}>
-                <i style={{ width: `${Math.min(100, (x.v / x.max) * 100)}%` }} />
-              </div>
-              <p>{x.note}</p>
-            </div>
-          ))}
+        <div className={css.tbexecs}>{exec('cfo')}{exec('cto')}</div>
+
+        <div className={css.tbboard}>
+          <div className={css.tbtally}>
+            <span className={css.for}>FOR <b>{forCount}</b></span>
+            <i>THE BOARD · CARRIES ON 4</i>
+            <span className={css.against}><b>{againstCount}</b> AGAINST</span>
+          </div>
+          <div className={css.tbseats}>
+            {seats.map((seat, index) => {
+              const done = index < resolved;
+              /* the first seat is yours, the chair: you do not lobby yourself */
+              const face = faceOf(inputs, seat.name);
+              return (
+                <button key={seat.id} type="button"
+                  className={cx(css.tbseat, done && (seat.lean > 0 ? css.for : css.against), target === seat.id && css.targeted)}
+                  disabled={heard < 3 || voting || used || index === 0}
+                  onClick={() => setTarget(current => (current === seat.id ? null : seat.id))}>
+                  <PersonFace className={css.tbseatface} name={seat.name} gender={face?.gender} src={face?.avatar} />
+                  <b>{index === 0 ? 'You' : seat.name.split(' ')[0]}</b>
+                  <span>{seat.kind.replace(' · CHAIR', '').replace('INVESTOR NOMINEE', 'INVESTOR')}</span>
+                  <em>{!done ? '·' : seat.lean > 0 ? 'FOR' : 'AGAINST'}</em>
+                </button>
+              );
+            })}
+          </div>
+          {reply && <p className={css.tbreply}>{reply}</p>}
+          {finished && <div className={cx(css.tbresult, carried ? css.ok : css.bad)}>{carried ? 'CARRIED' : 'NOT CARRIED'}</div>}
         </div>
 
-        {!r.reading && <p className={css.lsregsaid}>Annexure C is drafted. Ravi has not read it yet.</p>}
-        {r.reading && !r.done && <Reading label="REVIEWING" />}
-        {r.done && (
-          <div className={cx(css.lsinsert, (insists ? css.bad : ''))}>
-            <span>{insists ? 'HE INSISTS ON ONE LINE' : 'HE SIGNED IT AS DRAFTED'}</span>
-            <p>
-              {insists
-                ? '“Parts of the platform were built at speed and have not been completed.”'
-                : `“Platform risk disclosed as drafted. ${inputs.techDebt} points of carried debt, peak load ${inputs.peakLoad}%.”`}
-            </p>
+        {target && !voting && (
+          <div className={css.lslobby}>
+            <span>ONE CALL · {base.find(seat => seat.id === target)!.name.toUpperCase()}</span>
+            {ARGUMENTS.map(arg => (
+              <button key={arg.id} type="button" onClick={() => lobby(arg)}>
+                <b>{arg.label}</b><em>“{arg.line}”</em>
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {!r.reading && <Foot label="SEND HIM THE ANNEXURE" onGo={r.start} />}
-      {r.done && (!insists
-        ? <Foot label="NEXT GATE →" onGo={onPass} />
+      {heard === 0 && <Foot label="SEND IT ROUND THE TABLE" onGo={() => setHeard(1)} note="Your CFO reads it first, then your CTO, then the board votes." />}
+      {heard >= 3 && !voting && !target && (
+        <Foot label="PUT IT TO THE VOTE" onGo={() => setResolved(0)}
+          note={used ? 'Your call is made. The vote is what it is now.' : 'Before the vote you may call one director: tap a seat.'} />
+      )}
+      {finished && (cfoOk && carried
+        ? <Foot label="TAKE IT TO THE BANKS →" onGo={onPass} note={ctoInsists ? 'Your CTO’s line goes into the filing in their words.' : undefined} />
         : <Choice
-          a={{ title: 'LET THE LINE STAND', note: 'It goes into the filing in his words, and every analyst will quote it.', onPick: onPass }}
-          b={{ title: 'STRIKE THE LINE', note: 'The Chief Technology Officer resigned during preparation of this document.', onPick: onForce }} />
+          a={{ title: 'LOWER THE ASK', note: 'Back to the ask. Nothing is recorded.', onPick: onRevise }}
+          b={{ title: 'GO ANYWAY', note: [!cfoOk && 'The CFO declined to certify', !carried && 'a director resigns over the valuation'].filter(Boolean).join('; ') + '. It goes on the record, and buyers read it.', onPick: () => onForce({ cfo: !cfoOk, board: !carried }) }} />
       )}
     </div>
   );
@@ -591,7 +568,11 @@ const seatsOf = (ask: number, f: Fundamentals, marks: number, inputs: IpoInputs)
     { id: 's6', name: 'Yusuf Karim', kind: 'INVESTOR SEAT' },
     { id: 's7', name: 'Nomi Reisz', kind: 'INDEPENDENT' },
   ];
-  const source = inputs.boardSeats?.length ? [...inputs.boardSeats, ...defaults].slice(0, 7) : defaults;
+  /* #189: the board's own seats first (you, the chair, among them), then the standing ones, each person once */
+  const own = inputs.boardSeats?.length ? inputs.boardSeats : [];
+  const source = own.length
+    ? [...own, ...defaults.slice(1).filter(seat => !own.some(item => item.name === seat.name))].slice(0, 7)
+    : defaults;
   return source.map((seat, index) => ({
     ...seat,
     lean: index === 0 ? 3
@@ -607,113 +588,6 @@ const ARGUMENTS = [
   { id: 'a2', label: 'THE COMPARABLES', line: 'Every listed comparable trades above where we are asking.', w: 1.4 },
   { id: 'a3', label: 'PERSONAL LOYALTY', line: 'I am asking you to back me on this one.', w: .8 },
 ];
-
-const Board: React.FC<{
-  ask: number; f: Fundamentals; marks: number; inputs: IpoInputs;
-  onPass: () => void; onRevise: () => void; onForce: () => void;
-}> = ({ ask, f, marks, inputs, onPass, onRevise, onForce }) => {
-  const base = useMemo(() => seatsOf(ask, f, marks, inputs), [ask, f, marks, inputs]);
-  const [lobbied, setLobbied] = useState<Record<string, number>>({});
-  const [target, setTarget] = useState<string | null>(null);
-  const [used, setUsed] = useState(false);
-  const [resolved, setResolved] = useState(-1);
-  const [reply, setReply] = useState<string | null>(null);
-
-  const seats = base.map(s => ({ ...s, lean: s.lean + (lobbied[s.id] ?? 0) }));
-  const voting = resolved >= 0;
-  const shown = seats.slice(0, Math.max(0, resolved));
-  const forCount = shown.filter(s => s.lean > 0).length;
-  const againstCount = shown.length - forCount;
-  const finished = resolved >= seats.length;
-  const carried = seats.filter(s => s.lean > 0).length >= 4;
-
-  useEffect(() => {
-    if (!voting || finished) return;
-    const id = window.setTimeout(() => setResolved(n => n + 1), 640);
-    return () => clearTimeout(id);
-  }, [voting, resolved, finished]);
-
-  const lobby = (arg: typeof ARGUMENTS[number]) => {
-    if (!target) return;
-    const s = base.find(x => x.id === target)!;
-    /* you cannot argue a hard no into a yes — only somebody already close */
-    const swayable = s.lean > -1.5 && s.lean < 1;
-    const moved = swayable ? arg.w : arg.w * .2;
-    setLobbied(l => ({ ...l, [s.id]: moved }));
-    setUsed(true);
-    setReply(swayable && s.lean + moved > 0
-      ? '“All right. I will vote for it. I want the window in the minutes as the reason.”'
-      : s.lean >= 1
-        ? '“You already have me. You have spent your call on the wrong person.”'
-        : '“I have read the same numbers you have. It does not change my vote.”');
-    setTarget(null);
-  };
-
-  return (
-    <div className={cx(css.lsscene, css.div)}>
-      <GateCount at={2} />
-      <div className={css.lsdivwrap}>
-        <div className={css.lsdivhead}>
-          <span>RESOLUTION 4 · APPROVAL OF THE INDICATIVE VALUATION</span>
-          <b>{money(ask)}</b>
-        </div>
-
-        <div className={css.lstally}>
-          <div className={cx(css.lstallyside, css.for)}><span>FOR</span><b>{forCount}</b></div>
-          <div className={css.lstallymid}><i>CARRIES ON</i><em>4</em></div>
-          <div className={cx(css.lstallyside, css.against)}><span>AGAINST</span><b>{againstCount}</b></div>
-        </div>
-
-        <div className={css.lsseats}>
-          {seats.map((s, i) => {
-            const done = i < resolved;
-            const cls = !done ? 'pending' : s.lean > 0 ? 'for' : 'against';
-            return (
-              <button className={cx(css.lsseat, css[cls], (target === s.id ? css.targeted : ''))} key={s.id}
-                disabled={voting || used || s.id === 's1'}
-                onClick={() => setTarget(t => t === s.id ? null : s.id)}>
-                <i />
-                <div><b>{s.name}</b><span>{s.kind}</span></div>
-                <em>{!done ? '—' : s.lean > 0 ? 'FOR' : 'AGAINST'}</em>
-              </button>
-            );
-          })}
-        </div>
-
-        {reply && <p className={css.lsdivreply}>{reply}</p>}
-        {finished && (
-          <div className={cx(css.lsdivresult, (carried ? css.ok : css.bad))}>
-            {carried ? 'CARRIED' : 'NOT CARRIED'}
-          </div>
-        )}
-      </div>
-
-      {target && !voting && (
-        <div className={css.lslobby}>
-          <span>ONE CALL · {base.find(s => s.id === target)!.name.toUpperCase()}</span>
-          {ARGUMENTS.map(a => (
-            <button key={a.id} onClick={() => lobby(a)}>
-              <b>{a.label}</b><em>“{a.line}”</em>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!voting && !target && (
-        <Foot label="OPEN THE VOTE"
-          note={used ? 'Your call is made. The vote is what it is now.'
-            : 'You may call one director before the vote opens. Tap a seat.'}
-          onGo={() => setResolved(0)} />
-      )}
-      {finished && (carried
-        ? <Foot label="NEXT GATE →" onGo={onPass} />
-        : <Choice
-          a={{ title: 'LOWER THE ASK', note: 'Back to the model. The vote is struck from the minutes.', onPick: onRevise }}
-          b={{ title: 'PROCEED REGARDLESS', note: 'An independent director resigned prior to filing, citing the indicative valuation.', onPick: onForce }} />
-      )}
-    </div>
-  );
-};
 
 /* ============================================================
    CHAPTER 01 · 6 — THE SYNDICATE                           DESK
@@ -801,50 +675,6 @@ const Syndicate: React.FC<{
       </div>
       <Foot label="APPOINT AND CONTINUE →" disabled={!bankId || !settled}
         onGo={() => onGo(!!picked?.firm)} />
-    </div>
-  );
-};
-
-/* ============================================================
-   CHAPTER 01 · 7 — THE NUMBER STANDS                       ROOM
-   The marks stamp themselves onto the cover, one at a time.
-   ============================================================ */
-const Stands: React.FC<{
-  brand: Brand; ask: number; shares: number; preIpoShares: number; marks: Mark[]; onGo: () => void;
-}> = ({ brand, ask, shares, preIpoShares, marks, onGo }) => {
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    if (n >= marks.length) return;
-    const id = window.setTimeout(() => setN(x => x + 1), 720);
-    return () => clearTimeout(id);
-  }, [n, marks.length]);
-  const price = ask / (preIpoShares + shares);
-
-  return (
-    <div className={cx(css.lsscene, css.room)}>
-      <div className={css.lscover}>
-        <div className={css.lscoverhead}>
-          <span>DRAFT PROSPECTUS · COVER</span>
-          <b>{(brand.name || 'EMPIRE+').toUpperCase()}</b>
-        </div>
-        <div className={css.lscovernum}>
-          <span>INDICATIVE VALUATION</span>
-          <b>{money(ask)}</b>
-          <em>{mn(shares)} shares at {dollars(price)}</em>
-        </div>
-        <div className={css.lscovermarks}>
-          {marks.slice(0, n).map(m => (
-            <div className={css.lscovermark} key={m.id}><i />{m.short}</div>
-          ))}
-          {marks.length === 0 && (
-            <p className={css.lscoverclean}>Signed by everyone who had to sign it. Nothing was forced.</p>
-          )}
-        </div>
-      </div>
-      <Foot label="FILE THE DOCUMENT →" onGo={onGo}
-        note={marks.length
-          ? `${marks.length === 1 ? 'One objection is' : `${marks.length} objections are`} printed on the cover of your own prospectus.`
-          : undefined} />
     </div>
   );
 };
@@ -1738,60 +1568,17 @@ const ListingDay: React.FC<{
         )}
         {t < 1 && <p className={css.lstapeskip}>TAP TO RUN THE DAY OUT</p>}
       </div>
-      {t >= 1 && <Foot label="THE MORNING AFTER →" onGo={() => onGo(close)} />}
-    </div>
-  );
-};
-
-/* ============================================================
-   CHAPTER 05 — AFTER
-   Not a newspaper. The game already has two of those. This is the bill.
-   ============================================================ */
-const After: React.FC<{
-  brand: Brand; inputs: IpoInputs; ticker: string;
-  close: number; shares: number; marks: Mark[]; onGo: () => void;
-}> = ({ brand, inputs, ticker, close, shares, marks, onGo }) => {
-  const total = inputs.preIpoShares + shares;
-  const held = inputs.preIpoShares * (inputs.founderPct / 100);
-  const worth = held * close;
-  const after = inputs.founderPct * (inputs.preIpoShares / total);
-
-  return (
-    <div className={cx(css.lsscene, css.room)}>
-      <div className={css.lscover}>
-        <div className={css.lscoverhead}>
-          <span>{ticker} · YOU ARE A PUBLIC COMPANY</span>
-          <b>{(brand.name || 'EMPIRE+').toUpperCase()}</b>
+      {t >= 1 && (
+        <div className={css.tbbell}>
+          <span className={css.tbbellicon} aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20a2 2 0 0 0 4 0" /><path d="M12 3v2" />
+            </svg>
+          </span>
+          <div><b>THE CLOSING BELL</b><span>{ticker} closes its first day at {dollars(close)}, {pctS(((close - book.price) / book.price) * 100)} on the issue.</span></div>
         </div>
-        <div className={css.lscovernum}>
-          <span>WHAT YOU ARE WORTH ON PAPER</span>
-          <b>{money(worth)}</b>
-          <em>{after.toFixed(1)}% of {money(total * close)}</em>
-        </div>
-        <div className={css.lsbill}>
-          <div className={css.lsbillrow}>
-            <b>LOCKED FOR 180 DAYS</b>
-            <p>You cannot sell a single share of it until then. Not one.</p>
-          </div>
-          <div className={css.lsbillrow}>
-            <b>EARNINGS, EVERY QUARTER</b>
-            <p>Four times a year, forever, you explain this company to strangers who own it.</p>
-          </div>
-          <div className={css.lsbillrow}>
-            <b>THE PRICE IS NOW ON YOUR DESK</b>
-            <p>Every decision you make from here moves it, in public, the same day.</p>
-          </div>
-          {marks.length > 0 && (
-            <div className={cx(css.lsbillrow, css.bad)}>
-              <b>AND SOMEBODY GAVE A QUOTE</b>
-              <p>“{marks[0].short.includes('DIRECTOR') || marks[0].short.includes('CTO')
-                ? 'I resigned because I was not prepared to put my name to it. I stand by that.'
-                : 'I declined to certify the assumptions. That is all I am going to say.'}”</p>
-            </div>
-          )}
-        </div>
-      </div>
-      <Foot label="BACK TO THE BOARDROOM →" onGo={onGo} />
+      )}
+      {t >= 1 && <Foot label="RING IT · TO MARKETS →" onGo={() => onGo(close)} />}
     </div>
   );
 };
@@ -1809,9 +1596,13 @@ export const Listing: React.FC<{
   const hex = hslHex(brand.hue, brand.sat, 58);
   const f = useMemo(() => fundamentalsOf(inputs), [inputs]);
 
-  const [scene, setScene] = useState<Scene>(() => initialCheckpoint?.scene ?? 'RESOLUTION');
+  const [scene, setScene] = useState<Scene>(() => {
+    const saved = initialCheckpoint?.scene;
+    return saved ? RESUME_AT[saved] ?? saved : 'ASK';
+  });
   const [ask, setAsk] = useState(() => initialCheckpoint?.ask ?? Math.round(fundamentalsOf(inputs).fair));
-  const [shares, setShares] = useState(() => initialCheckpoint?.shares ?? Math.max(250_000, Math.min(40_000_000, inputs.initialNewShares)));
+  /* #189: the float is chosen as a % in the ask, so a big company is no longer held to 40M new shares */
+  const [shares, setShares] = useState(() => initialCheckpoint?.shares ?? Math.max(250_000, inputs.initialNewShares));
   const [revision, setRevision] = useState(() => initialCheckpoint?.revision ?? 1);
   const [bankId, setBankId] = useState<string | null>(() => initialCheckpoint?.bankId ?? null);
   const [marks, setMarks] = useState<Mark[]>(() => initialCheckpoint?.marks ?? []);
@@ -1829,9 +1620,9 @@ export const Listing: React.FC<{
   const [airMv, setAirMv] = useState(() => initialCheckpoint?.interviewMove ?? 0);
   const [book, setBook] = useState<BookResult | null>(() => initialCheckpoint?.book ?? null);
   const [closePx, setClosePx] = useState(() => initialCheckpoint?.closePrice ?? 0);
-  const [ticker] = useState(() => initialCheckpoint?.ticker ?? tickerOptions(brand.name)[0]);
+  const [ticker, setTicker] = useState(() => initialCheckpoint?.ticker ?? tickerOptions(brand.name)[0]);
   const [seg, setSeg] = useState<Segment | null>(null);
-  const after = useRef<Scene>('RESOLUTION');
+  const after = useRef<Scene>('ASK');
   const checkpointCallback = useRef(onCheckpoint);
   useEffect(() => { checkpointCallback.current = onCheckpoint; }, [onCheckpoint]);
   useEffect(() => {
@@ -1930,7 +1721,8 @@ export const Listing: React.FC<{
     ],
   });
 
-  const finishReal = () => {
+  /* the closing bell: the listing is committed and public life lands on MARKETS */
+  const finishReal = (closePrice: number = closePx) => {
     const p = book?.price ?? price;
     const bank = BANKS.find(b => b.id === bankId) ?? BANKS[2];
     /* the staff slice is sold at a 10% discount, so it raises less */
@@ -1940,9 +1732,9 @@ export const Listing: React.FC<{
       ticker, bank: bank.name, price: p, raised,
       netProceeds: raised * (1 - bank.feePct / 100),
       coverage: book?.cover ?? 1,
-      openPrice: p * (1 + ((closePx - p) / p) * .72), closePrice: closePx || p,
-      popPct: p ? ((closePx - p) / p) * 100 : 0,
-      founderWorth: inputs.preIpoShares * (closePx || p) * (inputs.founderPct / 100),
+      openPrice: p * (1 + ((closePrice - p) / p) * .72), closePrice: closePrice || p,
+      popPct: p ? ((closePrice - p) / p) * 100 : 0,
+      founderWorth: inputs.preIpoShares * (closePrice || p) * (inputs.founderPct / 100),
       founderPctAfter: inputs.founderPct * (inputs.preIpoShares / total),
       omitted: inputs.risks.filter(r => omit[r.id]).map(r => r.label),
       marks,
@@ -1970,46 +1762,24 @@ export const Listing: React.FC<{
   return (
     <div className={css.ls} data-epx-root>
       <div className={css.lstop}>
-        {onBack && scene === 'RESOLUTION' && <button className={css.lsback} onClick={onBack}>←</button>}
+        {onBack && scene === 'ASK' && <button className={css.lsback} onClick={onBack} aria-label="Back">←</button>}
         <ChapterRail scene={scene} />
       </div>
 
-      {scene === 'RESOLUTION' &&
-        <Resolution brand={brand} inputs={inputs} f={f} onGo={() => setScene('ASK')} />}
-
       {scene === 'ASK' &&
-        <Ask inputs={inputs} f={f} ask={ask} setAsk={setAsk} shares={shares} setShares={setShares}
-          revision={revision} onGo={() => setScene('CFO')} />}
+        <ListingAsk brand={brand} inputs={inputs} f={f} ticker={ticker} setTicker={setTicker}
+          ask={ask} setAsk={setAsk} shares={shares} setShares={setShares} onGo={() => setScene('TABLE')} />}
 
-      {scene === 'CFO' &&
-        <Cfo key={`cfo${revision}`} ask={ask} f={f} name={inputs.executiveNames?.cfo || 'Chief Financial Officer'}
-          onPass={() => setScene('CTO')}
+      {scene === 'TABLE' &&
+        <ListingTable key={`t${revision}`} inputs={inputs} f={f} ask={ask} marks={marks.length}
+          onPass={() => setScene('SYNDICATE')}
           onRevise={() => { setRevision(r => r + 1); setScene('ASK'); }}
-          onForce={() => {
-            addMark({
+          onForce={objections => {
+            if (objections.cfo) addMark({
               id: 'cfo', bookCost: .17, short: 'CFO DECLINED TO CERTIFY',
               label: 'Management has adopted valuation assumptions which the Chief Financial Officer declined to certify.',
             });
-            setScene('CTO');
-          }} />}
-
-      {scene === 'CTO' &&
-        <Cto key={`cto${revision}`} inputs={inputs}
-          onPass={() => setScene('BOARD')}
-          onForce={() => {
-            addMark({
-              id: 'cto', bookCost: .12, short: 'CTO RESIGNED BEFORE FILING',
-              label: 'The Chief Technology Officer resigned during preparation of this document.',
-            });
-            setScene('BOARD');
-          }} />}
-
-      {scene === 'BOARD' &&
-        <Board key={`b${revision}`} ask={ask} f={f} marks={marks.length} inputs={inputs}
-          onPass={() => setScene('SYNDICATE')}
-          onRevise={() => { setRevision(r => r + 1); setScene('ASK'); }}
-          onForce={() => {
-            addMark({
+            if (objections.board) addMark({
               id: 'board', bookCost: .21, short: 'DIRECTOR RESIGNED OVER VALUATION',
               label: 'An independent director resigned prior to filing, citing the indicative valuation.',
             });
@@ -2024,12 +1794,9 @@ export const Listing: React.FC<{
               id: 'bank', bookCost: .26, short: 'NO FIRM UNDERWRITING',
               label: 'The offering proceeds on a best-efforts basis. No underwriter has committed to purchase unsubscribed shares.',
             });
-            setScene('STANDS');
+            /* the number is public the moment it exists */
+            cutTo(leak(), 'DILIGENCE');
           }} />}
-
-      {scene === 'STANDS' &&
-        <Stands brand={brand} ask={ask} shares={shares} preIpoShares={inputs.preIpoShares} marks={marks}
-          onGo={() => cutTo(leak(), 'DILIGENCE')} />}
 
       {scene === 'DILIGENCE' &&
         <Diligence inputs={inputs} marks={marks} weeks={weeks} setWeeks={setWeeks}
@@ -2083,11 +1850,7 @@ export const Listing: React.FC<{
       {scene === 'LISTING' && book &&
         <ListingDay ticker={ticker} book={book}
           firmBook={!marks.some(m => m.id === 'bank')}
-          onGo={c => { setClosePx(c); setScene('AFTER'); }} />}
-
-      {scene === 'AFTER' &&
-        <After brand={brand} inputs={inputs} ticker={ticker} close={closePx} shares={shares}
-          marks={marks} onGo={finishReal} />}
+          onGo={c => { setClosePx(c); finishReal(c); }} />}
 
     </div>
   );

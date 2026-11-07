@@ -83,7 +83,10 @@ const targetedPricing: OwnedStreamingPricingConfiguration = {
     introOffer: 50,
     introOfferPlanId: 'FAMILY',
 };
-const targetedForecast = forecastWorldStreamingLaunchPricing(player, targetedPricing, ['US', 'IN']);
+/* Pay yearly at its default for the leakage check: since #71 who pays yearly follows the discount, and at 0%
+   nobody would, so the untargeted plans' yearly buyers it reads would not exist */
+const targetedYearlyPricing: OwnedStreamingPricingConfiguration = { ...targetedPricing, annualDiscount: 15 };
+const targetedForecast = forecastWorldStreamingLaunchPricing(player, targetedYearlyPricing, ['US', 'IN']);
 const deepPromotionForecast = forecastWorldStreamingLaunchPricing(player, { ...targetedPricing, introOffer: 90 }, ['US', 'IN']);
 const noPromotionForecast = forecastWorldStreamingLaunchPricing(player, { ...targetedPricing, introOffer: 0 }, ['US', 'IN']);
 assert.ok(
@@ -98,7 +101,7 @@ assert.ok(targetedForecast.planAllocations.some(row => row.planId !== 'FAMILY' &
 const expectedTargetedFirstYear = targetedForecast.planAllocations.reduce((sum, row) => {
     const list = targetedPricing.plans.find(plan => plan.id === row.planId)!.monthly;
     return sum + row.monthlyHouseholds * (row.planId === 'FAMILY' ? 188.88 : 12 * list)
-        + row.annualHouseholds * 12 * list;
+        + row.annualHouseholds * 12 * streamingBillingPathPrice(list, targetedYearlyPricing.annualDiscount, targetedYearlyPricing.introOffer, 0, 'ANNUAL');
 }, 0);
 assert.ok(Math.abs(targetedForecast.firstYearSubscriptionRevenue - expectedTargetedFirstYear) < .02,
     'a Premiere-only intro discount must not reduce untargeted plans in the first-year world forecast');
@@ -341,8 +344,9 @@ const targetedPricePaths = renderToStaticMarkup(React.createElement(PlanPricePat
 assert.match(targetedPricePaths, /List price.*\$17\.99/s, 'the plan explains the price the player entered');
 assert.match(targetedPricePaths, /First three months.*\$8\.99/s, 'the plan explains its targeted monthly promo price');
 assert.match(targetedPricePaths, /Pay yearly.*\$17\.99/s, 'the plan keeps the annual path distinct when its discount is Off');
-assert.match(targetedPricePaths, /Opening blend.*\$11\.96/s, 'the plan explains the blended opening price');
-assert.match(targetedPricePaths, /Year one.*\$197\.79/s, 'the plan explains the first-year per-subscriber result');
+// #71: with Pay yearly Off nobody pays yearly, so the blend and year one are the monthly path's
+assert.match(targetedPricePaths, /Opening blend.*\$8\.99.*0% yearly, 100% monthly/s, 'the plan explains the blended opening price');
+assert.match(targetedPricePaths, /Year one.*\$188\.88/s, 'the plan explains the first-year per-subscriber result');
 assert.match(targetedPricePaths, /0% projected share/, 'the breakdown ties the price path to its projected subscriber share');
 assert.match(targetedPricePaths, /Monthly path: 100% affordable\. Annual path: 0% affordable/,
     'the plan explains that the monthly promotion is affordable even when the annual path is not');

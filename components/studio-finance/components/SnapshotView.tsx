@@ -74,21 +74,21 @@ export function SnapshotView({ data, cut, period, summary, health, onNavigate, o
       />
 
       <section className="sf-changed">
-        <p className="sf-eyebrow">Operating profit</p>
+        <p className="sf-eyebrow">Profit after content costs</p>
         <p className="sf-changed-copy">
           {summary.accountingProfit === null ? 'Unavailable for legacy accounting weeks.' : money(summary.accountingProfit, { sign: true })}
         </p>
         <p className="sf-flow-note">
           {summary.accountingProfit === null
             ? 'Earlier weeks used estimated content expenses. New settled weeks use finite content schedules.'
-            : `After incurred operating costs and ${money(summary.contentAmortization)} of content expense. Content payments stay in cash flow; amortization does not charge cash again.`}
+            : `Cash this period is ${money(summary.revenue - summary.expense, { sign: true })}. Here, content you paid for is counted over its life (${money(summary.contentAmortization)} this period), so profit can sit below cash.`}
         </p>
       </section>
 
       {/* --- health ------------------------------------------------------ */}
       <section className="sf-health">
         <Gauge
-          label={summary.accountingProfit === null ? 'Before content margin' : 'Operating margin'}
+          label={summary.accountingProfit === null ? 'Before content margin' : 'Margin after content'}
           value={pct(health.margin)}
           note={health.margin >= 20 ? 'Healthy' : health.margin >= 0 ? 'Thin' : 'Negative'}
           fill={(health.margin + 20) / 70}

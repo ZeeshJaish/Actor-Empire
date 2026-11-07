@@ -5,6 +5,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Business, NPCActor, Player, TalentCareerProfile } from '../../types';
 import { formatMoney } from '../../services/formatUtils';
 import { NPC_DATABASE } from '../../services/npcLogic';
+import { getIndustryNpcs } from '../../services/industry/industryPeople';
+import { industryStakeGain } from '../../services/industry/industryStakes';
 import { getTalentCareerProfile } from '../../services/talentCareer';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import { STUDIO_CATALOG } from '../../services/studioLogic';
@@ -38,6 +40,10 @@ import {
 } from '../../services/studioAcquisition';
 import { setSubsidiaryOperatingModel } from '../../services/studioGroup';
 import { getMergedStudioIds } from '../../services/stockLogic';
+import { getAbsoluteWeek } from '../../services/legacyLogic';
+import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
+import { getStreamingEquityValuation } from '../../services/streamingPublicMarkets';
+import { valueWorldStudio } from '../../services/valuation/studioValuation';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { getInheritedStudioProjects } from '../../services/legacyLogic';
@@ -65,6 +71,8 @@ interface ForbesAppProps {
 type Tab = 'ACTORS' | 'STUDIOS' | 'STREAMING' | 'MY_RANK';
 
 const FORBES_CELEB_OCCUPATIONS = new Set<NPCActor['occupation']>([
+    /* #178: the industry's executives rank too: their worth grows with their pay */
+    'EXECUTIVE',
     'ACTOR',
     'DIRECTOR',
     'MUSIC_ARTIST',
@@ -119,7 +127,10 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       onUpdatePlayer(nextPlayer);
       return { ...result, player: nextPlayer };
   };
+  /* #178: the industry's notable people (investors, the rivals' CEOs, whoever works for us) come first, so their live
+     worth wins over a static copy of the same person */
   const knownActorPool = [
+      ...getIndustryNpcs(player, industryStakeGain(player), true),
       ...NPC_DATABASE,
       ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []),
       ...getEnabledGlobalCreatorSocialProfiles(player)
@@ -147,7 +158,14 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
       return sum + (item?.price || 0);
   }, 0);
   
-  const playerNetWorth = player.money + assetsValue;
+  /* #184: the founder's stake in their streaming company, at the valuation engine's value */
+  const streamingStake = player.ownedStreamingPlatform?.identity
+      ? (() => {
+          const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+          return Math.round(getStreamingEquityValuation(platform) * Math.max(0, platform.founderOwnershipPercent) / 100);
+      })()
+      : 0;
+  const playerNetWorth = player.money + assetsValue + streamingStake;
 
   // --- 2. BUILD RANKINGS ---
   
@@ -198,11 +216,14 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
         };
     });
 
+  /* #184: every studio at the valuation engine's value: its standing, moved by its books, its record, its slate, cash and debt */
+  const studioWeek = getAbsoluteWeek(player.age, player.currentWeek);
   const marketStudios = (player.world.studios ? (Object.values(player.world.studios) as any[]) : (Object.values(STUDIO_CATALOG) as any[]))
       .filter(studio => !mergedStudioIds.has(studio.id))
       .map(studio => {
           const stock = player.stocks.find(stock => stock.relatedStudioId === studio.id);
-          return stock ? { ...studio, valuation: getListedCompanyValuation(player, stock).equityMarketCap / 1e9 } : studio;
+          /* a listed company is worth its market cap, as on its profile, and its price follows the valuation engine (#185); the rest, the engine's value (#184) */
+          return { ...studio, valuation: (stock ? getListedCompanyValuation(player, stock).equityMarketCap : valueWorldStudio(studio, studioWeek).equityValue) / 1_000_000_000 };
       });
   const playerOwnedStudioById = new Map(playerOwnedStudios.map(studio => [studio.id, studio]));
   // A newly acquired studio may still exist in the market snapshot. The save

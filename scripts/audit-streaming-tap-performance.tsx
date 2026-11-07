@@ -101,7 +101,7 @@ check('revisiting an HQ section returns the unchanged player without losing tour
 check('backend eligibility reads current canonical grants and service configuration', () => {
     const configured = structuredClone(player);
     configured.ownedStreamingPlatform.serviceConfiguration.pricing = configureStreamingPricingOffer(
-        configured.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'STORE' });
+        configured.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'STORE', alone: true });
     const restricted: StreamingRightsAccessGrant = { schemaVersion: 1, modes: ['SUBSCRIPTION'], earlyWindowWeeks: 0, purchaseFulfillment: 'NONE', source: 'EXPLICIT' };
     configured.ownedStreamingPlatform.catalogLicenses.push({ id: 'source-grant', accessGrant: restricted } as any);
     const sourced = { ...lot, sourceLicenseId: 'source-grant' };
@@ -109,7 +109,7 @@ check('backend eligibility reads current canonical grants and service configurat
     configured.ownedStreamingPlatform.catalogLicenses.at(-1)!.accessGrant = { ...restricted, modes: ['RENTAL'] };
     assert.equal(getStreamingBuyerAuctionBackendCapability(configured, sourced).rental, true);
     configured.ownedStreamingPlatform.serviceConfiguration.pricing = configureStreamingPricingOffer(
-        configured.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'SUBSCRIPTION' });
+        configured.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'SUBSCRIPTION', alone: true });
     assert.equal(getStreamingBuyerAuctionBackendCapability(configured, sourced).rental, false);
     assert.equal(getStreamingBuyerAuctionBackendCapability(configured, { ...sourced, windowType: 'PERMANENT' }).eligibleRevenueFraction, 0);
 });

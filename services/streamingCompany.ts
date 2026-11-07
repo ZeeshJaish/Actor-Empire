@@ -240,6 +240,35 @@ export const STREAMING_EXECUTIVE_CANDIDATES: StreamingExecutiveCandidate[] = [
         skill: 88, loyalty: 63, ambition: 82, ethics: 71, preferredStrategy: 'MARGIN_FIRST',
     },
     {
+        /* #164: two more for the Marketing and Trust seats, so every seat has three to choose from */
+        id: 'tomas-varga', name: 'Tomás Varga', role: 'MARKETING_HEAD', roleLabel: 'Marketing Head', initials: 'TV',
+        gender: 'MALE', formerCompany: 'Northlight Pictures', yearsExperience: 9,
+        specialty: 'Brand storytelling', style: 'Cinematic', strength: 'Makes a service feel like an event.',
+        caution: 'Spends on look before reach.', weeklyCompensation: 150_000,
+        skill: 76, loyalty: 72, ambition: 70, ethics: 78, preferredStrategy: 'CREATIVE_FIRST',
+    },
+    {
+        id: 'ines-moreau', name: 'Ines Moreau', role: 'MARKETING_HEAD', roleLabel: 'Marketing Head', initials: 'IM',
+        gender: 'FEMALE', formerCompany: 'Vistaplay', yearsExperience: 13,
+        specialty: 'Performance marketing', style: 'Data-led', strength: 'Wins homes at the lowest cost per join.',
+        caution: 'Cuts a campaign the week it slows.', weeklyCompensation: 185_000,
+        skill: 84, loyalty: 70, ambition: 64, ethics: 82, preferredStrategy: 'MARGIN_FIRST',
+    },
+    {
+        id: 'marco-ruiz', name: 'Marco Ruiz', role: 'SECURITY_TRUST_HEAD', roleLabel: 'Security & Trust Head', initials: 'MR',
+        gender: 'MALE', formerCompany: 'PanWorld Broadcast', yearsExperience: 7,
+        specialty: 'Rapid response', style: 'Hands-on', strength: 'First on every incident, at a junior salary.',
+        caution: 'Wants a bigger role soon.', weeklyCompensation: 115_000,
+        skill: 71, loyalty: 58, ambition: 88, ethics: 80, preferredStrategy: 'BALANCED',
+    },
+    {
+        id: 'ingrid-solberg', name: 'Ingrid Solberg', role: 'SECURITY_TRUST_HEAD', roleLabel: 'Security & Trust Head', initials: 'IS',
+        gender: 'FEMALE', formerCompany: 'StreamCo', yearsExperience: 16,
+        specialty: 'Anti-piracy', style: 'Steady', strength: 'Leaks come down fast; rivals rarely lure her.',
+        caution: 'Prefers caution over speed.', weeklyCompensation: 140_000,
+        skill: 78, loyalty: 86, ambition: 45, ethics: 90, preferredStrategy: 'TRUST_FIRST',
+    },
+    {
         id: 'amara-diallo', name: 'Amara Diallo', role: 'COO', roleLabel: 'COO', initials: 'AD',
         gender: 'FEMALE', formerCompany: 'PanWorld Broadcast', yearsExperience: 9,
         specialty: 'People and partner operations', style: 'Collaborative', strength: 'Improves execution without burning out the company.',
@@ -431,11 +460,15 @@ export const hireStreamingExecutive = (
     player: Player,
     executiveId: string,
     requestedIdempotencyKey?: string,
+    /** #180: someone from the industry's people (not the old list), on the terms agreed: their pay and signing bonus */
+    terms?: { candidate?: StreamingExecutiveCandidate; signingBonus?: number },
 ): HireStreamingExecutiveResult => {
     if (!isIncorporated(player)) {
         return { player, changed: false, reason: 'INVALID_STATE' };
     }
-    const candidate = STREAMING_EXECUTIVE_CANDIDATES.find(item => item.id === executiveId);
+    const candidate = terms?.candidate && terms.candidate.id === executiveId
+        ? terms.candidate
+        : STREAMING_EXECUTIVE_CANDIDATES.find(item => item.id === executiveId);
     if (!candidate) {
         return { player, changed: false, reason: 'UNKNOWN_EXECUTIVE' };
     }
@@ -455,6 +488,10 @@ export const hireStreamingExecutive = (
         : `executive-hire:${candidate.id}:${absoluteWeek}`;
     if (platform.eventLedger.some(entry => entry.idempotencyKey === idempotencyKey)) {
         return { player, changed: false, reason: 'ALREADY_COMMITTED' };
+    }
+    const signingBonus = Math.max(0, Math.round(terms?.signingBonus || 0));
+    if (signingBonus > platform.treasuryCash) {
+        return { player, changed: false, reason: 'INVALID_STATE' };
     }
     const appointment: OwnedStreamingExecutiveAppointment = {
         id: createDeterministicId('streaming_executive', platform.simulationSeed, idempotencyKey),
@@ -476,6 +513,7 @@ export const hireStreamingExecutive = (
         performance: 60,
         level: 2,
         experience: 0,
+        ...(signingBonus ? { signingBonus } : {}),
     };
     const ledgerEntry: OwnedStreamingLedgerEntry = {
         id: createDeterministicId('streaming_event', platform.simulationSeed, idempotencyKey),
@@ -488,10 +526,12 @@ export const hireStreamingExecutive = (
             executiveId: candidate.id,
             role: candidate.role,
             weeklyCompensation: candidate.weeklyCompensation,
+            ...(signingBonus ? { signingBonus } : {}),
         },
     };
     const ownedStreamingPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        treasuryCash: platform.treasuryCash - signingBonus,
         leadership: {
             ...platform.leadership,
             appointments: [...platform.leadership.appointments, appointment],

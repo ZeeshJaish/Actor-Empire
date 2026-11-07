@@ -18,7 +18,10 @@ const EVENT_TYPES = new Set<IndustryEventType>([
     'PROJECT_OVERRUN', 'PROJECT_HELD', 'PROJECT_SOLD', 'PROJECT_CANCELLED',
     'PROJECT_RELEASE_PLANNED', 'PROJECT_RELEASED', 'PROJECT_HIT', 'PROJECT_FLOP',
     'PROJECT_SLEEPER', 'RIGHTS_DEAL', 'RIGHTS_TRANSFER', 'RIGHTS_SALE_ANNOUNCED', 'FRANCHISE_DECISION',
-    'AWARD_NOMINATED', 'AWARD_WON', 'PARTNERSHIP_REPEATED',
+    'AWARD_NOMINATED', 'AWARD_WON', 'PARTNERSHIP_REPEATED', 'PLATFORM_TECH_LAUNCHED',
+    'PLATFORM_OUTAGE', 'PLATFORM_RESTORED', 'PLATFORM_PRICE_RAISED', 'PLATFORM_ADS_ADDED', 'PLATFORM_PRICE_CUT',
+    'PLATFORM_QUALITY_GAP', 'PLATFORM_REBRANDED', 'PLATFORM_APP_REDESIGNED', 'PLATFORM_FREE_TIER', 'PLATFORM_OFFER_CHANGED',
+    'PLATFORM_VALUE_PRAISED', 'PLATFORM_VALUE_CRITICISED', 'PLATFORM_CHART_MOMENT', 'PLATFORM_CAMPAIGN_MOMENT',
 ]);
 const IMPORTANCE = new Set<IndustryEventImportance>(['LOW', 'MEDIUM', 'HIGH']);
 const EVIDENCE_KINDS = new Set<IndustryEventEvidence['kind']>([
@@ -89,6 +92,7 @@ const normalizeEvent = (value: unknown): IndustryEventFact | null => {
         headline,
         detail,
         evidence: normalizeEvidence(candidate.evidence),
+        ...(optionalText(candidate.imageMediaId) ? { imageMediaId: optionalText(candidate.imageMediaId) } : {}),
     };
 };
 

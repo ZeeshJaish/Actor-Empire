@@ -75,6 +75,10 @@ interface Props {
   onOpenInfrastructure?: () => void;
   onOpenProduct?: () => void;
   onOpenCampusConstruction?: () => void;
+  /** where it opens: the Campus Map by default; a branch's lab from Platform › Tech's
+      Engineering list; the research still under way from its row there */
+  initialView?: 'CAMPUS' | 'LAB' | 'RESEARCH';
+  initialBranch?: StreamingTechnologyCampusBranch;
 }
 
 type CampusView = 'RESEARCH' | 'CAMPUS' | 'LAB' | 'CONSTRUCTION' | 'LEDGER';
@@ -186,20 +190,27 @@ export default function StreamingTechnologyCampus({
   onOpenInfrastructure,
   onOpenProduct,
   onOpenCampusConstruction,
+  initialView,
+  initialBranch,
 }: Props) {
   const campus = useMemo(() => getStreamingTechnologyCampus(player), [player]);
   const researchPortfolio = useMemo(() => getStreamingResearchPortfolio(player), [player]);
+  /* New research has stopped (the plan's §11); only programmes already under way are shown,
+     so they can be cleared and installed. Localization moved to the Content Desk in #23. */
+  const inFlight = useMemo(() => researchPortfolio.programs.filter(item => item.program
+    && item.program.stage !== 'OPERATING' && item.definition.installTargetType !== 'LOCALIZATION_CAPABILITY'), [researchPortfolio]);
   const defaultBranch = campus.facilities.find(facility => facility.nextNode?.status === 'AVAILABLE')?.definition.id
     || 'DELIVERY_CAPACITY';
   const [ui, dispatch] = useReducer(reducer, {
-    view: campus.activeProject ? 'CONSTRUCTION' : 'RESEARCH',
-    branch: defaultBranch,
+    view: campus.activeProject && !initialView ? 'CONSTRUCTION'
+      : initialView === 'RESEARCH' && !inFlight.length ? 'CAMPUS' : initialView || 'CAMPUS',
+    branch: initialBranch || defaultBranch,
     selectedDefinitionId: null,
     buildMode: 'BALANCED',
     feedback: '',
   });
   const [selectedResearchId, setSelectedResearchId] = useState(
-    researchPortfolio.activeProgram?.definitionId || researchPortfolio.programs[0]?.definition.id || '',
+    researchPortfolio.activeProgram?.definitionId || inFlight[0]?.definition.id || '',
   );
   const [facilityTargetId, setFacilityTargetId] = useState('');
   const selectedFacility = campus.facilities.find(facility => facility.definition.id === ui.branch) || campus.facilities[0];
@@ -209,8 +220,8 @@ export default function StreamingTechnologyCampus({
   const preview = selectedNode ? previewStreamingTechnologyProject(selectedNode.definition, ui.buildMode) : null;
   const activeProject = campus.activeProject;
   const weeksRemaining = activeProject ? Math.max(0, activeProject.readyAtAbsoluteWeek - campus.absoluteWeek) : 0;
-  const selectedResearch = researchPortfolio.programs.find(item => item.definition.id === selectedResearchId)
-    || researchPortfolio.programs[0]
+  const selectedResearch = inFlight.find(item => item.definition.id === selectedResearchId)
+    || inFlight[0]
     || null;
   const compatibleFacilities = useMemo(
     () => getImmersionCoolingCompatibleFacilities(player.ownedStreamingPlatform),
@@ -355,8 +366,8 @@ export default function StreamingTechnologyCampus({
     return (
       <section className="tech-research-lab">
         <header>
-          <div><span>R&D PORTFOLIO</span><h2>Seven disciplines. Six accountable stages.</h2></div>
-          <p>Research creates a tested possibility. IP clearance, installation capital and an exact operating target remain separate decisions.</p>
+          <div><span>RESEARCH UNDER WAY</span><h2>Finish what was started.</h2></div>
+          <p>New research has moved: picture and sound are unlocked in Platform › Tech, and engineering builds no longer wait for research. Programmes already under way are cleared and installed here.</p>
         </header>
 
         {/* --- the fibre ladder ------------------------------------------------
@@ -366,7 +377,7 @@ export default function StreamingTechnologyCampus({
             getting faster. Both numbers are shown together because they are one
             position, and because the standard beside them is the reason either
             of them matters. */}
-        <div className="tech-fibre">
+        {fibreState.generation > 0 || fibreState.level > 0 ? <div className="tech-fibre">
           <div className="tech-fibre-where">
             <span>NETWORK FIBRE</span>
             <h3>{fibreGeneration.name}</h3>
@@ -404,10 +415,10 @@ export default function StreamingTechnologyCampus({
               </>
             )}
           </div>
-        </div>
+        </div> : null}
         <div className="tech-research-layout">
           <div className="tech-research-catalog" aria-label="Research categories">
-            {researchPortfolio.programs.map(item => (
+            {inFlight.map(item => (
               <button
                 type="button"
                 key={item.definition.id}
@@ -493,7 +504,7 @@ export default function StreamingTechnologyCampus({
                   </button>
                 ) : (
                   <button type="button" className="tech-research-primary" disabled={Boolean(blockers.length)} onClick={() => openResearchInstallation(selectedResearch)}>
-                    {definition.mappedProductLineId ? 'Open Product Lab' : 'Open installation blueprint'} <ChevronRight size={17} />
+                    {definition.mappedProductLineId ? 'Open Products' : 'Open installation blueprint'} <ChevronRight size={17} />
                   </button>
                 )}
                 {blockers.map(blocker => <span className="tech-install-blocker" key={blocker}><LockKeyhole size={14} /> {blocker}</span>)}
@@ -671,15 +682,15 @@ export default function StreamingTechnologyCampus({
           sceneId="noc"
           className="tech-campus-scene"
           eyebrow="TECHNOLOGY CAMPUS"
-          title={researchPortfolio.activeProgram ? `${researchPortfolio.activeProgram.title} is in ${researchPortfolio.activeProgram.stage.replaceAll('_', ' ').toLowerCase()}.` : activeProject ? `${activeProject.title} is under construction.` : 'Research the possibility. Install the real system.'}
-          description="Build the systems viewers never see—but always feel. Seven R&D disciplines feed canonical facilities, rack groups, platform products and future construction—with no free upgrades."
+          title={researchPortfolio.activeProgram ? `${researchPortfolio.activeProgram.title} is in ${researchPortfolio.activeProgram.stage.replaceAll('_', ' ').toLowerCase()}.` : activeProject ? `${activeProject.title} is under construction.` : 'Engineering you build, week by week.'}
+          description="Build the systems viewers never see—but always feel. Every system is now unlocked and raised in Platform › Tech; a build already under way finishes here over game weeks."
           status={{
             label: activeProject ? `${weeksRemaining} game weeks remaining` : `${campus.completedProjectCount} projects installed`,
             detail: `${campus.availableEngineeringStaff} engineering staff • ${campus.technicalDebt} technical debt`,
             tone: activeProject ? 'warning' : campus.technicalDebt >= 20 ? 'critical' : 'active',
           }}
           hotspots={[
-            { id: 'research', label: 'Research Pipeline', status: researchPortfolio.activeProgram ? researchPortfolio.activeProgram.stage.replaceAll('_', ' ') : 'Available', x: 16, y: 43, tone: researchPortfolio.activeProgram ? 'warning' : 'active', icon: <FlaskConical size={16} /> },
+            ...(inFlight.length ? [{ id: 'research', label: 'Research Pipeline', status: `${inFlight.length} under way`, x: 16, y: 43, tone: 'warning' as const, icon: <FlaskConical size={16} /> }] : []),
             { id: 'campus', label: 'Campus Map', status: 'Six facilities', x: 37, y: 31, tone: 'active', icon: <Network size={16} /> },
             { id: 'construction', label: 'Construction Bay', status: activeProject ? `${weeksRemaining} weeks left` : 'Available', x: 51, y: 29, tone: activeProject ? 'warning' : 'success', icon: <HardHat size={16} /> },
             { id: 'ledger', label: 'Engineering Ledger', status: `${campus.completedProjectCount} installed`, x: 81, y: 44, tone: 'neutral', icon: <CircuitBoard size={16} /> },
@@ -688,7 +699,7 @@ export default function StreamingTechnologyCampus({
         />
 
         <nav className="tech-campus-tabs" aria-label="Technology Campus sections">
-          <button type="button" className={ui.view === 'RESEARCH' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_RESEARCH' })}><FlaskConical size={17} /><span>Research<small>Seven R&D disciplines</small></span></button>
+          {inFlight.length ? <button type="button" className={ui.view === 'RESEARCH' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_RESEARCH' })}><FlaskConical size={17} /><span>Research<small>{inFlight.length} under way</small></span></button> : null}
           <button type="button" className={ui.view === 'CAMPUS' || ui.view === 'LAB' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_CAMPUS' })}><CloudCog size={17} /><span>Campus Map<small>Six engineering facilities</small></span></button>
           <button type="button" className={ui.view === 'CONSTRUCTION' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_CONSTRUCTION' })}><HardHat size={17} /><span>Install & Operate<small>{activeProject ? `${weeksRemaining} weeks remaining` : 'Bay available'}</small></span></button>
           <button type="button" className={ui.view === 'LEDGER' ? 'is-active' : ''} onClick={() => dispatch({ type: 'OPEN_LEDGER' })}><CircuitBoard size={17} /><span>Engineering Ledger<small>{campus.completedProjectCount} installed</small></span></button>
@@ -702,7 +713,7 @@ export default function StreamingTechnologyCampus({
             <p>Complete the existing infrastructure build in game weeks. Technology Campus does not bypass construction readiness.</p>
             <button type="button" onClick={onOpenInfrastructure}>Open infrastructure control</button>
           </section>
-        ) : ui.view === 'RESEARCH' ? renderResearch() : ui.view === 'CAMPUS' ? renderCampus() : ui.view === 'LAB' ? renderLab() : ui.view === 'CONSTRUCTION' ? renderConstruction() : renderLedger()}
+        ) : ui.view === 'RESEARCH' && inFlight.length ? renderResearch() : ui.view === 'CAMPUS' || ui.view === 'RESEARCH' ? renderCampus() : ui.view === 'LAB' ? renderLab() : ui.view === 'CONSTRUCTION' ? renderConstruction() : renderLedger()}
 
         {campus.available && !campus.ctoActive ? (
           <aside className="tech-campus-cto-note">

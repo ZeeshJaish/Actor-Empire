@@ -32,6 +32,7 @@ import {
     getStreamingNetworkPhysicalSummary,
 } from './streamingInfrastructurePhysical';
 import { getProductionLocation } from './productionLocations';
+import { streamingIncidentWaitEndsAt } from './streamingIncidentRepair';
 
 const clamp = (value: number, minimum = 0, maximum = 100): number => Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum));
 const roundMoney = (value: number): number => Math.max(0, Math.round(value / 1_000) * 1_000);
@@ -333,7 +334,8 @@ export const getStreamingInfrastructureOperationsEffects = (
         engagementRateDelta: -.008 * severity * pressure,
         playbackDelta: -1.4 * severity * pressure,
         capacityMultiplier: clamp(1 - remainingLoss / 100, .35, 1),
-        weeklyOperatingCost: premium + (recovering ? roundMoney(320_000 * severity) : 0),
+        /* a STATUS fix (#50) is priced all in: no weekly recovery bill on top */
+        weeklyOperatingCost: premium + (recovering && activeIncident.statusRepair?.path !== 'FIX' ? roundMoney(320_000 * severity) : 0),
         activeIncident,
     };
 };
@@ -387,6 +389,30 @@ export const commitStreamingInfrastructureOperationsWeek = (
             crisisSecurity: { ...platform.crisisSecurity, infrastructureOperations: operations },
         };
         ledger.push(eventLedger(platform, snapshot.absoluteWeek, 'INFRASTRUCTURE_INCIDENT_RECOVERED', `${recovered.idempotencyKey}:recovered`, `${recovered.title} reached verified recovery.`, 'WEEK_PROCESSOR', { incidentId: recovered.id, facilityId: recovered.facilityId }));
+    }
+
+    /* Nobody repaired it (#50): it runs its course 6 or 10 weeks after it opened, at full harm all
+       along. Engineers work around it; the site is not repaired. */
+    const ranItsCourse = operations.incidents.filter(item => item.stage === 'DETECTED' && snapshot.absoluteWeek >= streamingIncidentWaitEndsAt(item));
+    if (ranItsCourse.length) {
+        operations = {
+            ...operations,
+            incidents: operations.incidents.map(item => (ranItsCourse.some(done => done.id === item.id) ? {
+                ...item,
+                stage: 'RESOLVED' as const,
+                resolvedAtAbsoluteWeek: snapshot.absoluteWeek,
+                outcomeNote: `It ran its course after ${snapshot.absoluteWeek - item.detectedAtAbsoluteWeek} weeks: engineers worked around it, and nothing was repaired.`,
+            } : item)),
+        };
+        platform = {
+            ...platform,
+            crisisSecurity: {
+                ...platform.crisisSecurity,
+                publicTrust: clamp(platform.crisisSecurity.publicTrust - 2 * ranItsCourse.length),
+                infrastructureOperations: operations,
+            },
+        };
+        ranItsCourse.forEach(item => ledger.push(eventLedger(platform, snapshot.absoluteWeek, 'INFRASTRUCTURE_INCIDENT_RECOVERED', `${item.idempotencyKey}:ran-its-course`, `${item.title} ran its course with nobody fixing it.`, 'WEEK_PROCESSOR', { incidentId: item.id, facilityId: item.facilityId })));
     }
 
     const cadence = operations.maintenanceCadence;
@@ -472,9 +498,10 @@ export const commitStreamingInfrastructureOperationsWeek = (
         eventLedger: [...platform.eventLedger, ...ledger],
     };
 
+    /* Assisted Management answers what nobody has: not an incident the player chose to wait out on STATUS (#50) */
     const assistedIncident = detected || [...platform.crisisSecurity.infrastructureOperations.incidents]
         .reverse()
-        .find(item => item.stage === 'DETECTED') || null;
+        .find(item => item.stage === 'DETECTED' && item.statusRepair?.path !== 'WAIT') || null;
     if (assistedIncident && management?.mode === 'ASSISTED') {
         const alternatives = facilities.filter(item => item.id !== assistedIncident.facilityId);
         const action: StreamingInfrastructureResponseAction = alternatives.length && management.priority !== 'ECONOMY' ? 'REROUTE_TRAFFIC' : management.priority === 'PREMIUM' || management.priority === 'RELIABLE' ? 'EMERGENCY_CAPACITY' : platform.leadership.delegation.incidentPolicy === 'CONTAIN_FIRST' ? 'ISOLATE_AND_REPAIR' : 'FAILOVER_BACKUP';

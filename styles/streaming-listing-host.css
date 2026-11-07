@@ -1,0 +1,16 @@
+/* #188: the listing's stage, moved out of the old Public markets desk (MARKETS replaced it) */
+.lh-backdrop { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; padding: 0; color: #f7f2e8; background: #030407; }
+.lh-stage { position: relative; width: min(100%, 1040px); height: min(100dvh, 900px); overflow: hidden; background: #07080b; box-shadow: 0 40px 120px rgba(0,0,0,.75); }
+@media (min-width: 900px) { .lh-stage { border-radius: 24px; } }
+.lh-failure { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+.lh-failure span { font-size: 9px; font-weight: 900; letter-spacing: .2em; color: #b89a5c; }
+.lh-failure b { max-width: 320px; font-size: 15px; line-height: 1.45; color: #f1ece2; }
+.lh-failure button { min-height: 44px; padding: 0 20px; border: 0; border-radius: 12px; font-weight: 900; color: #1d1607; background: linear-gradient(#ffd27a, #d9a136); }
+@media (prefers-reduced-motion: reduce) {
+  .lh-stage *, .lh-stage *::before, .lh-stage *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

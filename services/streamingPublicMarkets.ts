@@ -1,3 +1,6 @@
+import { valueOwnedStreamingPlatform } from './valuation/streamingValuation';
+import { nextSharePrice } from './valuation/sharePrice';
+import { settleStreamingBuybackWeek, streamingBuybackTranche } from './streamingBuybacks';
 import type {
     OwnedStreamingActivistCampaign,
     OwnedStreamingEarningsRecord,
@@ -22,6 +25,7 @@ import {
     normalizeOwnedStreamingPlatformState,
     queueOwnedStreamingCinematic,
 } from './ownedStreamingPlatform';
+import { spendPlayerEnergy } from './premiumLogic';
 
 const clamp = (value: number, minimum: number, maximum: number) => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -32,6 +36,106 @@ const roundPrice = (value: number) => Math.max(0.25, Math.round(value * 100) / 1
 const formatPublicMoney = (value: number) => Math.abs(value) >= 1_000_000_000
     ? `$${(value / 1_000_000_000).toFixed(2)}B`
     : `$${(value / 1_000_000).toFixed(1)}M`;
+
+/* ── #173 (plan §21.17): the IPO in this update ── */
+/** activists and hostile bids come back with M&A */
+export const STREAMING_ACTIVISM_ENABLED = false;
+/** ringing the bell starts the listing *(start)* */
+export const STREAMING_IPO_BELL_ENERGY = 25;
+/** an optional earnings call on a quarter's report *(start)* */
+export const STREAMING_EARNINGS_CALL_ENERGY = 10;
+/** weeks after a report that a call can still be held */
+export const STREAMING_EARNINGS_CALL_WEEKS = 2;
+/** a resolution's result: the share price (percent) and the board's confidence */
+const VOTE_EFFECTS: Record<OwnedStreamingShareholderVote['type'], Record<'passed' | 'failed', { price: number; board: number; words: string }>> = {
+    DIRECTOR_MANDATE: {
+        passed: { price: 0.5, board: 3, words: 'Independent directors gain a mandate: the market reads better oversight.' },
+        failed: { price: -0.5, board: -2, words: 'The director mandate failed: oversight stays as it was.' },
+    },
+    EXECUTIVE_PAY: {
+        passed: { price: -0.5, board: 1, words: "Executive pay rises 5%: the team's salaries go up." },
+        failed: { price: 0.5, board: -2, words: 'Executive pay stays where it is; the team notices.' },
+    },
+    CAPITAL_AUTHORITY: {
+        passed: { price: -1, board: 2, words: 'The board may issue new shares: the market prices in some dilution.' },
+        failed: { price: 0.5, board: -1, words: 'No new capital authority: any raise comes back to shareholders.' },
+    },
+    STRATEGIC_REVIEW: {
+        passed: { price: 1, board: -2, words: 'A strategic review begins: the market likes the scrutiny, the board less so.' },
+        failed: { price: -1, board: 1, words: 'No strategic review: the current plan stands.' },
+    },
+};
+
+/**
+ * #173: a resolution decided, by the founder's vote or, unanswered by its due week, by the public alone. Its result
+ * moves the board's confidence now and the share price at the next quote; "Executive pay" passed raises every
+ * executive's salary 5%.
+ */
+const settleShareholderVote = (
+    platform: OwnedStreamingPlatformState,
+    vote: OwnedStreamingShareholderVote,
+    founderVote: 'FOR' | 'AGAINST' | null,
+    absoluteWeek: number,
+): OwnedStreamingPlatformState => {
+    const founderWeight = platform.founderOwnershipPercent;
+    const publicWeight = 100 - founderWeight;
+    const finalSupport = founderVote === null
+        ? roundPercent(vote.institutionalSupport)
+        : roundPercent((founderVote === 'FOR' ? founderWeight : 0) + publicWeight * vote.institutionalSupport / 100);
+    const approved = finalSupport >= 50;
+    const effect = VOTE_EFFECTS[vote.type][approved ? 'passed' : 'failed'];
+    const founderDelta = founderVote === null ? -2 : approved === (founderVote === 'FOR') ? 2 : -3;
+    const settled: OwnedStreamingShareholderVote = {
+        ...vote,
+        founderVote,
+        finalSupport,
+        status: approved ? 'APPROVED' : 'REJECTED',
+        consequence: effect.words,
+        decidedBy: founderVote === null ? 'PUBLIC' : 'FOUNDER',
+        priceEffectPercent: effect.price,
+        priceAppliedAtAbsoluteWeek: null,
+    };
+    const raisePay = vote.type === 'EXECUTIVE_PAY' && approved;
+    const ledger = publicLedger(platform, absoluteWeek, `shareholder-vote:${vote.id}`, 'SHAREHOLDER_VOTE_RESOLVED',
+        `${vote.title} ${approved ? 'passed' : 'failed'} with ${finalSupport.toFixed(1)}% support${founderVote === null ? ': the public decided' : ''}.`, { finalSupport });
+    return {
+        ...platform,
+        governance: { ...platform.governance, boardConfidence: Math.round(clamp(platform.governance.boardConfidence + effect.board + founderDelta, 0, 100)) },
+        leadership: raisePay ? {
+            ...platform.leadership,
+            appointments: platform.leadership.appointments.map(item => (item.status === 'ACTIVE' ? { ...item, weeklyCompensation: Math.round(item.weeklyCompensation * 1.05) } : item)),
+        } : platform.leadership,
+        publicCompany: { ...platform.publicCompany, shareholderVotes: platform.publicCompany.shareholderVotes.map(item => (item.id === vote.id ? settled : item)) },
+        eventLedger: platform.eventLedger.some(entry => entry.idempotencyKey === ledger.idempotencyKey) ? platform.eventLedger : [...platform.eventLedger, ledger],
+    };
+};
+
+/** #173: an earnings call on the latest report (10⚡): it softens a miss, or lifts a beat, at the next quote */
+export const holdStreamingEarningsCall = (player: Player): StreamingPublicMarketActionResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    if (platform.publicCompany.lifecycle !== 'PUBLIC') return { changed: false, player, reason: 'The company is not listed.' };
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const latest = platform.publicCompany.earnings.at(-1);
+    if (!latest || absoluteWeek - latest.reportedAtAbsoluteWeek > STREAMING_EARNINGS_CALL_WEEKS) return { changed: false, player, reason: 'There is no fresh report to speak to.' };
+    if (latest.callHeldAtAbsoluteWeek !== undefined && latest.callHeldAtAbsoluteWeek !== null) return { changed: false, player, reason: 'You already held this quarter\'s call.' };
+    if ((player.energy?.current ?? 0) < STREAMING_EARNINGS_CALL_ENERGY) return { changed: false, player, reason: `An earnings call takes ${STREAMING_EARNINGS_CALL_ENERGY} energy.` };
+    const effect = latest.outcome === 'MISS'
+        ? roundPercent(Math.min(6, Math.abs(latest.stockReactionPercent) * 0.4))
+        : latest.outcome === 'BEAT' ? 2 : 1;
+    const ledger = publicLedger(platform, absoluteWeek, `earnings-call:${latest.id}`, 'PUBLIC_EARNINGS_REPORTED',
+        latest.outcome === 'MISS' ? 'The earnings call explained the miss.' : latest.outcome === 'BEAT' ? 'The earnings call sold the beat.' : 'The earnings call steadied a mixed quarter.', { cycleNumber: latest.cycleNumber });
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        publicCompany: {
+            ...platform.publicCompany,
+            earnings: platform.publicCompany.earnings.map(item => (item.id === latest.id ? { ...item, callHeldAtAbsoluteWeek: absoluteWeek, callEffectPercent: effect, callAppliedAtAbsoluteWeek: null } : item)),
+        },
+        eventLedger: [...platform.eventLedger, ledger],
+    }, player.id);
+    const nextPlayer: Player = { ...player, energy: { ...player.energy }, flags: { ...player.flags }, ownedStreamingPlatform: nextPlatform };
+    spendPlayerEnergy(nextPlayer, STREAMING_EARNINGS_CALL_ENERGY, 'Earnings call');
+    return { changed: true, player: nextPlayer };
+};
 
 export interface StreamingIpoReadinessItem {
     id: 'LIVE_HISTORY' | 'CFO' | 'GOVERNANCE' | 'SCALE' | 'RELIABILITY' | 'FINANCE';
@@ -96,6 +200,8 @@ export const startStreamingCinematicIpoJourney = (
     }
     const view = getStreamingPublicMarkets({ ...player, ownedStreamingPlatform: platform });
     if (!view.canStartRoadshow) return { changed: false, player, reason: 'IPO readiness requirements are not complete.' };
+    /* #173: ringing the bell takes 25 energy; resuming a saved listing takes none */
+    if ((player.energy?.current ?? 0) < STREAMING_IPO_BELL_ENERGY) return { changed: false, player, reason: `Ringing the bell takes ${STREAMING_IPO_BELL_ENERGY} energy.` };
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const ticker = input.ticker.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5) || view.suggestedTicker;
     const idempotencyKey = `ipo-cinematic-journey:${ticker}:${absoluteWeek}`;
@@ -106,9 +212,11 @@ export const startStreamingCinematicIpoJourney = (
         startedAtAbsoluteWeek: absoluteWeek,
         updatedAtAbsoluteWeek: absoluteWeek,
         lastProcessedAbsoluteWeek: absoluteWeek,
-        scene: 'RESOLUTION',
+        /* #189: the listing opens on the ask */
+        scene: 'ASK',
         ask: Math.round(clamp(input.ask, 1, Number.MAX_SAFE_INTEGER)),
-        shares: Math.round(clamp(input.shares, 250_000, 40_000_000)),
+        /* #189: the float is a % of the company now, so a big company sells more than 40M shares */
+        shares: Math.round(clamp(input.shares, 250_000, 500_000_000)),
         revision: 1,
         bankId: null,
         marks: [],
@@ -130,7 +238,9 @@ export const startStreamingCinematicIpoJourney = (
         ...platform,
         publicCompany: { ...platform.publicCompany, lifecycle: 'IPO_PREPARATION', ipoJourney: journey },
     }, player.id);
-    return { changed: true, player: { ...player, ownedStreamingPlatform: nextPlatform } };
+    const nextPlayer: Player = { ...player, energy: { ...player.energy }, flags: { ...player.flags }, ownedStreamingPlatform: nextPlatform };
+    spendPlayerEnergy(nextPlayer, STREAMING_IPO_BELL_ENERGY, 'Ring the bell');
+    return { changed: true, player: nextPlayer };
 };
 
 export const checkpointStreamingCinematicIpoJourney = (
@@ -165,18 +275,51 @@ const getTrailingOperations = (platform: OwnedStreamingPlatformState, weeks = 12
     platform.weeklyHistory.slice(-weeks).flatMap(snapshot => snapshot.operations ? [snapshot.operations] : [])
 );
 
-export const getStreamingEquityValuation = (platform: OwnedStreamingPlatformState): number => {
-    const operations = getTrailingOperations(platform);
-    const trailingRevenue = operations.reduce((sum, item) => sum + item.subscriptionRevenue + (item.productRevenue || 0), 0);
-    const annualizedRevenue = trailingRevenue > 0 ? trailingRevenue * (52 / Math.max(1, operations.length)) : 0;
-    const subscriberValue = platform.metrics.subscribers * 260;
-    const revenueValue = annualizedRevenue * 4.5;
-    const technologyPremium = 1 + clamp(platform.metrics.technologyHealth, 0, 100) / 500;
-    const prestigePremium = 1 + clamp(platform.competitiveWorld.globalPrestige, 0, 100) / 600;
-    return Math.max(
-        180_000_000,
-        roundMoney((subscriberValue + revenueValue + platform.treasuryCash - platform.debtPrincipal) * technologyPremium * prestigePremium),
-    );
+/**
+ * What the company is worth: #184, the valuation engine's equity value (services/valuation), the same number on every
+ * screen (OWNERSHIP, MARKETS, the listing, investors, options, Forbes).
+ */
+export const getStreamingEquityValuation = (platform: OwnedStreamingPlatformState): number => valueOwnedStreamingPlatform(platform).equityValue;
+
+/** #185: our listed company as a ticker in the Stocks app */
+export interface StreamingOwnTicker {
+    symbol: string;
+    name: string;
+    price: number;
+    changePercent: number;
+    /** the offer price, then each week's close (the last 20) */
+    closes: number[];
+    marketCap: number;
+    sharesOutstanding: number;
+    founderPercent: number;
+    publicPercent: number;
+    /** what a share is worth by the valuation engine */
+    valuePerShare: number;
+    listedAtAbsoluteWeek: number;
+}
+
+export const getStreamingOwnTicker = (player: Player): StreamingOwnTicker | null => {
+    const source = player.ownedStreamingPlatform;
+    /* #190: a sold company is no longer ours to trade */
+    if (!source?.identity || source.lifecycle === 'SOLD' || source.publicCompany?.lifecycle !== 'PUBLIC' || !source.publicCompany.listing) return null;
+    const platform = normalizeOwnedStreamingPlatformState(source, player.id);
+    const listing = platform.publicCompany.listing!;
+    const quotes = platform.publicCompany.quoteHistory;
+    const price = quotes.at(-1)?.close || listing.offerPrice;
+    const floatHolder = platform.finance.equityHolders.find(holder => holder.holderName === 'Public shareholder float');
+    return {
+        symbol: listing.ticker,
+        name: platform.identity!.name,
+        price,
+        changePercent: quotes.at(-1)?.changePercent || 0,
+        closes: [listing.offerPrice, ...quotes.map(quote => quote.close)].slice(-20),
+        marketCap: roundMoney(price * listing.sharesOutstanding),
+        sharesOutstanding: listing.sharesOutstanding,
+        founderPercent: platform.founderOwnershipPercent,
+        publicPercent: floatHolder ? floatHolder.ownershipPercent : roundPercent(listing.publicShares / Math.max(1, listing.sharesOutstanding) * 100),
+        valuePerShare: getStreamingEquityValuation(platform) / Math.max(1, listing.sharesOutstanding),
+        listedAtAbsoluteWeek: listing.listedAtAbsoluteWeek,
+    };
 };
 
 const suggestTicker = (name: string) => {
@@ -282,178 +425,8 @@ const publicLedger = (
     metadata,
 });
 
-export const startStreamingIpoRoadshow = (
-    player: Player,
-    input: { ticker: string; narrative: StreamingIpoNarrative; offerPercent: number },
-): StreamingPublicMarketActionResult => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const view = getStreamingPublicMarkets({ ...player, ownedStreamingPlatform: platform });
-    if (!view.canStartRoadshow) return { changed: false, player, reason: 'IPO readiness requirements are not complete.' };
-    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const offerPercent = clamp(Math.round(input.offerPercent), 10, 30);
-    const ticker = input.ticker.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5) || view.suggestedTicker;
-    const sharesOutstanding = 100_000_000;
-    const midpoint = roundPrice(view.valuation / sharesOutstanding);
-    const rng = createDeterministicRng(`${platform.simulationSeed}:ipo-roadshow:${absoluteWeek}:${ticker}`);
-    const narrativeFit = input.narrative === 'AUDIENCE_SCALE'
-        ? clamp(platform.metrics.subscribers / 100_000, 0, 18)
-        : input.narrative === 'PROFITABLE_GROWTH'
-            ? clamp(getTrailingOperations(platform).reduce((sum, item) => sum + item.netCashContribution, 0) / 3_000_000, -8, 18)
-            : input.narrative === 'TECHNOLOGY_NETWORK'
-                ? platform.metrics.technologyHealth * 0.18
-                : platform.competitiveWorld.globalPrestige * 0.18;
-    const governanceSignal = platform.governance.boardConfidence * 0.18;
-    const institutionalDemandScore = roundPercent(clamp(36 + narrativeFit + governanceSignal + rng() * 18, 20, 98));
-    const retailDemandScore = roundPercent(clamp(34 + platform.metrics.engagementRate * 180 + platform.competitiveWorld.globalPrestige * 0.16 + rng() * 22, 18, 99));
-    const demandMultiplier = 0.88 + (institutionalDemandScore + retailDemandScore) / 1_000;
-    const lowPrice = roundPrice(midpoint * demandMultiplier * 0.92);
-    const highPrice = roundPrice(midpoint * demandMultiplier * 1.08);
-    const plan = {
-        ticker,
-        venueName: 'Empire Exchange',
-        narrative: input.narrative,
-        offerPercent,
-        targetCapital: roundMoney(sharesOutstanding * offerPercent / 100 * ((lowPrice + highPrice) / 2)),
-        lowPrice,
-        highPrice,
-        institutionalDemandScore,
-        retailDemandScore,
-        roadshowStops: ['Creator Summit', 'Institutional Hall', 'Global Media Forum', 'Retail Founder Stream'],
-        startedAtAbsoluteWeek: absoluteWeek,
-    };
-    const ledger = publicLedger(
-        platform,
-        absoluteWeek,
-        `ipo-roadshow:${ticker}:${absoluteWeek}`,
-        'IPO_ROADSHOW_STARTED',
-        `${platform.identity?.name || 'The platform'} opened its IPO roadshow as ${ticker}.`,
-        { offerPercent, institutionalDemandScore, retailDemandScore },
-    );
-    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
-        ...platform,
-        publicCompany: { ...platform.publicCompany, lifecycle: 'ROADSHOW', ipoPlan: plan },
-        eventLedger: [...platform.eventLedger, ledger],
-    }, player.id);
-    return { changed: true, player: { ...player, ownedStreamingPlatform: nextPlatform } };
-};
-
-export const listStreamingPlatform = (
-    player: Player,
-    selectedPrice: number,
-): StreamingPublicMarketActionResult => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const plan = platform.publicCompany.ipoPlan;
-    if (platform.publicCompany.lifecycle !== 'ROADSHOW' || !plan) return { changed: false, player, reason: 'Complete the IPO roadshow first.' };
-    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const offerPrice = roundPrice(clamp(selectedPrice, plan.lowPrice, plan.highPrice));
-    const sharesOutstanding = 100_000_000;
-    const publicShares = Math.round(sharesOutstanding * plan.offerPercent / 100);
-    const capitalRaised = roundMoney(publicShares * offerPrice);
-    const ownershipMultiplier = 1 - plan.offerPercent / 100;
-    const founderOwnershipAfter = roundPercent(platform.founderOwnershipPercent * ownershipMultiplier);
-    const listing = {
-        listedAtAbsoluteWeek: absoluteWeek,
-        ticker: plan.ticker,
-        venueName: plan.venueName,
-        offerPercent: plan.offerPercent,
-        sharesOutstanding,
-        publicShares,
-        offerPrice,
-        capitalRaised,
-        founderOwnershipBefore: platform.founderOwnershipPercent,
-        founderOwnershipAfter,
-        preIpoShares: sharesOutstanding - publicShares,
-        newShares: publicShares,
-        employeeQuotaPercent: 0,
-        underwriterId: 'legacy-roadshow',
-        underwriterName: 'Empire Exchange syndicate',
-        firmBook: true,
-        bookCoverage: Math.max(0, (plan.institutionalDemandScore + plan.retailDemandScore) / 100),
-        anchorDiscountAccepted: false,
-        governanceMarks: [],
-        diligenceWeeks: 0,
-        regulatorAttempts: 1,
-    };
-    const demand = (plan.institutionalDemandScore + plan.retailDemandScore) / 2;
-    const firstClose = roundPrice(offerPrice * (0.96 + demand / 1_000));
-    const quote: OwnedStreamingMarketQuote = {
-        id: createDeterministicId('streaming_quote', platform.simulationSeed, absoluteWeek),
-        absoluteWeek,
-        open: offerPrice,
-        high: roundPrice(Math.max(offerPrice, firstClose) * 1.035),
-        low: roundPrice(Math.min(offerPrice, firstClose) * 0.975),
-        close: firstClose,
-        volume: Math.round(publicShares * clamp(0.18 + demand / 250, 0.2, 0.7)),
-        marketCap: roundMoney(firstClose * sharesOutstanding),
-        changePercent: roundPercent((firstClose / offerPrice - 1) * 100),
-        drivers: ['IPO demand book', `${plan.narrative.toLowerCase().replace(/_/g, ' ')} narrative`],
-    };
-    const ledger = publicLedger(
-        platform,
-        absoluteWeek,
-        `ipo-listed:${plan.ticker}:${absoluteWeek}`,
-        'IPO_LISTED',
-        `${platform.identity?.name || 'The platform'} listed at $${offerPrice.toFixed(2)} and raised $${capitalRaised.toLocaleString()}.`,
-        { ticker: plan.ticker, offerPrice, capitalRaised, founderOwnershipAfter },
-    );
-    let nextPlatform = compactOwnedStreamingPlatformForPersistence({
-        ...platform,
-        founderOwnershipPercent: founderOwnershipAfter,
-        treasuryCash: platform.treasuryCash + capitalRaised,
-        governance: {
-            ...platform.governance,
-            boardConfidence: Math.round(clamp(platform.governance.boardConfidence + 3, 0, 100)),
-        },
-        finance: {
-            ...platform.finance,
-            equityHolders: [
-                ...platform.finance.equityHolders.map(holder => ({
-                    ...holder,
-                    ownershipPercent: roundPercent(holder.ownershipPercent * ownershipMultiplier),
-                })),
-                {
-                    id: createDeterministicId('streaming_equity', platform.simulationSeed, 'public-float'),
-                    holderName: 'Public shareholder float',
-                    ownershipPercent: plan.offerPercent,
-                    investedCapital: capitalRaised,
-                    issuedAtAbsoluteWeek: absoluteWeek,
-                },
-            ],
-            capitalActions: [
-                ...platform.finance.capitalActions,
-                {
-                    id: createDeterministicId('streaming_capital', platform.simulationSeed, `ipo:${absoluteWeek}`),
-                    idempotencyKey: `ipo:${absoluteWeek}`,
-                    type: 'EQUITY_ISSUANCE',
-                    absoluteWeek,
-                    amount: capitalRaised,
-                    treasuryDelta: capitalRaised,
-                    personalCashDelta: 0,
-                    debtDelta: 0,
-                    ownershipBefore: platform.founderOwnershipPercent,
-                    ownershipAfter: founderOwnershipAfter,
-                },
-            ],
-        },
-        publicCompany: {
-            ...platform.publicCompany,
-            lifecycle: 'PUBLIC',
-            listing,
-            quoteHistory: [...platform.publicCompany.quoteHistory, quote],
-        },
-        eventLedger: [...platform.eventLedger, ledger],
-        milestoneKeys: Array.from(new Set([...platform.milestoneKeys, 'streaming-ipo-listed'])),
-    }, player.id);
-    nextPlatform = queueOwnedStreamingCinematic(nextPlatform, {
-        idempotencyKey: `ipo-listing:${plan.ticker}:${absoluteWeek}`,
-        type: 'IPO_LISTING',
-        priority: 'MAJOR',
-        availableAtAbsoluteWeek: absoluteWeek,
-        title: `${plan.ticker} Listing Day`,
-        factIds: [ledger.id],
-    });
-    return { changed: true, player: { ...player, ownedStreamingPlatform: nextPlatform } };
-};
+/* #189 (plan §22.4): the old roadshow (`startStreamingIpoRoadshow`, `listStreamingPlatform`) is gone: a company lists
+   only through the listing's own commit below. The dev tools and audits list through `listStreamingCompanyForQa`. */
 
 /**
  * Commits the graphics-first listing experience into the canonical company
@@ -486,7 +459,8 @@ export const commitStreamingCinematicIpo = (
     }
 
     const preIpoShares = Math.round(clamp(input.preIpoShares, 1_000_000, 1_000_000_000));
-    const newShares = Math.round(clamp(input.newShares, 250_000, 40_000_000));
+    /* #189: up to as many new shares as there were (a 50% float); the ask's dial offers 10–30% */
+    const newShares = Math.round(clamp(input.newShares, 250_000, preIpoShares));
     const sharesOutstanding = preIpoShares + newShares;
     const offerPercent = roundPercent(newShares / sharesOutstanding * 100);
     const canonicalPrice = view.valuation / sharesOutstanding;
@@ -645,6 +619,22 @@ export const commitStreamingCinematicIpo = (
     return { changed: true, player: { ...player, ownedStreamingPlatform: nextPlatform } };
 };
 
+/** #188: what a promise of each kind would set, from the last 12 weeks (MARKETS shows it before you promise). The
+ *  revenue is the plans' alone, as the report measures it (product revenue no longer inflates the target). */
+export const previewStreamingGuidance = (platform: OwnedStreamingPlatformState, tone: StreamingGuidanceTone) => {
+    const multiplier = tone === 'CONSERVATIVE' ? 0.96 : tone === 'AMBITIOUS' ? 1.12 : 1.04;
+    const operations = getTrailingOperations(platform);
+    const trailingRevenue = operations.reduce((sum, item) => sum + item.subscriptionRevenue, 0);
+    const trailingCash = operations.reduce((sum, item) => sum + item.netCashContribution, 0);
+    const playback = operations.length ? operations.reduce((sum, item) => sum + item.playbackSuccessRate, 0) / operations.length : 97;
+    return {
+        subscriberTarget: Math.round(platform.metrics.subscribers * multiplier),
+        revenueTarget: Math.round(Math.max(1, trailingRevenue) * multiplier),
+        cashContributionTarget: Math.round(trailingCash >= 0 ? trailingCash * multiplier : trailingCash * (2 - multiplier)),
+        playbackTarget: roundPercent(clamp(playback + (tone === 'AMBITIOUS' ? 0.3 : tone === 'CONSERVATIVE' ? -0.2 : 0), 95, 99.95)),
+    };
+};
+
 export const issueStreamingPublicGuidance = (
     player: Player,
     tone: StreamingGuidanceTone,
@@ -654,20 +644,12 @@ export const issueStreamingPublicGuidance = (
     if (platform.publicCompany.guidance.some(item => item.status === 'ACTIVE')) return { changed: false, player, reason: 'Active guidance already covers the next report.' };
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const nextCycle = (platform.cycleReviews.filter(item => item.kind === 'TWELVE_WEEK_REVIEW').at(-1)?.cycleNumber || 0) + 1;
-    const multiplier = tone === 'CONSERVATIVE' ? 0.96 : tone === 'AMBITIOUS' ? 1.12 : 1.04;
-    const operations = getTrailingOperations(platform);
-    const trailingRevenue = operations.reduce((sum, item) => sum + item.subscriptionRevenue + (item.productRevenue || 0), 0);
-    const trailingCash = operations.reduce((sum, item) => sum + item.netCashContribution, 0);
-    const playback = operations.length ? operations.reduce((sum, item) => sum + item.playbackSuccessRate, 0) / operations.length : 97;
     const guidance: OwnedStreamingPublicGuidance = {
         id: createDeterministicId('streaming_guidance', platform.simulationSeed, nextCycle),
         cycleNumber: nextCycle,
         tone,
         issuedAtAbsoluteWeek: absoluteWeek,
-        subscriberTarget: Math.round(platform.metrics.subscribers * multiplier),
-        revenueTarget: Math.round(Math.max(1, trailingRevenue) * multiplier),
-        cashContributionTarget: Math.round(trailingCash >= 0 ? trailingCash * multiplier : trailingCash * (2 - multiplier)),
-        playbackTarget: roundPercent(clamp(playback + (tone === 'AMBITIOUS' ? 0.3 : tone === 'CONSERVATIVE' ? -0.2 : 0), 95, 99.95)),
+        ...previewStreamingGuidance(platform, tone),
         status: 'ACTIVE',
     };
     const ledger = publicLedger(platform, absoluteWeek, `public-guidance:${guidance.id}`, 'PUBLIC_GUIDANCE_ISSUED', `${tone.toLowerCase()} guidance issued for public quarter ${nextCycle}.`, { cycleNumber: nextCycle });
@@ -687,35 +669,9 @@ export const castStreamingShareholderVote = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const vote = platform.publicCompany.shareholderVotes.find(item => item.id === voteId && item.status === 'OPEN');
     if (!vote) return { changed: false, player, reason: 'That vote is no longer open.' };
-    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const founderWeight = platform.founderOwnershipPercent;
-    const publicWeight = 100 - founderWeight;
-    const finalSupport = roundPercent(
-        (founderVote === 'FOR' ? founderWeight : 0) + publicWeight * vote.institutionalSupport / 100,
-    );
-    const approved = finalSupport >= 50;
-    const consequence = approved
-        ? 'The resolution becomes a binding public-company mandate.'
-        : 'The resolution fails; the current operating mandate remains in force.';
-    const ledger = publicLedger(platform, absoluteWeek, `shareholder-vote:${vote.id}`, 'SHAREHOLDER_VOTE_RESOLVED', `${vote.title} ${approved ? 'passed' : 'failed'} with ${finalSupport.toFixed(1)}% support.`, { finalSupport });
-    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
-        ...platform,
-        governance: {
-            ...platform.governance,
-            boardConfidence: Math.round(clamp(platform.governance.boardConfidence + (approved === (founderVote === 'FOR') ? 2 : -3), 0, 100)),
-        },
-        publicCompany: {
-            ...platform.publicCompany,
-            shareholderVotes: platform.publicCompany.shareholderVotes.map(item => item.id === vote.id ? {
-                ...item,
-                founderVote,
-                finalSupport,
-                status: approved ? 'APPROVED' : 'REJECTED',
-                consequence,
-            } : item),
-        },
-        eventLedger: [...platform.eventLedger, ledger],
-    }, player.id);
+    /* #173: the same settlement as the public's: the board's confidence, the price at the next quote, executive pay */
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence(
+        settleShareholderVote(platform, vote, founderVote, getAbsoluteWeek(player.age, player.currentWeek)), player.id);
     return { changed: true, player: { ...player, ownedStreamingPlatform: nextPlatform } };
 };
 
@@ -805,18 +761,24 @@ export const resolveStreamingHostileTakeover = (
     return { changed: true, player: { ...player, ownedStreamingPlatform: nextPlatform } };
 };
 
-const buildQuarterEvents = (
+/**
+ * A quarter's score against what the market expected: the guidance when there is one; otherwise (#185) the trend
+ * carried on (the last quarter's growth and cash), or a small step up for a first quarter. So a quarter that only
+ * stays in the black is not a free BEAT.
+ */
+export const scoreStreamingQuarter = (
     platform: OwnedStreamingPlatformState,
     review: OwnedStreamingPlatformState['cycleReviews'][number],
-): Pick<OwnedStreamingPlatformState['publicCompany'], 'guidance' | 'earnings' | 'shareholderVotes' | 'activistCampaigns' | 'hostileTakeovers'> & { ledger: OwnedStreamingLedgerEntry[] } => {
+) => {
     const publicCompany = platform.publicCompany;
-    if (review.kind !== 'TWELVE_WEEK_REVIEW' || publicCompany.earnings.some(item => item.cycleNumber === review.cycleNumber)) {
-        return { ...publicCompany, ledger: [] };
-    }
     const guidance = publicCompany.guidance.find(item => item.status === 'ACTIVE' && item.cycleNumber === review.cycleNumber) || null;
-    const subscriberTarget = guidance?.subscriberTarget || Math.max(1, review.subscriberStart);
-    const revenueTarget = guidance?.revenueTarget || Math.max(1, review.totalSubscriptionRevenue);
-    const cashTarget = guidance?.cashContributionTarget ?? 0;
+    /* #185: without guidance the market expects the trend to carry on (the last quarter's growth and cash), so a quarter
+       that only stays in the black is no longer a free BEAT; with no quarter before it, it expects a small step up */
+    const previousQuarter = [...platform.cycleReviews].reverse().find(item => item.kind === 'TWELVE_WEEK_REVIEW' && item.cycleNumber < review.cycleNumber) || null;
+    const trend = previousQuarter ? clamp(previousQuarter.subscriberEnd / Math.max(1, previousQuarter.subscriberStart), 0.8, 1.5) : 1.03;
+    const subscriberTarget = guidance?.subscriberTarget || Math.max(1, Math.round(review.subscriberStart * trend));
+    const revenueTarget = guidance?.revenueTarget || Math.max(1, previousQuarter ? Math.round(previousQuarter.totalSubscriptionRevenue * trend) : review.totalSubscriptionRevenue);
+    const cashTarget = guidance?.cashContributionTarget ?? (previousQuarter ? previousQuarter.totalCashContribution : review.totalCashContribution);
     const playbackTarget = guidance?.playbackTarget || 97;
     const subscriberScore = clamp(review.subscriberEnd / subscriberTarget, 0, 1.4);
     const revenueScore = clamp(review.totalSubscriptionRevenue / revenueTarget, 0, 1.4);
@@ -827,6 +789,24 @@ const buildQuarterEvents = (
     const score = roundPercent((subscriberScore * 28 + revenueScore * 28 + cashScore * 24 + playbackScore * 20));
     const outcome: OwnedStreamingEarningsRecord['outcome'] = score >= 103 ? 'BEAT' : score < 88 ? 'MISS' : 'MIXED';
     const stockReactionPercent = roundPercent(clamp((score - 95) * 0.22, -12, 12));
+    return {
+        guidance,
+        targets: { subscribers: subscriberTarget, revenue: revenueTarget, cash: cashTarget, playback: playbackTarget },
+        score,
+        outcome,
+        stockReactionPercent,
+    };
+};
+
+const buildQuarterEvents = (
+    platform: OwnedStreamingPlatformState,
+    review: OwnedStreamingPlatformState['cycleReviews'][number],
+): Pick<OwnedStreamingPlatformState['publicCompany'], 'guidance' | 'earnings' | 'shareholderVotes' | 'activistCampaigns' | 'hostileTakeovers'> & { ledger: OwnedStreamingLedgerEntry[] } => {
+    const publicCompany = platform.publicCompany;
+    if (review.kind !== 'TWELVE_WEEK_REVIEW' || publicCompany.earnings.some(item => item.cycleNumber === review.cycleNumber)) {
+        return { ...publicCompany, ledger: [] };
+    }
+    const { guidance, score, outcome, stockReactionPercent } = scoreStreamingQuarter(platform, review);
     const earnings: OwnedStreamingEarningsRecord = {
         id: createDeterministicId('streaming_earnings', platform.simulationSeed, review.cycleNumber),
         cycleNumber: review.cycleNumber,
@@ -859,7 +839,7 @@ const buildQuarterEvents = (
     };
     const hasActiveActivist = publicCompany.activistCampaigns.some(item => item.status === 'ACTIVE');
     const demandOptions: StreamingActivistDemand[] = ['MARGIN_DISCIPLINE', 'SLATE_REFRESH', 'BOARD_SEAT', 'ASSET_REVIEW'];
-    const activist = outcome === 'MISS' && !hasActiveActivist ? {
+    const activist = STREAMING_ACTIVISM_ENABLED && outcome === 'MISS' && !hasActiveActivist ? {
         id: createDeterministicId('streaming_activist', platform.simulationSeed, review.cycleNumber),
         investorName: ['Northstar Capital', 'Aperture Partners', 'Beacon Value Fund'][review.cycleNumber % 3],
         ownershipPercent: roundPercent(clamp(3.2 + (100 - score) / 8, 3, 9.5)),
@@ -930,13 +910,33 @@ export const commitStreamingPublicMarketWeek = (
     if (platform.publicCompany.lifecycle !== 'PUBLIC' || !platform.publicCompany.listing) return platform;
     const listing = platform.publicCompany.listing;
     if (platform.publicCompany.quoteHistory.some(item => item.absoluteWeek === snapshot.absoluteWeek)) return platform;
+    /* #173: a resolution past its due week closes: unanswered, the public decides */
+    platform.publicCompany.shareholderVotes
+        .filter(vote => vote.status === 'OPEN' && vote.dueAtAbsoluteWeek < snapshot.absoluteWeek)
+        .forEach(vote => { platform = settleShareholderVote(platform, vote, null, snapshot.absoluteWeek); });
+    /* #173: what decided votes and earnings calls move reaches this week's quote */
+    const voteNudge = platform.publicCompany.shareholderVotes
+        .filter(vote => vote.status !== 'OPEN' && typeof vote.priceEffectPercent === 'number' && vote.priceAppliedAtAbsoluteWeek === null)
+        .reduce((sum, vote) => sum + (vote.priceEffectPercent || 0), 0);
+    const callNudge = platform.publicCompany.earnings
+        .filter(item => typeof item.callHeldAtAbsoluteWeek === 'number' && (item.callAppliedAtAbsoluteWeek === null || item.callAppliedAtAbsoluteWeek === undefined))
+        .reduce((sum, item) => sum + (item.callEffectPercent || 0), 0);
+    platform = {
+        ...platform,
+        publicCompany: {
+            ...platform.publicCompany,
+            shareholderVotes: platform.publicCompany.shareholderVotes.map(vote => (vote.status !== 'OPEN' && typeof vote.priceEffectPercent === 'number' && vote.priceAppliedAtAbsoluteWeek === null
+                ? { ...vote, priceAppliedAtAbsoluteWeek: snapshot.absoluteWeek } : vote)),
+            earnings: platform.publicCompany.earnings.map(item => (typeof item.callHeldAtAbsoluteWeek === 'number' && (item.callAppliedAtAbsoluteWeek === null || item.callAppliedAtAbsoluteWeek === undefined)
+                ? { ...item, callAppliedAtAbsoluteWeek: snapshot.absoluteWeek } : item)),
+        },
+    };
     const previous = platform.publicCompany.quoteHistory.at(-1);
     const previousClose = previous?.close || listing.offerPrice;
     const operations = snapshot.operations;
-    const subscriberSignal = clamp(snapshot.netSubscriberMovement / Math.max(1, snapshot.subscribers), -0.08, 0.08);
-    const cashSignal = operations ? clamp(operations.netCashContribution / Math.max(1, platform.treasuryCash), -0.05, 0.05) : 0;
+    /* #185: members, cash and debt reach the price through the company's value (the valuation engine); what is left here
+       are the week's events: reliability, incidents, trust, oversight, governance, results, votes and calls */
     const reliabilitySignal = operations ? clamp((operations.playbackSuccessRate - 97.5) / 100, -0.04, 0.02) : 0;
-    const debtSignal = -clamp(platform.debtPrincipal / Math.max(1, previousClose * listing.sharesOutstanding), 0, 0.04);
     const crisis = [...platform.crisisSecurity.crises].reverse().find(item => item.stage !== 'RESOLVED') || null;
     const crisisSignal = crisis
         ? -(crisis.severity === 'CRITICAL' ? 0.09 : crisis.severity === 'MAJOR' ? 0.065 : crisis.severity === 'SERIOUS' ? 0.04 : 0.02)
@@ -950,13 +950,35 @@ export const commitStreamingPublicMarketWeek = (
     const governanceMarkSignal = -clamp((listing.governanceMarks?.length || 0) * 0.006, 0, 0.04);
     const latestReview = platform.cycleReviews.find(item => item.endAbsoluteWeek === snapshot.absoluteWeek && item.kind === 'TWELVE_WEEK_REVIEW');
     const quarterEvents = latestReview ? buildQuarterEvents(platform, latestReview) : null;
-    const earningsReaction = quarterEvents?.earnings.at(-1)?.cycleNumber === latestReview?.cycleNumber
+    /* #173: only in a review's week (with no review both sides were undefined and the close threw every other week) */
+    const earningsReaction = latestReview && quarterEvents && quarterEvents.earnings.at(-1)?.cycleNumber === latestReview.cycleNumber
         ? quarterEvents.earnings.at(-1)!.stockReactionPercent / 100
         : 0;
     const rng = createDeterministicRng(`${platform.simulationSeed}:public-quote:${snapshot.absoluteWeek}`);
-    const noise = (rng() - 0.5) * 0.035;
-    const move = clamp(subscriberSignal * 0.9 + cashSignal * 0.7 + reliabilitySignal + debtSignal + crisisSignal + trustSignal + oversightSignal + governanceMarkSignal + earningsReaction + noise, -0.18, 0.18);
-    const close = roundPrice(previousClose * (1 + move));
+    /* the standing signals (reliability, an open incident, trust, oversight, governance marks) price the share above or
+       below its value for as long as they last; the one-off events (results, votes, calls) move it in their week */
+    const standing = reliabilitySignal + crisisSignal + trustSignal + oversightSignal + governanceMarkSignal;
+    /* #187: a running buyback is a buyer in the market: a small lift in each of its weeks */
+    const buyback = streamingBuybackTranche(platform);
+    /* #191: a new chief executive since the last quote: the market's view of them, −5% to +5% by their skill */
+    const lastQuoteWeek = previous?.absoluteWeek ?? -1;
+    const successorFact = [...platform.eventLedger].reverse().find(entry => entry.type === 'SUCCESSOR_APPOINTED'
+        && entry.absoluteWeek > lastQuoteWeek && entry.absoluteWeek <= snapshot.absoluteWeek);
+    const successor = successorFact ? platform.leadership.appointments.find(item => item.executiveId === successorFact.metadata?.executiveId) : null;
+    const successorMove = successor ? clamp((successor.skill - 60) / 800, -0.05, 0.05) : 0;
+    const fairPerShare = getStreamingEquityValuation(platform) / Math.max(1, listing.sharesOutstanding) * (1 + standing);
+    const step = nextSharePrice({
+        previous: previousClose,
+        fair: fairPerShare,
+        lastMove: (previous?.changePercent || 0) / 100,
+        sector: 'MEDIA',
+        absoluteWeek: snapshot.absoluteWeek,
+        events: earningsReaction + (voteNudge + callNudge) / 100 + (buyback ? 0.004 * buyback.percent : 0) + successorMove,
+        volatility: 0.03,
+        seed: `${platform.simulationSeed}:public-quote`,
+    });
+    const move = step.move;
+    const close = roundPrice(step.price);
     const open = roundPrice(previousClose * (1 + (rng() - 0.5) * 0.018));
     const quote: OwnedStreamingMarketQuote = {
         id: createDeterministicId('streaming_quote', platform.simulationSeed, snapshot.absoluteWeek),
@@ -969,6 +991,13 @@ export const commitStreamingPublicMarketWeek = (
         marketCap: roundMoney(close * listing.sharesOutstanding),
         changePercent: roundPercent((close / previousClose - 1) * 100),
         drivers: [
+            /* #173: what moved this week in particular comes first */
+            ...(callNudge ? ['The earnings call'] : []),
+            ...(voteNudge ? ['A shareholder vote'] : []),
+            ...(buyback ? ['The company buying back shares'] : []),
+            ...(successor ? ['A new chief executive'] : []),
+            /* #185: the pull towards what the company is worth */
+            ...(step.pull >= 0.01 ? ['Priced below its value'] : step.pull <= -0.01 ? ['Priced above its value'] : []),
             snapshot.netSubscriberMovement >= 0 ? 'Subscriber momentum' : 'Subscriber pressure',
             operations && operations.netCashContribution >= 0 ? 'Cash contribution' : 'Cash burn',
             operations && operations.playbackSuccessRate >= 98 ? 'Playback trust' : 'Reliability watch',
@@ -986,7 +1015,7 @@ export const commitStreamingPublicMarketWeek = (
         activistCampaigns: quarterEvents.activistCampaigns,
         hostileTakeovers: quarterEvents.hostileTakeovers,
     } : {};
-    platform = compactOwnedStreamingPlatformForPersistence({
+    platform = {
         ...platform,
         publicCompany: {
             ...platform.publicCompany,
@@ -994,6 +1023,8 @@ export const commitStreamingPublicMarketWeek = (
             ...quarterState,
         },
         eventLedger: [...platform.eventLedger, ...(quarterEvents?.ledger || [])],
-    }, player.id);
-    return platform;
+    };
+    /* #187: this week's part of a buyback, bought at the week's close */
+    platform = settleStreamingBuybackWeek(platform, snapshot.absoluteWeek, close);
+    return compactOwnedStreamingPlatformForPersistence(platform, player.id);
 };

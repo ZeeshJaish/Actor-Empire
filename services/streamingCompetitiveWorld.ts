@@ -1,7 +1,6 @@
 import type {
     OwnedStreamingAwardResult,
     OwnedStreamingAwardSeason,
-    OwnedStreamingCinematicEvent,
     OwnedStreamingCompetitiveWorldState,
     OwnedStreamingLedgerEntry,
     OwnedStreamingMarketShareSnapshot,
@@ -62,7 +61,6 @@ export interface StreamingRegionDefinition {
     acquisitionRateDelta: number;
     peakLoadPercent: number;
     requiredReachLevel: number;
-    contentOperationsRequired: number;
     securityRequired: number;
     culturalNote: string;
 }
@@ -171,13 +169,13 @@ export const STREAMING_RIVAL_TEMPLATES: Record<PlatformId, StreamingRivalTemplat
 };
 
 export const STREAMING_REGION_DEFINITIONS: StreamingRegionDefinition[] = [
-    { id: 'HOME_MARKET', name: 'Home Market', code: 'HOME', mapX: 53, mapY: 59, capitalCost: 0, weeklyOperatingCost: 0, developmentWeeks: 0, addressableAudienceMillions: 35, acquisitionRateDelta: 0, peakLoadPercent: 0, requiredReachLevel: 1, contentOperationsRequired: 0, securityRequired: 0, culturalNote: 'The operating base that proved the platform can serve a real audience.' },
-    { id: 'NORTH_AMERICA', name: 'North America', code: 'NA', mapX: 21, mapY: 35, capitalCost: 72_000_000, weeklyOperatingCost: 2_400_000, developmentWeeks: 8, addressableAudienceMillions: 190, acquisitionRateDelta: 0.0048, peakLoadPercent: 13, requiredReachLevel: 3, contentOperationsRequired: 18, securityRequired: 14, culturalNote: 'Expensive discovery, mature competition and enormous premium upside.' },
-    { id: 'LATIN_AMERICA', name: 'Latin America', code: 'LATAM', mapX: 31, mapY: 68, capitalCost: 42_000_000, weeklyOperatingCost: 1_450_000, developmentWeeks: 6, addressableAudienceMillions: 115, acquisitionRateDelta: 0.0041, peakLoadPercent: 10, requiredReachLevel: 2, contentOperationsRequired: 12, securityRequired: 10, culturalNote: 'Mobile-first growth rewards dubbing depth and regional storytelling.' },
-    { id: 'EUROPE', name: 'Europe', code: 'EU', mapX: 50, mapY: 31, capitalCost: 64_000_000, weeklyOperatingCost: 2_050_000, developmentWeeks: 8, addressableAudienceMillions: 155, acquisitionRateDelta: 0.0044, peakLoadPercent: 12, requiredReachLevel: 3, contentOperationsRequired: 20, securityRequired: 18, culturalNote: 'High-value audiences, fragmented languages and strict trust expectations.' },
-    { id: 'SOUTH_ASIA', name: 'South Asia', code: 'SA', mapX: 66, mapY: 54, capitalCost: 38_000_000, weeklyOperatingCost: 1_300_000, developmentWeeks: 6, addressableAudienceMillions: 230, acquisitionRateDelta: 0.0052, peakLoadPercent: 15, requiredReachLevel: 2, contentOperationsRequired: 14, securityRequired: 10, culturalNote: 'Massive audience depth with sharp price sensitivity and language diversity.' },
-    { id: 'EAST_ASIA', name: 'East Asia', code: 'EA', mapX: 79, mapY: 43, capitalCost: 78_000_000, weeklyOperatingCost: 2_650_000, developmentWeeks: 9, addressableAudienceMillions: 205, acquisitionRateDelta: 0.0049, peakLoadPercent: 14, requiredReachLevel: 4, contentOperationsRequired: 25, securityRequired: 22, culturalNote: 'Deep local competition makes cultural precision non-negotiable.' },
-    { id: 'MIDDLE_EAST_AFRICA', name: 'Middle East & Africa', code: 'MEA', mapX: 55, mapY: 66, capitalCost: 48_000_000, weeklyOperatingCost: 1_600_000, developmentWeeks: 7, addressableAudienceMillions: 135, acquisitionRateDelta: 0.0043, peakLoadPercent: 11, requiredReachLevel: 3, contentOperationsRequired: 18, securityRequired: 16, culturalNote: 'Fast-growing connected audiences reward local trust and flexible delivery.' },
+    { id: 'HOME_MARKET', name: 'Home Market', code: 'HOME', mapX: 53, mapY: 59, capitalCost: 0, weeklyOperatingCost: 0, developmentWeeks: 0, addressableAudienceMillions: 35, acquisitionRateDelta: 0, peakLoadPercent: 0, requiredReachLevel: 1, securityRequired: 0, culturalNote: 'The operating base that proved the platform can serve a real audience.' },
+    { id: 'NORTH_AMERICA', name: 'North America', code: 'NA', mapX: 21, mapY: 35, capitalCost: 72_000_000, weeklyOperatingCost: 2_400_000, developmentWeeks: 8, addressableAudienceMillions: 190, acquisitionRateDelta: 0.0048, peakLoadPercent: 13, requiredReachLevel: 3, securityRequired: 14, culturalNote: 'Expensive discovery, mature competition and enormous premium upside.' },
+    { id: 'LATIN_AMERICA', name: 'Latin America', code: 'LATAM', mapX: 31, mapY: 68, capitalCost: 42_000_000, weeklyOperatingCost: 1_450_000, developmentWeeks: 6, addressableAudienceMillions: 115, acquisitionRateDelta: 0.0041, peakLoadPercent: 10, requiredReachLevel: 2, securityRequired: 10, culturalNote: 'Mobile-first growth rewards dubbing depth and regional storytelling.' },
+    { id: 'EUROPE', name: 'Europe', code: 'EU', mapX: 50, mapY: 31, capitalCost: 64_000_000, weeklyOperatingCost: 2_050_000, developmentWeeks: 8, addressableAudienceMillions: 155, acquisitionRateDelta: 0.0044, peakLoadPercent: 12, requiredReachLevel: 3, securityRequired: 18, culturalNote: 'High-value audiences, fragmented languages and strict trust expectations.' },
+    { id: 'SOUTH_ASIA', name: 'South Asia', code: 'SA', mapX: 66, mapY: 54, capitalCost: 38_000_000, weeklyOperatingCost: 1_300_000, developmentWeeks: 6, addressableAudienceMillions: 230, acquisitionRateDelta: 0.0052, peakLoadPercent: 15, requiredReachLevel: 2, securityRequired: 10, culturalNote: 'Massive audience depth with sharp price sensitivity and language diversity.' },
+    { id: 'EAST_ASIA', name: 'East Asia', code: 'EA', mapX: 79, mapY: 43, capitalCost: 78_000_000, weeklyOperatingCost: 2_650_000, developmentWeeks: 9, addressableAudienceMillions: 205, acquisitionRateDelta: 0.0049, peakLoadPercent: 14, requiredReachLevel: 4, securityRequired: 22, culturalNote: 'Deep local competition makes cultural precision non-negotiable.' },
+    { id: 'MIDDLE_EAST_AFRICA', name: 'Middle East & Africa', code: 'MEA', mapX: 55, mapY: 66, capitalCost: 48_000_000, weeklyOperatingCost: 1_600_000, developmentWeeks: 7, addressableAudienceMillions: 135, acquisitionRateDelta: 0.0043, peakLoadPercent: 11, requiredReachLevel: 3, securityRequired: 16, culturalNote: 'Fast-growing connected audiences reward local trust and flexible delivery.' },
 ];
 
 const STREAMING_RIVAL_MOVE_COST_MILLIONS_V1: Readonly<Record<StreamingRivalMoveType, number>> = Object.freeze({
@@ -450,7 +448,6 @@ export const getStreamingRegionBlockers = (
             ? 'Multi-region'
             : 'National';
     if (reach.level < definition.requiredReachLevel) blockers.push(`${reachLabel} reach (Level ${definition.requiredReachLevel}) is required.`);
-    if (platform.technologyLevels.CONTENT_OPERATIONS < definition.contentOperationsRequired) blockers.push(`Content Operations ${definition.contentOperationsRequired} is required.`);
     if (platform.technologyLevels.SECURITY < definition.securityRequired) blockers.push(`Security ${definition.securityRequired} is required.`);
     return blockers;
 };
@@ -554,6 +551,9 @@ const responseCost = (
     if (responseId === 'EXPAND_MANDATE') return 2_000_000;
     return Math.round(move.cashCostMillions * 100_000);
 };
+
+/** #164: the team's rival-call card shows each answer's price */
+export const streamingRivalResponseCost = responseCost;
 
 export const respondToStreamingRivalMove = (
     player: Player,
@@ -1040,7 +1040,6 @@ export const commitStreamingCompetitiveWorldWeek = (
     const launchWeek = platform.launchCommit?.committedAtAbsoluteWeek || absoluteWeek;
     const weeksLive = Math.max(0, absoluteWeek - launchWeek);
     const ledger: OwnedStreamingLedgerEntry[] = [...completed.ledger];
-    const cinematics: OwnedStreamingCinematicEvent[] = [];
     let moves = platform.competitiveWorld.moves;
     if (weeksLive > 0 && weeksLive % 4 === 0) {
         const eligible = rivals
@@ -1057,18 +1056,6 @@ export const commitStreamingCompetitiveWorldWeek = (
                 rivals = rivals.map(item => item.platformId === selected.platformId ? created.rival : item);
                 moves = [...moves, created.move];
                 ledger.push(created.ledger);
-                if (!platform.milestoneKeys.includes('first-platform-war')) {
-                    cinematics.push({
-                        id: createDeterministicId('streaming_scene', platform.simulationSeed, 'first-platform-war'),
-                        idempotencyKey: 'first-platform-war',
-                        type: 'PLATFORM_WAR_DECLARATION',
-                        status: 'QUEUED',
-                        priority: 'IMPORTANT',
-                        availableAtAbsoluteWeek: absoluteWeek,
-                        title: created.move.title,
-                        factIds: [created.ledger.id],
-                    });
-                }
             }
         }
     }
@@ -1116,17 +1103,11 @@ export const commitStreamingCompetitiveWorldWeek = (
             metadata: { playerShare: playerEntry?.sharePercent || 0, playerRank },
         };
         ledger.push(milestoneLedger);
-        cinematics.push({
-            id: createDeterministicId('streaming_scene', platform.simulationSeed, key),
-            idempotencyKey: key,
-            type: dominanceMilestone ? 'GLOBAL_DOMINANCE' : 'MARKET_SHARE_BREAKTHROUGH',
-            status: 'QUEUED',
-            priority: 'MAJOR',
-            availableAtAbsoluteWeek: absoluteWeek,
-            title: milestoneLedger.summary,
-            factIds: [milestoneLedger.id],
-        });
     }
+    /* #141: the Streaming Awards are off for the player (Zeesh, option b). The season is still decided every 52 weeks and
+       its prestige still moves the economy quietly; no ceremony is queued, and the Legacy room shows no moment for it.
+       The war declaration and market-share scenes went with Platform Wars, the only room that played them; their
+       ledger facts and milestone keys stay. */
     let awardSeasons = platform.competitiveWorld.awardSeasons;
     const seasonNumber = Math.floor(weeksLive / 52);
     if (seasonNumber >= 1 && !awardSeasons.some(item => item.seasonNumber === seasonNumber)) {
@@ -1148,16 +1129,6 @@ export const commitStreamingCompetitiveWorldWeek = (
             metadata: { seasonNumber, playerNominations: season.playerNominations, playerWins: season.playerWins },
         };
         ledger.push(awardLedger);
-        cinematics.push({
-            id: createDeterministicId('streaming_scene', platform.simulationSeed, `${season.idempotencyKey}:ceremony`),
-            idempotencyKey: `${season.idempotencyKey}:ceremony`,
-            type: 'STREAMING_AWARDS_CEREMONY',
-            status: 'QUEUED',
-            priority: 'MAJOR',
-            availableAtAbsoluteWeek: absoluteWeek,
-            title: `Streaming Awards • Season ${seasonNumber}`,
-            factIds: [awardLedger.id],
-        });
     }
     return compactOwnedStreamingPlatformForPersistence({
         ...platform,
@@ -1168,7 +1139,6 @@ export const commitStreamingCompetitiveWorldWeek = (
             awardSeasons,
         },
         eventLedger: [...platform.eventLedger, ...ledger],
-        cinematicQueue: [...platform.cinematicQueue, ...cinematics],
         milestoneKeys: Array.from(new Set([
             ...platform.milestoneKeys,
             ...(ledger.some(item => item.type === 'RIVAL_MOVE_COMMITTED') ? ['first-platform-war'] : []),

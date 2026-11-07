@@ -41,5 +41,9 @@ export function createRangeDraft(initial: number, onCommit: (value: number) => v
       finish();
       disposed = true;
     },
+    /** React's development double mount disposes the draft and then mounts it again; it must work after that */
+    revive() {
+      disposed = false;
+    },
   };
 }

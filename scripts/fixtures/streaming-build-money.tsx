@@ -7,7 +7,8 @@ import {
   getStreamingLaunchMarketingRecommendations,
   type StreamingLaunchMarketingInput,
 } from '../../services/streamingLaunchMarketing';
-import type { OwnedStreamingLaunchMarketingDraft } from '../../types';
+import type { CampaignFormatId, OwnedStreamingLaunchMarketingDraft } from '../../types';
+import { launchRateCardOf } from '../../services/campaigns/launchCampaignRates';
 import '../../components/studio-finance/styles/tokens.css';
 import '../../components/studio-finance/styles/studio-finance.css';
 import '../../components/studio-finance/styles/launch.css';
@@ -47,6 +48,10 @@ function Fixture() {
       available: input.channelAvailability?.[channel.id]?.available !== false,
       reason: input.channelAvailability?.[channel.id]?.reason,
     })),
+    /* #158: the builder opens, priced on the fixture's own countries */
+    forecastFor: (next: OwnedStreamingLaunchMarketingDraft) => forecastStreamingLaunchMarketing(input, next),
+    rateCardFor: (places?: Partial<Record<CampaignFormatId, string>>) => launchRateCardOf(input.countries.map(country => ({ countryId: country.countryId, homes: country.reachableHouseholds, costIndex: country.mediaCostIndex })), places),
+    serviceName: 'NORTHSTAR+', brandHue: 248, accent: '#4b32ff',
   }), [draft]);
   const infrastructure = 32_000_000;
   const total = infrastructure + draft.budgetCeiling;
@@ -55,9 +60,9 @@ function Fixture() {
     lines: [
       { id: 'infra', label: 'Network commissioning', amount: infrastructure, timing: 'COMMISSION' },
       { id: 'market', label: 'Market clearances', amount: 7_400_000, timing: 'SETTLED' },
-      { id: 'campaign', label: 'Launch marketing ceiling', amount: draft.budgetCeiling, timing: 'OPENING_NIGHT' },
+      { id: 'campaign', label: 'Launch campaign', amount: draft.budgetCeiling, note: !draft.budgetCeiling ? 'Organic launch' : draft.weeks ? `${draft.weeks} ${draft.weeks === 1 ? 'week' : 'weeks'} before opening, paid in full at commission` : 'Reserved and spent across construction', timing: draft.weeks ? 'COMMISSION' : 'OPENING_NIGHT' },
     ],
-    total, commissionNow: infrastructure, deferred: draft.budgetCeiling,
+    total, commissionNow: infrastructure + (draft.weeks ? draft.budgetCeiling : 0), deferred: draft.weeks ? 0 : draft.budgetCeiling,
     available, headroom: Math.max(0, available - total), shortfall: Math.max(0, total - available),
   };
   return <main className="sf lw bw" style={{ '--sf-brand': '#4b32ff', '--sf-brand-rgb': '75, 50, 255' } as React.CSSProperties}>
@@ -71,7 +76,7 @@ function Fixture() {
         } as never}
         draft={{ campaignId: '' } as never}
         patch={() => undefined}
-        totals={{} as never}
+        totals={{ weeks: input.buildWeeks } as never}
         plan={plan as never}
         services={{} as never}
         handlers={{ onChangeMarketing: patch => setDraft(current => ({ ...current, ...patch, revision: current.revision + 1 })) }}

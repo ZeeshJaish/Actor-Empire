@@ -45,6 +45,8 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
   const heldSlices = capital.ownership.filter((slice) => slice.pct > 0);
 
   const toggle = (key: RouteKey) => setExpanded((prev) => (prev === key ? null : key));
+  /* #175: a host that keeps owners, investors and the listing in its own rooms shows only the founder's money here */
+  const founderOnly = data.capitalScope === 'founder';
 
   const openPublicMarkets = () => {
     setExpanded('public');
@@ -56,7 +58,7 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
   return (
     <div className="sf-view">
       {/* --- ownership ---------------------------------------------------- */}
-      <section className="sf-owner">
+      {!founderOnly && <section className="sf-owner">
         <header className="sf-sec-head">
           <h2>Company ownership</h2>
           <span className="sf-owner-val">{money(capital.valuation)} valuation</span>
@@ -79,19 +81,19 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
       {/* --- the thing late-game players check most, kept at the top ------- */}
-      <button type="button" className="sf-ipochip" onClick={openPublicMarkets}>
+      {!founderOnly && <button type="button" className="sf-ipochip" onClick={openPublicMarkets}>
         <span className="sf-eyebrow">IPO readiness</span>
         <span className="sf-ipochip-count">{ipo.met} / {ipo.total}</span>
         <span className="sf-ipochip-bar" aria-hidden="true">
           {Array.from({ length: ipo.total }, (_, i) => <i key={i} className={i < ipo.met ? 'is-met' : undefined} />)}
         </span>
         <span className="sf-ipochip-go" aria-hidden="true">›</span>
-      </button>
+      </button>}
 
-      <p className="sf-eyebrow sf-track-head">Funding routes</p>
+      <p className="sf-eyebrow sf-track-head">{founderOnly ? 'Your own money' : 'Funding routes'}</p>
 
       <ol className="sf-track">
         {/* --- founder ---------------------------------------------------- */}
@@ -102,16 +104,24 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
           line={`${money(capital.founderPersonalCash)} of your own money available`}
           expanded={expanded === 'founder'}
           onToggle={() => toggle('founder')}
-          action={<button type="button" className="sf-btn sf-btn--primary" onClick={() => setInjecting(true)}>Inject capital</button>}
+          action={(
+            <div className="sf-route-pair">
+              <button type="button" className="sf-btn sf-btn--primary" onClick={() => setInjecting(true)}>Inject capital</button>
+              {/* #163: borrowing stays in the game's Bank; this was wired (onOpenBank) and never shown */}
+              {handlers.onOpenBank && (
+                <button type="button" className="sf-btn sf-btn--ghost" onClick={() => handlers.onOpenBank?.()}>Your bank</button>
+              )}
+            </div>
+          )}
         >
-          <p className="sf-route-copy">Moves money from your personal balance into the company. No dilution, no interest — but it is gone from your own account.</p>
+          <p className="sf-route-copy">Moves money from your personal balance into the company. No dilution, no interest — but it is gone from your own account. Short of it? Borrow in your bank, then put it in here.</p>
         </Route>
 
-        {/* --- private equity --------------------------------------------- */}
-        <Route
+        {/* --- investors (#163: they are named investors, not a private-equity fund) --- */}
+        {!founderOnly && <Route
           step="02"
           state={capital.cfoHired ? 'open' : 'locked'}
-          name="Private equity"
+          name="Investors"
           line={capital.cfoHired
             ? offer ? `${offer.investor} · ${money(offer.amount)} offered` : 'No investor at the table yet'
             : 'Requires a qualified CFO'}
@@ -126,10 +136,10 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
           {capital.cfoHired
             ? <p className="sf-route-copy">An outside investor buys new shares. The company gets cash it never repays; you get a smaller share of everything that follows.</p>
             : <p className="sf-route-copy">Hire a CFO to open equity fundraising. Investors will not sit down with a company that cannot produce audited numbers.</p>}
-        </Route>
+        </Route>}
 
         {/* --- public markets --------------------------------------------- */}
-        <Route
+        {!founderOnly && <Route
           ref={publicRef}
           step="03"
           state={capital.ipo.unlocked ? 'open' : 'milestone'}
@@ -151,8 +161,19 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
             ))}
           </ul>
           <p className="sf-route-copy">Finance keeps the cap table and the company's cash. Listing, share price and public trading move to the IPO desk once you qualify.</p>
-        </Route>
+        </Route>}
       </ol>
+
+      {/* #175: owners, investors and the listing have one home each, in the Boardroom */}
+      {founderOnly && (handlers.onOpenOwnership || handlers.onOpenMarkets) && (
+        <section className="sf-elsewhere">
+          <p className="sf-eyebrow sf-track-head">Shares and investors, in the Boardroom</p>
+          <div className="sf-route-pair">
+            {handlers.onOpenOwnership && <button type="button" className="sf-btn sf-btn--ghost" onClick={() => handlers.onOpenOwnership?.()}>Owners and investors</button>}
+            {handlers.onOpenMarkets && <button type="button" className="sf-btn sf-btn--ghost" onClick={() => handlers.onOpenMarkets?.()}>Going public</button>}
+          </div>
+        </section>
+      )}
 
       <InjectionSheet
         open={injecting}
@@ -167,7 +188,7 @@ export function CapitalView({ data, handlers, initialRoute, onCashMoved }: Props
         }}
       />
 
-      {offer && (
+      {offer && !founderOnly && (
         <Sheet
           open={reviewing}
           onClose={() => setReviewing(false)}

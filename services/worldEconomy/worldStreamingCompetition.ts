@@ -12,13 +12,14 @@ import type {
     StreamingBillingPath,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
-import { getWorldStreamingOffers, getWorldStreamingOfferExposure, getWorldStreamingStoreStrength } from './worldStreamingOffers';
+import { getWorldStreamingDeviceReachFactor, getWorldStreamingOfferMarketing, getWorldStreamingOffers, getWorldStreamingOfferExposure, getWorldStreamingStoreStrength } from './worldStreamingOffers';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldPopulation';
 import { calculateStreamingCommercialAudienceAdjustment } from './worldStreamingCommercialEconomy';
-import { STREAMING_ANNUAL_BILLING_SHARE } from '../streamingPricingEconomy';
+import { STREAMING_ANNUAL_BILLING_SHARE, STREAMING_REFERENCE_ANNUAL_DISCOUNT, streamingAnnualBillingShare } from '../streamingPricingEconomy';
 import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
+import { STREAMING_4K_RANK, STREAMING_AD_LEVEL_EFFECTS, STREAMING_MOBILE_PLAN, streamingPrestigePictureBonus } from '../streamingPlanOffer';
 
 export const WORLD_STREAMING_COMPETITION_SCHEMA_VERSION = 1 as const;
 const MAX_SNAPSHOTS = 32;
@@ -97,20 +98,41 @@ const planUtility = (
     budgetPerHousehold: number,
     billingPrice: number,
     transactionalPrice: number,
+    bestRivalPictureRank = STREAMING_4K_RANK,
 ): { utility: number; driver: string } => {
     const affordability = clamp(100 - billingPrice / Math.max(.5, budgetPerHousehold) * 62, -80, 95);
+    /* Phase 2 (§6.7): ads cost what their level costs (standard is what ads always cost), and a
+       prestige viewer weighs 4K HDR and beyond against the best picture a rival sells here. */
+    const ads = STREAMING_AD_LEVEL_EFFECTS[plan.ads ? (plan.adLevel && plan.adLevel !== 'NONE' ? plan.adLevel : 'STANDARD') : 'NONE'];
     const featureFit = plan.appealIndex
-        + (cohort.lifeStageId === 'FAMILY' && plan.featureIds.includes('streams4') ? 16 : 0)
+        // families: four screens or more (six a little more, #60), Watch party on the whole service (#60) and
+        // Kids profiles on the plans that include them (#62); a rival's are 0
+        + (cohort.lifeStageId === 'FAMILY'
+            ? (plan.featureIds.includes('streams6') ? 20 : plan.featureIds.includes('streams4') ? 16 : 0) + (offer.familyAppealIndex || 0)
+                + (plan.featureIds.includes('kids') ? offer.kidsAppealIndex || 0 : 0) : 0)
         + (cohort.primaryPersonaId === 'HABIT_STREAMERS' && plan.featureIds.includes('downloads') ? 10 : 0)
-        + (cohort.primaryPersonaId === 'PRESTIGE_EXPLORERS' && plan.featureIds.includes('uhd') ? 13 : 0)
-        + (cohort.primaryPersonaId === 'VALUE_SEEKERS' && plan.ads ? 7 : 0)
-        - (plan.ads ? (100 - cohort.priceSensitivityIndex) * .09 : 0);
+        // Playback's fast starts, no buffering and the extras around the player (#53); a rival's is 0
+        + (cohort.primaryPersonaId === 'HABIT_STREAMERS' ? offer.habitAppealIndex || 0 : 0)
+        // Content protection (#55): where homes pirate, a service whose titles are hard to copy is the way to watch them
+        + cohort.piracyTendencyIndex / 100 * (offer.protectionIndex || 0) * .25
+        + (cohort.primaryPersonaId === 'PRESTIGE_EXPLORERS' && plan.featureIds.includes('uhd')
+            ? streamingPrestigePictureBonus(plan.pictureRank ?? STREAMING_4K_RANK, bestRivalPictureRank) : 0)
+        + (cohort.primaryPersonaId === 'VALUE_SEEKERS' && plan.ads ? ads.valueBonus : 0)
+        // Smarter ad breaks (#61): the player's ads cost it less with viewers; a rival's factor is 1
+        - (plan.ads ? (100 - cohort.priceSensitivityIndex) * ads.penalty * (offer.adPenaltyFactor ?? 1) : 0)
+        // #106 a phones-only plan: a home that watches on a TV gives it up, one that watches on a phone alone loses
+        // nothing, and a price-minded home minds the small screen less, so it draws where many homes have a phone and
+        // no TV, and the price-minded everywhere
+        - (plan.mobileOnly ? STREAMING_MOBILE_PLAN.tvHomePenalty * (1 - (offer.phoneOnlyShareByCountry?.[countryId] ?? 0))
+            * (1 - cohort.priceSensitivityIndex / 250) : 0);
     const countryCatalogue = offer.subscriptionCatalogueStrengthByCountry?.[countryId]
         ?? offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
     const catalogueFit = countryCatalogue
         + (cohort.primaryPersonaId === 'FANDOM_LOYALISTS' ? countryCatalogue * .16 : 0);
-    const localizationFit = offer.localizationStrengthIndex
-        + (cohort.primaryPersonaId === 'LOCAL_FIRST' ? offer.localizationStrengthIndex * .22 : 0);
+    // The player's offer carries its region subtitles and dubbing per market.
+    const localizationStrength = offer.localizationStrengthByCountry?.[countryId] ?? offer.localizationStrengthIndex;
+    const localizationFit = localizationStrength
+        + (cohort.primaryPersonaId === 'LOCAL_FIRST' ? localizationStrength * .22 : 0);
     const trustFit = offer.reliabilityIndex
         + (cohort.primaryPersonaId === 'HABIT_STREAMERS' ? offer.loyaltyIndex * .16 : 0);
     const momentum = clamp(offer.countryMomentum[countryId] || 0, -20, 20);
@@ -131,7 +153,7 @@ const planUtility = (
         + localizationFit * .13
         + offer.reputationIndex * .1
         + trustFit * .1
-        + offer.marketingIndex * .05
+        + getWorldStreamingOfferMarketing(offer, countryId) * .05
         + offer.loyaltyIndex * .04
         + momentum
         + participation.streamingInterestIndex * .08
@@ -164,22 +186,28 @@ const allocateBillingPath = (
     const budgetPerHousehold = totalBudget / reachableHouseholds;
     const publicRentalPrices = transactionalOffers.flatMap(offer => {
         const store = projectStreamingCommercialOffers(offer.commercialConfiguration).storeOffer;
-        const weight=getWorldStreamingStoreStrength(offer,countryId)/100*getWorldStreamingOfferExposure(offer);
+        const weight=getWorldStreamingStoreStrength(offer,countryId)/100*getWorldStreamingOfferExposure(offer, countryId);
         return store?.eligibility.kind === 'PUBLIC' && store.rent > 0 && weight>0
             && store.rent <= budgetPerHousehold ? [{price:store.rent,weight}] : [];
     });
+    /* The best 4K-HDR-or-better picture each offer sells, and so the best its rivals here sell. */
+    const offerBestPicture = offers.map(offer => offer.plans.reduce((best, plan) => (
+        plan.featureIds.includes('uhd') ? Math.max(best, plan.pictureRank ?? STREAMING_4K_RANK) : best), -1));
+    const bestRivalPicture = (index: number): number => offerBestPicture.reduce((best, rank, other) => (
+        other === index ? best : Math.max(best, rank)), STREAMING_4K_RANK);
     // A tiny/unseen store cannot set the whole market's value benchmark.
     const referencePrice=Math.max(.5,budgetPerHousehold/4);
     const transactionalPrice=(referencePrice+publicRentalPrices.reduce((sum,row)=>sum+row.price*row.weight,0))
         /(1+publicRentalPrices.reduce((sum,row)=>sum+row.weight,0));
-    const candidates = offers.flatMap(offer => {
+    const candidates = offers.flatMap((offer, offerIndex) => {
+        const rivalPicture = bestRivalPicture(offerIndex);
         const affordablePlans = offer.plans.filter(plan => (
             (billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice) <= budgetPerHousehold + .001
         ));
         if (!affordablePlans.length) return [];
         const ranked = affordablePlans.map(plan => {
             const billingPrice = billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice;
-            return { plan, billingPrice, ...planUtility(cohort, participation, offer, plan, countryId, budgetPerHousehold, billingPrice, transactionalPrice) };
+            return { plan, billingPrice, ...planUtility(cohort, participation, offer, plan, countryId, budgetPerHousehold, billingPrice, transactionalPrice, rivalPicture) };
         })
             .sort((left, right) => right.utility - left.utility || left.plan.id.localeCompare(right.plan.id));
         const best = ranked[0];
@@ -192,7 +220,7 @@ const allocateBillingPath = (
         const catalogueFit = clamp((countryCatalogue - 10) / 90, .02, 1);
         return [{ offer, plan: best.plan, billingPath, billingPrice: best.billingPrice, utility: best.utility,
             weight: Math.max(.0001, Math.exp(clamp((best.utility - 45) / 24, -3, 3))
-                * catalogueFit * getWorldStreamingOfferExposure(offer)), driver: best.driver }];
+                * catalogueFit * getWorldStreamingOfferExposure(offer, countryId) * getWorldStreamingDeviceReachFactor(offer)), driver: best.driver }];
     }).sort((left, right) => right.utility - left.utility || left.offer.platformId.localeCompare(right.offer.platformId));
     if (!candidates.length) {
         return { billingPath, reachableHouseholds, subscribingHouseholds: 0, totalSubscriptions: 0, totalBudget, totalSpend: 0, allocations: [] };
@@ -257,6 +285,57 @@ const allocateBillingPath = (
     };
 };
 
+/* Pay yearly (#71): the pools choose who subscribes to what; how the player's subscribers pay follows its
+   discount. The odds that one pays yearly grow in step with it (15% keeps the pools' split, so the market is
+   exactly as before), and those who switch take their homes and what they spend to the other path. A switch
+   to a dearer price stops where that path's budget runs out. Rivals keep the pools' split. */
+const rebillPlayerSubscribers = (monthly: BillingPathAllocation, annual: BillingPathAllocation): void => {
+    const mine = (path: BillingPathAllocation) => path.allocations.find(row => row.offer.isPlayer);
+    const offer = (mine(monthly) || mine(annual))?.offer;
+    const discount = offer?.annualDiscountPercent ?? STREAMING_REFERENCE_ANNUAL_DISCOUNT;
+    if (!offer || discount === STREAMING_REFERENCE_ANNUAL_DISCOUNT) return;
+    const yearly = mine(annual)?.households || 0;
+    const total = (mine(monthly)?.households || 0) + yearly;
+    if (!total) return;
+    const shift = Math.round(total * streamingAnnualBillingShare(discount, yearly / total)) - yearly;
+    if (!shift) return;
+    const [from, to] = shift > 0 ? [monthly, annual] : [annual, monthly];
+    const source = mine(from)!;
+    const price = (plan: Candidate['plan']) => to.billingPath === 'MONTHLY' ? plan.monthlyBillingPrice : plan.annualBillingMonthlyPrice;
+    let target = mine(to);
+    if (!target) {
+        /* both pools hold the same budget a home */
+        const homes = from.reachableHouseholds + to.reachableHouseholds;
+        if (!homes || price(source.plan) > (from.totalBudget + to.totalBudget) / homes + .001) return;
+        target = { ...source, billingPath: to.billingPath, billingPrice: price(source.plan), households: 0, primaryHouseholds: 0 };
+        to.allocations.push(target);
+    }
+    const dearer = target.billingPrice - source.billingPrice;
+    const room = dearer > 0 ? Math.max(0, Math.floor((to.totalBudget - to.totalSpend + .001) / dearer)) : source.households;
+    const moved = Math.min(Math.abs(shift), source.households, room);
+    if (!moved) {
+        if (!target.households) to.allocations.splice(to.allocations.indexOf(target), 1);
+        return;
+    }
+    const homes = Math.min(source.primaryHouseholds, Math.round(moved * source.primaryHouseholds / source.households));
+    const spend = round2(moved * source.billingPrice);
+    source.households -= moved;
+    source.primaryHouseholds -= homes;
+    target.households += moved;
+    target.primaryHouseholds += homes;
+    from.reachableHouseholds -= homes;
+    to.reachableHouseholds += homes;
+    from.subscribingHouseholds -= homes;
+    to.subscribingHouseholds += homes;
+    from.totalSubscriptions -= moved;
+    to.totalSubscriptions += moved;
+    from.totalBudget = round2(from.totalBudget - spend);
+    to.totalBudget = round2(to.totalBudget + spend);
+    from.totalSpend = round2(from.totalSpend - spend);
+    to.totalSpend = round2(to.totalSpend + moved * target.billingPrice);
+    if (!source.households) from.allocations.splice(from.allocations.indexOf(source), 1);
+};
+
 export const allocateWorldStreamingCohort = (
     countryId: string,
     cohort: WorldAudienceCohortState,
@@ -273,6 +352,7 @@ export const allocateWorldStreamingCohort = (
         allocateBillingPath(countryId, cohort, participation, offers, 'MONTHLY', monthlyHomes, monthlyBudget, transactionalOffers),
         allocateBillingPath(countryId, cohort, participation, offers, 'ANNUAL', annualHomes, round2(totalBudget - monthlyBudget), transactionalOffers),
     ];
+    rebillPlayerSubscribers(paths[0], paths[1]);
     return {
         reachableHouseholds,
         subscribingHouseholds: paths.reduce((sum, path) => sum + path.subscribingHouseholds, 0),

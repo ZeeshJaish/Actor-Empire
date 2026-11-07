@@ -191,6 +191,51 @@ export interface StreamingAudiencePersonaView {
     averageMonthlyEntertainmentBudget: number;
 }
 
+/** #128: one reason the player's service gained or lost households in the last settled week. */
+export interface StreamingAudienceFlowReason {
+    id: WorldStreamingCustomerReasonId;
+    label: string;
+    detail: string;
+    households: number;
+    sharePercent: number;
+}
+
+/** #128: why homes came to the player's service and why they left, from the customer snapshot's
+    `playerFlows` (real movements, by reason). Not available before a week settles with #128. */
+export interface StreamingAudienceFlowsView {
+    available: boolean;
+    absoluteWeek: number | null;
+    came: StreamingAudienceFlowReason[];
+    left: StreamingAudienceFlowReason[];
+}
+
+/** #128: one service's share of the week's streaming hours, from the viewing settlement. */
+export interface StreamingAudienceWatchRaceEntry {
+    id: string;
+    name: string;
+    color: string;
+    hours: number;
+    sharePercent: number;
+    player: boolean;
+}
+
+/** #128: the week's watch time by service, every platform's settled hours (the player's included). The
+    six biggest rivals are named; the rest are folded into "Other services". */
+export interface StreamingAudienceWatchRaceView {
+    available: boolean;
+    totalHours: number;
+    entries: StreamingAudienceWatchRaceEntry[];
+}
+
+/** #128: one settled week of the customer ledger (`worldStreamingCustomers.snapshots`, 52 kept). */
+export interface StreamingAudienceHistoryPoint {
+    absoluteWeek: number;
+    payingHouseholds: number;
+    paidAccounts: number;
+    playerAccounts: number;
+    playerMonthlyRevenue: number;
+}
+
 export interface StreamingAudienceSwitchingView {
     joinedThisWeek: number;
     cancelledThisWeek: number;
@@ -281,6 +326,10 @@ export interface StreamingAudienceMarketView {
     platforms: StreamingAudiencePlatformView[];
     personas: StreamingAudiencePersonaView[];
     switching: StreamingAudienceSwitchingView;
+    /** #128: real reasons homes came and left, the real watch-time race, and the ledger's weekly history. */
+    flows: StreamingAudienceFlowsView;
+    watchRace: StreamingAudienceWatchRaceView;
+    history: StreamingAudienceHistoryPoint[];
 }
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
@@ -721,6 +770,55 @@ const playerModelOf = (pricing: Parameters<typeof projectStreamingCommercialOffe
     return { subscription, ads, store, primary: subscription ? 'ACCOUNTS' : ads ? 'AD_HOMES' : store ? 'BUYERS' : 'ACCOUNTS' };
 };
 
+/* #128: the words for a reason, by the side it moved homes. The customer engine gives a join the
+   PLAN_VALUE reason, a rotation back in CATALOGUE, a return RELEASE and a switch COMPETITOR; a cancel
+   PRICE, CATALOGUE or SHARING_POLICY, a rotation out ROTATION and a switch away COMPETITOR. */
+const FLOW_IN_WORDS: Partial<Record<WorldStreamingCustomerReasonId, { label: string; detail: string }>> = {
+    PLAN_VALUE: { label: 'Your plans and price', detail: 'New homes picked one of your plans.' },
+    CATALOGUE: { label: 'Something to watch', detail: 'Homes rotated in for your catalogue.' },
+    COMPETITOR: { label: 'Switched from a rival', detail: 'Homes left another service for yours.' },
+    RELEASE: { label: 'Came back', detail: 'Homes that had left returned for something new.' },
+    MARKETING: { label: 'Your campaigns', detail: 'Promotion brought homes in.' },
+    LOCALIZATION: { label: 'Local fit', detail: 'Their language and culture won them over.' },
+};
+const FLOW_OUT_WORDS: Partial<Record<WorldStreamingCustomerReasonId, { label: string; detail: string }>> = {
+    PRICE: { label: 'Price', detail: 'The plan stopped fitting the budget.' },
+    CATALOGUE: { label: 'Nothing to watch next', detail: 'They ran out of reasons to stay.' },
+    ROTATION: { label: 'Rotated out', detail: 'Homes paused you to try another service.' },
+    COMPETITOR: { label: 'Switched to a rival', detail: 'Another service won their slot.' },
+    SHARING_POLICY: { label: 'Sharing rules', detail: 'Account-sharing checks pushed homes out.' },
+    PLAN_VALUE: { label: 'Plan value', detail: 'The plan stopped feeling worth it.' },
+    RELIABILITY: { label: 'Playback trouble', detail: 'Outages and buffering broke their trust.' },
+};
+
+/** #128: the week's watch time by service, from every platform's settled viewing hours. */
+const RACE_NAMED_RIVALS = 6;
+const buildWatchRace = (
+    viewing: Player['world']['worldStreamingViewing'] | null,
+    playerPresentation: AudiencePlatformPresentation,
+): StreamingAudienceWatchRaceView => {
+    const rows = Object.values(viewing?.platforms ?? {}).filter(row => row.totalHoursViewed > 0);
+    const totalHours = rows.reduce((sum, row) => sum + row.totalHoursViewed, 0);
+    if (!viewing || totalHours <= 0) return { available: false, totalHours: 0, entries: [] };
+    const share = (hours: number) => round1(hours / totalHours * 100);
+    const player = rows.find(row => row.platformId === 'PLAYER');
+    const rivals = rows.filter(row => row.platformId !== 'PLAYER').sort((left, right) => right.totalHoursViewed - left.totalHoursViewed || left.platformId.localeCompare(right.platformId));
+    const named = rivals.slice(0, RACE_NAMED_RIVALS).map(row => {
+        const brand = resolveStreamingPlatformBrandById(row.platformId, row.platformName || undefined);
+        return { id: row.platformId, name: brand.displayName, color: brand.primaryColor, hours: row.totalHoursViewed, sharePercent: share(row.totalHoursViewed), player: false };
+    });
+    const otherHours = rivals.slice(RACE_NAMED_RIVALS).reduce((sum, row) => sum + row.totalHoursViewed, 0);
+    return {
+        available: true,
+        totalHours,
+        entries: [
+            ...(player ? [{ id: 'PLAYER', name: playerPresentation.name, color: playerPresentation.color, hours: player.totalHoursViewed, sharePercent: share(player.totalHoursViewed), player: true }] : []),
+            ...named,
+            ...(otherHours > 0 ? [{ id: 'OTHER', name: 'Other services', color: '#5b6474', hours: otherHours, sharePercent: share(otherHours), player: false }] : []),
+        ],
+    };
+};
+
 export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMarketView => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -816,34 +914,39 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
         PIRACY_ACCESS: { label: 'Piracy access', detail: 'Affordability or access gaps pushed viewing outside paid services.' },
         OTHER: { label: 'Other pressure', detail: 'Several smaller factors combined to change the household decision.' },
     };
-    const playerMovementReasons = worldStreamingCustomers
-        ? worldStreamingCustomers.recentMovements.filter(movement => (
-            movement.absoluteWeek === absoluteWeek
-            && (movement.sourcePlatformId === 'PLAYER' || movement.destinationPlatformId === 'PLAYER')
-        ))
-        : [];
-    const reasonTotals = new Map<WorldStreamingCustomerReasonId, number>();
-    playerMovementReasons.forEach(movement => reasonTotals.set(
-        movement.reasonId,
-        (reasonTotals.get(movement.reasonId) || 0) + movement.households,
-    ));
-    const reasonTotal = Math.max(1, [...reasonTotals.values()].reduce((total, value) => total + value, 0));
-    const canonicalReasons = [...reasonTotals.entries()]
-        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-        .slice(0, 5)
-        .map(([id, households]) => ({
-            id,
-            label: reasonLabels[id].label,
-            sharePercent: round1(households / reasonTotal * 100),
-            detail: reasonLabels[id].detail,
-        }));
-    const switchingReasons = canonicalReasons.length ? canonicalReasons : [
-        { id: 'PRICE', label: 'Price & bundles', sharePercent: 31, detail: 'Homes rotate toward a cheaper plan or a bundle they already pay for.' },
-        { id: 'NEXT_WATCH', label: 'Nothing next', sharePercent: 27, detail: 'A viewer finishes the title they joined for and cannot see the next reason to stay.' },
-        { id: 'RIVAL_HIT', label: 'Rival premiere', sharePercent: 19, detail: 'A major release shifts watch time first, then the household subscription.' },
-        { id: 'LOCAL_FIT', label: 'Local fit', sharePercent: 13, detail: 'Language, payment, sport or local storytelling feels stronger elsewhere.' },
-        { id: 'TRUST', label: 'Playback & trust', sharePercent: 10, detail: 'Buffering, outages or weak account trust turn frustration into cancellation.' },
-    ];
+    /* #128: the reasons come from the settled week's own movements into and out of the service
+       (`playerFlows` on the customer snapshot). Before such a week there are none, and none are made up. */
+    const customerSnapshots = player.world?.worldStreamingCustomers?.snapshots ?? [];
+    const flowSnapshot = [...customerSnapshots].reverse().find(snapshot => snapshot.playerFlows);
+    const flowRows = (side: 'in' | 'out'): StreamingAudienceFlowReason[] => {
+        const totals = Object.entries(flowSnapshot?.playerFlows?.[side] ?? {}) as Array<[WorldStreamingCustomerReasonId, number]>;
+        const total = Math.max(1, totals.reduce((sum, [, households]) => sum + households, 0));
+        const words = side === 'in' ? FLOW_IN_WORDS : FLOW_OUT_WORDS;
+        return totals
+            .filter(([, households]) => households > 0)
+            .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+            .map(([id, households]) => ({
+                id,
+                label: words[id]?.label ?? reasonLabels[id].label,
+                detail: words[id]?.detail ?? reasonLabels[id].detail,
+                households,
+                sharePercent: round1(households / total * 100),
+            }));
+    };
+    const flows: StreamingAudienceFlowsView = {
+        available: Boolean(flowSnapshot),
+        absoluteWeek: flowSnapshot?.absoluteWeek ?? null,
+        came: flowRows('in'),
+        left: flowRows('out'),
+    };
+    const switchingReasons = flows.left.slice(0, 5).map(row => ({ id: row.id, label: row.label, sharePercent: row.sharePercent, detail: row.detail }));
+    const history: StreamingAudienceHistoryPoint[] = customerSnapshots.map(snapshot => ({
+        absoluteWeek: snapshot.absoluteWeek,
+        payingHouseholds: snapshot.payingHouseholds,
+        paidAccounts: snapshot.endingPaidAccounts,
+        playerAccounts: snapshot.playerEndingPaidAccounts,
+        playerMonthlyRevenue: snapshot.playerMonthlySubscriptionRevenue,
+    }));
     return {
         generatedAtAbsoluteWeek: absoluteWeek,
         weeksSinceFounding,
@@ -929,5 +1032,8 @@ export const getStreamingAudienceMarket = (player: Player): StreamingAudienceMar
             playerChurnPercent,
             reasons: switchingReasons,
         },
+        flows,
+        watchRace: buildWatchRace(worldStreamingViewing, playerPresentation),
+        history,
     };
 };

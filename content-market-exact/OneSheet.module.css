@@ -8,10 +8,14 @@
   background:repeating-conic-gradient(#fff 0 .5deg,transparent .5deg 1deg)}
 .po .poshade{position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(180deg,rgba(0,0,0,.34) 0%,transparent 22%,transparent 46%,rgba(0,0,0,.82) 88%)}
-.po .potype{position:absolute;left:7%;right:7%;bottom:13%;z-index:2}
+.po .potype{position:absolute;left:7%;right:7%;bottom:13%;z-index:2;container-type:inline-size}
 .po .porule{display:block;width:26px;height:1.5px;margin-bottom:5px;background:rgba(255,255,255,.8)}
 .po .potype b{display:block;color:#fff;font-weight:900;line-height:.94;letter-spacing:-.005em;
-  text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,.7)}
+  text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,.7);
+  /* the size's type, made smaller when the widest line (--po-em, set by Poster)
+     would run past the sheet's edge, so a long word is never cut off. Type a few
+     pixels high renders wider than its em, so the smallest sheets keep more room. */
+  font-size:var(--po-type,14px);font-size:min(var(--po-type,14px),calc(var(--po-room,92cqi) / var(--po-em,1)))}
 .po .poyear{display:block;margin-top:4px;font-size:6px;font-weight:900;letter-spacing:.24em;
   color:rgba(255,255,255,.62)}
 /* the credit block. Unreadable on purpose — it is what makes this a poster. */
@@ -23,13 +27,13 @@
   letter-spacing:.06em;color:#0b0c10;background:#fff;padding:2px 5px;border-radius:99px}
 
 /* a poster in a thumbnail wall is ~35px wide; sm still overflowed its own words */
-.po.po-xs .potype b{font-size:5px;letter-spacing:0;line-height:1.02}
+.po.po-xs .potype b{--po-type:5px;--po-room:80cqi;letter-spacing:0;line-height:1.02}
 .po.po-xs .porule{width:9px;margin-bottom:2px}
-.po.po-sm .potype b{font-size:8px}
+.po.po-sm .potype b{--po-type:8px}
 .po.po-sm .porule{width:14px;margin-bottom:3px}
-.po.po-md .potype b{font-size:14px}
+.po.po-md .potype b{--po-type:14px}
 .po.po-md .pobilling i{font-size:2.6px;letter-spacing:.04em}
-.po.po-lg .potype b{font-size:23px}
+.po.po-lg .potype b{--po-type:23px}
 .po.po-lg .pobilling i{font-size:3.4px;letter-spacing:.05em}
 
 /* ── rival platform marks ── */

@@ -1,0 +1,111 @@
+/* ============================================================================
+   CAMPAIGN CREATIVES (#148) — the Creative step's frame cards, the cropper and
+   a creative seen live in its scene. The Studio's dark language (#146): Anton
+   for the big words, Archivo for labels, the service's colour as the accent
+   (--cs-accent from the Studio, --cr-accent on the cropper, which sits above).
+   The HQ shell resets button fonts at 0-1-1, so button rules are 0-2-0 or more.
+   ========================================================================== */
+
+.lead{margin:12px 2px 0;font-size:10.5px;line-height:1.5;color:#9aa3b4}
+.none{margin-top:12px;padding:14px;border-radius:14px;background:#0c0f15;border:1px dashed rgba(255,255,255,.12);font-size:10.5px;color:#8b93a5;text-align:center}
+.frames{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.frameCard{display:flex;flex-direction:column;gap:10px;padding:10px;border-radius:16px;background:#0c0f15;border:1px solid rgba(255,255,255,.075);
+  animation:cr-rise .42s cubic-bezier(.2,.9,.3,1.08) backwards;animation-delay:calc(var(--i,0) * 60ms)}
+@keyframes cr-rise{from{opacity:0;transform:translateY(12px)}}
+.frameTall{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:12px}
+.frameInfo{display:flex;flex-direction:column;gap:6px;min-width:0}
+.frameHead{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.frameHead b{font-size:13px;font-weight:900;color:#fff}
+.frameHead span{font:400 13px/1 'Anton','Archivo',sans-serif;letter-spacing:.04em;color:color-mix(in srgb,var(--cs-accent) 70%,#fff)}
+.frameHead em{margin-left:auto;padding:4px 7px;border-radius:999px;font:900 7px/1 'Archivo','Inter',sans-serif;font-style:normal;letter-spacing:.12em}
+.badgeYours{background:color-mix(in srgb,var(--cs-accent) 22%,#0b0e14);color:#fff;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--cs-accent) 60%,transparent)}
+.badgeMade{background:rgba(255,255,255,.06);color:#aab2c0}
+.frameInfo small{font-size:9.5px;line-height:1.4;color:#8b93a5}
+.problem{font-size:9.5px;line-height:1.4;color:#fcd34d}
+.frameActions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.frameActions .upload,.frameActions.frameActions button{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 12px;border-radius:11px;
+  font:900 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.frameActions .upload:active,.frameActions.frameActions button:active{transform:scale(.95)}
+.upload{position:relative;overflow:hidden;background:var(--cs-accent);color:var(--epx-brand-ink,#fff)}
+.upload input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.frameActions .see{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#f3f5f9}
+.frameActions .reset{background:transparent;border:1px solid rgba(255,255,255,.12);color:#aab2c0}
+.noImage{margin:10px 2px 0;font-size:9.5px;line-height:1.45;color:#7c8597}
+
+/* a creative, small, in its frame's shape */
+.thumb{position:relative;display:block;width:100%;border-radius:9px;overflow:hidden;background:#07090d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 12px 24px -16px #000}
+.thumb canvas{display:block;width:100%;height:100%;object-fit:contain}
+.thumbTall{width:auto;height:168px}
+.thumbWait{position:absolute;inset:0;background:linear-gradient(100deg,rgba(255,255,255,.02) 30%,rgba(255,255,255,.07) 50%,rgba(255,255,255,.02) 70%) 0 0/200% 100%;
+  animation:cr-wait 1.2s linear infinite}
+@keyframes cr-wait{to{background-position:-200% 0}}
+
+/* ── the cropper ── */
+/* the cropper and the live scene open in a portal over the Studio (z-index 75) */
+.cropper{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;max-width:520px;margin:0 auto;background:#030407;color:#eef0f5;
+  font-family:'Inter',system-ui,sans-serif;animation:cr-fade .2s ease both}
+@keyframes cr-fade{from{opacity:0}}
+.cropTop{display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 10px}
+.cropTop.cropTop .cropClose{flex:0 0 auto;width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);font:700 13px/1 'Inter',sans-serif;color:#d4dae4}
+.cropTop div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.cropTop b{font:400 18px/1.05 'Anton','Archivo',sans-serif;letter-spacing:.04em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* #153: labels wrap rather than cut, at 320–430 */
+.cropTop span{font-size:9.5px;line-height:1.35;color:#8b93a5;overflow-wrap:anywhere}
+.cropStage{position:relative;flex:1;min-height:0;overflow:hidden;touch-action:none;cursor:grab;user-select:none}
+.cropStage:active{cursor:grabbing}
+.cropImage{position:absolute;left:0;top:0;max-width:none;transform-origin:0 0;pointer-events:none;-webkit-user-drag:none}
+.cropBox{position:absolute;pointer-events:none;border-radius:3px;box-shadow:0 0 0 1.5px rgba(255,255,255,.88),0 0 0 100vmax rgba(3,4,7,.7)}
+/* the thirds, faint */
+.cropBox i{position:absolute;background:rgba(255,255,255,.22)}
+.cropBox i:nth-child(1){left:33.33%;top:0;bottom:0;width:1px}
+.cropBox i:nth-child(2){left:66.66%;top:0;bottom:0;width:1px}
+.cropBox i:nth-child(3){top:33.33%;left:0;right:0;height:1px}
+.cropBox i:nth-child(4){top:66.66%;left:0;right:0;height:1px}
+.cropBar{display:flex;flex-direction:column;gap:10px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#06070b;border-top:1px solid rgba(255,255,255,.07)}
+.cropBar p{font-size:9.5px;line-height:1.45;color:#7c8597;text-align:center}
+.zoom{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;gap:10px}
+.zoom.zoom button{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);font:700 18px/1 'Inter',sans-serif;color:#fff}
+.zoom input{width:100%;accent-color:var(--cr-accent)}
+.cropBar.cropBar .cropUse{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:56px;padding:10px 16px 10px 18px;border-radius:16px;text-align:left;
+  background:var(--cr-accent);color:var(--epx-brand-ink,#fff);box-shadow:0 14px 30px -14px var(--cr-accent);transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.cropBar.cropBar .cropUse:active{transform:scale(.97)}
+.cropUse span{display:flex;flex-direction:column;gap:4px}
+.cropUse b{font:900 14px/1.1 'Inter',system-ui,sans-serif}
+.cropUse small{font-size:10px;font-weight:700;opacity:.85}
+.cropUse i{font-style:normal;font-size:18px;font-weight:900}
+
+/* ── a creative live in its scene ── */
+.live{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;max-width:520px;margin:0 auto;background:#020305;font-family:'Inter',system-ui,sans-serif;
+  animation:cr-fade .2s ease both}
+.liveView{position:relative;flex:1;min-height:0}
+.liveView > div:first-child{position:absolute;inset:0}
+.liveHud{position:absolute;left:14px;right:60px;top:max(14px,env(safe-area-inset-top));display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font:800 9px/1.35 'Archivo','Inter',sans-serif;letter-spacing:.12em;
+  color:#fff;text-transform:uppercase;text-shadow:0 1px 8px rgba(0,0,0,.6);animation:cr-fade .5s ease .6s both}
+.liveTag{display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border-radius:6px;background:rgba(239,68,68,.9)}
+.liveTag i{width:6px;height:6px;border-radius:50%;background:#fff;animation:cr-blink 1s steps(2) infinite}
+@keyframes cr-blink{50%{opacity:.2}}
+.liveView.liveView .liveClose{position:absolute;right:14px;top:max(12px,env(safe-area-inset-top));width:34px;height:34px;border-radius:11px;background:rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.2);font:700 13px/1 'Inter',sans-serif;color:#fff;backdrop-filter:blur(8px)}
+.liveBar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#06070b;border-top:1px solid rgba(255,255,255,.07)}
+.liveBar span{min-width:0;font-size:10px;font-weight:700;line-height:1.3;color:#aab2c0;overflow-wrap:anywhere}
+.liveBar.liveBar button{flex:0 0 auto;min-height:42px;padding:0 16px;border-radius:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+  font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#fff}
+
+/* the creatives on a campaign's review and sheet */
+.strip{display:flex;gap:8px;overflow-x:auto;padding:2px 24px 4px 0;margin-top:10px;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(90deg,#000 82%,transparent);mask-image:linear-gradient(90deg,#000 82%,transparent)}
+.strip::-webkit-scrollbar{display:none}
+.strip figure{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;margin:0}
+.strip figure .thumb{width:auto;height:74px;max-width:200px}
+.strip .stripButton{position:relative;display:block;padding:0;border-radius:9px;background:none}
+.strip .stripButton:disabled{opacity:1}
+.strip .stripButton i{position:absolute;right:5px;bottom:5px;display:flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
+  background:rgba(0,0,0,.6);font-size:8px;font-style:normal;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.3)}
+.strip figcaption{font:800 7px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.1em;color:#8b93a5;text-transform:uppercase;white-space:nowrap}
+.strip figcaption b{color:color-mix(in srgb,var(--cs-accent) 70%,#fff)}
+
+@media (max-width:360px){
+  .thumbTall{height:140px}
+  .frameActions .upload,.frameActions.frameActions button{padding:0 10px;font-size:8.5px}
+}
+@media (prefers-reduced-motion:reduce){.frameCard,.cropper,.live,.liveHud{animation:none !important}}

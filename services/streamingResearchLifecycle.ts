@@ -265,15 +265,6 @@ export const getStreamingResearchInstallationBlockers = (
         for (const prerequisiteId of capability?.prerequisiteIds || []) {
             if (!installedCapabilityIds.has(prerequisiteId)) blockers.push(`${prerequisiteId.replaceAll('_', ' ')} required`);
         }
-        const contentOperationsLevel = Math.max(
-            platform.capabilities.legacyLevelFloors.CONTENT_OPERATIONS || 0,
-            ...platform.technologyProjects
-                .filter(project => project.status === 'COMPLETED' && project.branch === 'CONTENT_OPERATIONS')
-                .map(project => project.targetLevel),
-        );
-        if (capability && contentOperationsLevel < capability.contentOperationsFloor) {
-            blockers.push(`Content Operations level ${capability.contentOperationsFloor} required`);
-        }
     }
     return blockers;
 };
@@ -297,7 +288,13 @@ export const getStreamingResearchPortfolio = (player: Player): {
     return {
         available,
         activeProgram,
-        programs: STREAMING_RESEARCH_DEFINITIONS.map(definition => {
+        // Localization is researched by region in the Content Desk now. A
+        // campus localization program a save already began still shows here
+        // so it can finish; new ones are not offered.
+        programs: STREAMING_RESEARCH_DEFINITIONS.filter(definition => (
+            definition.installTargetType !== 'LOCALIZATION_CAPABILITY'
+            || platform.researchPrograms.some(item => item.definitionId === definition.id)
+        )).map(definition => {
             const program = platform.researchPrograms.find(item => item.definitionId === definition.id) || null;
             const blockers = program?.stage === 'READY_TO_INSTALL'
                 ? getStreamingResearchInstallationBlockers(platform, definition)
@@ -313,6 +310,8 @@ export const getStreamingResearchPortfolio = (player: Player): {
     };
 };
 
+export const STREAMING_RESEARCH_RETIRED_REASON = 'New research has moved: picture and sound are unlocked in Platform › Tech, and engineering builds no longer wait for it. Research already under way finishes here.';
+
 export const startStreamingResearchProgram = (
     player: Player,
     definitionId: string,
@@ -324,6 +323,14 @@ export const startStreamingResearchProgram = (
     if (platform.researchPrograms.some(program => program.definitionId === definitionId)) return { player, changed: false, reason: 'This program already exists.' };
     const definition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === definitionId);
     if (!definition) return { player, changed: false, reason: 'Research program not found.' };
+    if (definition.installTargetType === 'LOCALIZATION_CAPABILITY') {
+        return { player, changed: false, reason: 'Subtitles and dubbing are researched by region in the Content Desk, Localization tab.' };
+    }
+    /* The research pipeline (research → prototype → test → patent or licence → install) is
+       retired (codex-handoff/plans/platform-tech-plan.md §11): picture and sound are unlocked in
+       Platform › Tech, and engineering builds no longer wait for research. Programmes already
+       under way keep advancing and can still be cleared and installed. */
+    return { player, changed: false, reason: STREAMING_RESEARCH_RETIRED_REASON };
     const preview = previewStreamingResearchProgram(definition, buildMode);
     const researchCost = preview.researchCost;
     if (platform.treasuryCash < researchCost) return { player, changed: false, reason: 'The platform treasury cannot fund this research program.' };

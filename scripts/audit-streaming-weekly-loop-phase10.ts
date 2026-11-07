@@ -325,8 +325,8 @@ assert(gameLoopSource.includes("emitLoopStage('owned_streaming_start')"), 'Strea
     'ONE-WEEK MANDATE',
     'Return to game and advance week',
 ].forEach(fragment => assert(componentSource.includes(fragment), `Phase 10 UI should include ${fragment}.`));
-assert(hqSource.includes('<StreamingWeeklyCeoLoop'), 'Platform HQ should expose the complete weekly CEO loop after launch.');
-assert(hqSource.includes('onReturnToGame={onReturnToGame || onBack}'), 'The weekly transition should prefer a direct route back to the real game.');
+/* #176 (Zeesh: "weekly brief hata do game se"): the weekly brief left the game, so nothing mounts the loop any more */
+assert(!hqSource.includes('<StreamingWeeklyCeoLoop'), 'Platform HQ no longer mounts the weekly CEO loop (#176).');
 assert(entrySource.includes('onReturnToGame={onReturnToGame}'), 'The streaming entry should preserve the return-to-game callback.');
 assert(lifestyleSource.includes('onReturnToGame={onReturnHome'), 'Lifestyle should bridge the streaming CTA back to the main game.');
 assert(appSource.includes('onReturnHome={() => setActivePage(Page.HOME)}'), 'The weekly CTA should land on the real Home screen and its Next Week button.');

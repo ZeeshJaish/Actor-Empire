@@ -7,7 +7,7 @@
    can begin.
    ========================================================================== */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BuildStageId } from '../../finance/build';
 import { kitWords, cityFor, computeRacks, constructionProgress, facilityRacks, facilityRoomLabel, gates, listingFor, providerOf } from '../../finance/build';
 import type { StageProps } from './BuildWizard';
@@ -16,7 +16,7 @@ import { regionOfCity, regionsOf } from '../../finance/placer';
 import { Cutscene } from '../cine/Cutscene';
 import { commissionBeats } from '../cine/CommissionCut';
 
-export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: StageProps & { onJump: (stage: BuildStageId) => void }) {
+export function StageLaunch({ data, draft, totals, plan, handlers, onJump, commissionRequest = 0 }: StageProps & { onJump: (stage: BuildStageId) => void; commissionRequest?: number }) {
   const [rolling, setRolling] = useState(false);
   const [done, setDone] = useState(data.commissioned);
   const [commitError, setCommitError] = useState('');
@@ -169,6 +169,14 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump }: Sta
     setCommitError('');
     setRolling(true);
   };
+  /* #157: the HUD's big Commission button runs this same sequence (only a new
+     press, never the count it opened with) */
+  const seenRequest = useRef(commissionRequest);
+  useEffect(() => {
+    if (commissionRequest === seenRequest.current) return;
+    seenRequest.current = commissionRequest;
+    if (!blocked && !done) beginCommission();
+  }, [commissionRequest]);
 
   if (done) {
     return (

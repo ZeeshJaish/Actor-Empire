@@ -4,6 +4,7 @@ import { ArrowLeft, BarChart3, BriefcaseBusiness, ChevronRight, Clapperboard, Fl
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { IndustryClaimBadge, IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
 import { IndustryNarrativeContext } from './IndustryNarrativeContext';
+import { StoredMediaImage } from '../../components/StoredMediaImage';
 
 interface NewsAppProps {
   player: Player;
@@ -215,6 +216,7 @@ const StoryDetail: React.FC<{
             </button>
           </div>
 
+          {item.imageMediaId && <StoredMediaImage mediaId={item.imageMediaId} className="mt-5 block w-full max-h-96 rounded-2xl object-cover object-[center_35%]" />}
           {item.subtext && <p className="mt-5 text-base leading-relaxed font-sans text-zinc-300">{item.subtext}</p>}
 
           {claimContext && (
@@ -302,6 +304,7 @@ const NewsAppLegacy: React.FC<NewsAppProps> = ({ player, onBack }) => {
                             </div>
                             <div className="flex justify-between items-start mb-1"><h3 className={`${idx === 0 && tab === 'TOP_STORY' ? 'text-2xl leading-tight' : 'text-lg leading-snug'} font-bold text-zinc-100`}>{item.headline}</h3></div>
                             {item.subtext && <p className={`text-zinc-400 font-sans ${idx === 0 && tab === 'TOP_STORY' ? 'text-sm mt-2' : 'text-xs mt-1'}`}>{item.subtext}</p>}
+                            {item.imageMediaId && <StoredMediaImage mediaId={item.imageMediaId} className="mt-3 block w-full max-h-64 rounded-xl object-cover object-[center_35%]" />}
                             <div className="flex items-center gap-2 mt-3"><span className="text-[10px] text-zinc-600 font-sans uppercase">{t(language, 'common.week')} {item.week} • {t(language, 'common.year')} {item.year}</span></div>
                         </button>
                     ))}

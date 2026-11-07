@@ -26,6 +26,8 @@ import {
     type EntertainmentStockSnapshot,
 } from '../../services/entertainmentStockMarket';
 import { getShareholderInfluence } from '../../services/shareholderVoting';
+import { getStreamingOwnTicker, type StreamingOwnTicker } from '../../services/streamingPublicMarkets';
+import { quoteOwnShareTrade, tradeOwnStreamingShares } from '../../services/streamingOwnShares';
 import {
     getStockTakeoverSnapshot,
 } from '../../services/stockTakeover';
@@ -64,6 +66,151 @@ const formatOwnership = (value: number) => {
     if (value === 0) return '0%';
     if (value < 0.01) return '<0.01%';
     return `${value.toFixed(value >= 10 ? 1 : 2)}%`;
+};
+
+/* #185: our own listed company, first in the market */
+const OwnTickerRow: React.FC<{ ticker: StreamingOwnTicker; onOpen: () => void }> = ({ ticker, onOpen }) => {
+    const positive = ticker.changePercent >= 0;
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            className="w-full rounded-xl border border-amber-400/45 bg-gradient-to-br from-amber-500/15 via-zinc-900 to-zinc-900 p-4 text-left transition-colors active:bg-zinc-800"
+        >
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-400 text-[10px] font-black text-black">
+                        {ticker.symbol}
+                    </div>
+                    <div className="min-w-0">
+                        <div className="truncate text-sm font-bold text-white">{ticker.name}</div>
+                        <div className="mt-0.5 text-[9px] font-black uppercase tracking-wide text-amber-300">Your company · {formatOwnership(ticker.founderPercent)} yours</div>
+                    </div>
+                </div>
+                <div className="w-24 shrink-0 text-right">
+                    <div className="font-mono text-sm font-bold text-white">{formatMoney(ticker.price)}</div>
+                    <div className={`flex items-center justify-end gap-1 text-[10px] font-bold ${positive ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                        {Math.abs(ticker.changePercent).toFixed(1)}%
+                    </div>
+                </div>
+            </div>
+        </button>
+    );
+};
+
+/* #187: buying and selling our own shares: a share of the company, its price with the size's impact, what you hold */
+const OWN_TRADE_SIZES = [0.5, 1, 2, 5];
+const OwnShareTrade: React.FC<{ player: Player; onTraded: (next: Player) => void }> = ({ player, onTraded }) => {
+    const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
+    const [size, setSize] = useState(1);
+    const [armed, setArmed] = useState(false);
+    const [note, setNote] = useState<string | null>(null);
+    const quote = quoteOwnShareTrade(player, side, size);
+    if (!quote) return null;
+    const trade = () => {
+        if (quote.warning && !armed) { setArmed(true); return; }
+        const result = tradeOwnStreamingShares(player, side, size);
+        setArmed(false);
+        setNote(result.message);
+        if (result.changed) onTraded(result.player);
+    };
+    return (
+        <div className="mt-3 rounded-xl border border-amber-400/30 bg-zinc-900 p-3">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-black/40 p-1" role="radiogroup" aria-label="Buy or sell your shares">
+                {(['BUY', 'SELL'] as const).map(option => (
+                    <button key={option} type="button" role="radio" aria-checked={side === option} onClick={() => { setSide(option); setArmed(false); setNote(null); }}
+                        className={`min-h-9 rounded-md text-xs font-black uppercase tracking-wide ${side === option ? (option === 'BUY' ? 'bg-emerald-500 text-black' : 'bg-rose-500 text-white') : 'text-zinc-400'}`}>
+                        {option === 'BUY' ? 'Buy' : 'Sell'}
+                    </button>
+                ))}
+            </div>
+            <div className="mt-3 text-[9px] font-bold uppercase tracking-wide text-zinc-500">Of the company</div>
+            <div className="mt-1 grid grid-cols-4 gap-1.5">
+                {OWN_TRADE_SIZES.map(option => (
+                    <button key={option} type="button" onClick={() => { setSize(option); setArmed(false); setNote(null); }}
+                        className={`min-h-9 rounded-lg border text-xs font-bold ${size === option ? 'border-amber-400 bg-amber-400/15 text-amber-200' : 'border-zinc-800 text-zinc-300'}`}>
+                        {option}%
+                    </button>
+                ))}
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-zinc-400">
+                {quote.shares.toLocaleString()} shares at about {formatMoney(quote.pricePerShare)} each (the size moves the price): <span className="font-mono text-white">{formatCompactMoney(quote.total)}</span>.
+                You hold {formatOwnership(quote.founderAfter - (side === 'BUY' ? size : -size))} → <span className="font-bold text-white">{formatOwnership(quote.founderAfter)}</span>.
+            </p>
+            {quote.warning && <p className="mt-2 text-xs font-bold text-amber-300">{armed ? 'Tap again to sell anyway: ' : ''}{quote.warning}</p>}
+            <button type="button" disabled={Boolean(quote.blocked)} onClick={trade}
+                className={`mt-3 min-h-11 w-full rounded-xl text-xs font-black uppercase tracking-wide ${quote.blocked ? 'bg-zinc-800 text-zinc-500' : side === 'BUY' ? 'bg-gradient-to-b from-amber-300 to-amber-500 text-black' : 'bg-rose-500 text-white'}`}>
+                {quote.blocked || `${side === 'BUY' ? 'Buy' : armed ? 'Sell anyway' : 'Sell'} ${size}% · ${formatCompactMoney(quote.total)}`}
+            </button>
+            {note && <p className="mt-2 text-xs text-zinc-300" role="status">{note}</p>}
+        </div>
+    );
+};
+
+/* #185: our ticker's page: the weekly closes since listing, what it is worth, and who holds it */
+const OwnTickerDetail: React.FC<{ ticker: StreamingOwnTicker; onBack: () => void; player: Player; onTraded: (next: Player) => void }> = ({ ticker, onBack, player, onTraded }) => {
+    const positive = ticker.changePercent >= 0;
+    const low = Math.min(...ticker.closes, ticker.valuePerShare);
+    const high = Math.max(...ticker.closes, ticker.valuePerShare);
+    const span = Math.max(0.01, high - low);
+    const y = (value: number) => 108 - ((value - low) / span) * 96;
+    const points = ticker.closes.map((close, index) => `${(index / Math.max(1, ticker.closes.length - 1)) * 300},${y(close).toFixed(1)}`).join(' ');
+    const gap = ticker.price > 0 ? (ticker.valuePerShare / ticker.price - 1) * 100 : 0;
+    return (
+        <div className="absolute inset-0 z-50 flex flex-col bg-black text-white animate-in slide-in-from-right duration-300">
+            <div className="flex items-center gap-3 border-b border-zinc-800 bg-zinc-900 p-4 pt-12">
+                <button type="button" onClick={onBack} aria-label="Back to stock market" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-zinc-800">
+                    <ArrowLeft size={20} />
+                </button>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                        <div className="text-lg font-bold">{ticker.symbol}</div>
+                        <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-black">Your company</span>
+                    </div>
+                    <div className="break-words text-xs leading-snug text-zinc-400">{ticker.name}</div>
+                </div>
+                <div className="text-right">
+                    <div className="text-lg font-bold">{formatMoney(ticker.price)}</div>
+                    <div className={`text-[10px] font-bold ${positive ? 'text-emerald-500' : 'text-rose-500'}`}>{positive ? '+' : ''}{ticker.changePercent.toFixed(2)}%</div>
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+                    <svg viewBox="0 0 300 116" className="h-32 w-full" preserveAspectRatio="none" aria-label="Weekly closes since listing">
+                        <line x1="0" x2="300" y1={y(ticker.valuePerShare)} y2={y(ticker.valuePerShare)} stroke="rgba(251,191,36,.55)" strokeDasharray="4 4" strokeWidth="1" />
+                        <polyline points={points} fill="none" stroke={positive ? '#10b981' : '#f43f5e'} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                    </svg>
+                    <div className="mt-2 flex justify-between text-[10px] text-zinc-500">
+                        <span>Listed at {formatMoney(ticker.closes[0])}</span>
+                        <span className="text-amber-300">- - value {formatMoney(ticker.valuePerShare)}</span>
+                    </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[
+                        ['Market cap', formatCompactMoney(ticker.marketCap)],
+                        ['Value per share', formatMoney(ticker.valuePerShare)],
+                        ['Your stake', formatOwnership(ticker.founderPercent)],
+                        ['Public float', formatOwnership(ticker.publicPercent)],
+                    ].map(([label, value]) => (
+                        <div key={label} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+                            <div className="text-[9px] font-bold uppercase tracking-wide text-zinc-500">{label}</div>
+                            <div className="mt-1 font-mono text-sm font-bold text-white">{value}</div>
+                        </div>
+                    ))}
+                </div>
+                {/* #187: your own shares: bought from the public, sold after the lock-up */}
+                <OwnShareTrade player={player} onTraded={onTraded} />
+                <p className="mt-3 text-xs leading-relaxed text-zinc-400">
+                    {Math.abs(gap) < 1
+                        ? 'The market prices it at about what the company is worth by its numbers.'
+                        : gap > 0
+                            ? `By its numbers a share is worth ${gap.toFixed(0)}% more than its price; each week the price moves part of the way there.`
+                            : `The price is ${Math.abs(gap).toFixed(0)}% above what its numbers say a share is worth; each week it moves part of the way back.`}
+                </p>
+            </div>
+        </div>
+    );
 };
 
 const StockRow: React.FC<{
@@ -145,6 +292,9 @@ export const StocksApp: React.FC<StocksAppProps> = ({
     const [orderMode, setOrderMode] = useState<StockOrderMode>('SHARES');
     const [controlFeedback, setControlFeedback] = useState('');
     const [tradeFeedback, setTradeFeedback] = useState('');
+    /* #185: our own ticker, once the company is listed */
+    const [ownTickerOpen, setOwnTickerOpen] = useState(false);
+    const ownTicker = useMemo(() => getStreamingOwnTicker(player), [player]);
     const stockScrollRef = useRef<HTMLDivElement>(null);
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
@@ -180,6 +330,8 @@ export const StocksApp: React.FC<StocksAppProps> = ({
     useEffect(() => {
         if (stockScrollRef.current) stockScrollRef.current.scrollTop = 0;
     }, [selectedStockId, tab]);
+
+    if (ownTickerOpen && ownTicker) return <OwnTickerDetail ticker={ownTicker} onBack={() => setOwnTickerOpen(false)} player={player} onTraded={next => onUpdatePlayer?.(next)} />;
 
     if (selectedStock) {
         const snapshot = snapshots.get(selectedStock.id) || getEntertainmentStockSnapshot(player, selectedStock);
@@ -610,6 +762,7 @@ export const StocksApp: React.FC<StocksAppProps> = ({
             </div>
 
             <div ref={stockScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4 custom-scrollbar">
+                {tab === 'MARKET' && ownTicker ? <OwnTickerRow ticker={ownTicker} onOpen={() => setOwnTickerOpen(true)} /> : null}
                 {visibleStocks.length === 0 ? (
                     <div className="mt-10 text-center text-sm text-zinc-600">{tr('stocks.noInvestments')}</div>
                 ) : visibleStocks.map(stock => {

@@ -19,6 +19,16 @@ import { compactCount, money, moneyPrecise, pct } from '../../finance/format';
 import { FlagField } from '../FlagField';
 import { StreamingTitleArt } from '../StreamingTitleArt';
 import { Mark } from '../../../streaming-transplant/StreamingBrandVisuals';
+import { StepIcon, TickIcon } from './StageIcons';
+import { STREAMING_OFFER_PERSONALITY } from '../../../streaming-transplant/offerPersonality';
+
+/* #113: each stream in the colour of the offer it belongs to (#104's personalities) */
+const STREAM_COLOUR: Record<string, string> = {
+  subs: STREAMING_OFFER_PERSONALITY.SUBSCRIPTION.colour,
+  ads: STREAMING_OFFER_PERSONALITY.ADS.colour,
+  daypass: STREAMING_OFFER_PERSONALITY.ADS.colour,
+  rentals: STREAMING_OFFER_PERSONALITY.STORE.colour,
+};
 
 const WAVE: Record<string, number[]> = {
   pulse: [30, 90, 40, 95, 35, 25, 20],
@@ -65,11 +75,10 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
   const pack = data.identPackages.find((p) => p.id === draft.packageId);
   const catalogueDepth = data.catalogue.hours / Math.max(1, data.catalogue.hoursNeeded);
 
-  /* The six decisions this wizard is made of. The hero draws one pip each and
-     the grid below draws one tile each, off this same list, so the count in the
-     hero and the tiles under it can never disagree — and a pip jumps to the
-     step it stands for, which is what makes the hero part of the page rather
-     than a picture sitting on top of it. */
+  /* The six decisions this wizard is made of: the briefing's six objectives.
+     The briefing draws one objective each and the grid below one tile each,
+     off this same list, so the count in the briefing and the tiles under it
+     can never disagree — and an objective jumps to the step it stands for. */
   const checks = [
     { label: 'Markets', ok: chosen.length > 0, step: 'markets' as LaunchStepId },
     { label: 'Clearance', ok: approved === chosen.length && chosen.length > 0, step: 'clearance' as LaunchStepId },
@@ -85,53 +94,67 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
 
   return (
     <>
-      {/* --- the title card for your own opening night --------------------
-          It was a tall panel with a watermarked bolt filling most of it, a name
-          in the only mixed-case display text on the screen, and two numbers
-          that did not agree: a ring reading 2/6 beside a sentence counting
-          something else entirely. And a week number — 1259 — that meant
-          nothing to anyone.
+      {/* --- the mission briefing (#110) ------------------------------------
+          The overview reads as a briefing for opening night: the service's
+          mark and name, the mission in one line, its six objectives, and a
+          stamp — GO when all six are settled, NO GO while something blocks,
+          otherwise how many are still open. Each objective is the step it
+          stands for, with that step's glyph from the launch sequence, and
+          jumps to it; the sentence beneath reconciles both counts. */}
+      <section className={`bl-hero is-${state}`} aria-label="Mission briefing">
+        <div className="bl-brief-top">
+          <p className="sf-eyebrow">Mission briefing</p>
+          <span className={`bl-brief-stamp is-${state}`}>
+            {state === 'ready' ? 'Go' : state === 'blocked' ? 'No go' : `${checks.length - done} open`}
+          </span>
+        </div>
+        <div className="bl-brief-id">
+          <span className="bl-hero-mark" aria-hidden="true">
+            <Mark
+              brand={{
+                name: data.company.name,
+                markId: data.company.markId || 'BOLT',
+                customMark: data.company.logoSrc || null,
+              }}
+              className="bl-hero-mark-glyph"
+            />
+          </span>
+          <span className="bl-brief-name">
+            <em>Opening night</em>
+            <h2>{data.company.name}</h2>
+          </span>
+        </div>
+        <p className="bl-brief-goal">
+          {chosen.length > 0
+            ? `Open in ${footprint.countries} ${footprint.countries === 1 ? 'market' : 'markets'} · ${compactCount(footprint.audience)} viewers · ${compactCount(data.catalogue.titles)} titles`
+            : 'Choose where to open first'}
+        </p>
 
-          It is the splash a household would see the night this opens: the mark
-          drawn properly, the name set the way every other heading is set, and
-          one row of six pips that ARE the six decisions below. Each pip is the
-          step it stands for and jumps to it; the sentence beneath reconciles
-          both counts in one breath. */}
-      <section className={`bl-hero is-${state}`}>
-        <span className="bl-hero-mark" aria-hidden="true">
-          <Mark
-            brand={{
-              name: data.company.name,
-              markId: data.company.markId || 'BOLT',
-              customMark: data.company.logoSrc || null,
-            }}
-            className="bl-hero-mark-glyph"
-          />
-        </span>
-        <p className="sf-eyebrow">Opening night</p>
-        <h2>{data.company.name}</h2>
-
-        <div className="bl-hero-pips" role="group" aria-label="The six decisions">
-          {checks.map((check) => (
-            <button
-              key={check.step}
-              type="button"
-              className={check.ok ? 'is-ok' : blockedSteps.has(check.step) ? 'is-blocked' : undefined}
-              onClick={() => onJump(check.step)}
-              aria-label={`${check.label} — ${check.ok ? 'settled' : 'still open'}`}
-            >
-              <i aria-hidden="true" />
-              <em>{check.label}</em>
-            </button>
-          ))}
+        <div className="bl-hero-pips" role="group" aria-label="The six objectives">
+          {checks.map((check) => {
+            const blocked = !check.ok && blockedSteps.has(check.step);
+            return (
+              <button
+                key={check.step}
+                type="button"
+                className={check.ok ? 'is-ok' : blocked ? 'is-blocked' : undefined}
+                onClick={() => onJump(check.step)}
+                aria-label={`${check.label} — ${check.ok ? 'settled' : blocked ? 'blocked' : 'still open'}`}
+              >
+                <span className="bl-pip-glyph" aria-hidden="true"><StepIcon step={check.step} /></span>
+                <span className="bl-pip-mark" aria-hidden="true">{check.ok ? <TickIcon /> : blocked ? '!' : null}</span>
+                <em>{check.label}</em>
+              </button>
+            );
+          })}
         </div>
 
         <p className="bl-hero-read">
           {state === 'ready'
-            ? `All ${checks.length} decisions are settled. Build the Platform can start from this.`
+            ? `All ${checks.length} objectives are settled. Build the Platform can start from this.`
             : state === 'blocked'
               ? `${done} of ${checks.length} settled · ${blocking} ${blocking === 1 ? 'thing still blocks' : 'things still block'} opening night.`
-              : `${done} of ${checks.length} settled · finish the remaining decisions and clearance checks before opening night.`}
+              : `${done} of ${checks.length} settled · finish the remaining objectives and clearance checks before opening night.`}
         </p>
       </section>
 
@@ -210,8 +233,11 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
         </Tile>
       </div>
 
-      {/* --- what it is forecast to do -------------------------------------- */}
-      <section className="bl-money">
+      {/* --- what it is forecast to do --------------------------------------
+          #113: the projected result, each stream in its offer's colour and named
+          under the bar, so the bar says where the money comes from. */}
+      <section className="bl-money" aria-label="Projected result">
+        <p className="sf-eyebrow bl-money-head">Projected result</p>
         <div className="bl-money-top">
           <div>
             <p className="sf-eyebrow">Potential gross if playable</p>
@@ -223,10 +249,19 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
           </div>
         </div>
         <div className="bl-money-bar" aria-hidden="true">
-          {forecastReady && forecast.streams.map((stream, i) => (
-            <i key={stream.id} style={{ width: `${(stream.monthly / Math.max(1, forecast.monthlyRevenue)) * 100}%`, opacity: 1 - i * 0.14 }} title={stream.name} />
+          {forecastReady && forecast.streams.map((stream) => (
+            <i key={stream.id} style={{ width: `${(stream.monthly / Math.max(1, forecast.monthlyRevenue)) * 100}%`, background: STREAM_COLOUR[stream.id] }} title={stream.name} />
           ))}
         </div>
+        {forecastReady && forecast.streams.length > 0 && (
+          <ul className="bl-money-keys">
+            {forecast.streams.map((stream) => (
+              <li key={stream.id} style={{ ['--k' as string]: STREAM_COLOUR[stream.id] ?? 'var(--sf-brand-on)' }}>
+                <i aria-hidden="true" />{stream.name}<b>{money(stream.monthly)}</b>
+              </li>
+            ))}
+          </ul>
+        )}
         <p className="bl-money-note">
           {forecastReady ? `${money(forecast.yearlyRevenue)} first-year equivalent if eligible titles are watched and buyers convert` : 'Forecast updating or unavailable'} · before network, payment and rights costs · {money(treasury.planned)} planned to launch
           {gap > 0 && <> · {money(gap)} still to find</>}
@@ -266,6 +301,7 @@ export function StepBlueprint({ data, draft, chosen, treasury, free, gap, handle
   );
 }
 
+/* #113: a dossier card — the decision's picture, its label and its value; a tick once it is settled */
 function Tile({ label, value, state, onJump, children }: {
   label: string; value: string; state: boolean; onJump: () => void; children: ReactNode;
 }) {
@@ -274,6 +310,7 @@ function Tile({ label, value, state, onJump, children }: {
       <span className="bl-tile-art">{children}</span>
       <span className="bl-tile-label">{label}</span>
       <span className="bl-tile-value">{value}</span>
+      {state && <span className="bl-tile-tick" aria-hidden="true"><TickIcon /></span>}
     </button>
   );
 }

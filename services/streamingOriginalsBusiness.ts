@@ -29,7 +29,6 @@ export interface StreamingOriginalLocalizationDefinition {
     dubbedLanguageCount: number;
     cashCost: number;
     deliveryWeeks: number;
-    contentOperationsRequired: number;
 }
 
 export const STREAMING_ORIGINAL_LOCALIZATION_PACKAGES: StreamingOriginalLocalizationDefinition[] = [
@@ -41,7 +40,6 @@ export const STREAMING_ORIGINAL_LOCALIZATION_PACKAGES: StreamingOriginalLocaliza
         dubbedLanguageCount: 0,
         cashCost: 500_000,
         deliveryWeeks: 1,
-        contentOperationsRequired: 0,
     },
     {
         id: 'MULTI_REGION',
@@ -51,7 +49,6 @@ export const STREAMING_ORIGINAL_LOCALIZATION_PACKAGES: StreamingOriginalLocaliza
         dubbedLanguageCount: 3,
         cashCost: 2_500_000,
         deliveryWeeks: 2,
-        contentOperationsRequired: 10,
     },
     {
         id: 'GLOBAL',
@@ -61,7 +58,6 @@ export const STREAMING_ORIGINAL_LOCALIZATION_PACKAGES: StreamingOriginalLocaliza
         dubbedLanguageCount: 8,
         cashCost: 7_500_000,
         deliveryWeeks: 3,
-        contentOperationsRequired: 20,
     },
 ];
 
@@ -116,7 +112,7 @@ export const commitStreamingOriginalLocalization = (
 ): {
     player: Player;
     changed: boolean;
-    reason?: 'UNKNOWN_ORIGINAL' | 'NOT_GREENLIT' | 'ALREADY_PLANNED' | 'TECH_REQUIRED' | 'INSUFFICIENT_TREASURY';
+    reason?: 'UNKNOWN_ORIGINAL' | 'NOT_GREENLIT' | 'ALREADY_PLANNED' | 'INSUFFICIENT_TREASURY';
 } => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const commission = platform.originalCommissions.find(item => item.id === commissionId);
@@ -124,9 +120,7 @@ export const commitStreamingOriginalLocalization = (
     if (!commission.canonicalProjectId) return { player, changed: false, reason: 'NOT_GREENLIT' };
     if (commission.localization) return { player, changed: false, reason: 'ALREADY_PLANNED' };
     const definition = getLocalizationDefinition(packageId);
-    if (platform.technologyLevels.CONTENT_OPERATIONS < definition.contentOperationsRequired) {
-        return { player, changed: false, reason: 'TECH_REQUIRED' };
-    }
+    // #86: a package needs only its cash (Content operations is no longer needed)
     if (platform.treasuryCash < definition.cashCost) {
         return { player, changed: false, reason: 'INSUFFICIENT_TREASURY' };
     }

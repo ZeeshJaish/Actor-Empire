@@ -137,10 +137,13 @@ assert(first.personas.length === 6, 'Audience must retain all six canonical pers
 assertPercentageTotal(first.personas.map(persona => persona.sharePercent), 'Audience personas must cover the full active-viewer market.');
 assert(first.switching.joinedThisWeek === 64_000 && first.switching.cancelledThisWeek === 31_000, 'Market Command must read weekly joins and cancellations from the canonical CEO loop.');
 assert(first.switching.reactivatedThisWeek === 5_400, 'Market Command must read canonical reactivations rather than estimating over saved operations.');
-assert(first.switching.reasons.reduce((total, reason) => total + reason.sharePercent, 0) === 100, 'Platform-switching reasons must resolve to 100%.');
+assert(first.switching.reasons.length === 0, 'Before a week settles with household flows, no switching reasons are made up (#128).');
 assert(audienceDesk.live, 'The ZIP Audience desk adapter must open its live analytics state for a launched platform.');
 assert(JSON.stringify(audienceDesk.market) === JSON.stringify(first), 'The ZIP Audience desk must receive the same canonical living-market values used by every later system.');
-assert(audienceDesk.regions.length === 2, 'The ZIP Audience desk must aggregate the selected Day-One countries into canonical launch regions.');
-assert(audienceDesk.regions.every(region => region.rivals.length > 0), 'Audience territory cards must read leading rivals from the living market.');
+/* #136: the desk's old region rows are gone; MARKETS groups the living market's countries itself (audienceAtlasModel) */
+const launchCountries = first.countries.filter(country => country.selectedForLaunch);
+assert(new Set(launchCountries.map(country => country.regionId)).size === 2, 'The selected Day-One countries must fall in two canonical launch regions.');
+assert(launchCountries.every(country => country.topPlatformName), 'Each launch country must name its leading rival from the living market.');
+assert(audienceDesk.room.head.audience >= 0, 'The Audience desk must carry the room model.');
 
 console.log('Streaming Phase 2 Living Audience and Rival Market audit passed.');

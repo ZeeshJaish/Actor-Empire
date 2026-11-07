@@ -1,0 +1,183 @@
+/* ============================================================================
+   PLAN BUILDER — plans side by side, rows of what each offers, a picker sheet.
+   The rooms' flat dark language. The accent is the host's brand colour:
+   --pb-accent, else the Offer tab's --oa / --offer-accent, else the launch
+   wizard's --sf-brand-on.
+
+   Both hosts reset button fonts (`.streaming-hq-shell button {font:inherit}`
+   and the wizard's own), so button text rules here are written at 0-2-0+.
+   ========================================================================== */
+
+.builder{--pa:var(--pb-accent,var(--oa,var(--offer-accent,var(--sf-brand-on,#8b5cf6))));position:relative;min-width:0}
+
+.head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-bottom:9px;min-height:28px}
+.count{font:600 10px/1.2 'Inter',system-ui,sans-serif;color:#7d8698}
+.builder .suggest{min-height:32px;padding:7px 11px;border-radius:999px;border:1px solid color-mix(in srgb,var(--pa) 45%,transparent);
+  background:color-mix(in srgb,var(--pa) 10%,transparent);font:800 9.5px/1.2 'Inter',system-ui,sans-serif;color:color-mix(in srgb,var(--pa) 55%,#fff);text-align:center}
+.confirm{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;font:600 10px/1.3 'Inter',system-ui,sans-serif;color:#c9cfda;text-align:right}
+.builder .confirm button{min-height:32px;padding:6px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);
+  font:800 9.5px/1 'Inter',system-ui,sans-serif;color:#eef0f5}
+.builder .confirm button:first-of-type{border-color:color-mix(in srgb,var(--pa) 55%,transparent);background:color-mix(in srgb,var(--pa) 18%,transparent)}
+
+.eyebrow{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7d8698}
+
+/* the table scrolls sideways past the second or third plan; the row names stay put */
+.scroll{overflow-x:auto;overscroll-behavior-x:contain;border-radius:15px;border:1px solid rgba(255,255,255,.09);background:#090b10;scrollbar-width:thin}
+.scroll:focus-visible{outline:2px solid color-mix(in srgb,var(--pa) 60%,transparent);outline-offset:2px}
+.table{border-collapse:separate;border-spacing:0;min-width:100%}
+.corner,.rowHead{position:sticky;left:0;z-index:2;width:84px;min-width:84px;max-width:84px;padding:0 8px 0 10px;
+  background:#0b0d12;border-right:1px solid rgba(255,255,255,.07);text-align:left}
+.corner{padding-top:10px;padding-bottom:8px;vertical-align:bottom}
+.rowHead{font:700 9.5px/1.2 'Inter',system-ui,sans-serif;color:#8b93a5;border-top:1px solid rgba(255,255,255,.05)}
+.groupStart>th,.groupStart>td{border-top-color:rgba(255,255,255,.12)}
+
+/* #105 tier columns: each opens with a band in its colour, its name and a big price */
+.planHead{--pc:var(--pa);position:relative;min-width:98px;padding:13px 6px 9px;vertical-align:top;text-align:center;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--pc) 17%,#0b0d12),#0b0d12 88%);
+  box-shadow:inset 0 3px 0 var(--pc);border-bottom:1px solid color-mix(in srgb,var(--pc) 35%,rgba(255,255,255,.08))}
+/* editable: the plan's menu and a NEW tag sit in a band above its name, so the name has the column's width */
+.editable .planHead{padding-top:28px}
+.builder .headPrice{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;margin-top:6px;padding:6px 2px 5px;
+  border:1px solid transparent;border-radius:11px;background:none;text-align:center}
+.headPrice b{font:400 23px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#fff;white-space:nowrap}
+.headPrice small{font:700 8.5px/1.2 'Inter',system-ui,sans-serif;color:#8b93a5;white-space:nowrap}
+.builder button.headPrice{border-color:color-mix(in srgb,var(--pc) 32%,transparent);background:color-mix(in srgb,var(--pc) 9%,transparent);
+  transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.builder button.headPrice:active{transform:scale(.95)}
+.builder .headPrice.active{background:color-mix(in srgb,var(--pa) 18%,transparent);border-color:color-mix(in srgb,var(--pa) 65%,transparent)}
+.newTag{position:absolute;top:10px;left:0;right:0;font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:color-mix(in srgb,var(--pa) 60%,#fff)}
+/* two lines tall, so the prices under a short name and a long one line up */
+.builder .planName{display:flex;align-items:flex-end;justify-content:center;width:100%;min-height:calc(2.4em + 4px);padding:2px 3px;border:0;background:none;
+  font:800 12px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;text-align:center;overflow-wrap:break-word}
+.builder .rename{width:100%;max-width:120px;padding:5px 6px;border-radius:8px;border:1px solid color-mix(in srgb,var(--pa) 60%,transparent);
+  background:#0f131a;font:800 11px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;text-align:center}
+.menuWrap{position:absolute;top:3px;right:1px}
+.builder .more{width:26px;height:26px;border-radius:8px;border:0;background:none;font:900 13px/1 'Inter',system-ui,sans-serif;color:#7d8698}
+.menu{position:absolute;top:27px;right:0;z-index:5;display:flex;flex-direction:column;min-width:118px;padding:4px;border-radius:11px;
+  background:#121620;border:1px solid rgba(255,255,255,.12);box-shadow:0 12px 30px -12px rgba(0,0,0,.8)}
+.builder .menu>button{min-height:36px;padding:8px 10px;border-radius:8px;border:0;background:none;font:700 10.5px/1 'Inter',system-ui,sans-serif;color:#dfe3ea;text-align:left}
+.builder .menu>button:disabled{color:#4f5763}
+.builder .menu>button:not(:disabled):active{background:rgba(255,255,255,.06)}
+.swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:6px 6px 8px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:3px}
+.builder .swatch{width:100%;aspect-ratio:1;min-width:14px;border-radius:50%;border:2px solid transparent;background:var(--sw);padding:0}
+.builder .swatch[aria-pressed="true"]{border-color:#fff}
+
+.cell{--pc:var(--pa);padding:0;border-top:1px solid rgba(255,255,255,.05);text-align:center;position:relative;background:color-mix(in srgb,var(--pc) 4%,transparent)}
+.builder .cell>button,.cell>span{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;min-height:38px;padding:4px 5px;
+  border:0;background:none;font:700 11px/1.2 'Inter',system-ui,sans-serif;color:#dfe3ea;text-align:center}
+.cell.off>button,.cell.off>span{color:#4f5763}
+.cell.active{background:color-mix(in srgb,var(--pa) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pa) 55%,transparent)}
+.builder .cell>button:active{background:rgba(255,255,255,.05)}
+.cellLocked>button,.cellLocked>span{color:#d9a54a}
+.lock.cellLock{width:11px;height:11px;stroke:#d9a54a}
+.cellLocked .chip{border-color:rgba(217,165,74,.5);color:#d9a54a}
+
+/* #105 what a cell shows: chips (the table's best picture golden), ad pips, screens, ticks, a download arrow */
+.chip{display:inline-flex;align-items:center;justify-content:center;min-width:34px;padding:4px 7px;border-radius:8px;border:1px solid #2c3240;background:#11141b;
+  font:800 10.5px/1 'Inter',system-ui,sans-serif;color:#e4e8ef;white-space:nowrap}
+.chip.gold{border-color:rgba(255,207,63,.85);background:linear-gradient(180deg,rgba(255,207,63,.22),rgba(255,207,63,.05));color:#ffd970;
+  box-shadow:0 0 14px -5px rgba(255,207,63,.8),inset 0 1px 0 rgba(255,255,255,.14)}
+.glyph{width:17px;height:17px;fill:none;stroke:color-mix(in srgb,var(--pc) 72%,#fff);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.screens{display:grid;gap:3px;justify-content:center}
+.screen{width:12px;height:10px;fill:none;stroke:#c9cfda;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round}
+.devices{display:flex;align-items:flex-end;gap:2px}
+.adFace{display:flex;flex-direction:column;align-items:center;gap:4px}
+.pips{display:flex;gap:3px}
+.pips i{width:7px;height:7px;border-radius:50%;background:#262a34}
+.pips i.pipOn{background:#ffb020;box-shadow:0 0 6px -1px rgba(255,176,32,.75)}
+.adFace small{font:700 8px/1 'Inter',system-ui,sans-serif;color:#8b93a5;white-space:nowrap}
+.noAds{font:700 9.5px/1.2 'Inter',system-ui,sans-serif;color:#6f7888}
+.dash{color:#4f5763}
+/* a row the service cannot sell yet: a lock in each cell, and its name opens the step in Tech */
+.lock.slotLock{width:13px;height:13px;stroke:#5f6875}
+.lockedRow>.rowHead{color:#6f7888}
+.builder .rowUnlock{display:flex;align-items:center;gap:3px;width:max-content;max-width:100%;margin:1px 0 0 -3px;min-height:24px;padding:2px 3px;border:0;border-radius:6px;
+  background:none;font:800 8.5px/1 'Inter',system-ui,sans-serif;letter-spacing:.02em;color:#e9bf52;white-space:nowrap}
+.rowUnlock .lock{width:10px;height:10px;stroke:#e9bf52}
+.builder .rowUnlock:active{transform:scale(.95)}
+/* a cell that differs from the pricing in force */
+.changed::after{content:'';position:absolute;top:6px;right:6px;width:5px;height:5px;border-radius:50%;background:var(--pa);pointer-events:none}
+
+/* Free with ads (#46): the first column, its own underline; muted until its quality is set */
+.freeHead{border-bottom-style:dashed}
+.freeHint{display:block;margin-top:2px;font:700 7.5px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#7d8698}
+.builder .cell.unset>button,.cell.unset>span{color:#9aa3b2;font-style:italic}
+.unset .chip{border-style:dashed;color:#9aa3b2;font-style:italic}
+.sheetNote{margin:10px 0 0;font:600 10px/1.45 'Inter',system-ui,sans-serif;color:#8b93a5}
+/* Rent or buy (#47): its price picker */
+.storePrices{display:flex;flex-direction:column;gap:7px}
+.storePrices>.eyebrow{margin-top:6px}
+.stepRow{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(64px,auto) 40px;align-items:center;gap:8px;padding:6px 6px 6px 12px;
+  border-radius:12px;border:1px solid rgba(255,255,255,.08);background:#0f131a}
+.stepRow>span{font:700 11px/1.25 'Inter',system-ui,sans-serif;color:#c9cfda;overflow-wrap:anywhere}
+.stepRow>b{font:400 18px/1 'Anton','Archivo',sans-serif;color:#f3f5f9;text-align:center;white-space:nowrap}
+.builder .stepRow>button{display:flex;align-items:center;justify-content:center;height:36px;padding:0;border-radius:10px;
+  border:1px solid rgba(255,255,255,.12);background:#121620;font:800 16px/1 'Inter',system-ui,sans-serif;color:#eef0f5}
+.builder .stepRow>button:disabled{color:#4f5763;border-color:rgba(255,255,255,.06)}
+.segments{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.builder .segments>button{min-height:38px;padding:8px 10px;border-radius:11px;border:1px solid rgba(255,255,255,.1);background:#0f131a;
+  font:800 10.5px/1.2 'Inter',system-ui,sans-serif;color:#c9cfda}
+.builder .segments>button[aria-pressed="true"]{border-color:color-mix(in srgb,var(--pa) 60%,transparent);background:color-mix(in srgb,var(--pa) 14%,#0f131a);color:#f3f5f9}
+
+.addHead{min-width:92px;padding:8px 8px 7px;vertical-align:bottom;border-bottom:2px solid transparent}
+.builder .add{width:100%;min-height:36px;padding:9px 6px;border-radius:11px;border:1px dashed rgba(255,255,255,.18);background:none;
+  font:800 9.5px/1.2 'Inter',system-ui,sans-serif;color:#aab2c0;text-align:center}
+.builder .add:disabled{color:#5f6875;border-color:rgba(255,255,255,.08)}
+.addCell{border-top:1px solid rgba(255,255,255,.05)}
+
+.footRow .rowHead{color:#6f7888}
+.stat{padding:8px 4px 10px;border-top:1px solid rgba(255,255,255,.1);text-align:center;white-space:nowrap}
+.stat b{font:400 15px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
+.stat i{margin-left:4px;font:700 9px/1 'Inter',system-ui,sans-serif;font-style:normal;color:#8b93a5}
+
+/* ── the picker sheet ── */
+.builder .backdrop{position:fixed;inset:0;z-index:80;border:0;padding:0;background:rgba(3,4,7,.55);animation:pbFade .16s ease}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:81;max-width:520px;max-height:76vh;margin:0 auto;overflow-y:auto;overscroll-behavior:contain;
+  padding:14px 16px calc(18px + env(safe-area-inset-bottom));border-radius:20px 20px 0 0;
+  background:#0c0f15;border:1px solid rgba(255,255,255,.1);border-bottom:0;box-shadow:0 -18px 40px -20px rgba(0,0,0,.9);
+  animation:pbRise .2s cubic-bezier(.2,.8,.2,1);text-align:left}
+.sheetHead{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:3px 10px;margin-bottom:12px}
+.sheetHead .eyebrow{grid-column:1;overflow-wrap:anywhere}
+.sheetHead b{grid-column:1;font:900 17px/1.15 'Inter',system-ui,sans-serif;letter-spacing:-.01em;color:#eef0f5}
+.builder .close{grid-column:2;grid-row:1 / span 2;min-height:36px;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.04);font:800 10px/1 'Inter',system-ui,sans-serif;color:#eef0f5}
+
+.options{display:flex;flex-direction:column;gap:6px;list-style:none;margin:0;padding:0}
+.builder .option{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:48px;padding:10px 12px;border-radius:12px;
+  border:1px solid rgba(255,255,255,.08);background:#0f131a;text-align:left}
+.option>span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.option b{font:800 12px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;overflow-wrap:anywhere}
+.option small{font:600 9.5px/1.3 'Inter',system-ui,sans-serif;color:#8b93a5;overflow-wrap:anywhere}
+.builder .option.chosen{border-color:color-mix(in srgb,var(--pa) 60%,transparent);background:color-mix(in srgb,var(--pa) 12%,#0f131a)}
+.builder .option.locked{background:#0b0e13;border-style:dashed}
+.option.locked b{color:#6f7888}
+.option.locked small{color:#a88a55}
+.tick{flex:0 0 auto;font:900 13px/1 'Inter',system-ui,sans-serif;font-style:normal;color:color-mix(in srgb,var(--pa) 60%,#fff)}
+.lock{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:#6f7888;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.builder .option.shake{animation:pbShake .38s ease}
+
+.note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin-top:10px;padding:10px 12px;border-radius:12px;
+  background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.3);font:600 10.5px/1.4 'Inter',system-ui,sans-serif;color:#ffd58a}
+.note>span{min-width:0;flex:1 1 160px}
+.builder .note button{flex:0 0 auto;min-height:36px;padding:8px 11px;border-radius:9px;border:1px solid rgba(255,176,32,.45);background:rgba(255,176,32,.12);
+  font:800 10px/1 'Inter',system-ui,sans-serif;color:#ffe2a8}
+
+.priceEdit{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:10px}
+.builder .priceEdit button{height:48px;border-radius:13px;border:1px solid rgba(255,255,255,.12);background:#0f131a;
+  font:800 20px/1 'Inter',system-ui,sans-serif;color:#eef0f5}
+.builder .priceEdit label{display:flex;align-items:baseline;justify-content:center;gap:3px;min-width:0;padding:8px 10px;border-radius:13px;
+  border:1px solid color-mix(in srgb,var(--pa) 45%,transparent);background:#0f131a}
+.priceEdit span{font:400 22px/1 'Anton','Archivo',sans-serif;color:#aab2c0}
+.builder .priceEdit input{width:100%;max-width:110px;min-width:0;border:0;background:none;font:400 30px/1 'Anton','Archivo',sans-serif;color:#f3f5f9;text-align:center;
+  -moz-appearance:textfield;appearance:textfield}
+.priceEdit input::-webkit-outer-spin-button,.priceEdit input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.priceEdit i{font:700 10px/1 'Inter',system-ui,sans-serif;font-style:normal;color:#8b93a5;white-space:nowrap}
+.priceDetail{margin-top:12px}
+
+@keyframes pbShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}}
+@keyframes pbRise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pbFade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .builder .option.shake,.sheet,.builder .backdrop{animation:none}
+  .builder button.headPrice{transition:none}
+}

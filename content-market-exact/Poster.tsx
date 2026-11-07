@@ -34,9 +34,14 @@ const MOTIF_OF: Record<string, Motif> = {
   Thriller: 'beam', Drama: 'horizon', Horror: 'door', Romance: 'bloom',
   Espionage: 'grid', Historical: 'arch', Mixed: 'stack', 'Sci-Fi': 'orbit',
   Documentary: 'horizon', Comedy: 'bloom', Action: 'beam',
+  /* the rest of the game's genres, by family, so they stop all drawing a horizon */
+  Crime: 'grid', Mystery: 'door', Fantasy: 'arch', Biopic: 'arch', War: 'arch',
+  Adventure: 'orbit', Superhero: 'beam', Sports: 'beam', Animation: 'bloom', Musical: 'bloom', Family: 'bloom',
 };
 
-export const motifFor = (genre: string): Motif => MOTIF_OF[genre] ?? 'horizon';
+/* Callers pass "Thriller", "THRILLER", "Sci Fi" or "SCI_FI"; letters alone decide. */
+const MOTIF_BY_LETTERS = new Map(Object.entries(MOTIF_OF).map(([genre, motif]) => [genre.toLowerCase().replace(/[^a-z]/g, ''), motif]));
+export const motifFor = (genre: string): Motif => MOTIF_OF[genre] ?? MOTIF_BY_LETTERS.get(genre.toLowerCase().replace(/[^a-z]/g, '')) ?? 'horizon';
 
 /** the credit block. Real ones are unreadable, and that is the point. */
 const BILLING = [
@@ -45,28 +50,44 @@ const BILLING = [
   'EXECUTIVE PRODUCERS  PRODUCED BY  WRITTEN BY  DIRECTED BY',
 ];
 
+/* break the title the way a poster does, in at most three lines. A title that
+   needs more takes longer lines (and smaller type) rather than losing words. */
+const breakTitle = (title: string): string[] => {
+  const words = title.toUpperCase().split(/\s+/).filter(Boolean);
+  for (let budget = 11; ; budget += 3) {
+    const lines: string[] = [];
+    let cur = '';
+    for (const w of words) {
+      if ((cur + ' ' + w).trim().length > budget && cur) { lines.push(cur); cur = w; }
+      else cur = (cur + ' ' + w).trim();
+    }
+    if (cur) lines.push(cur);
+    if (lines.length <= 3) return lines;
+  }
+};
+
+/* the heavy caps' advance widths in em, measured from the game's type: a line's
+   width sets how small the type must go to fit the sheet (CJK and other scripts
+   count a full em) */
+const GLYPH_EM: Record<string, number> = { W: 1, M: .9, ' ': .2, I: .32, '.': .32, ',': .32, ':': .32, ';': .32, "'": .32, '!': .36 };
+const emOf = (line: string) => [...line].reduce((sum, ch) => sum + (GLYPH_EM[ch] ?? (ch.charCodeAt(0) > 0x24f ? 1 : .74)), 0);
+
 export const Poster: React.FC<{
   id: string; title: string; genre: string; hue: number; year?: number;
   size?: 'xs' | 'sm' | 'md' | 'lg';
   /** a collection shows a fan of spines rather than one sheet */
   stack?: number;
   poster?: CustomPoster;
-}> = ({ id, title, genre, hue, year, size = 'md', stack, poster }) => {
+  /** artwork only: no title or credit block, for cards that set the name themselves */
+  bare?: boolean;
+}> = ({ id, title, genre, hue, year, size = 'md', stack, poster, bare = false }) => {
   const motif = motifFor(genre);
   /* deterministic wobble so two thrillers do not draw the same poster */
   const seed = [...id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
   const jitter = (n: number, span: number) => ((seed * (n + 7)) % span) - span / 2;
 
-  const words = title.toUpperCase().split(' ');
-  /* break the title the way a poster does: never more than three lines */
-  const lines: string[] = [];
-  let cur = '';
-  for (const w of words) {
-    if ((cur + ' ' + w).trim().length > 11 && cur) { lines.push(cur); cur = w; }
-    else cur = (cur + ' ' + w).trim();
-  }
-  if (cur) lines.push(cur);
-  const shown = lines.slice(0, 3);
+  const shown = breakTitle(title);
+  const widestEm = Math.max(1, ...shown.map(emOf));
 
   const fallback = (
     <div className={cx(css.po, css['po-' + (size)])}>
@@ -165,13 +186,13 @@ export const Poster: React.FC<{
       <div className={css.pograin} />
       <div className={css.poshade} />
 
-      <div className={css.potype}>
+      {!bare && <div className={css.potype} style={{ ['--po-em' as string]: widestEm.toFixed(2) }}>
         <i className={css.porule} />
         {shown.map((l, i) => <b key={i}>{l}</b>)}
         {year && (size === 'md' || size === 'lg') && <span className={css.poyear}>{year}</span>}
-      </div>
+      </div>}
 
-      {(size === 'md' || size === 'lg') && (
+      {!bare && (size === 'md' || size === 'lg') && (
         <div className={css.pobilling}>
           {BILLING.slice(0, size === 'lg' ? 3 : 2).map((b, i) => <i key={i}>{b}</i>)}
         </div>

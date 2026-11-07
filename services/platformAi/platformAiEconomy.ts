@@ -16,7 +16,6 @@ import { createDeterministicId } from '../deterministicRandom';
 import {
     calculateStreamingAdvertisingRevenueFullCurrency,
     calculateStreamingRunwayFromTrailingCosts,
-    calculateStreamingStandaloneValuationFullCurrency,
     calculateStreamingSubscriptionRevenueFullCurrency,
     calculateStreamingSignedRoyaltyAllocations,
 } from '../streamingEconomyCore';
@@ -26,6 +25,7 @@ import { getPlatformResearchRecurringCostMillions } from './platformAiResearch';
 import { createPlatformAiRecurringEfficiencySnapshot } from './platformAiEfficiency';
 import { getPlatformAiOperatingProfile } from './platformAiOperatingProfiles';
 import { PLATFORM_AI_PROFILES } from './platformAiProfiles';
+import { valueAiStreamingPlatform, type AiPlatformValuationInput } from '../valuation/streamingValuation';
 import {
     createPlatformAiTradeRoyaltyEvidenceDecision,
     progressPlatformAiDistressWorld,
@@ -898,6 +898,24 @@ export const calculatePlatformAiRescueCapMillions = (
     ));
 };
 
+/** #184: what the valuation engine reads from an AI platform: a year's revenue, the quarter's (for growth), costs, cash,
+ *  debt, the catalogue, the technology, the reputation and the AI's distress */
+export const platformAiValuationInput = (platform: PlatformState, absoluteWeek: number): AiPlatformValuationInput => {
+    const trailingEconomy = trailingEconomyFor(platform);
+    const yearRevenues = (platform.ai?.financeHistory || []).slice(-52).map(snapshot => Number(snapshot.revenueMillions)).filter(Number.isFinite);
+    return {
+        weeklyRevenueMillions: average(yearRevenues, trailingEconomy.revenueMillions),
+        weeklyOperatingCostMillions: trailingEconomy.operatingCostMillions,
+        quarterWeeklyRevenueMillions: trailingEconomy.revenueMillions,
+        cashMillions: safe(platform.cashReserve, 0),
+        debtMillions: safe(platform.ai?.debtMillions, 0),
+        catalogueScore: catalogueScoreFor(platform, absoluteWeek),
+        technologyScore: technologyScoreFor(platform),
+        prestige: safe(platform.reputation, 50),
+        distressMultiplier: distressMultiplierFor(platform),
+    };
+};
+
 export const calculatePlatformAiValuationBillions = (
     input: PlatformAiRunwayInput,
 ): number => {
@@ -907,19 +925,11 @@ export const calculatePlatformAiValuationBillions = (
     const platform = input.platform.ai
         ? input.platform
         : normalizePlatformAiState(input.platform, input.player.id, 0);
-    const trailingEconomy = trailingEconomyFor(platform);
-    const calculated = calculateStreamingStandaloneValuationFullCurrency({
-        trailingWeeklyRevenueFullCurrency: trailingEconomy.revenueMillions * 1_000_000,
-        trailingWeeklyOperatingCostFullCurrency: trailingEconomy.operatingCostMillions * 1_000_000,
-        subscribers: platform.subscribers * PLATFORM_AI_PROFILES[platform.id].paidSubscriberShare * 1_000_000,
-        catalogueScore: catalogueScoreFor(
-            platform,
-            input.absoluteWeek ?? platform.ai!.financeHistory.at(-1)?.absoluteWeek ?? 0,
-        ),
-        technologyScore: technologyScoreFor(platform),
-        debtFullCurrency: platform.ai!.debtMillions * 1_000_000,
-        distressMultiplier: distressMultiplierFor(platform),
-    }) / 1_000_000_000;
+    /* #184: the valuation engine, the same as every other company's */
+    const calculated = valueAiStreamingPlatform(platformAiValuationInput(
+        platform,
+        input.absoluteWeek ?? platform.ai!.financeHistory.at(-1)?.absoluteWeek ?? 0,
+    )).equityValue / 1_000_000_000;
     const prior = safe(platform.ai!.standaloneValuationBillions, 0) || safe(platform.valuation, 0);
     return roundMillions(prior * 0.85 + calculated * 0.15);
 };

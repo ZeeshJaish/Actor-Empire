@@ -12,7 +12,6 @@ import type {
 import {
     calculateStreamingAdvertisingRevenueFullCurrency,
     calculateStreamingRunwayFromTrailingCosts,
-    calculateStreamingStandaloneValuationFullCurrency,
     calculateStreamingSubscriptionRevenueFullCurrency,
 } from '../services/streamingEconomyCore';
 import {
@@ -20,6 +19,7 @@ import {
     calculatePlatformAiScaledBaseOperationsMillions,
     calculatePlatformAiValuationBillions,
     calculatePlatformAiWeeklyEconomy,
+    platformAiValuationInput,
     getPlatformAiRunway,
     resolvePlatformAiDistress,
     settlePlatformAiEconomy,
@@ -33,6 +33,7 @@ import {
     normalizeWorldPlatformAi,
 } from '../services/platformAi';
 import { fullCurrencyToMillions } from '../services/streamingRightsCore';
+import { valueAiStreamingPlatform } from '../services/valuation/streamingValuation';
 import { commitStreamingCompetitiveWorldWeek } from '../services/streamingCompetitiveWorld';
 import { scoutStreamingAcquisitionTarget, valueStreamingAcquisitionTarget } from '../services/streamingAcquisitions';
 import { createPlatformAiFixture } from './helpers/platformAiFixture';
@@ -307,15 +308,11 @@ activeRightsValuationPlatform.ai!.rightsContracts = [
 const activeRightsTechnologyScore = Object.values(activeRightsValuationPlatform.ai!.capabilities.technologyLevels)
     .reduce((sum, value) => sum + value, 0)
     / Object.values(activeRightsValuationPlatform.ai!.capabilities.technologyLevels).length;
-const activeRightsOnlyValuation = calculateStreamingStandaloneValuationFullCurrency({
-    trailingWeeklyRevenueFullCurrency: 0,
-    trailingWeeklyOperatingCostFullCurrency: 0,
-    subscribers: 0,
-    catalogueScore: 1,
-    technologyScore: activeRightsTechnologyScore,
-    debtFullCurrency: 0,
-    distressMultiplier: 1,
-}) / 1_000_000_000 * 0.15;
+/* #184: the valuation engine reads the catalogue score; only the active third-party licence counts towards it */
+const activeRightsInput = platformAiValuationInput(activeRightsValuationPlatform, activeRightsValuationPlatform.ai!.financeHistory.at(-1)?.absoluteWeek ?? 0);
+assert.equal(activeRightsInput.catalogueScore, 1, 'only the active third-party licence counts in the catalogue');
+assert.ok(Math.abs(activeRightsInput.technologyScore - activeRightsTechnologyScore) < 1e-9);
+const activeRightsOnlyValuation = valueAiStreamingPlatform(activeRightsInput).equityValue / 1_000_000_000 * 0.15;
 closeTo(
     calculatePlatformAiValuationBillions({ player: fixture, platform: activeRightsValuationPlatform }),
     activeRightsOnlyValuation,
@@ -333,19 +330,15 @@ youtubeValuationPlatform.ai!.financeHistory = [youtubeEconomy.snapshot!];
 const youtubeTechnologyScore = Object.values(youtubeValuationPlatform.ai!.capabilities.technologyLevels)
     .reduce((sum, value) => sum + value, 0)
     / Object.values(youtubeValuationPlatform.ai!.capabilities.technologyLevels).length;
-const youtubePaidAudienceValuation = calculateStreamingStandaloneValuationFullCurrency({
-    trailingWeeklyRevenueFullCurrency: youtubeEconomy.snapshot!.revenueMillions * 1_000_000,
-    trailingWeeklyOperatingCostFullCurrency: youtubeEconomy.snapshot!.operatingCostMillions * 1_000_000,
-    subscribers: youtubeValuationPlatform.subscribers * 1_000_000 * PLATFORM_AI_PROFILES.YOUTUBE.paidSubscriberShare,
-    catalogueScore: 0,
-    technologyScore: youtubeTechnologyScore,
-    debtFullCurrency: 0,
-    distressMultiplier: 1,
-}) / 1_000_000_000 * 0.15;
+/* #184: YouTube is valued by the engine on what its audience brings in (its revenue), not on the audience's size */
+const youtubeInput = platformAiValuationInput(youtubeValuationPlatform, youtubeValuationPlatform.ai!.financeHistory.at(-1)?.absoluteWeek ?? 0);
+assert.ok(Math.abs(youtubeInput.weeklyRevenueMillions - youtubeEconomy.snapshot!.revenueMillions) < 0.01, 'its revenue');
+assert.ok(Math.abs(youtubeInput.technologyScore - youtubeTechnologyScore) < 1e-9);
+const youtubeRevenueValuation = valueAiStreamingPlatform(youtubeInput).equityValue / 1_000_000_000 * 0.15;
 closeTo(
     calculatePlatformAiValuationBillions({ player: fixture, platform: youtubeValuationPlatform }),
-    youtubePaidAudienceValuation,
-    'YouTube standalone valuation must use its paid subscriber share rather than its total audience',
+    youtubeRevenueValuation,
+    'YouTube standalone valuation follows the valuation engine on its revenue',
 );
 
 // Only ACTIVE rivals may source or commit fresh content.
@@ -983,16 +976,9 @@ assert.equal(limitedScaleCap, 650, 'LIMITED backing halves the exact 13-week ope
 const valuationPlatform = normalizedPlatform('DISNEY_PLUS');
 valuationPlatform.ai!.standaloneValuationBillions = 80;
 valuationPlatform.ai!.financeHistory = [marketSnapshot];
-const rawStandalone = calculateStreamingStandaloneValuationFullCurrency({
-    trailingWeeklyRevenueFullCurrency: marketSnapshot.revenueMillions * 1_000_000,
-    trailingWeeklyOperatingCostFullCurrency: marketSnapshot.operatingCostMillions * 1_000_000,
-    subscribers: valuationPlatform.subscribers * 1_000_000,
-    catalogueScore: valuationPlatform.ai!.releaseMemory.length + valuationPlatform.ai!.rightsContracts.length,
-    technologyScore: Object.values(valuationPlatform.ai!.capabilities.technologyLevels).reduce((sum, value) => sum + value, 0)
-        / Object.values(valuationPlatform.ai!.capabilities.technologyLevels).length,
-    debtFullCurrency: valuationPlatform.ai!.debtMillions * 1_000_000,
-    distressMultiplier: 1,
-}) / 1_000_000_000;
+/* #184: the raw value is the valuation engine's, on the platform's own inputs */
+const rawStandalone = valueAiStreamingPlatform(platformAiValuationInput(valuationPlatform, valuationPlatform.ai!.financeHistory.at(-1)?.absoluteWeek ?? 0))
+    .equityValue / 1_000_000_000;
 const smoothedValuation = calculatePlatformAiValuationBillions({ player: fixture, platform: valuationPlatform });
 closeTo(smoothedValuation, 80 * 0.85 + rawStandalone * 0.15, 'Standalone valuation should use 85/15 smoothing');
 const fundedValuationPlatform = structuredClone(valuationPlatform);
@@ -1038,20 +1024,12 @@ assert.ok(
 const youtubePaidEquivalentPlatform = normalizedPlatform('YOUTUBE');
 youtubePaidEquivalentPlatform.ai!.standaloneValuationBillions = 10;
 youtubePaidEquivalentPlatform.ai!.financeHistory = [marketSnapshot];
-const youtubeRawPaidEquivalent = calculateStreamingStandaloneValuationFullCurrency({
-    trailingWeeklyRevenueFullCurrency: marketSnapshot.revenueMillions * 1_000_000,
-    trailingWeeklyOperatingCostFullCurrency: marketSnapshot.operatingCostMillions * 1_000_000,
-    subscribers: youtubePaidEquivalentPlatform.subscribers * 0.04 * 1_000_000,
-    catalogueScore: youtubePaidEquivalentPlatform.ai!.releaseMemory.length + youtubePaidEquivalentPlatform.ai!.rightsContracts.length,
-    technologyScore: Object.values(youtubePaidEquivalentPlatform.ai!.capabilities.technologyLevels).reduce((sum, value) => sum + value, 0)
-        / Object.values(youtubePaidEquivalentPlatform.ai!.capabilities.technologyLevels).length,
-    debtFullCurrency: youtubePaidEquivalentPlatform.ai!.debtMillions * 1_000_000,
-    distressMultiplier: 1,
-}) / 1_000_000_000;
+const youtubeRawEngine = valueAiStreamingPlatform(platformAiValuationInput(youtubePaidEquivalentPlatform, youtubePaidEquivalentPlatform.ai!.financeHistory.at(-1)?.absoluteWeek ?? 0))
+    .equityValue / 1_000_000_000;
 closeTo(
     calculatePlatformAiValuationBillions({ player: fixture, platform: youtubePaidEquivalentPlatform }),
-    10 * 0.85 + youtubeRawPaidEquivalent * 0.15,
-    'YouTube subscriber valuation uses four-percent paid equivalents while advertising keeps the full audience',
+    10 * 0.85 + youtubeRawEngine * 0.15,
+    'YouTube is valued by the engine on what its audience brings in (advertising keeps the full audience); the audience\'s size adds nothing by itself',
 );
 
 const legacyHistoryPlatform = structuredClone(fixture.world.platforms!.HULU);
@@ -1681,10 +1659,11 @@ youtubeExactValuationPlatform.ai!.financeHistory = [{
     operatingCostMillions: 50,
     operatingNetCashFlowMillions: 50,
 }];
-assert.equal(
+/* #184: the engine on $100M of weekly revenue at a 50% margin; the audience's size adds nothing by itself */
+closeTo(
     calculatePlatformAiValuationBillions({ player: fixture, platform: youtubeExactValuationPlatform }),
-    10.561,
-    'YouTube valuation must smooth 85% of 10B with 15% of 13.74B, using only 4M paid subscribers.',
+    10 * 0.85 + valueAiStreamingPlatform(platformAiValuationInput(youtubeExactValuationPlatform, youtubeExactValuationPlatform.ai!.financeHistory.at(-1)?.absoluteWeek ?? 0)).equityValue / 1_000_000_000 * 0.15,
+    'YouTube valuation smooths 85% of 10B with 15% of the valuation engine on its revenue.',
 );
 const youtubeFullAudienceEconomy = calculatePlatformAiWeeklyEconomy({
     player: fixture,

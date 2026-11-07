@@ -356,6 +356,9 @@ assert.equal(aiEconomyRow.standardWeeklyOperatingCost,
     'AI world settlement includes shared commercial payment and delivery costs');
 const subscriptionsOnly = structuredClone(player) as Player;
 subscriptionsOnly.ownedStreamingPlatform.serviceConfiguration.pricing.streams = ['subs'];
+// #103 (plan §18.3): ads on a plan are the plan's own, so subscriptions with no ads also take the plans' ads off
+subscriptionsOnly.ownedStreamingPlatform.serviceConfiguration.pricing.plans = subscriptionsOnly.ownedStreamingPlatform.serviceConfiguration.pricing.plans
+    .map(plan => ({ ...plan, ads: false }));
 const subscriptionsOnlyState = createViewing(subscriptionsOnly, absoluteWeek);
 const subscriptionsOnlyOutcome = getPlayerOutcome(subscriptionsOnlyState);
 assert.ok(subscriptionsOnlyOutcome, 'subscriptions-only player remains viewable');

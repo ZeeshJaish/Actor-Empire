@@ -12,6 +12,10 @@
      CLEARANCE  every expansion file and where it stands in government review,
                 with the one button each needs when a government asks for more
 
+   #139: a country you could enter is the Define the Launch country card
+   itself (LaunchCountryCard, shared with the wizard), with this week's
+   viewers, the whole entry cost and who holds the homes now.
+
    Presentation only. Every mutation is a callback the HQ owns (`actions`), so
    the page never touches the save itself, and no tap here loads code or saves
    anything except the explicit File / Submit / Refile buttons.
@@ -23,9 +27,18 @@ import { cx } from './presentation/cx';
 import { AudienceAtlas } from './AudienceAtlas';
 import { RegionRail } from './AudiencePanels';
 import { CountryFlagSvg } from '../studio-finance/components/FlagField';
+import { LaunchCountryCard } from '../studio-finance/components/launch/LaunchCountryCard';
+import { brandVars as financeBrandVars } from '../studio-finance/finance/brand';
+import { compactCount, money as cardMoney, signedPct } from '../studio-finance/finance/format';
+import type { Country } from '../studio-finance/finance/launch';
+import { buildStreamingLaunchCountry } from '../StreamingDefineLaunchExperience';
+import '../studio-finance/styles/tokens.css';
+import '../studio-finance/styles/studio-finance.css';
+import '../studio-finance/styles/launch.css';
 import {
   REGION_SHORT_LABELS,
   compact,
+  sharesOf,
   summariseRegions,
   type AtlasCountry,
   type AtlasRegionId,
@@ -64,35 +77,36 @@ const money = (value: number) => `$${compact(Math.max(0, Math.round(value)))}`;
 const MIN_WEEKLY_OPERATING_COST = 55_000;
 const MIN_WEEKLY_LABEL = `$${MIN_WEEKLY_OPERATING_COST / 1000}K`;
 const COVERAGE_WORDS: Record<'SERVED' | 'THIN' | 'DARK', string> = { SERVED: 'network ready', THIN: 'thin signal', DARK: 'no network yet' };
+const COVERAGE_TONE: Record<'SERVED' | 'THIN' | 'DARK', string> = { SERVED: 'good', THIN: 'warn', DARK: 'bad' };
 const STAGES = ['APPLICATION_FILED', 'RIGHTS_VERIFICATION', 'REGULATORY_REVIEW', 'CONSUMER_DATA_COMPLIANCE', 'FINAL_APPROVAL'];
-const DIFFICULTY_TONE: Record<string, string> = { EASY: '#4ade80', MODERATE: '#f5b544', HARD: '#ff6b6b' };
-const DIFFICULTY_WORDS: Record<string, string> = { EASY: 'Easy launch', MODERATE: 'Moderate launch', HARD: 'Hard launch' };
 
 interface EntryFacts {
-  growth: number;
-  difficulty: string;
+  /** The Define the Launch country, as the wizard's card reads it. */
+  card: Country;
+  /** What filing charges: rights, compliance and the rest. */
   cost: number;
-  weeks: string;
-  languages: string[];
 }
 const factsCache = new Map<string, EntryFacts | null>();
 const factsOf = (countryId: string): EntryFacts | null => {
   if (factsCache.has(countryId)) return factsCache.get(countryId)!;
   const market = getStreamingDayOneMarket(countryId);
   const profile = getStreamingCountryMarketProfile(countryId);
-  const facts = market && profile ? {
-    growth: market.annualGrowthPercent,
-    difficulty: market.launchDifficulty,
-    cost: profile.entryCosts.total,
-    weeks: `${profile.approvalPeriodWeeks.minimum}–${profile.approvalPeriodWeeks.maximum} wk`,
-    languages: market.languages,
-  } : null;
+  const facts = market && profile ? { card: buildStreamingLaunchCountry(market), cost: profile.entryCosts.total } : null;
   factsCache.set(countryId, facts);
   return facts;
 };
 
+/** Who holds the homes this week, for the card's bar; the market's own roster when the world has no count yet. */
+const holdersOf = (country: AtlasCountry) => {
+  const { shares, unclaimedShare } = sharesOf([country.view]);
+  const rivals = shares.filter(item => item.id !== 'PLAYER').map(item => ({ name: item.name, share: item.share }));
+  return rivals.length > 0 || unclaimedShare > 0 ? { rivals, open: unclaimedShare } : undefined;
+};
+
 export const AudienceMarketEntry: React.FC<{
   accent: string;
+  /** The same colour as hex, for the shared country card's tokens. */
+  accentHex: string;
   countries: AtlasCountry[];
   operations: OwnedStreamingMarketOperation[];
   actions: MarketEntryActions;
@@ -103,7 +117,7 @@ export const AudienceMarketEntry: React.FC<{
   initialTab?: 'CHOOSE' | 'CLEARANCE';
   onOpenCountry: (countryId: string) => void;
   onClose: () => void;
-}> = ({ accent, countries, operations, actions, picked: pickedIds, onPickedChange, initialRegion = null, initialTab, onOpenCountry, onClose }) => {
+}> = ({ accent, accentHex, countries, operations, actions, picked: pickedIds, onPickedChange, initialRegion = null, initialTab, onOpenCountry, onClose }) => {
   const expansion = useMemo(() => operations.filter(operation => operation.scope === 'COUNTRY' && operation.entryKind === 'EXPANSION' && operation.status !== 'EXITED'), [operations]);
   const [tab, setTab] = useState<'CHOOSE' | 'CLEARANCE'>(initialTab ?? (pickedIds.length || !expansion.length ? 'CHOOSE' : 'CLEARANCE'));
   const [focusRegion, setFocusRegion] = useState<AtlasRegionId | null>(initialRegion);
@@ -227,29 +241,40 @@ export const AudienceMarketEntry: React.FC<{
               <div className={css.empty}><b>Nothing left to enter here</b><span>Every country in {focusLabel} is already live or on its way.</span></div>
             ) : (
               <div className={css.cards}>
-                {shownOpen.map(country => {
-                  const facts = factsOf(country.id);
-                  const on = picked.has(country.id);
-                  return (
-                    <article key={country.id} className={cx(css.card, on && css.cardOn)}>
-                      <button type="button" className={css.cardBody} onClick={() => onOpenCountry(country.id)} aria-label={`${country.name} country card`}>
-                        <span className={css.cardFlag}><CountryFlagSvg code={country.id} fit="stretch" /></span>
-                        <span className={css.cardName}><b>{country.name}</b><small>{country.view.platformHouseholds[0] ? `led by ${country.view.platformHouseholds[0].name}` : 'no leader yet'}</small></span>
-                        <span className={css.cardViewers}><b>{country.view.activeViewers > 0 ? compact(country.view.activeViewers) : '—'}</b><small>watching</small></span>
-                      </button>
-                      <div className={css.cardFacts}>
-                        {facts && <span style={{ ['--tone' as string]: DIFFICULTY_TONE[facts.difficulty] || '#9aa3b3' }}><i />{DIFFICULTY_WORDS[facts.difficulty] || facts.difficulty}</span>}
-                        {facts && <span>+{facts.growth}% a year</span>}
-                        {facts && <span>{money(facts.cost)}</span>}
-                        {facts && <span>{facts.weeks}</span>}
-                        {coverage[country.id] && <span className={css[`cover_${coverage[country.id]}`]}><i />{COVERAGE_WORDS[coverage[country.id]]}</span>}
-                      </div>
-                      <button type="button" className={cx(css.pick, on && css.pickOn)} onClick={() => toggle(country.id)} aria-pressed={on}>
-                        {on ? '✓ Picked' : '+ Pick'}
-                      </button>
-                    </article>
-                  );
-                })}
+                <div className={cx('sf', css.cardScope)} style={financeBrandVars(accentHex) as React.CSSProperties}>
+                  <ul className="lw-countries">
+                    {shownOpen.map((country, index) => {
+                      const facts = factsOf(country.id);
+                      if (!facts) return null;
+                      const on = picked.has(country.id);
+                      const cover = coverage[country.id];
+                      return (
+                        <LaunchCountryCard
+                          key={country.id}
+                          country={facts.card}
+                          on={on}
+                          index={index}
+                          figures={[
+                            { label: 'Watching', value: country.view.activeViewers > 0 ? compactCount(country.view.activeViewers) : '—' },
+                            { label: 'Growth', value: signedPct(facts.card.growth, 0), good: true },
+                            { label: 'Entry cost', value: cardMoney(facts.cost) },
+                          ]}
+                          holders={holdersOf(country)}
+                          chips={(
+                            <>
+                              <span className="lw-chip is-plain">{facts.card.dossier.approvalWeeks} review</span>
+                              {cover && <span className={`lw-chip is-plain sf-tone-${COVERAGE_TONE[cover]}`}>{COVERAGE_WORDS[cover]}</span>}
+                            </>
+                          )}
+                          pinned="Picked"
+                          switchLabel={on ? 'Picked' : 'Pick'}
+                          onReport={() => onOpenCountry(country.id)}
+                          onToggle={() => toggle(country.id)}
+                        />
+                      );
+                    })}
+                  </ul>
+                </div>
                 {scopedOpen.length > shownOpen.length && (
                   <button type="button" className={css.more} onClick={() => setShowAll(true)}>Show all {scopedOpen.length}</button>
                 )}

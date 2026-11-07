@@ -48,6 +48,8 @@ export interface NetworkMapBoxProps {
   onShowWorld?: () => void;
   onShowRegion?: () => void;
   boxRef?: React.Ref<HTMLDivElement>;
+  /** #90: a live network (the Network tab): the busiest hour, and only the weekly cost (its hardware is paid for) */
+  live?: boolean;
 }
 
 /** Keep the animated headline and its animated remainder on the same frame.
@@ -60,7 +62,7 @@ export const displayedNetworkShortfall = (expectedShown: number, coveredShown: n
 export function NetworkMapBox({
   data, draft, totals, services, regionId, cityId,
   previewCityId, previewRacks = 0, previewCapacity = 0, focusCityId,
-  onSelectCity, onSelectRegion, onShowWorld, onShowRegion, boxRef, tucked = false,
+  onSelectCity, onSelectRegion, onShowWorld, onShowRegion, boxRef, tucked = false, live = false,
 }: NetworkMapBoxProps) {
   const region = regionId ? data.regions.find(candidate => candidate.id === regionId) : undefined;
   const city = cityId ? data.cities.find(candidate => candidate.id === cityId) : undefined;
@@ -181,7 +183,7 @@ export function NetworkMapBox({
             {/* Three figures, each said plainly (#115): what the night
                 expects, who it is drawn from, and how much of it you serve.
                 The word is "served", the same word the row under it uses. */}
-            <em>on the night</em>
+            <em>{live ? 'at the busiest hour' : 'on the night'}</em>
             <em className="is-scope">{scoped ? `${scoped.name} · ${compactCount(scopePeople)} people` : `${compactCount(scopePeople)} people`}</em>
           </span>
           <span className="bw-net-gauge" role="img" aria-label={coverageAvailable ? `${pct} percent of the night covered` : 'Coverage unavailable'}>
@@ -229,7 +231,7 @@ export function NetworkMapBox({
               figures on the map are a matched pair — the night, and how much
               of it you serve — so the money goes on the line under them
               rather than in among them. */}
-          <s>{money(buildCostShown)} once · {money(weeklyCostShown)}/wk</s>
+          <s>{live ? `${money(weeklyCostShown)}/wk` : `${money(buildCostShown)} once · ${money(weeklyCostShown)}/wk`}</s>
         </p>
       )}
     </div>

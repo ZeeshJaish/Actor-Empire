@@ -6,10 +6,14 @@
  *   OFFER    → everything the viewer is sold: ways to earn, plans and prices
  *              (editable live, staged, applied from next week), account
  *              sharing, storefront and ident — see PlatformOffer.tsx
- *   STATUS   → a public status page (status.<service>.com), 90-day uptime bars and all
+ *   STATUS   → a public status page (status.<service>.com), 90-day uptime bars and all; since
+ *              #49 the health board of servers, tech and products and the one incident list
+ *              (crises and server incidents) — see PlatformStatus.tsx
  *   CAPACITY → (tab "NETWORK") the network map: markets by how well they are
  *              served, each room's field, sites, load — see PlatformNetwork.tsx
- *   TECH     → upgrade tracks that take game weeks to build
+ *   TECH     → the tech tree (TechDesk.tsx: Picture, HDR, Colour, Sound, unlocked with
+ *              cash and raised with energy), then the engineering tracks still built
+ *              over game weeks
  *   PRODUCTS → the product suite, each active / paused / locked behind research
  *
  * A status page is the perfect vehicle for an outage, because everyone has
@@ -22,7 +26,14 @@ import React, { useMemo, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
 import { PlatformOffer, type PlatformOfferActions, type PlatformOfferData, type PlatformSharingProps } from './PlatformOffer';
 import { PlatformNetwork } from './PlatformNetwork';
+import { PlatformStatus, platformStatusOverall, type PlatformRepairResult } from './PlatformStatus';
+import type { StreamingStatusBoard, StreamingStatusIncident } from '../../services/streamingStatusBoard';
+import type { StreamingIncidentRepairPath } from '../../services/streamingIncidentRepair';
 import type { StreamingNetworkMapView } from '../../services/streamingNetworkMapView';
+import type { StreamingTechDeskView } from '../../services/streamingTechDesk';
+import type { StreamingTechId } from '../../types';
+import { TechDesk, type TechDeskActions } from './TechDesk';
+import { ProductShowcase } from './ProductShowcase';
 
 /* ============================================================
    MODEL
@@ -45,6 +56,8 @@ export interface NetComponent {
       bars beside "0.00% uptime" — the most reassuring possible way to display
       an absence. */
   history: number[];
+  /** #102: the first bar is the launch's week (the service is younger than the strip), and the foot says "Launch" */
+  fromLaunch?: boolean;
 }
 
 export interface ServerCity {
@@ -65,10 +78,15 @@ export interface TechTrack {
 
 export interface PlatformProduct {
   id: string; name: string; note: string;
-  state: 'ACTIVE' | 'PAUSED' | 'LOCKED';
+  /* BUILDING: launched in the old Product Lab and still being built (#126); it goes live at the weekly close */
+  state: 'ACTIVE' | 'PAUSED' | 'LOCKED' | 'BUILDING';
   requires?: string;
   weeklyCost?: number;
   load?: number;                  // added server load %
+  /** the save's product line (KIDS, LIVE…), for Pause and Resume */
+  lineId?: string;
+  /** weeks until a BUILDING product goes live */
+  readyIn?: number;
 }
 
 export interface Incident {
@@ -95,6 +113,10 @@ export interface NetworkState {
   products: PlatformProduct[];
   incidents: Incident[];
   peakLoad: number;               // %
+  /** #92: regions with a network order under way (the Network desk's Building rows) */
+  networkBuilding?: number;
+  /** #97: this week's playback success, % of plays that start and hold (the room strip's PLAYBACK) */
+  playbackSuccess?: number | null;
   headroom: string;               // e.g. "1.9 Tbps of 2.4 Tbps"
   technicalDebt: number;          // 0-100
 }
@@ -121,13 +143,6 @@ export interface PlatformDeskOffer {
 
 const money = (n: number) => n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M`
   : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${n}`;
-
-const STATUS_COPY: Record<CompStatus, string> = {
-  operational: 'Operational',
-  degraded: 'Degraded performance',
-  outage: 'Major outage',
-  maintenance: 'Under maintenance',
-};
 
 /* ============================================================
    BUILD A TIER — the doctrine choice, before any money moves
@@ -200,8 +215,8 @@ export const PlatformDesk: React.FC<{
   onBuild?: (t: TechTrack, doctrine: 'HARDENED' | 'BALANCED' | 'SPRINT', cost: number, weeks: number) => void;
   onCancelBuild?: (t: TechTrack) => void;
   treasury?: number;
-  onToggleProduct?: (p: PlatformProduct) => void;
-  onOpenChronicle?: () => void;
+  /** a product the save already runs, paused or resumed (#126: the old Product Lab is gone) */
+  onPauseProduct?: (p: PlatformProduct, paused: boolean) => { ok: boolean; message: string };
   /** The Offer page's data and actions; without it the tab is not shown. */
   offer?: PlatformDeskOffer;
   /** The Network page's map; without it the tab keeps the plain city list. */
@@ -209,23 +224,46 @@ export const PlatformDesk: React.FC<{
   /** Opens the Technology Campus for a track, where builds are priced and
       started; without it the tab keeps its own doctrine sheet. */
   onOpenTechnology?: (t: TechTrack) => void;
-}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onToggleProduct, onOpenChronicle, offer, network, onOpenTechnology, treasury = 0 }) => {
+  /** The tech tree (Picture, HDR, Colour, Sound) and its two actions; with it, the
+      Engineering list below no longer shows Playback quality, which the tree replaces. */
+  techDesk?: StreamingTechDeskView;
+  techActions?: TechDeskActions;
+  /** old research programmes still under way, finished in the Technology Campus */
+  researchUnderWay?: number;
+  onOpenResearch?: () => void;
+  /** the tech the Tech tab opens on (a locked plan step's Go to Tech) */
+  techFocus?: StreamingTechId | null;
+  /** STATUS's health board and incident list (#49); without it the tab is the prototype's status page */
+  statusBoard?: StreamingStatusBoard;
+  /** an open incident's Respond: Incident Command */
+  onRespondToIncident?: (incident: StreamingStatusIncident) => void;
+  /** an open incident's Repair now, Fix or Wait it out (#50) */
+  onRepairIncident?: (incident: StreamingStatusIncident, path: StreamingIncidentRepairPath) => PlatformRepairResult;
+  /** #90: a live company's Network tab: the network changed region by region, on Build's own map and board */
+  networkDesk?: React.ReactNode;
+}> = ({ brand, state, onBack, initialTab, onAddCity, onBuild, onCancelBuild, onPauseProduct, offer, network, onOpenTechnology, techDesk, techActions, researchUnderWay = 0, onOpenResearch, treasury = 0, techFocus = null, statusBoard, onRespondToIncident, onRepairIncident, networkDesk }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   const tabs = offer ? TABS : TABS.filter(t => t !== 'OFFER');
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab && tabs.includes(initialTab) ? initialTab : tabs[0]);
   const [buildTrack, setBuildTrack] = useState<TechTrack | null>(null);
+  /* the Offer tab's plan builder sends a locked step here, opened on the tech it needs */
+  const [focusTech, setFocusTech] = useState<StreamingTechId | null>(techFocus);
+  const goToTech = (techId: StreamingTechId) => { setFocusTech(techId); setTab('TECH'); };
 
-  /* the banner is derived from the components, never set by hand */
-  const overall: CompStatus = useMemo(() => {
-    if (state.components.some(x => x.status === 'outage')) return 'outage';
-    if (state.components.some(x => x.status === 'degraded')) return 'degraded';
-    if (state.components.some(x => x.status === 'maintenance')) return 'maintenance';
-    return 'operational';
-  }, [state.components]);
+  /* the banner is derived, never set by hand: from the health board, or the strips without one */
+  const overall: CompStatus = useMemo(() => platformStatusOverall(state, statusBoard), [state, statusBoard]);
 
   const hot = state.cities.filter(x => x.loadPct >= 85).length;
   const building = state.tech.filter(t => t.building).length;
+  /* with the Tech tab, Playback (Picture, HDR, Colour, Sound), Reliability (Stabilization), Delivery (Optimisation),
+     Security (#54 Trust and safety) and Recommendations (#59 Smart AI) are built there, and Content operations is no
+     longer needed (#86); a build already under way stays until it finishes */
+  const engineering = techDesk
+    ? state.tech.filter(t => t.building || !['PLAYBACK_QUALITY', 'RELIABILITY', 'DELIVERY_CAPACITY', 'SECURITY', 'DATA_RECOMMENDATIONS', 'CONTENT_OPERATIONS'].includes(t.id))
+    : state.tech;
+  /* the list shows only while it has a track or old research to finish */
+  const showEngineering = engineering.length > 0 || (researchUnderWay > 0 && Boolean(onOpenResearch));
 
   return (
     <div className={cx(s.nw, s[overall])} data-epx-root style={brandVars(brand)}>
@@ -241,11 +279,17 @@ export const PlatformDesk: React.FC<{
       <div className={s.nwstats}>
         <div><span>PEAK LOAD</span><b className={state.peakLoad >= 85 ? s.bad : state.peakLoad >= 70 ? s.warn : ''}>{state.peakLoad}%</b></div>
         <div><span>CITIES</span><b>{state.cities.length}</b></div>
-        <div><span>BUILDING</span><b>{building}</b></div>
+        {/* #97 (Zeesh: "BUILDING … badal kar kuch aur"): the room's third number is how playback went this week; the
+            network's builds have their own rows on NETWORK */}
+        <div><span>PLAYBACK</span><b className={state.playbackSuccess == null ? '' : state.playbackSuccess < 92 ? s.bad : state.playbackSuccess < 97 ? s.warn : ''}>
+          {state.playbackSuccess == null ? '—' : `${state.playbackSuccess >= 99.95 ? 100 : state.playbackSuccess.toFixed(1)}%`}
+        </b></div>
         <div><span>TECH DEBT</span><b className={state.technicalDebt >= 50 ? s.bad : state.technicalDebt >= 25 ? s.warn : ''}>{state.technicalDebt}</b></div>
       </div>
 
-      <div className={cx(s.nwtabs, onOpenChronicle ? s.withrecord : '')}>
+      {/* #125 (Zeesh: "hata dete history pGE AND moments dikane ki jarurat nahi"): the HISTORY button and the
+          Infrastructure Chronicle it opened are gone; STATUS keeps the history (lines since launch, a year of incidents) */}
+      <div className={s.nwtabs}>
         {tabs.map(t => (
           <button key={t} className={tab === t ? s.on : ''} onClick={() => setTab(t)}>
             {TAB_LABELS[t]}
@@ -253,78 +297,22 @@ export const PlatformDesk: React.FC<{
             {t === 'CAPACITY' && hot > 0 && <i className={cx(s.tdot, s.degraded)} />}
           </button>
         ))}
-        {onOpenChronicle ? (
-          <button type="button" className={s.recordtab} onClick={onOpenChronicle} aria-label="Open infrastructure history">
-            HISTORY <i className={s.recorddot} />
-          </button>
-        ) : null}
       </div>
 
       <div className={s.nwscroll}>
 
         {/* ── OFFER — what viewers get and pay, editable while live ── */}
         {tab === 'OFFER' && offer && (
-          <PlatformOffer accent={c} offer={offer.data} actions={offer.actions} sharing={offer.sharing} />
+          <PlatformOffer accent={c} offer={offer.data} actions={offer.actions} sharing={offer.sharing} onGoToTech={techDesk ? goToTech : undefined} />
         )}
 
         {/* ── STATUS — the page everyone has watched go red ── */}
-        {tab === 'STATUS' && (
-          <>
-            <div className={cx(s.banner, s[overall])}>
-              <i className={s.bdot} />
-              <div>
-                <b>{overall === 'operational' ? 'All Systems Operational' : STATUS_COPY[overall]}</b>
-                <span>
-                  {overall === 'operational'
-                    ? 'Subscribers are watching normally'
-                    : 'Subscribers are seeing this right now'}
-                </span>
-              </div>
-            </div>
+        {tab === 'STATUS' && <PlatformStatus state={state} board={statusBoard} onRespond={onRespondToIncident} onRepair={onRepairIncident}
+          onTestLoad={networkDesk ? () => setTab('CAPACITY') : undefined} />}
 
-            <section className={s.nwsec}>
-              <div className={s.nwhead}><h2>Components</h2><span>last {state.components[0]?.history.length ?? 30} weeks</span></div>
-              {state.components.map(comp => (
-                <div className={s.comp} key={comp.id}>
-                  <div className={s.comptop}>
-                    <b>{comp.name}</b>
-                    <em className={s[comp.status] ?? comp.status}>{STATUS_COPY[comp.status]}</em>
-                  </div>
-                  {/* the uptime strip — the one element that says "status page" instantly */}
-                  <div className={s.upstrip}>
-                    {comp.history.map((d, n) => (
-                      <i key={n} className={d === 3 ? s.none : d === 2 ? s.down : d === 1 ? s.deg : s.ok} />
-                    ))}
-                  </div>
-                  {/* one bar per weekly settlement, so the strip is read in weeks */}
-                  <div className={s.compfoot}>
-                    <span>{comp.history.length} weeks ago</span>
-                    <em>{comp.uptime.toFixed(comp.measure ? 0 : 2)}% {comp.measure ?? 'uptime'}</em>
-                    <span>this week</span>
-                  </div>
-                </div>
-              ))}
-            </section>
-
-            <section className={s.nwsec}>
-              <div className={s.nwhead}><h2>Incident history</h2></div>
-              {state.incidents.length === 0 && <div className={s.nwempty}>No incidents recorded.</div>}
-              {state.incidents.map(i => (
-                <div className={cx(s.incident, s[i.severity])} key={i.id}>
-                  <div className={s.inctop}>
-                    <b>{i.title}</b>
-                    <em>{i.when}</em>
-                  </div>
-                  <p>{i.note}</p>
-                  <span className={s.incres}>Resolved in {i.resolvedIn}</span>
-                </div>
-              ))}
-            </section>
-          </>
-        )}
-
-        {/* ── NETWORK — the map, the gauges and the sites ── */}
-        {tab === 'CAPACITY' && network && (
+        {/* ── NETWORK — a live company changes it here, region by region (#90); before launch, the map and the door to Build ── */}
+        {tab === 'CAPACITY' && networkDesk}
+        {tab === 'CAPACITY' && !networkDesk && network && (
           <PlatformNetwork accent={c} map={network} state={state} onChangeNetwork={onAddCity} />
         )}
 
@@ -378,11 +366,19 @@ export const PlatformDesk: React.FC<{
           </section>
         )}
 
-        {/* ── TECH — upgrades that cost real weeks ── */}
-        {tab === 'TECH' && (
+        {/* ── TECH — the tech tree, then the upgrades that cost real weeks ── */}
+        {tab === 'TECH' && techDesk && <TechDesk desk={techDesk} {...techActions} focusTechId={focusTech} />}
+        {tab === 'TECH' && showEngineering && (
           <section className={s.nwsec}>
-            <div className={s.nwhead}><h2>Engineering</h2><span>{building} in progress</span></div>
-            {state.tech.map(t => (
+            <div className={s.nwhead}><h2>Engineering</h2><span>{techDesk ? `builds take weeks · ${building} in progress` : `${building} in progress`}</span></div>
+            {researchUnderWay > 0 && onOpenResearch ? (
+              <button type="button" className={s.researchrow} onClick={onOpenResearch}>
+                <b>Research under way</b>
+                <span>{researchUnderWay} programme{researchUnderWay === 1 ? '' : 's'} to finish. New research has moved to Tech above.</span>
+                <em>OPEN →</em>
+              </button>
+            ) : null}
+            {engineering.map(t => (
               <div className={cx(s.track, (t.building ? s.busy : ''))} key={t.id}>
                 <div className={s.tktop}>
                   <div className={s.tkid}>
@@ -427,31 +423,10 @@ export const PlatformDesk: React.FC<{
           </section>
         )}
 
-        {/* ── PRODUCTS — what the service actually offers ── */}
+        {/* ── PRODUCTS — #126 (plan §19.13): every product coming in a future update, as moving thumbnails; a save's
+            products from the old Product Lab run on above them ── */}
         {tab === 'PRODUCTS' && (
-          <section className={s.nwsec}>
-            <div className={s.nwhead}><h2>Product suite</h2><span>{state.products.filter(p => p.state === 'ACTIVE').length} live</span></div>
-            <div className={s.prodgrid}>
-              {state.products.map(p => (
-                <button key={p.id} className={cx(s.prod, s[p.state.toLowerCase()])}
-                  onClick={() => p.state !== 'LOCKED' && onToggleProduct?.(p)}>
-                  <div className={s.prodtop}>
-                    <b>{p.name}</b>
-                    <i className={cx(s.pstate, s[p.state.toLowerCase()])}>{p.state === 'LOCKED' ? '🔒' : p.state}</i>
-                  </div>
-                  <span className={s.prodnote}>{p.note}</span>
-                  {p.state === 'LOCKED' ? (
-                    <span className={s.prodreq}>Needs {p.requires}</span>
-                  ) : (
-                    <div className={s.prodfoot}>
-                      <span>{p.weeklyCost ? `${money(p.weeklyCost)}/wk` : 'no cost'}</span>
-                      {p.load !== undefined && <em>+{p.load}% load</em>}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          </section>
+          <ProductShowcase yours={state.products.filter(p => p.state !== 'LOCKED')} onPause={onPauseProduct} />
         )}
 
         <div className={s.nwfoot} />

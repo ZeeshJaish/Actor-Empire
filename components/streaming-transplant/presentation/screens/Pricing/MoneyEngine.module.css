@@ -1,0 +1,108 @@
+/* #104 the money engine (plan §18.4; Zeesh: "बॉक्स मुझे एकदम पसंद नहीं … गेम वाला भी फील … तीनों का एक पर्सनैलिटी"):
+   a loadout. The MAIN slot glows in its offer's colour under a crown; the two side slots carry switches and "Make main".
+   --c is the slot's offer colour (offerPersonality.tsx). */
+.engine{display:flex;flex-direction:column;gap:10px;min-width:0}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 10px;margin:0 2px}
+.head span{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#8b93a5;white-space:nowrap}
+.head em{margin-left:auto;font-style:normal;font-size:11px;font-weight:700;color:#c9c4ff;white-space:nowrap}
+
+/* ── the MAIN slot: the front door ── */
+.main{position:relative;overflow:hidden;isolation:isolate;display:grid;grid-template-columns:62px minmax(0,1fr);align-items:center;gap:10px 13px;
+  padding:17px 14px 14px;border-radius:18px;
+  background:radial-gradient(130% 150% at 0% 0%,color-mix(in srgb,var(--c) 30%,transparent),transparent 58%),linear-gradient(160deg,#151722,#0b0c12);
+  border:1px solid color-mix(in srgb,var(--c) 58%,transparent);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 14px 34px -16px color-mix(in srgb,var(--c) 70%,transparent);
+  animation:me-crowned .55s cubic-bezier(.2,.9,.25,1.15) both}
+.main::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.08) 50%,transparent 62%);transform:translateX(-130%);
+  animation:me-sweep 6s ease-in-out 1.2s infinite}
+@keyframes me-crowned{0%{opacity:0;transform:translateY(10px) scale(.94);filter:brightness(1.8)}60%{opacity:1;filter:brightness(1.2)}100%{transform:none;filter:none}}
+@keyframes me-sweep{0%,62%{transform:translateX(-130%)}100%{transform:translateX(130%)}}
+.emblem{position:relative;display:grid;place-items:center;width:62px;height:62px;border-radius:18px;color:#0b0c12;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--c) 68%,white),var(--c) 55%,color-mix(in srgb,var(--c) 72%,black));
+  box-shadow:0 0 24px -6px var(--c),inset 0 1px 0 rgba(255,255,255,.4)}
+.emblem > svg{width:36px;height:36px}
+.crown{position:absolute;top:-11px;left:50%;display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 6px;border-radius:99px;transform:translateX(-50%);
+  background:#ffcf3f;color:#2b2000;font-style:normal;font-size:9.5px;font-weight:900;letter-spacing:.12em;white-space:nowrap;box-shadow:0 3px 10px rgba(255,207,63,.45);
+  animation:me-crown-drop .5s cubic-bezier(.2,1.4,.4,1) .15s both}
+.crown svg{width:11px;height:11px}
+@keyframes me-crown-drop{from{opacity:0;transform:translate(-50%,-12px) scale(.6)}to{opacity:1;transform:translateX(-50%)}}
+.lead{min-width:0;display:flex;flex-direction:column;gap:3px}
+.lead small{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--c)}
+.lead b{font-family:var(--sf-font-display,'Anton',Impact,sans-serif);font-weight:400;font-size:27px;line-height:1.02;color:#fff;overflow-wrap:break-word}
+.lead > span{font-size:12px;line-height:1.35;color:#c3c8d4}
+/* the money: a score strip across the slot, so the name keeps the whole width beside the emblem */
+.money{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 9px;padding:9px 12px 10px;border-radius:12px;
+  background:rgba(0,0,0,.3);border:1px solid color-mix(in srgb,var(--c) 24%,transparent)}
+.money b{font-family:var(--sf-font-display,'Anton',Impact,sans-serif);font-weight:400;font-size:27px;line-height:1;color:#fff;white-space:nowrap}
+.money small{font-size:11px;line-height:1.3;color:#8b93a5}
+.detail{grid-column:1/-1;font-size:11.5px;line-height:1.4;color:#aeb6c4;overflow-wrap:anywhere}
+
+/* ── the side slots ── */
+.sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.side{position:relative;display:flex;flex-direction:column;gap:9px;min-width:0;padding:12px;border-radius:16px;
+  background:linear-gradient(165deg,color-mix(in srgb,var(--c) 10%,#12141b),#0c0d12);
+  border:1px solid color-mix(in srgb,var(--c) 38%,#232733);transition:border-color .2s,background .2s}
+.side.off{background:#0b0c11;border:1px dashed #2d323e}
+/* the name drops under the badge when it cannot sit beside it whole (a narrow phone) */
+.sideTop{display:flex;flex-wrap:wrap;align-items:center;gap:8px 9px;min-width:0}
+.badge{flex:0 0 auto;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;color:#0b0c12;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--c) 68%,white),var(--c));box-shadow:0 0 14px -5px var(--c)}
+.badge svg{width:24px;height:24px}
+.side.off .badge{background:#1b1e26;color:var(--c);box-shadow:none}
+.sideName{flex:1 0 auto;max-width:100%;display:flex;flex-direction:column;gap:1px}
+.sideName small{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c)}
+.sideName b{font-size:13.5px;font-weight:800;line-height:1.2;color:#eef0f5;overflow-wrap:break-word}
+.sideMoney{display:flex;flex-direction:column;gap:2px}
+.sideMoney b{font-family:var(--sf-font-display,'Anton',Impact,sans-serif);font-weight:400;font-size:20px;line-height:1.05;color:#fff;white-space:nowrap}
+.side.off .sideMoney b{color:#5f6875}
+.sideMoney small{font-size:10.5px;line-height:1.35;color:#8b93a5;overflow-wrap:anywhere}
+.sideDetail{font-size:11px;line-height:1.4;color:#aeb6c4;overflow-wrap:anywhere}
+.actions{display:flex;flex-direction:column;gap:6px;margin-top:auto}
+/* scoped to .engine: the launch wizard's `.sf button` reset (0-1-1) zeroes a bare class's padding, border and font */
+.engine .toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:36px;padding:0 10px 0 12px;border-radius:11px;
+  background:#1a1d26;border:1px solid #2d323e;color:#c6ccda;font-size:12px;font-weight:800;text-align:left;
+  transition:transform .12s cubic-bezier(.3,1.5,.5,1),background .2s,border-color .2s}
+.toggle i{position:relative;flex:0 0 auto;width:32px;height:18px;border-radius:99px;background:#2d323e;transition:background .2s}
+.toggle i::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8b93a5;
+  transition:transform .2s cubic-bezier(.3,1.4,.5,1),background .2s}
+.toggle.isOn{background:color-mix(in srgb,var(--c) 16%,#12141b);border-color:color-mix(in srgb,var(--c) 55%,transparent);color:#fff}
+.toggle.isOn i{background:var(--c)}
+.toggle.isOn i::after{transform:translateX(14px);background:#fff}
+.side.off .toggle{background:var(--c);border-color:transparent;color:#0b0c12}
+.side.off .toggle i{background:rgba(0,0,0,.22)}
+.side.off .toggle i::after{background:rgba(255,255,255,.85)}
+.engine .crownMe{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;min-height:32px;border-radius:11px;background:transparent;
+  border:1px solid rgba(255,207,63,.35);color:#ffd970;font-size:11.5px;font-weight:800;transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.crownMe svg{width:12px;height:12px}
+.toggle:active,.crownMe:active,.pick:active:not(:disabled){transform:scale(.96)}
+
+/* ── the first choice: an empty front door ── */
+.empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 16px 18px;border-radius:18px;text-align:center;
+  border:1.5px dashed rgba(255,207,63,.4);background:radial-gradient(90% 120% at 50% 0%,rgba(255,207,63,.08),transparent 70%);
+  animation:me-wait 2.4s ease-in-out infinite}
+.empty i{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:rgba(255,207,63,.14);color:#ffcf3f}
+.empty i svg{width:20px;height:20px}
+.empty b{font-family:var(--sf-font-display,'Anton',Impact,sans-serif);font-weight:400;font-size:22px;line-height:1.05;color:#fff}
+.empty span{font-size:12px;line-height:1.4;color:#aeb6c4}
+@keyframes me-wait{50%{border-color:rgba(255,207,63,.75)}}
+.picks{display:flex;flex-direction:column;gap:8px}
+.engine .pick{display:grid;grid-template-columns:38px minmax(0,1fr) 10px;align-items:center;gap:12px;width:100%;padding:12px 14px 12px 12px;border-radius:15px;
+  text-align:left;color:inherit;background:linear-gradient(100deg,color-mix(in srgb,var(--c) 14%,#12141b),#0c0d12 70%);
+  border:1px solid color-mix(in srgb,var(--c) 40%,#232733);transition:transform .12s cubic-bezier(.3,1.5,.5,1),border-color .2s}
+.pick:disabled{opacity:.55}
+.pickText{min-width:0;display:flex;flex-direction:column;gap:2px}
+.pickText small{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--c)}
+.pickText b{font-size:15px;font-weight:800;color:#fff}
+.pickText span{font-size:11.5px;line-height:1.35;color:#aeb6c4}
+.go{width:9px;height:9px;border:solid var(--c);border-width:2px 2px 0 0;transform:rotate(45deg)}
+
+/* a narrow phone: a smaller emblem */
+@media (max-width:359px){
+  .main{grid-template-columns:54px minmax(0,1fr)}
+  .emblem{width:54px;height:54px}
+}
+@media (prefers-reduced-motion:reduce){
+  .main,.main::after,.crown,.empty{animation:none}
+  .toggle,.toggle i,.toggle i::after,.crownMe,.pick,.side{transition:none}
+}

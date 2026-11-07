@@ -42,34 +42,89 @@ const editorialPriority = (event: IndustryEventFact): number => {
         COMPANY_FUNDED: 105,
         COMPANY_RESTRUCTURED: 104,
         PROJECT_CANCELLED: 100,
+        PLATFORM_OUTAGE: 100,
+        PLATFORM_ADS_ADDED: 100,
+        PLATFORM_PRICE_RAISED: 98,
         AWARD_WON: 98,
+        PLATFORM_QUALITY_GAP: 96,
+        PLATFORM_TECH_LAUNCHED: 95,
         PROJECT_RELEASED: 90,
         COMPANY_LAUNCHED: 85,
         PROJECT_OVERRUN: 80,
         PROJECT_DELAYED: 75,
         PROJECT_HELD: 70,
+        PLATFORM_PRICE_CUT: 70,
+        PLATFORM_RESTORED: 60,
+        /* #117 */
+        PLATFORM_OFFER_CHANGED: 97,
+        PLATFORM_FREE_TIER: 94,
+        PLATFORM_REBRANDED: 92,
+        PLATFORM_VALUE_CRITICISED: 90,
+        PLATFORM_VALUE_PRAISED: 88,
+        PLATFORM_APP_REDESIGNED: 80,
+        /* #143 */
+        PLATFORM_CHART_MOMENT: 93,
+        /* #149 */
+        PLATFORM_CAMPAIGN_MOMENT: 95,
     } as Partial<Record<IndustryEventFact['type'], number>>)[event.type] || 0;
     return importance + consequence;
 };
 
-const selectEditorialEvents = (events: IndustryEventFact[]): IndustryEventFact[] => {
+/* the story a service's event belongs to in its week */
+const PLATFORM_STORY_GROUP: Partial<Record<IndustryEventFact['type'], string>> = {
+    PLATFORM_RESTORED: 'PLATFORM_OUTAGE',
+    PLATFORM_PRICE_RAISED: 'PLATFORM_PRICING',
+    PLATFORM_ADS_ADDED: 'PLATFORM_PRICING',
+    PLATFORM_PRICE_CUT: 'PLATFORM_PRICING',
+    /* #117: the offer's moves are one story with its prices; a look and an app redesign one; value one */
+    PLATFORM_FREE_TIER: 'PLATFORM_PRICING',
+    PLATFORM_OFFER_CHANGED: 'PLATFORM_PRICING',
+    PLATFORM_REBRANDED: 'PLATFORM_BRAND',
+    PLATFORM_APP_REDESIGNED: 'PLATFORM_BRAND',
+    PLATFORM_VALUE_PRAISED: 'PLATFORM_VALUE',
+    PLATFORM_VALUE_CRITICISED: 'PLATFORM_VALUE',
+    PLATFORM_CHART_MOMENT: 'PLATFORM_CHART',
+    PLATFORM_CAMPAIGN_MOMENT: 'PLATFORM_CAMPAIGN',
+};
+
+/* #162 (Zeesh: "campaign ke hisab se reaction … news me dikhna chaiye"): the player's own campaigns have their own place
+   in the week's news, beside the public stories: one story per campaign, at most two campaigns a week */
+const OWN_CAMPAIGN_STORIES_PER_WEEK = 2;
+const isOwnCampaignStory = (event: IndustryEventFact, ownPlatformId?: string): boolean => Boolean(ownPlatformId)
+    && event.type === 'PLATFORM_CAMPAIGN_MOMENT' && (event.companyId === ownPlatformId || event.platformId === ownPlatformId);
+
+const selectEditorialEvents = (events: IndustryEventFact[], ownPlatformId?: string): IndustryEventFact[] => {
     const selected: IndustryEventFact[] = [];
     const representedStories = new Set<string>();
+    /* the player's own service's news leads its week (Phase 5, #66): one slot at most, as one story */
+    const own = (event: IndustryEventFact) => Number(Boolean(ownPlatformId) && event.type.startsWith('PLATFORM_')
+        && (event.companyId === ownPlatformId || event.platformId === ownPlatformId));
+    let publicStories = 0;
+    let campaignStories = 0;
     const ordered = [...events].sort((left, right) => (
         right.absoluteWeek - left.absoluteWeek
+        || own(right) - own(left)
         || editorialPriority(right) - editorialPriority(left)
         || left.id.localeCompare(right.id)
     ));
     for (const event of ordered) {
-        const storyKey = event.projectId
-            ? `project:${event.projectId}`
-            : event.companyId
-                ? `company:${event.companyId}`
-                : `event:${event.id}`;
+        /* #162: one of the player's own campaigns is its own story (its key names the campaign), outside the public two */
+        const ownCampaign = isOwnCampaignStory(event, ownPlatformId);
+        if (ownCampaign ? campaignStories >= OWN_CAMPAIGN_STORIES_PER_WEEK : publicStories >= INDUSTRY_PUBLIC_STORY_LIMIT_PER_WEEK) continue;
+        /* a service's launches, outages and prices are separate stories; an outage and its fix one (#67, #68) */
+        const storyKey = ownCampaign ? `campaign:${event.idempotencyKey.split(':').slice(0, 3).join(':')}` : event.type.startsWith('PLATFORM_')
+            ? `platform:${event.companyId || event.platformId}:${PLATFORM_STORY_GROUP[event.type] || event.type}`
+            : event.projectId
+                ? `project:${event.projectId}`
+                : event.companyId
+                    ? `company:${event.companyId}`
+                    : `event:${event.id}`;
         if (representedStories.has(storyKey)) continue;
         representedStories.add(storyKey);
         selected.push(event);
-        if (selected.length >= INDUSTRY_PUBLIC_STORY_LIMIT_PER_WEEK) break;
+        if (ownCampaign) campaignStories += 1;
+        else publicStories += 1;
+        if (publicStories >= INDUSTRY_PUBLIC_STORY_LIMIT_PER_WEEK && (!ownPlatformId || campaignStories >= OWN_CAMPAIGN_STORIES_PER_WEEK)) break;
     }
     return selected;
 };
@@ -81,6 +136,8 @@ const shouldPublishNews = (event: IndustryEventFact): boolean => (
         'COMPANY_RECOVERED', 'COMPANY_FUNDED', 'COMPANY_RESTRUCTURED', 'COMPANY_ACQUIRED',
         'COMPANY_CLOSED', 'PROJECT_DELAYED', 'PROJECT_OVERRUN', 'PROJECT_HELD',
         'PROJECT_SOLD', 'PROJECT_CANCELLED', 'RIGHTS_DEAL', 'RIGHTS_TRANSFER', 'RIGHTS_SALE_ANNOUNCED',
+        /* #161: a campaign's stories (its first week, its fatigue, its result) are news too; people's posts carry it on X */
+        'PLATFORM_CAMPAIGN_MOMENT',
     ].includes(event.type))
 );
 
@@ -91,13 +148,17 @@ const shouldPublishX = (event: IndustryEventFact): boolean => (
 
 const shouldPublishInstagram = (event: IndustryEventFact): boolean => (
     event.importance === 'HIGH'
-    && ['COMPANY_LAUNCHED', 'PROJECT_CAST', 'AWARD_WON'].includes(event.type)
+    && ['COMPANY_LAUNCHED', 'PROJECT_CAST', 'AWARD_WON', 'PLATFORM_TECH_LAUNCHED', 'PLATFORM_QUALITY_GAP', 'PLATFORM_REBRANDED',
+        'PLATFORM_VALUE_PRAISED', 'PLATFORM_VALUE_CRITICISED', 'PLATFORM_CHART_MOMENT', 'PLATFORM_CAMPAIGN_MOMENT'].includes(event.type)
 );
 
 const newsCategory = (event: IndustryEventFact): NewsItem['category'] => (
     event.importance === 'HIGH' && [
         'COMPANY_PROMOTED', 'COMPANY_ACQUIRED', 'COMPANY_CLOSED',
-        'PROJECT_HIT', 'PROJECT_FLOP', 'AWARD_WON',
+        'PROJECT_HIT', 'PROJECT_FLOP', 'AWARD_WON', 'PLATFORM_TECH_LAUNCHED', 'PLATFORM_OUTAGE',
+        'PLATFORM_PRICE_RAISED', 'PLATFORM_ADS_ADDED', 'PLATFORM_PRICE_CUT',
+        'PLATFORM_REBRANDED', 'PLATFORM_FREE_TIER', 'PLATFORM_OFFER_CHANGED', 'PLATFORM_VALUE_PRAISED', 'PLATFORM_VALUE_CRITICISED',
+        'PLATFORM_CHART_MOMENT', 'PLATFORM_CAMPAIGN_MOMENT',
     ].includes(event.type) ? 'TOP_STORY' : 'INDUSTRY'
 );
 
@@ -142,6 +203,7 @@ const eventNews = (
     } : {}),
     ...(event.companyId ? { companyId: event.companyId } : {}),
     ...(event.projectId ? { projectId: event.projectId } : {}),
+    ...(event.imageMediaId ? { imageMediaId: event.imageMediaId } : {}),
 });
 
 const eventXPost = (
@@ -179,6 +241,7 @@ const eventXPost = (
         ...(personality ? { mediaPersonalityId: personality.id } : {}),
         ...(event.companyId ? { companyId: event.companyId } : {}),
         ...(event.projectId ? { projectId: event.projectId } : {}),
+        ...(event.imageMediaId ? { contentMediaId: event.imageMediaId } : {}),
     };
 };
 
@@ -218,6 +281,7 @@ const eventInstagramPost = (
         ...(personality ? { mediaPersonalityId: personality.id } : {}),
         ...(event.companyId ? { companyId: event.companyId } : {}),
         ...(event.projectId ? { projectId: event.projectId } : {}),
+        ...(event.imageMediaId ? { contentMediaId: event.imageMediaId } : {}),
     };
 };
 
@@ -257,7 +321,7 @@ export const projectIndustryEvents = (
     const xPosts: XPost[] = [];
     const instaPosts: InstaPost[] = [];
     const publicationKeys = [...ledger.publishedEventKeys];
-    const selected = selectEditorialEvents(eligible);
+    const selected = selectEditorialEvents(eligible, player.ownedStreamingPlatform?.identity?.slug);
     const authorshipFor = (
         event: IndustryEventFact,
         mediaStoryId: string | undefined,
@@ -311,7 +375,9 @@ export const projectIndustryEvents = (
     eligible.forEach(event => publicationKeys.push(evaluatedKey(event)));
 
     const changedStoryIds = new Set(advancement.changedStoryIds);
-    const remainingStoryBudget = Math.max(0, INDUSTRY_PUBLIC_STORY_LIMIT_PER_WEEK - selected.length);
+    /* #162: the player's own campaign stories do not take the public stories' room */
+    const remainingStoryBudget = Math.max(0, INDUSTRY_PUBLIC_STORY_LIMIT_PER_WEEK
+        - selected.filter(event => !isOwnCampaignStory(event, player.ownedStreamingPlatform?.identity?.slug)).length);
     const dueStories = mediaWorld.stories
         .filter(story => (
             !changedStoryIds.has(story.id)

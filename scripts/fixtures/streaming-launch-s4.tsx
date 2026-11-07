@@ -2,10 +2,18 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StepPricing } from '../../components/studio-finance/components/launch/StepPricing';
 import type { Country, LaunchData, LaunchDraft, PricingSettings } from '../../components/studio-finance/finance/launch';
+import { getStreamingPlanBuilderView } from '../../services/streamingPlanBuilder';
 import '../../components/studio-finance/styles/tokens.css';
 import '../../components/studio-finance/styles/studio-finance.css';
 import '../../components/studio-finance/styles/launch.css';
 import '../../components/studio-finance/styles/kit.css';
+
+/* a mid-game service for the plan builder (#45): 1080p, 4K and HDR from its Playback level, two
+   and four screens, downloads; 8K and Spatial still to unlock */
+const planBuilder = getStreamingPlanBuilderView({
+  technologyLevels: { PLAYBACK_QUALITY: 60, RELIABILITY: 40, DELIVERY_CAPACITY: 40, PRODUCT_EXPERIENCE: 30 },
+  productLines: [],
+});
 
 const pricing: PricingSettings = {
   streams: ['subs'],
@@ -35,7 +43,8 @@ const country = {
 function Fixture() {
   const [draft, setDraft] = useState<LaunchDraft>({ pricing, selectedCountryIds: ['US'] });
   const data = {
-    pricing, market: { rivalAveragePrice: 12, reachRate: .3 }, capabilityLocks: {},
+    pricing, market: { rivalAveragePrice: 12, reachRate: .3 }, capabilityLocks: {}, planBuilder,
+    company: { name: 'Fixture+', week: 1, brandHex: '#7c5cff' },
   } as unknown as LaunchData;
   return (
     <div className="sf lw s4-fixture">
@@ -44,7 +53,8 @@ function Fixture() {
           data={data} draft={draft} patch={(next) => setDraft(current => ({ ...current, ...next }))}
           chosen={[country]}
           treasury={{ available: 1_000_000_000, founderContributed: 1_000_000_000, planned: 0, committed: 0, paid: 0 }}
-          free={1_000_000_000} gap={0} handlers={{}}
+          free={1_000_000_000} gap={0}
+          handlers={{ onOpenTechnology: (techId) => console.info(`Go to Tech: ${techId ?? 'Tech'}`) }}
         />
       </div>
     </div>

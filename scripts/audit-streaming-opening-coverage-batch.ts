@@ -16,7 +16,7 @@ const fixture = (count = 1, countryIds?: string[]) => {
     const week = getAbsoluteWeek(player.age, player.currentWeek);
     const platform = player.ownedStreamingPlatform;
     platform.serviceConfiguration.pricing = configureStreamingPricingOffer(platform.serviceConfiguration.pricing,
-        { kind: 'CORE', coreModel: 'SUBSCRIPTION' });
+        { kind: 'CORE', coreModel: 'SUBSCRIPTION', alone: true });
     for (let index = 0; index < count; index++) {
         const id = `opening-batch-${index}`;
         const licence = addStreamingAuditCatalogueTitle(player, week, id);
@@ -54,11 +54,11 @@ const cases = (): Record<string, Player> => {
         releasePattern: 'SINGLE_PREMIERE', marketingPlan: 'LEAN' }] } as any;
     const freeAds = fixture(1, ['US', 'IN']);
     freeAds.ownedStreamingPlatform.serviceConfiguration.pricing = configureStreamingPricingOffer(
-        freeAds.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'ADVERTISING' });
+        freeAds.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'ADVERTISING', alone: true });
     Object.values(freeAds.world.streamingRightsContracts!).find(contract => contract.sourceProjectId === 'opening-batch-0')!.accessGrant!.modes = ['AD_SUPPORTED'];
     const noPlayableOffer = fixture(1, ['US', 'IN']);
     noPlayableOffer.ownedStreamingPlatform.serviceConfiguration.pricing = configureStreamingPricingOffer(
-        noPlayableOffer.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'STORE' });
+        noPlayableOffer.ownedStreamingPlatform.serviceConfiguration.pricing, { kind: 'CORE', coreModel: 'STORE', alone: true });
     Object.values(noPlayableOffer.world.streamingRightsContracts!).find(contract => contract.sourceProjectId === 'opening-batch-0')!.accessGrant!.modes = ['SUBSCRIPTION'];
     const original = createC6QaCareer();
     const values = { fiftyTwo, denied, fallback, freeAds, noPlayableOffer, original };

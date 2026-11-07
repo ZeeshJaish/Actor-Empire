@@ -179,11 +179,14 @@ export const advanceStreamingResearchStage = (
     const advanced = advanceStreamingResearchSchedule(program, absoluteWeek);
     if (advanced !== program) return advanced;
     /* A facility install completes on its own schedule, and so does a
-       network-wide one: neither has anything left for the player to decide once
-       the work has started. Without NETWORK_FIBRE here a fibre generation
-       reached INSTALLING and stayed there for the rest of the career. */
+       network-wide one or a localization capability: none has anything left
+       for the player to decide once the work has started. Without NETWORK_FIBRE
+       here a fibre generation reached INSTALLING and stayed there for the rest
+       of the career; without LOCALIZATION_CAPABILITY, Localization Foundation
+       did the same and no language network could ever open. */
     return program.stage === 'INSTALLING'
-        && (program.installationTargetType === 'FACILITY' || program.installationTargetType === 'NETWORK_FIBRE')
+        && (program.installationTargetType === 'FACILITY' || program.installationTargetType === 'NETWORK_FIBRE'
+            || program.installationTargetType === 'LOCALIZATION_CAPABILITY')
         ? completeStreamingResearchInstallationSchedule(program, absoluteWeek)
         : program;
 };

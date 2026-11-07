@@ -83,11 +83,17 @@ export const reserveOwnedStreamingLaunchMarketing = (
         return { player, changed: false, reason: 'INSUFFICIENT_TREASURY' };
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const startsAtAbsoluteWeek = absoluteWeek + 1;
-    const endsAtAbsoluteWeek = Math.max(startsAtAbsoluteWeek, Math.round(readyAtAbsoluteWeek));
+    const firstWeek = absoluteWeek + 1;
+    const endsAtAbsoluteWeek = Math.max(firstWeek, Math.round(readyAtAbsoluteWeek));
+    /* #158: a plan with its weeks runs the last of them before opening; before #158, the whole build */
+    const startsAtAbsoluteWeek = draft.weeks ? Math.max(firstWeek, endsAtAbsoluteWeek - draft.weeks + 1) : firstWeek;
     const planId = createDeterministicId('streaming_launch_marketing', platform.simulationSeed, idempotencyKey);
+    /* #160 (plan §20.14, Zeesh: "jaise hi start button press karenge … hamara paisa sara deduct ho jayega"): a plan built
+       with its weeks (#158) is paid in full now; one from before is reserved and paid week by week */
+    const prepaid = Boolean(draft.weeks) && ceiling > 0;
     const plan: OwnedStreamingLaunchMarketingPlan = {
         ...draft,
+        ...(prepaid ? { prepaid: true } : {}),
         id: planId,
         idempotencyKey,
         status: 'RESERVED',
@@ -105,19 +111,20 @@ export const reserveOwnedStreamingLaunchMarketing = (
         id: createDeterministicId('streaming_cost', platform.simulationSeed, idempotencyKey),
         idempotencyKey,
         category: 'MARKETING' as const,
-        label: 'Opening-night marketing ceiling',
-        status: 'COMMITTED' as const,
+        label: 'Launch campaign',
+        status: prepaid ? 'PAID' as const : 'COMMITTED' as const,
         plannedAmount: ceiling,
-        committedAmount: ceiling,
-        paidAmount: 0,
+        committedAmount: prepaid ? 0 : ceiling,
+        paidAmount: prepaid ? ceiling : 0,
         weeklyAmount: Math.ceil(ceiling / Math.max(1, endsAtAbsoluteWeek - startsAtAbsoluteWeek + 1)),
         createdAtAbsoluteWeek: absoluteWeek,
         committedAtAbsoluteWeek: absoluteWeek,
-        paidAtAbsoluteWeek: null,
+        paidAtAbsoluteWeek: prepaid ? absoluteWeek : null,
         sourceReferenceId: planId,
     } : null;
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        ...(prepaid ? { treasuryCash: platform.treasuryCash - ceiling } : {}),
         launchMarketingPlan: plan,
         costCommitments: commitment ? [...platform.costCommitments, commitment] : platform.costCommitments,
     }, player.id);
@@ -140,12 +147,16 @@ export const processOwnedStreamingLaunchMarketingWeek = (
         plan.budgetCeiling,
         plan.timeline,
         Math.max(1, plan.endsAtAbsoluteWeek - plan.startsAtAbsoluteWeek + 1),
+        plan.openingNight ?? 0,
     );
     const scheduleIndex = absoluteWeek - plan.startsAtAbsoluteWeek;
     const scheduled = scheduleIndex >= 0 && scheduleIndex < schedule.length ? schedule[scheduleIndex] : 0;
-    const spend = commitment
-        ? Math.max(0, Math.min(scheduled, commitment.committedAmount, platform.treasuryCash))
-        : 0;
+    /* #160: a plan paid in full at commission runs on what was paid; the treasury is not touched again */
+    const spend = plan.prepaid
+        ? Math.max(0, Math.min(scheduled, plan.budgetCeiling - plan.spentAmount))
+        : commitment
+            ? Math.max(0, Math.min(scheduled, commitment.committedAmount, platform.treasuryCash))
+            : 0;
     const progress = plan.budgetCeiling > 0 ? Math.min(1, (plan.spentAmount + spend) / plan.budgetCeiling) : 0;
     const decayed = absoluteWeek > plan.endsAtAbsoluteWeek ? .92 : 1;
     const countryAwareness = Object.fromEntries(plan.forecastSnapshot.countryForecasts.map(country => [
@@ -155,7 +166,7 @@ export const processOwnedStreamingLaunchMarketingWeek = (
         ) * decayed)),
     ]));
     const nextCommitments = [...platform.costCommitments];
-    if (commitment) {
+    if (commitment && !plan.prepaid) {
         nextCommitments[commitmentIndex] = {
             ...commitment,
             committedAmount: Math.max(0, commitment.committedAmount - spend),
@@ -165,7 +176,7 @@ export const processOwnedStreamingLaunchMarketingWeek = (
     }
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
-        treasuryCash: platform.treasuryCash - spend,
+        treasuryCash: platform.treasuryCash - (plan.prepaid ? 0 : spend),
         launchMarketingPlan: {
             ...plan,
             status: spend > 0 || plan.spentAmount > 0 ? 'SPENDING' : plan.status,
@@ -191,9 +202,11 @@ export const settleOwnedStreamingLaunchMarketingAtOpening = (
         return { player, changed: false, reason: 'UNCHANGED' };
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    let returnedAmount = 0;
+    /* #160: a plan paid in full gives back what its weeks did not use */
+    let returnedAmount = plan.prepaid ? Math.max(0, Math.round(plan.budgetCeiling - plan.spentAmount)) : 0;
     const costCommitments = platform.costCommitments.map(item => {
         if (item.sourceReferenceId !== plan.id || item.category !== 'MARKETING') return item;
+        if (plan.prepaid) return item;
         returnedAmount = item.committedAmount;
         return {
             ...item,
@@ -204,6 +217,7 @@ export const settleOwnedStreamingLaunchMarketingAtOpening = (
     });
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        ...(plan.prepaid ? { treasuryCash: platform.treasuryCash + returnedAmount } : {}),
         launchMarketingPlan: {
             ...plan,
             status: plan.spentAmount > 0 ? 'SETTLED' : 'CANCELLED',

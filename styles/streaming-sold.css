@@ -1,0 +1,26 @@
+/* #190: the company is sold */
+.sold-shell { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; color: #eef0f5; background: radial-gradient(ellipse 120% 55% at 50% 0%, rgba(214, 172, 92, .14), transparent 62%), #050609; font-family: 'Inter', system-ui, sans-serif; }
+.sold-top { display: flex; align-items: center; gap: 10px; padding: calc(14px + env(safe-area-inset-top)) 16px 10px; }
+.sold-top button { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: #eef0f5; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); }
+.sold-top span { font-size: 9px; font-weight: 900; letter-spacing: .2em; color: #8b93a5; }
+.sold-top span b { color: #e2c06f; }
+.sold-main { flex: 1; overflow-y: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.sold-hero { position: relative; padding: 26px 16px 20px; border-radius: 18px; text-align: center; background: linear-gradient(160deg, rgba(214, 172, 92, .12), rgba(255, 255, 255, .02)); border: 1px solid rgba(214, 172, 92, .3); overflow: hidden; }
+.sold-stamp { display: inline-block; padding: 6px 16px 4px; border: 3px solid #e2c06f; border-radius: 8px; font: 400 30px/1 'Anton', 'Archivo', sans-serif; font-style: normal; letter-spacing: .2em; color: #e2c06f; transform: rotate(-6deg); animation: sold-stamp .45s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+@keyframes sold-stamp { from { transform: scale(2.2) rotate(-16deg); opacity: 0; } }
+.sold-hero h1 { margin: 16px 0 0; font: 400 34px/1.05 'Anton', 'Archivo', sans-serif; letter-spacing: .02em; color: #f6f1e6; overflow-wrap: anywhere; }
+.sold-hero p { margin: 8px 0 0; font-size: 12px; line-height: 1.45; color: #c9d0db; }
+.sold-card { padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, .03); border: 1px solid rgba(255, 255, 255, .09); }
+.sold-card > span { display: block; font-size: 8.5px; font-weight: 900; letter-spacing: .18em; color: #8b93a5; }
+.sold-card > b { display: block; margin-top: 6px; font: 400 30px/1 'Anton', 'Archivo', sans-serif; color: #f6d78f; }
+.sold-card > p { margin: 7px 0 0; font-size: 11.5px; line-height: 1.5; color: #aeb6c4; }
+.sold-bar { display: block; height: 8px; margin-top: 11px; border-radius: 99px; background: #11141b; overflow: hidden; }
+.sold-bar em { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #a87a2a, #e2c06f); }
+.sold-list { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.sold-list li { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; }
+.sold-list b { color: #eef0f5; }
+.sold-list em { font-style: normal; color: #8b93a5; text-align: right; }
+.sold-foot { padding: 10px 16px max(14px, env(safe-area-inset-bottom)); }
+.sold-go { width: 100%; min-height: 50px; border-radius: 14px; font-size: 14px; font-weight: 900; color: #1d1607; background: linear-gradient(#ffd27a, #d9a136); box-shadow: 0 8px 22px rgba(217, 161, 54, .28); }
+.sold-go:active { transform: scale(.98); }
+@media (prefers-reduced-motion: reduce) { .sold-stamp { animation: none; } }

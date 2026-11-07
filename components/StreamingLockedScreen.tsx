@@ -37,6 +37,7 @@ import AccessibleDialog from './AccessibleDialog';
 import StreamingFoundingWizard from './StreamingFoundingWizard';
 import StreamingPlatformHQ from './StreamingPlatformHQ';
 import StreamingFoundingJourney from './StreamingFoundingJourney';
+import StreamingSoldScreen from './StreamingSoldScreen';
 import StreamingVisualScene from './StreamingVisualScene';
 import '../styles/streaming-lock.css';
 
@@ -52,7 +53,7 @@ interface Props {
   onOpenProductionHouse?: () => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
-  initialDestination?: 'HOME' | 'FINANCE';
+  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS';
   initialContentMarketOfferId?: string;
   onContentMarketOfferConsumed?: () => void;
 }
@@ -197,7 +198,7 @@ export default function StreamingLockedScreen({
     player.ownedStreamingPlatform.identity
     && player.ownedStreamingPlatform.foundingProfile,
   ));
-  const [headquartersDestination, setHeadquartersDestination] = useState<'HOME' | 'FINANCE'>(initialDestination);
+  const [headquartersDestination, setHeadquartersDestination] = useState<'HOME' | 'FINANCE' | 'STATUS'>(initialDestination);
   const [feedback, setFeedback] = useState('');
   const eligibility = useMemo(() => evaluateStreamingEligibility(player), [player]);
   const platform = player.ownedStreamingPlatform;
@@ -243,6 +244,11 @@ export default function StreamingLockedScreen({
     setShowLaunchMoment(true);
     navigator.vibrate?.([18, 42, 28]);
   };
+
+  /* #190: a sold company: what it went for, what you were paid, and the road to a new one */
+  if (platform.lifecycle === 'SOLD') {
+    return <StreamingSoldScreen player={player} onUpdatePlayer={onUpdatePlayer} onBack={onBack} />;
+  }
 
   if (
     access.viewState === 'CHECKING_ACCESS'

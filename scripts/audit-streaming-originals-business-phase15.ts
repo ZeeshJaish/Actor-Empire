@@ -199,7 +199,8 @@ const createFixture = (): Player => {
             },
             technologyLevels: {
                 ...initial.technologyLevels,
-                CONTENT_OPERATIONS: 20,
+                // #86: no package needs Content operations (World Premiere Grid needed 20)
+                CONTENT_OPERATIONS: 0,
             },
             treasuryCash: 40_000_000,
             weeklyHistory: Array.from({ length: 4 }, (_, index) => ({

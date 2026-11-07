@@ -1,0 +1,131 @@
+/* ============================================================================
+   A CAMPAIGN'S PAGE (#149) — the Studio's dark language (#146): Anton for the
+   big words, Archivo for labels, the service's colour as --cs-accent, the
+   actions in a pinned bar. The HQ shell resets button fonts at 0-1-1, so button
+   rules here are 0-2-0 or more.
+   ========================================================================== */
+
+.page{position:fixed;inset:0;z-index:75;display:flex;flex-direction:column;max-width:520px;margin:0 auto;background:#050609;color:#eef0f5;
+  font-family:'Inter',system-ui,sans-serif;animation:cp-in .26s cubic-bezier(.22,.8,.3,1) both}
+@keyframes cp-in{from{opacity:0;transform:translateX(18px)}}
+.top{display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 12px;
+  background:radial-gradient(110% 150% at 100% 0%,color-mix(in srgb,var(--cs-accent) 20%,transparent),transparent 60%),linear-gradient(#0b0d13,#08090e);
+  border-bottom:1px solid rgba(255,255,255,.07)}
+.top.top .back{flex:0 0 auto;width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  font:400 17px/1 'Inter',system-ui,sans-serif;color:#d4dae4;transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.top.top .back:active{transform:scale(.9)}
+.title{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.title b{font:400 21px/1.05 'Anton','Archivo',sans-serif;letter-spacing:.03em;color:#fff;overflow-wrap:anywhere}
+.title span{font:800 7.5px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.15em;color:color-mix(in srgb,var(--cs-accent) 70%,#fff)}
+.grade{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;font:400 20px/1 'Anton','Archivo',sans-serif;font-style:normal}
+.gradeS{background:linear-gradient(135deg,#ffe07a,#f5a623);color:#1a1300;box-shadow:0 8px 22px -10px #f5a623}
+.gradeA{background:rgba(74,222,128,.16);color:#4ade80}
+.gradeB{background:rgba(96,165,250,.16);color:#93c5fd}
+.gradeC{background:rgba(255,255,255,.07);color:#aab2c0}
+
+.scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 0 120px}
+.hero{position:relative;height:300px;overflow:hidden;background:#05070c;border-bottom:1px solid rgba(255,255,255,.07)}
+.hero > div:first-child{position:absolute;inset:0}
+.heroThumb.heroThumb{position:absolute;inset:auto 14px;top:50%;transform:translateY(-50%);width:auto;border-radius:12px}
+.heroHud{position:absolute;left:14px;right:14px;top:12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font:800 9px/1.35 'Archivo','Inter',sans-serif;
+  letter-spacing:.12em;text-transform:uppercase;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+.liveTag,.endTag{display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border-radius:6px}
+.liveTag{background:rgba(239,68,68,.9)}
+.liveTag i{width:6px;height:6px;border-radius:50%;background:#fff;animation:cp-blink 1s steps(2) infinite}
+.endTag{background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.endTag i{display:none}
+@keyframes cp-blink{50%{opacity:.2}}
+.hero.hero .heroOpen{position:absolute;right:12px;bottom:12px;padding:8px 11px;border-radius:10px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.22);
+  font:900 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#fff;backdrop-filter:blur(8px)}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid rgba(255,255,255,.07)}
+.stats div{display:flex;flex-direction:column;gap:5px;min-width:0;padding:12px 10px;border-left:1px solid rgba(255,255,255,.06)}
+.stats div:first-child{border-left:none;padding-left:14px}
+.stats span{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7c8597}
+.stats b{font:400 19px/1 'Anton','Archivo',sans-serif;color:#f3f5f9;white-space:nowrap}
+.stats small{font-size:8.5px;font-weight:700;line-height:1.3;color:#7c8597;overflow-wrap:anywhere}
+.good{color:#4ade80 !important}
+
+.sh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:18px 16px 9px}
+.sh h2{font-size:15px;font-weight:900;color:#f3f5f9}
+.sh span{font-size:9px;font-weight:700;color:#6f7889}
+.note{margin:4px 16px 0;font-size:10px;line-height:1.5;color:#7c8597}
+
+/* week by week: two rows of bars on one week axis */
+.chart{margin:0 14px;padding:12px 12px 10px;border-radius:16px;background:#0c0f15;border:1px solid rgba(255,255,255,.07)}
+.chartRow{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:end;gap:8px}
+.chartRow + .chartRow{margin-top:8px}
+.chartLabel{padding-bottom:3px;font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.13em;color:#7c8597}
+.bars{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);align-items:end;gap:2px;height:58px}
+.chartRow + .chartRow .bars{height:40px}
+.bars.bars .bar{display:flex;align-items:flex-end;height:100%;padding:0;border-radius:4px 4px 0 0;background:rgba(255,255,255,.025)}
+.bar i{display:block;width:100%;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--cs-accent) 70%,#0c0f15);transition:height .5s cubic-bezier(.2,.9,.3,1)}
+.barJoins i{background:rgba(74,222,128,.55)}
+.bar i.barPaused{height:100% !important;background:repeating-linear-gradient(135deg,rgba(252,211,77,.22) 0 4px,transparent 4px 8px)}
+.barOn i{background:var(--cs-accent)}
+.barJoins.barOn i{background:#4ade80}
+.chartNote{margin-top:10px;font-size:9.5px;line-height:1.45;color:#aab2c0}
+.chartNote b{color:#fff}
+
+/* where it ran */
+.countries{display:flex;flex-direction:column;gap:5px;margin:0 14px}
+.country{display:grid;grid-template-columns:24px minmax(0,1fr) 96px 44px;align-items:center;gap:9px;padding:8px 10px;border-radius:12px;background:#0c0f15;border:1px solid rgba(255,255,255,.06);
+  animation:cp-rise .38s cubic-bezier(.2,.9,.3,1.08) backwards;animation-delay:calc(var(--i,0) * 40ms)}
+@keyframes cp-rise{from{opacity:0;transform:translateY(10px)}}
+.flag{display:block;width:24px;height:16px;border-radius:3px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.14)}
+.flag svg{display:block;width:100%;height:100%}
+/* #153: names wrap rather than cut, at 320–430 */
+.country b{font-size:11px;font-weight:800;line-height:1.25;overflow-wrap:anywhere}
+.aware{position:relative;display:block;height:14px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden}
+.aware i{position:absolute;left:0;top:0;bottom:0;background:color-mix(in srgb,var(--cs-accent) 70%,transparent)}
+.aware em{position:relative;display:block;font-style:normal;font-size:8px;font-weight:900;line-height:14px;text-align:center;color:#fff}
+.country strong{font:400 14px/1 'Anton','Archivo',sans-serif;text-align:right;color:#c9d0db}
+
+/* placements */
+.places{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 14px}
+.page .place{display:flex;flex-direction:column;gap:6px;min-width:0;padding:8px;border-radius:14px;text-align:left;background:#0c0f15;border:1px solid rgba(255,255,255,.07);
+  animation:cp-rise .4s cubic-bezier(.2,.9,.3,1.08) backwards;animation-delay:calc(var(--i,0) * 50ms);transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.page .place:not(:disabled):active{transform:scale(.97)}
+.page .place:disabled{opacity:1}
+.placeArt{position:relative;display:flex;align-items:center;justify-content:center;height:84px;border-radius:9px;overflow:hidden;background:#07090d}
+.placeArt > span:first-child{height:100%;width:100%}
+.placeArt i{position:absolute;right:6px;bottom:6px;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
+  background:rgba(0,0,0,.6);font-size:8px;font-style:normal;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.3)}
+.placeGlyph{display:flex;align-items:center;justify-content:center;width:44px !important;height:44px !important;padding:10px;border-radius:13px;
+  color:color-mix(in srgb,var(--cs-accent) 75%,#fff);background:color-mix(in srgb,var(--cs-accent) 12%,#0b0e14)}
+.placeGlyph svg{width:100%;height:100%}
+.place b{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:900;line-height:1.25;color:#fff;overflow-wrap:anywhere}
+.place b svg{flex:0 0 auto;width:13px;height:13px;color:color-mix(in srgb,var(--cs-accent) 70%,#fff)}
+.place small{font-size:9px;line-height:1.35;color:#8b93a5;overflow-wrap:anywhere}
+
+/* in the news */
+.news{display:flex;flex-direction:column;gap:6px;margin:0 14px}
+.newsRow{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 10px;border-radius:13px;background:#0c0f15;border:1px solid rgba(255,255,255,.07);
+  animation:cp-rise .38s cubic-bezier(.2,.9,.3,1.08) backwards;animation-delay:calc(var(--i,0) * 45ms)}
+.newsRow > i{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;font:900 8px/1 'Archivo','Inter',sans-serif;font-style:normal;letter-spacing:.06em}
+.newsNEWS{background:rgba(239,68,68,.14);color:#fca5a5}
+.newsX{background:rgba(255,255,255,.08);color:#f3f5f9}
+.newsINSTAGRAM{background:linear-gradient(135deg,rgba(236,72,153,.22),rgba(245,158,11,.22));color:#fbcfe8}
+.newsRow span{min-width:0;display:flex;flex-direction:column;gap:3px}
+.newsRow small{font:800 7.5px/1.3 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#7c8597;overflow-wrap:anywhere}
+.newsRow b{font-size:10.5px;font-weight:800;line-height:1.35;color:#e7ebf2;overflow-wrap:anywhere}
+.newsPic{width:44px;height:54px;border-radius:8px;object-fit:cover;object-position:center 35%;box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+
+/* the pinned actions */
+.pin{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(5,6,9,0),#050609 32%)}
+.pin.pin button{flex:1;min-height:54px;padding:0 12px;border-radius:15px;font:900 10.5px/1.15 'Archivo','Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;
+  transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.pin.pin button:active{transform:scale(.97)}
+.pin.pin .primary{background:var(--cs-accent);color:var(--epx-brand-ink,#fff);box-shadow:0 14px 30px -14px var(--cs-accent)}
+.pin.pin .secondary{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#f3f5f9}
+.pin.pin .danger{background:rgba(255,90,95,.12);border:1px solid rgba(255,90,95,.35);color:#ff8a8a}
+/* #155: Stop says what is left on a second line, so +1 week and +4 weeks fit beside it at 320 */
+.pin.pin button small{display:block;margin-top:4px;font-size:8px;letter-spacing:.06em;opacity:.85;overflow-wrap:anywhere}
+
+@media (max-width:360px){
+  .hero{height:250px}
+  .stats b{font-size:16px}
+  .country{grid-template-columns:22px minmax(0,1fr) 72px 40px}
+  .title b{font-size:18px}
+}
+@media (prefers-reduced-motion:reduce){.page,.country,.place{animation:none !important}}

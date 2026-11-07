@@ -7,38 +7,39 @@
 
    Two things carry the screen. Each market's audience is drawn as a share bar
    in the rivals' own recognition colours, so who owns the country is legible
-   before a word is read. And the running footprint lives in a dock pinned to
-   the bottom of the step — the old version buried it below every card, where a
-   player had no way to know it existed.
+   before a word is read. And the running footprint is one tap away on the
+   region bar.
+
+   #111 (Zeesh: "काफ़ी ख़राब बटन्स" … "थोड़ा गेम वाला भी फील"): the regions are
+   six tiles, each filling as its markets are taken; the region bar reads like
+   instruments beside one Add all / Remove all control; and a market is added
+   or dropped with one switch, the same control both ways.
+
+   #139: the country card is LaunchCountryCard, shared with the Audience room's
+   Enter new markets.
    ========================================================================== */
 
 import { useMemo, useState } from 'react';
-import type { Competition, Country } from '../../finance/launch';
+import type { Country } from '../../finance/launch';
 import { summarize, unclaimed } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
-import { compactCount, money, pct, signedPct } from '../../finance/format';
+import { compactCount, money, signedPct } from '../../finance/format';
 import { rivalColor, UNCLAIMED } from '../../finance/rivals';
-import { FlagField, flagAccent } from '../FlagField';
+import { FlagField } from '../FlagField';
 import { Sheet, Tag } from '../ui';
 import { CountryReport, ShareBar } from './CountryReport';
 import GroupMarketThumbnail from './GroupMarketThumbnail';
 import GroupMarketMap from './GroupMarketMap';
+import {
+  COMPETITION_LABEL,
+  COMPETITION_TONE,
+  DIFFICULTY_LABEL,
+  DIFFICULTY_TONE,
+  LaunchCountryCard,
+  OpeningSwitch,
+  ReportGlyph,
+} from './LaunchCountryCard';
 import { quoteStreamingMarketFilingEnergy } from '../../../../services/streamingMarketFilingQuote';
-
-/* Plain words. "Fierce" was doing no work that "fought over" doesn't do. */
-export const COMPETITION_LABEL: Record<Competition, string> = {
-  OPEN: 'Open',
-  BUSY: 'Crowded',
-  FIERCE: 'Fought over',
-};
-export const COMPETITION_TONE = { OPEN: 'good', BUSY: 'warn', FIERCE: 'bad' } as const;
-export const DIFFICULTY_LABEL = {
-  LOW: 'Easy entry',
-  MODERATE: 'Some paperwork',
-  HIGH: 'Hard entry',
-  SEVERE: 'Very hard entry',
-} as const;
-export const DIFFICULTY_TONE = { LOW: 'good', MODERATE: 'flat', HIGH: 'warn', SEVERE: 'bad' } as const;
 
 export function StepMarkets({ data, draft, patch, chosen, handlers, initialCountryId }: StepProps) {
   const [region, setRegion] = useState(data.countries.find(country=>country.id===initialCountryId)?.region || data.regions[0]);
@@ -112,112 +113,76 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
   /* One quote for one filing action, counting only markets not yet filed.
      Clearance and the transaction use the same canonical quote function. */
   const energyFor = (countries: Country[]) => quoteStreamingMarketFilingEnergy(unfiled(countries).map(country => country.id));
+  const pickedHere = inRegion.filter((country) => picked.has(country.id));
+  const allHere = inRegion.length > 0 && pickedHere.length === inRegion.length;
 
   return (
     <>
-      <div className="lw-regions" role="tablist" aria-label="Region">
+      {/* --- the world, a region at a time ---------------------------------
+          Six tiles: the region, a meter that fills as its markets are taken,
+          and the count against what it holds. The region you are in is lit. */}
+      <div className="lw-theatres" role="tablist" aria-label="Region">
         {data.regions.map((name) => {
-          const count = data.countries.filter((c) => c.region === name && picked.has(c.id)).length;
+          const all = data.countries.filter((c) => c.region === name);
+          const count = all.filter((c) => picked.has(c.id)).length;
           return (
             <button
               key={name}
               type="button"
               role="tab"
               aria-selected={name === region}
-              className={name === region ? 'lw-region is-on' : 'lw-region'}
+              aria-label={`${name}: ${count} of ${all.length} markets chosen`}
+              className={`lw-theatre${name === region ? ' is-on' : ''}${count > 0 ? ' has-picks' : ''}`}
               onClick={() => { setRegion(name); setOpenGroupId(null); }}
             >
-              {name}
-              {count > 0 && <i aria-label={`${count} selected`}>{count}</i>}
+              <b>{name}</b>
+              <span className="lw-theatre-meter" aria-hidden="true">
+                <i style={{ width: `${all.length > 0 ? (count / all.length) * 100 : 0}%` }} />
+              </span>
+              <em aria-hidden="true">{count}<s>/{all.length}</s></em>
             </button>
           );
         })}
       </div>
 
-      {/* The region line is the way into the whole footprint now. The dock that
-          used to sit under it said the same three numbers the strip above the
-          footer already says, in a card twice the height. */}
-      <div className="lw-regionhead">
-        <button type="button" className="lw-regionsum" onClick={() => setFootprintOpen(true)}>
-          <span className="lw-regionsum-facts">
-            <span>{inRegion.length} markets</span>
-            <span>{regionSummary.countries} chosen</span>
-            {regionSummary.countries > 0 && <span>{compactCount(regionSummary.audience)} viewers</span>}
-            {unfiled(inRegion.filter((country) => picked.has(country.id))).length > 0 &&
-              <span>{energyFor(inRegion.filter((country) => picked.has(country.id)))}E to file together</span>}
-          </span>
+      {/* The region bar: what this region amounts to, read like instruments and
+          opening the whole footprint, beside one control that takes the whole
+          region or gives it back. */}
+      <div className="lw-regionbar">
+        <button type="button" className="lw-regionsum" onClick={() => setFootprintOpen(true)}
+          aria-label={`${region}: ${regionSummary.countries} of ${inRegion.length} chosen. Open the opening footprint`}>
+          <span><em>Chosen</em><b>{regionSummary.countries}<s>/{inRegion.length}</s></b></span>
+          <span><em>Viewers</em><b>{regionSummary.countries > 0 ? compactCount(regionSummary.audience) : '—'}</b></span>
+          {unfiled(pickedHere).length > 0 && <span><em>To file</em><b>{energyFor(pickedHere)}E</b></span>}
           <i aria-hidden="true">›</i>
         </button>
-        {inRegion.some((country) => !picked.has(country.id))
-          ? <button type="button" className="sf-link" onClick={() => addAll(inRegion)}>Add all {inRegion.length}</button>
-          : <button type="button" className="sf-link" onClick={() => removeAll(inRegion)}>Remove all</button>}
+        <button type="button" className={allHere ? 'lw-bulk is-on' : 'lw-bulk'} onClick={() => (allHere ? removeAll(inRegion) : addAll(inRegion))}>
+          <i aria-hidden="true">{allHere ? '−' : '+'}</i>
+          {allHere ? 'Remove all' : `Add all ${inRegion.length}`}
+        </button>
       </div>
 
       <ul className="lw-countries">
         {heroes.map((country, i) => {
           const on = picked.has(country.id);
-          const open = unclaimed(country.rivals);
           return (
-            <li
+            <LaunchCountryCard
               key={country.id}
-              className={on ? 'lw-country is-on' : 'lw-country'}
-              style={{ ['--terr-accent' as string]: flagAccent(country.code) ?? 'var(--sf-brand-on)', ['--i' as string]: i }}
-            >
-              <div className="lw-country-band" aria-hidden="true">
-                <FlagField code={country.code} src={country.flagSrc} variant="band" />
-                <span className="sf-terr-grain" />
-                <span className="sf-terr-glow" />
-                <span className="sf-terr-shade" />
-                <span className={`sf-terr-badge sf-tone-${COMPETITION_TONE[country.competition]}`}>
-                  {COMPETITION_LABEL[country.competition]}
-                </span>
-                {on && <span className="lw-onday">On opening day</span>}
-                <span className={country.subRegion ? 'sf-terr-plate has-bloc' : 'sf-terr-plate'}>
-                  <span className="sf-terr-tag">{country.code}</span>
-                  <span className="sf-terr-name">{country.name}</span>
-                  {/* Where in the region this is — on its own line under the
-                      name. The plate is a flex row, so beside it this took half
-                      the width and truncated the United States to "United S…".
-                      The country is the headline; the bloc is a footnote. */}
-                  {country.subRegion && <span className="lw-terr-bloc">{country.subRegion}</span>}
-                </span>
-              </div>
-
-              <div className="lw-country-body">
-                <div className="lw-country-stats">
-                  <span><em>Audience</em><b>{compactCount(country.audience)}</b></span>
-                  <span><em>Growth</em><b className="sf-tone-good">{signedPct(country.growth, 0)}</b></span>
-                  <span><em>Market access</em><b>{money(country.rightsEstimate)}</b></span>
-                </div>
-
-                {/* Who owns the country, in their own colours. */}
-                <ShareBar rivals={country.rivals} open={open} compact />
-
-                <div className="lw-chips">
-                  {country.languages.map((lang) => (
-                    <span key={lang.name} className="lw-chip">{lang.name} <i>{pct(lang.share, 0)}</i></span>
-                  ))}
-                  <span className={`lw-chip is-plain sf-tone-${DIFFICULTY_TONE[country.difficulty]}`}>
-                    {DIFFICULTY_LABEL[country.difficulty]}
-                  </span>
-                  {(clearanceByCountry.get(country.id) ?? 'NOT_FILED') === 'NOT_FILED' &&
-                    <span className="lw-chip is-plain">{quoteStreamingMarketFilingEnergy([country.id])}E to file</span>}
-                </div>
-
-                <div className="lw-country-actions">
-                  <button type="button" className="sf-btn sf-btn--ghost" onClick={() => setReport(country)}>
-                    Full report
-                  </button>
-                  <button
-                    type="button"
-                    className={on ? 'sf-btn sf-btn--ghost' : 'sf-btn sf-btn--primary'}
-                    onClick={() => toggle(country.id)}
-                  >
-                    {on ? 'Remove' : 'Add to opening day'}
-                  </button>
-                </div>
-              </div>
-            </li>
+              country={country}
+              on={on}
+              index={i}
+              figures={[
+                { label: 'Audience', value: compactCount(country.audience) },
+                { label: 'Growth', value: signedPct(country.growth, 0), good: true },
+                { label: 'Market access', value: money(country.rightsEstimate) },
+              ]}
+              chips={(clearanceByCountry.get(country.id) ?? 'NOT_FILED') === 'NOT_FILED' &&
+                <span className="lw-chip is-plain">{quoteStreamingMarketFilingEnergy([country.id])}E to file</span>}
+              pinned="On opening day"
+              switchLabel={on ? 'On opening day' : 'Add to opening day'}
+              onReport={() => setReport(country)}
+              onToggle={() => toggle(country.id)}
+            />
           );
         })}
       </ul>
@@ -273,16 +238,16 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
               </div>
 
               <div className="lw-country-actions">
-                <button type="button" className="sf-btn sf-btn--ghost" onClick={() => setOpenGroupId(group.id)}>
-                  Full report
+                <button type="button" className="lw-report" onClick={() => setOpenGroupId(group.id)}>
+                  <ReportGlyph />Pick countries
                 </button>
-                <button
-                  type="button"
-                  className={all ? 'sf-btn sf-btn--ghost' : 'sf-btn sf-btn--primary'}
+                <OpeningSwitch
+                  on={all}
+                  part={taken.length > 0 && !all}
+                  label={all ? `All ${group.countries.length} on opening day` : taken.length > 0
+                    ? `${taken.length} of ${group.countries.length} · add all` : `Add all ${group.countries.length}`}
                   onClick={() => (all ? removeAll(group.countries) : addAll(group.countries))}
-                >
-                  {all ? 'Remove all' : `Add all ${group.countries.length}`}
-                </button>
+                />
               </div>
             </div>
           </article>

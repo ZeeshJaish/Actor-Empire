@@ -7,10 +7,16 @@
    The shell owns the stage track, the budget rail, and the draft. Nothing here
    is charged: racks, leases, repairs and campaigns are a drawing until the
    commissioning sequence in the last stage runs.
+
+   #157 (plan §20.13, Zeesh: "the build wizard ka header define the launch se
+   maatch nahi ho rha and even buttons"): the stages ride Define the Launch's
+   sequence rail, and the foot is Define the Launch's HUD — what blocks the
+   stage, its figure and the money left, Back as an icon and the next stage as
+   the one big button. On the last stage that button commissions.
    ========================================================================== */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { BuildData, BuildDraft, BuildHandlers, BuildStageId, BuildTotals } from '../../finance/build';
+import type { BuildData, BuildDraft, BuildHandlers, BuildStageId, BuildTotals, ServerTier } from '../../finance/build';
 import {
   BUILD_STAGES, CLOUD_WEEKLY_PER_RACK, OPEN_TIERS, REDUNDANCY_COPY, SERVER_TIERS, STAGE_STATE_COPY,
   buildTotals, constructionProgress, gates, infrastructureMoneyPlan, listingFor, moneyPlan,
@@ -22,9 +28,10 @@ import { brandVars } from '../../finance/brand';
 import { compactCount, money } from '../../finance/format';
 import { BuildBudgetContent } from '../BudgetSheets';
 import { Row, Sheet } from '../ui';
-import { Headline, PlanStrip, type StripView } from '../kit';
+import { Headline, type StripView } from '../kit';
+import { LaunchHud } from '../launch/LaunchHud';
 import { StageNetwork } from './StageNetwork';
-import { facilitiesIn, openingRegions } from '../../finance/placer';
+import { facilitiesIn, openingRegions, type RegionSetup } from '../../finance/placer';
 import { StageMoney } from './StageMoney';
 import { StageTest } from './StageTest';
 import { StageLaunch } from './StageLaunch';
@@ -224,6 +231,15 @@ export function BuildWizard({ data, operations = false, campaignOnly = false, in
      what is left to clear. Where a stage has a gate, the bar fails in the
      gate's own words so the strip and the final checklist cannot disagree. */
   const checks = useMemo(() => gates(data, draft), [data, draft]);
+  /* #157: the HUD's top edge reads what blocks this stage, in its gates' own words: the first, and how many more,
+     so the bar stays one card high (each one is on the stage itself) */
+  const hudBlockers = useMemo(() => {
+    const open = checks.filter((gate) => gate.stage === stageId && !gate.ok)
+      .map((gate) => ({ id: gate.id, text: `${gate.label}: ${gate.value}`, severity: (gate.id === 'team-plan' ? 'warn' : 'block') as 'block' | 'warn' }));
+    return open.length > 2 ? [open[0], { id: 'more', text: `${open.length - 1} more to settle on this stage`, severity: 'warn' as const }] : open;
+  }, [checks, stageId]);
+  /* #157: the HUD's Commission asks the Launch stage to run its sequence */
+  const [commissionRequest, setCommissionRequest] = useState(0);
   const bar = useMemo<StripView>(() => {
     if (noMarketQuote && (stageId === 'money' || stageId === 'launch')) return {
       subject: BUILD_STAGES[index].label, value: 0, format: () => 'No quote',
@@ -355,30 +371,34 @@ export function BuildWizard({ data, operations = false, campaignOnly = false, in
         {!operations && <span className="lw-count">{index + 1}<i>/{BUILD_STAGES.length}</i></span>}
       </header>
 
+      {/* --- the stages on Define the Launch's rail (#157) --------------------
+          Its glyphs, lit once settled, the one you are on drawn big with its
+          name under it, a red dot on a stage that blocks commissioning. */}
       {operations ? !campaignOnly && <nav className="op-editor-tabs bw-operations-tabs" aria-label="Network management">
         {([{id:"network", label:"Network"},{id:"test",label:"Load rehearsal"},{id:"launch",label:"Review revision"}] as const).map(tab => <button key={tab.id} type="button" aria-current={stageId === tab.id ? "page" : undefined} aria-pressed={stageId === tab.id} onClick={() => selectStage(tab.id)}>{tab.label}</button>)}
-      </nav> : <nav className="lw-track" aria-label="Build stages">
-        <span className="lw-track-line" aria-hidden="true">
+      </nav> : <nav className="lw-seq" aria-label="Build stages">
+        <span className="lw-seq-rail" aria-hidden="true">
           <i style={{ width: `${(index / (BUILD_STAGES.length - 1)) * 100}%` }} />
         </span>
         {BUILD_STAGES.map((s, i) => {
           const health = states[s.id];
           // A visited page is not a cleared gate. The track is navigable in
           // preview mode, so position alone must never manufacture a tick.
-          const state = i === index ? 'now' : i < index ? (health === 'DONE' ? 'done' : 'todo') : 'ahead';
+          const lit = health === 'DONE';
+          const state = i === index ? 'now' : lit ? 'lit' : i < index ? 'open' : 'ahead';
+          const flagged = health === 'BLOCKED';
           return (
             <button
               key={s.id}
               type="button"
-              className={`lw-stop is-${state} health-${health.toLowerCase()}`}
+              className={`lw-seq-stop is-${state}${lit ? ' is-settled' : ''}${flagged ? ' is-flagged' : ''}`}
               onClick={() => selectStage(s.id)}
-              aria-label={`${s.label} stage, ${state === 'now' ? 'current' : state === 'done' ? 'complete' : 'not complete'}; ${STAGE_STATE_COPY[health].label}`}
+              aria-label={`${s.label} stage, ${i === index ? 'current' : lit ? 'complete' : 'not complete'}; ${STAGE_STATE_COPY[health].label}`}
               aria-current={i === index ? 'step' : undefined}
             >
-              <span className="lw-stop-glyph" aria-hidden="true">
-                {state === 'done' ? <Tick /> : <StageIcon stage={s.id} />}
-              </span>
-              <span className="lw-stop-name">{s.label}</span>
+              <span className="lw-seq-glyph" aria-hidden="true"><StageIcon stage={s.id} /></span>
+              {lit && <span className="lw-seq-tick" aria-hidden="true"><Tick /></span>}
+              {i === index && <span className="lw-seq-name">{s.label}</span>}
             </button>
           );
         })}
@@ -458,38 +478,36 @@ export function BuildWizard({ data, operations = false, campaignOnly = false, in
           </section>}
           {!operations && stageId === 'launch' && (marketLocked
             ? <fieldset className="bw-construction-locked" disabled><legend>Commissioning locked until opening-market filing</legend><StageLaunch {...shared} onJump={setStageId} /></fieldset>
-            : <StageLaunch {...shared} onJump={setStageId} />)}
+            : <StageLaunch {...shared} onJump={setStageId} commissionRequest={commissionRequest} />)}
           <div className="sf-tail" />
         </div>
       </div>
 
-      {/* --- the plan, wherever you are ------------------------------------
-          This was a card between the track and the content: studio money, the
-          build, a gauge. It sat at the top, so the figures your decisions move
-          were furthest from the thumb moving them — and it never said the one
-          thing a network is for, which is whether it carries the night. It is
-          a strip above the footer now, and it answers that. */}
-      {!campaignOnly && !(operations && stageId === 'launch') && <PlanStrip
+      {/* --- the HUD, Define the Launch's own (#157) --------------------------
+          What blocks this stage at its top edge; the stage's figure and the
+          money left after the build, with the fuel line between them (tap for
+          the detail and where more money comes from); Back as an icon and the
+          next stage as the one big button. On Launch the button commissions,
+          the same sequence the agreement's own button runs. */}
+      {!operations && <LaunchHud
         view={bar}
         page={stageId}
-        tone={bar.verdict ? bar.verdict.tone : 'flat'}
-        over={buildPlan.shortfall > 0}
-        measure={{
-          label: stageId === 'network' ? 'Capacity' : stageId === 'test' ? 'Rehearsal load' : stageId === 'launch' ? 'Gates clear' : 'Budget',
-          value: bar.gauge.value,
-          of: bar.gauge.limit,
-        }}
-        money={noMarketQuote
-          ? { label: 'Quote', value: 'Pending', spent: 0, of: buildPlan.available }
-          : buildPlan.shortfall > 0
-          ? { label: 'Short', value: money(buildPlan.shortfall), bad: true, spent: buildPlan.total, of: buildPlan.available }
-          : { label: 'Money', value: money(buildPlan.available), spent: buildPlan.total, of: buildPlan.available }}
+        planned={buildPlan.total}
+        free={buildPlan.available}
+        planLabel="The build"
+        readout={!noMarketQuote}
+        blockers={hudBlockers}
         ways={[
           { label: 'The build', onClick: () => setOpenSheet('build') },
           buildPlan.shortfall > 0
             ? { label: 'Add money', primary: true, onClick: () => handlers.onOpenStudioFinance?.() }
             : { label: 'Money', onClick: () => setOpenSheet('money') },
         ]}
+        onBack={index > 0 ? () => go(index - 1) : undefined}
+        next={index === BUILD_STAGES.length - 1
+          ? { eyebrow: data.commissioned ? 'Done' : 'Sign', label: data.commissioned ? 'Commissioned' : `Commission · ${money(plan.commissionNow ?? plan.total)}`, glyph: <StageIcon stage="launch" />,
+            disabled: data.commissioned || bar.blocking || marketLocked, onClick: () => setCommissionRequest((count) => count + 1) }
+          : { eyebrow: 'Next', label: BUILD_STAGES[index + 1].label, glyph: <StageIcon stage={BUILD_STAGES[index + 1].id} />, onClick: () => go(index + 1) }}
       />}
 
       {/* Undoing an hour of decisions asks first, in the dialog the handoff
@@ -512,22 +530,9 @@ export function BuildWizard({ data, operations = false, campaignOnly = false, in
         </div>
       )}
 
-      {operations ? <footer className="lw-foot">
+      {operations && <footer className="lw-foot">
         <button type="button" className="sf-btn sf-btn--ghost" onClick={handlers.onExit}>Close</button>
         {!campaignOnly && <button type="button" className="sf-btn sf-btn--primary" onClick={() => selectStage(stageId === 'launch' ? 'network' : 'launch')}>{stageId === 'launch' ? 'Edit network' : 'Review revision'}</button>}
-      </footer> : <footer className="lw-foot">
-        <button type="button" className="sf-btn sf-btn--ghost" disabled={index === 0} onClick={() => go(index - 1)}>
-          Back
-        </button>
-        <button
-          type="button"
-          className="sf-btn sf-btn--primary"
-          disabled={index === BUILD_STAGES.length - 1}
-          aria-describedby={index === BUILD_STAGES.length - 1 ? 'bw-commission-guidance' : undefined}
-          onClick={() => go(index + 1)}
-        >
-          {index === BUILD_STAGES.length - 1 ? 'Commission below' : `Next · ${BUILD_STAGES[index + 1].label}`}
-        </button>
       </footer>}
 
       <Sheet
@@ -642,6 +647,24 @@ export interface StageProps {
   /** Ask to clear the draft entirely. Offered beside the pen, because that is
       where the question of who is drawing is already being asked. */
   onStartOver?: () => void;
+  /** #90: the board on a live company's Network tab (plan §17): the busiest hour, not the opening night; no
+      Suggest or what-ifs (both price hardware already standing); no "ready week" (an order's time is its own). */
+  live?: boolean;
+  /** #90: what the Network tab adds under an open region: its build and sell-back. */
+  renderRegionExtra?: (regionId: string) => React.ReactNode;
+  /** #93: what the Network tab shows between the map (its hero) and the regions: its numbers, load test and builds. */
+  afterMap?: React.ReactNode;
+  /** #96: a live company's Network desk drives the board. Its own write sells back below what stands and builds above
+      it, so one − / + does both; what stands per region shows on each maker (standing, new, sold); a region's head
+      carries the desk's badge (building, or what is drawn). Returns the placer's note, if any. */
+  liveDesk?: {
+    standing: (regionId: string) => { servers: Record<ServerTier, number>; cloud: number };
+    resaleRate: (regionId: string) => number;
+    write: (regionId: string, setup: RegionSetup) => string | null;
+    badge?: (regionId: string) => React.ReactNode;
+    /** a region whose levers rest, and why (a build under way: one a region at a time) */
+    locked?: (regionId: string) => boolean;
+  };
 }
 
 const whole = (value: number): string => String(Math.round(value));

@@ -163,37 +163,3 @@ export const calculateStreamingRunwayFromTrailingCosts = (input: StreamingRunway
     };
 };
 
-export interface StreamingStandaloneValuationInput {
-    /** All currency inputs and the result are full currency values. */
-    trailingWeeklyRevenueFullCurrency: number;
-    trailingWeeklyOperatingCostFullCurrency: number;
-    subscribers: number;
-    debtFullCurrency: number;
-    catalogueScore: number;
-    technologyScore: number;
-    distressMultiplier: number;
-}
-
-export const calculateStreamingStandaloneValuationFullCurrency = (
-    input: StreamingStandaloneValuationInput,
-): number => {
-    const weeklyRevenue = bounded(input.trailingWeeklyRevenueFullCurrency);
-    const weeklyCost = bounded(input.trailingWeeklyOperatingCostFullCurrency);
-    const annualRevenueBillions = weeklyRevenue * 52 / 1_000_000_000;
-    const operatingMargin = weeklyRevenue > 0
-        ? Math.min(0.75, Math.max(-1, (weeklyRevenue - weeklyCost) / weeklyRevenue))
-        : weeklyCost > 0 ? -1 : 0;
-    const revenueMultiple = Math.max(0.5, 1.8 + operatingMargin * 1.6);
-    const operatingValue = annualRevenueBillions * revenueMultiple;
-    const subscriberMillions = bounded(input.subscribers) / 1_000_000;
-    const subscriberValue = subscriberMillions * 0.055;
-    const catalogueValue = Math.min(250, bounded(input.catalogueScore) * 0.08);
-    const technologyValue = Math.min(50, bounded(input.technologyScore) / 100 * 12);
-    const debtBillions = bounded(input.debtFullCurrency) / 1_000_000_000;
-    const distressMultiplier = bounded(input.distressMultiplier, 0.1, 1);
-    const valuationBillions = Math.max(
-        0.01,
-        (operatingValue + subscriberValue + catalogueValue + technologyValue - debtBillions) * distressMultiplier,
-    );
-    return Math.round(valuationBillions * 1_000_000_000);
-};

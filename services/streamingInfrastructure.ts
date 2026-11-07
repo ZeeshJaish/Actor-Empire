@@ -49,6 +49,7 @@ import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInf
 import { normalizeStreamingRegionPlans } from './streamingCanonicalState';
 import { quoteStreamingNetworkPlan } from './streamingNetworkQuote';
 import { STREAMING_SERVER_SITES } from './streamingServerSites';
+import { STREAMING_SERVER_TIERS } from './streamingServerTiers';
 import {
     getStreamingFacilityPhysicalView,
     getStreamingNetworkPhysicalSummary,
@@ -599,8 +600,14 @@ export const createDefaultStreamingInfrastructureDraft = (
     player, normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id),
 );
 
+/** #89: a rack's power by its maker (Scout 0.6, Workhorse 1, Titan 1.8); a group with no maker (old saves) is a Workhorse */
+const rackGroupCompute = (group: { serverTier?: keyof typeof STREAMING_SERVER_TIERS }): number => (
+    group.serverTier ? STREAMING_SERVER_TIERS[group.serverTier]?.compute ?? 1 : 1
+);
+
 const getConfigurationValues = (
-    draft: OwnedStreamingInfrastructureSetupDraft,
+    draft: Pick<OwnedStreamingInfrastructureSetupDraft, 'strategy' | 'capacityPackageId' | 'facilities' | 'networkPlacements' | 'regionPlans'>
+        & Partial<OwnedStreamingInfrastructureSetupDraft>,
 ): Omit<StreamingInfrastructureForecast,
     | 'configurationSignature'
     | 'reachConfigurationKey'
@@ -657,9 +664,10 @@ const getConfigurationValues = (
         const rackCount = dutyGroups.length
             ? dutyGroups.reduce((sum, item) => sum + item.group.rackCount, 0)
             : network.reduce((sum, item) => sum + item.racks, 0);
+        // #89: each rack counts its maker's power, as Build shows it (a Titan carried a Workhorse's load before)
         const baseCapacity = dutyGroups.length
             ? dutyGroups.reduce((sum, item) => (
-                sum + item.group.rackCount * NETWORK_RACK_BASELINE_STREAMS
+                sum + item.group.rackCount * NETWORK_RACK_BASELINE_STREAMS * rackGroupCompute(item.group)
                     * item.rule.capacityMultiplier * item.migrationMultiplier
                     * (physicalViews.get(item.facility.id)?.steadyCapacityFactor ?? 1)
             ), 0)
@@ -668,7 +676,7 @@ const getConfigurationValues = (
             ), 0);
         const burstBaseCapacity = dutyGroups.length
             ? dutyGroups.reduce((sum, item) => (
-                sum + item.group.rackCount * NETWORK_RACK_BASELINE_STREAMS
+                sum + item.group.rackCount * NETWORK_RACK_BASELINE_STREAMS * rackGroupCompute(item.group)
                     * item.rule.capacityMultiplier * item.migrationMultiplier
                     * (physicalViews.get(item.facility.id)?.burstCapacityFactor ?? 1)
             ), 0)
@@ -779,6 +787,24 @@ const getConfigurationValues = (
     };
 };
 
+/**
+ * #89: what a live network gives from its rooms: capacity (each maker's power counted), weekly cost, reliability,
+ * staff, storage and the physical summary. A region's order is put into service with it, and an older revision is
+ * recounted with it once.
+ */
+export const deriveStreamingNetworkSetupValues = (
+    setup: OwnedStreamingInfrastructureSetup,
+    strategy: ConfigurableInfrastructureStrategy,
+    facilities: OwnedStreamingFacility[],
+    regionPlans: OwnedStreamingInfrastructureSetup['regionPlans'],
+) => getConfigurationValues({
+    strategy,
+    capacityPackageId: setup.capacityPackageId,
+    facilities,
+    networkPlacements: aggregateStreamingFacilities(facilities),
+    regionPlans: regionPlans || [],
+});
+
 /** Reuses the founding network model so later owned-campus racks change the same canonical capacity. */
 export const getStreamingFacilityNetworkSnapshot = (
     platform: OwnedStreamingPlatformState,
@@ -814,7 +840,7 @@ export const getStreamingFacilityNetworkSnapshot = (
     };
 };
 
-const getInfrastructureTechnologyFloor = (
+export const getInfrastructureTechnologyFloor = (
     baselineConcurrentStreams: number,
     reliabilityTarget: number,
 ): { delivery: number; reliability: number } => ({
@@ -1350,6 +1376,7 @@ export const commitStreamingInfrastructureSetup = (
         revision,
         committedAtAbsoluteWeek: absoluteWeek,
         loadTest,
+        capacityModel: 'TIERED',
     };
     const isLiveChangeOrder = Boolean(platform.launchCommit && existingSetup);
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({

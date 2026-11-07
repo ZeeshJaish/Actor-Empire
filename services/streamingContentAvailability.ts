@@ -282,6 +282,29 @@ export const createStreamingTitleRouteReadBatch = (
     };
 };
 
+/** A weekly close asks one unchanging player thousands of title × country ×
+ * route questions. Normalise the platform and derive the shared inputs once;
+ * each answer equals the unprepared call's (same functions, same inputs).
+ * Never reuse it after a mutation. */
+export const createPlayerStreamingTitleRouteEvaluator = (player: Player, absoluteWeek: number) => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
+    const activeCountryIds = new Set(getOwnedPlatformPackageCountryIds(platform));
+    const ownedTitleIds = new Set<string>();
+    const titles = new Map<string, ReturnType<typeof prepareTitleRouteContext>>();
+    return (projectId: string, countryId: string, route: StreamingTitleAccessRoute): StreamingTitleAccessDecision => {
+        let title = titles.get(projectId);
+        if (!title) {
+            const owned = resolveStreamingCatalogTitle(player, projectId)?.source === 'OWNED_LIBRARY';
+            if (owned) ownedTitleIds.add(projectId);
+            title = prepareTitleRouteContext(player, projectId, absoluteWeek, platform, owned);
+            titles.set(projectId, title);
+        }
+        return evaluatePlayerStreamingTitleRoute(player, projectId, countryId, absoluteWeek, route,
+            { platform, ownedTitleIds, offer, activeCountryIds, title });
+    };
+};
+
 export const getStreamingContentAvailability = (
     player: Player,
     projectId: string,

@@ -84,11 +84,12 @@ assert.match(premiere, /subsGained: commit\.initialSubscribers/,
 const buildMoney = readFileSync('components/studio-finance/components/build/StageMoney.tsx', 'utf8');
 assert.match(buildMoney, /label: 'Ways to watch'/,
   'ad-only and store-only are offers, not subscription plans on sale');
-const pricingUi = readFileSync('components/studio-finance/components/launch/StepPricing.tsx', 'utf8');
-assert.match(pricingUi, /label="Rent a film"[^\n]*step=\{0\.01\}/,
-  'the default $5.99 rental value must be a valid native slider step');
-assert.match(pricingUi, /label="Own it"[^\n]*step=\{0\.01\}/,
-  'the default $19.99 purchase value must be a valid native slider step');
+// #107: the store's prices are set in the offer's Store control, with steppers that keep the cents
+const pricingUi = readFileSync('components/streaming-transplant/OfferControls.tsx', 'utf8');
+assert.match(pricingUi, /<input type="number" inputMode="decimal" min=\{min\} max=\{max\} step="0\.01"/,
+  'a store price is a stepper whose field keeps the cents ($5.99 rent, $19.99 buy)');
+assert.match(pricingUi, /<PriceStepper label="Rent"[\s\S]*<PriceStepper label="Buy"/,
+  'the rent and purchase prices are both set to the cent');
 
 const initialPricing = createInitialOwnedStreamingPlatformState('pricing-p6').serviceConfiguration.pricing;
 const normalizedAdPlan = normalizeStreamingPricingConfiguration({

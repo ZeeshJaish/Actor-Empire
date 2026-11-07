@@ -5,6 +5,8 @@ import { createRoot } from 'react-dom/client';
 import StreamingDefineLaunchExperience from '../../components/StreamingDefineLaunchExperience';
 import { contentMarketFixture } from '../helpers/contentMarketFixture';
 import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
+// the game's own fonts (Anton, Archivo), so the fixture looks like the game
+import '../../styles/fonts.css';
 
 function Fixture() {
   const requestedStep = new URLSearchParams(window.location.search).get('step');

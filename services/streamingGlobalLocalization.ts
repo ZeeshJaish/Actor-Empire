@@ -69,9 +69,15 @@ export const getStreamingGlobalLocalizationView = (player: Player): StreamingGlo
     };
 };
 
+/**
+ * Opens a language network for the whole catalogue. The Content Desk opens
+ * regions with `requireFoundation: false`: since region localization, no
+ * campus research stands before a region (only its cost).
+ */
 export const activateStreamingLanguagePackage = (
     player: Player,
     packageId: string,
+    options: { requireFoundation?: boolean } = {},
 ): StreamingLanguagePackageActivationResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const definition = STREAMING_LANGUAGE_PACKAGES.find(item => item.id === packageId);
@@ -79,7 +85,7 @@ export const activateStreamingLanguagePackage = (
     const installedIds = new Set(platform.capabilities.installed
         .filter(item => item.status === 'OPERATING' || item.status === 'LEGACY_GRANT')
         .map(item => item.capabilityId));
-    if (!definition.prerequisiteCapabilityIds.every(id => installedIds.has(id))) {
+    if (options.requireFoundation !== false && !definition.prerequisiteCapabilityIds.every(id => installedIds.has(id))) {
         return { player, changed: false, reason: 'FOUNDATION_REQUIRED', detail: 'Install Localization Foundation before opening a language network.' };
     }
     const capabilityId = getStreamingLanguagePackageCapabilityId(definition.id);

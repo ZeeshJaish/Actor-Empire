@@ -2197,6 +2197,10 @@ export const evaluateStreamingRightsCompliance = (
             ? platform.growthActions
                 .filter(action => action.projectId === obligation.sourceProjectId && action.status === 'APPLIED')
                 .reduce((sum, action) => sum + action.cashCost, 0)
+                /* #150: and what the Campaign Studio's campaigns spent on it (a universe's campaign, its share) */
+                + (platform.campaignBook?.campaigns ?? [])
+                    .filter(campaign => campaign.subject.projectIds.includes(obligation.sourceProjectId))
+                    .reduce((sum, campaign) => sum + campaign.spent / Math.max(1, campaign.subject.projectIds.length), 0)
             : obligation.type === 'FUTURE_GREENLIGHT'
                 ? obligation.sourceAuctionId ? obligation.observedAmount : platform.originalCommissions.some(commission => (
                     commission.producerStudioId === obligation.counterpartyId

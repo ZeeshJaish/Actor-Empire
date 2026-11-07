@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
     INITIAL_PLAYER,
@@ -236,25 +236,19 @@ const serviceSource = readFileSync(resolve(process.cwd(), 'services/streamingInf
 const weeklySource = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
 const researchSource = readFileSync(resolve(process.cwd(), 'services/streamingResearchLifecycle.ts'), 'utf8');
 const campusSource = readFileSync(resolve(process.cwd(), 'services/streamingCampusConstruction.ts'), 'utf8');
-const componentSource = readFileSync(resolve(process.cwd(), 'components/StreamingInfrastructureChronicle.tsx'), 'utf8');
-const styleSource = readFileSync(resolve(process.cwd(), 'styles/streaming-infrastructure-chronicle.css'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
+const platformPageSource = readFileSync(resolve(process.cwd(), 'components/streaming-transplant/StreamingNetworkExperience.tsx'), 'utf8');
 for (const scene of ['FACILITY_OPENING', 'SERVER_HALL_EVOLUTION', 'GIGA_CAMPUS_CONSTRUCTION', 'INFRASTRUCTURE_RECOVERY', 'PATENT_ANNOUNCEMENT', 'RIVAL_ESPIONAGE_STORY', 'INFRASTRUCTURE_AWARDS', 'GLOBAL_RELIABILITY_MILESTONE']) {
     assert(serviceSource.includes(scene) || researchSource.includes(scene) || campusSource.includes(scene), `Phase 10 should orchestrate ${scene}.`);
 }
-for (const surface of ['Evolution', 'Performance', 'Cinema', 'Balance', 'CAUSAL EXPLANATIONS', 'FINAL BALANCE CONTRACT']) {
-    assert(componentSource.includes(surface), `The Infrastructure Chronicle should expose ${surface}.`);
-}
 assert(weeklySource.includes('commitStreamingInfrastructureProgressionWeek'), 'Progression must commit through the canonical weekly loop.');
 assert(campusSource.includes("type: 'FACILITY_OPENING'"), 'Opening a constructed campus should queue the dedicated facility-opening scene.');
-/* The Chronicle is now opened from the Network Desk, gated on availability,
-   rather than by a standalone button in the retired Tech room. */
-assert(
-    hqSource.includes('showInfrastructureChronicle')
-    && hqSource.includes('onOpenChronicle')
-    && hqSource.includes('infrastructureChronicle.available'),
-    'The finale Chronicle must be reachable, and only once it is available.',
-);
-assert(styleSource.includes('min-height: 44px') && styleSource.includes(':focus-visible') && styleSource.includes('safe-area-inset') && styleSource.includes('@media(max-width:600px)') && styleSource.includes('prefers-reduced-motion'), 'The finale should include mobile touch, safe-area, keyboard and reduced-motion accessibility.');
+/* #125 (Zeesh, 2026-11-02: "hata dete history pGE AND moments dikane ki jarurat nahi"): the Platform page's HISTORY
+   button and the Infrastructure Chronicle it opened are gone. The progression still commits each week (the history,
+   awards, milestones and the record above); STATUS shows the history the player needs. */
+assert(!existsSync(resolve(process.cwd(), 'components/StreamingInfrastructureChronicle.tsx'))
+    && !existsSync(resolve(process.cwd(), 'styles/streaming-infrastructure-chronicle.css')), 'The Infrastructure Chronicle screen is removed (#125).');
+assert(!hqSource.includes('showInfrastructureChronicle') && !hqSource.includes('onOpenChronicle'), 'The HQ no longer opens it.');
+assert(!platformPageSource.includes('onOpenChronicle') && !platformPageSource.includes('HISTORY <i'), 'The Platform page has no HISTORY button.');
 
 console.log('EMPIRE+ Cinematics, Progression and Final Balancing Phase 10 audit passed.');

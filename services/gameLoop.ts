@@ -177,6 +177,11 @@ import { calculateStudioSlateFatigue } from './studioSlateFatigue';
 import { getContinuationPerformanceGross, shouldResolveContinuationDecision } from './releaseContinuationLogic';
 import { processLivingEnsembleWeek } from './livingEnsemble';
 import { processOwnedStreamingPlatformWeek } from './streamingWeeklyLoop';
+import { runStreamingTeamWeek } from './team/streamingTeam';
+import { processStreamingInvestorRoundsWeek } from './streamingInvestorOffers';
+import { processStreamingCompanySaleWeek } from './streamingCompanySale';
+import { processIndustryPeopleWeek } from './industry/industryPeople';
+import { queueStreamingIncidentEvents } from './streamingIncidentEvent';
 import { advanceStreamingMarketClearances } from './streamingMarkets';
 import {
     appendStreamingOpeningProgrammeTransitions,
@@ -194,6 +199,8 @@ import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStr
 import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
 import { normalizeWorldStreamingAudienceChoiceState, settleWorldStreamingAudienceEntitlements } from './worldEconomy/worldStreamingAudienceChoice';
 import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
+import { advanceStreamingWeeklyChart } from './streamingWeeklyChart';
+import { runStreamingCampaignsWeek, settleStreamingCampaignResults } from './campaigns/streamingCampaigns';
 import { settleWorldStreamingPlatformEconomyWeek } from './worldEconomy/worldStreamingPlatformEconomy';
 import {
     repairDerivedWorldEconomyState,
@@ -6666,6 +6673,8 @@ export const processGameWeek = async (
         );
     }
     nextPlayer = advanceStreamingTitleLocalization(nextPlayer).player;
+    /* #145: the campaigns spend and build awareness before the world chooses, so this week's counts this week */
+    nextPlayer = runStreamingCampaignsWeek(nextPlayer, enteredStreamingAbsoluteWeek);
     emitLoopStage('world_streaming_competition_start', { absolute_week: enteredStreamingAbsoluteWeek });
     nextPlayer.world.worldStreamingCompetition = normalizeWorldStreamingCompetitionState(
         nextPlayer.world.worldStreamingCompetition,
@@ -6712,6 +6721,11 @@ export const processGameWeek = async (
     );
     nextPlayer=recordCinemaStreamingAudience(nextPlayer);
     nextPlayer = settleWorldStreamingAudienceEntitlements(nextPlayer, enteredStreamingAbsoluteWeek);
+    /* #129: the week's Top 10, from the viewing just settled (recorded only; it changes nothing else) */
+    const streamingWeeklyChart = advanceStreamingWeeklyChart(nextPlayer, enteredStreamingAbsoluteWeek);
+    if (streamingWeeklyChart) nextPlayer.world.streamingWeeklyChart = streamingWeeklyChart;
+    /* #145: each campaign that ran is credited with the joins and viewers its lift brought */
+    nextPlayer = settleStreamingCampaignResults(nextPlayer, enteredStreamingAbsoluteWeek);
     emitLoopStage('world_streaming_viewing_done', {
         absolute_week: enteredStreamingAbsoluteWeek,
         viewing_accounts: nextPlayer.world.worldStreamingViewing.global.totalViewingAccounts,
@@ -6753,6 +6767,27 @@ export const processGameWeek = async (
         absolute_week: ownedStreamingResult.snapshot?.absoluteWeek,
         subscriber_movement: ownedStreamingResult.snapshot?.netSubscriberMovement,
     });
+    /* #75: an incident that opened on STATUS this week is the week's popup */
+    if (ownedStreamingResult.processed) nextPlayer = queueStreamingIncidentEvents(nextPlayer, ownedStreamingResult.snapshot?.absoluteWeek);
+    /* #164: the team acts on the new week, after its results and the energy refill; a failure never stops the week */
+    if (ownedStreamingResult.processed) {
+        try {
+            /* #186: a round's offers come in its fourth week, before the CFO brings them to the tray */
+            nextPlayer = processStreamingInvestorRoundsWeek(nextPlayer);
+            /* #190: a sale's bids come in, lapse, or close (the company goes to the buyer) */
+            nextPlayer = processStreamingCompanySaleWeek(nextPlayer);
+            nextPlayer = runStreamingTeamWeek(nextPlayer);
+            emitLoopStage('streaming_team_done');
+        } catch (error) {
+            console.error('Streaming team week failed', error);
+        }
+    }
+    /* #178: the industry's people: who sits at our table, the pay they bank, and every 3 weeks the market's moves */
+    try {
+        nextPlayer = processIndustryPeopleWeek(nextPlayer);
+    } catch (error) {
+        console.error('Industry people week failed', error);
+    }
 
     if (nextPlayer.relationships) {
         nextPlayer.relationships = nextPlayer.relationships.map(rel => {

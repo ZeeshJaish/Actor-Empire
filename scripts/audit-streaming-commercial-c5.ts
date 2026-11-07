@@ -35,7 +35,8 @@ assert.ok(planEarly.plans[0].featureIds.includes('early'),
 const pass = configureOffer!(early, { kind: 'PASS', duration: 'ONE_HOUR', price: 2.5 });
 assert.equal(offers.projectStreamingCommercialOffers(pass).adFreePasses.oneHourPrice, 2.5);
 
-const freeOnly = configureOffer!(base, { kind: 'CORE', coreModel: 'ADVERTISING' });
+// #103: a free-only service (choosing a main offer after the first no longer turns the others off)
+const freeOnly = configureOffer!(base, { kind: 'CORE', coreModel: 'ADVERTISING', alone: true });
 const founding = structuredClone(fixture);
 founding.ownedStreamingPlatform.identity = {
     name: 'C5 Service', slug: 'c5-service', primaryColor: '#111', secondaryColor: '#eee',
@@ -45,7 +46,7 @@ founding.ownedStreamingPlatform.identity = {
 const savedFree = saveStreamingPricingPlan(founding, freeOnly);
 assert.equal(savedFree.changed, true, 'an ad-led offer can be saved at founding without research');
 assert.deepEqual(savedFree.player.ownedStreamingPlatform.serviceConfiguration.pricing.streams, ['ads']);
-const savedStore = saveStreamingPricingPlan(founding, configureOffer!(base, { kind: 'CORE', coreModel: 'STORE' }));
+const savedStore = saveStreamingPricingPlan(founding, configureOffer!(base, { kind: 'CORE', coreModel: 'STORE', alone: true }));
 assert.equal(savedStore.changed, true, 'a store-led offer can be saved at founding without research');
 assert.deepEqual(savedStore.player.ownedStreamingPlatform.serviceConfiguration.pricing.streams, ['rentals']);
 const savedEarly = saveStreamingPricingPlan(founding, planEarly);
@@ -98,22 +99,24 @@ const renderPricing = (pricing: typeof base): string => renderToStaticMarkup(cre
     handlers: { onForecastPricing: () => worldForecast },
 } as any));
 const adMarkup = renderPricing(freeOnly);
-assert.match(adMarkup, /Your offers/, 'the player selects a core offer, not eight revenue streams');
+// #104 (plan §18.4): the ways to earn are one money engine; a side slot's "Make main" changes the main offer
+assert.match(adMarkup, /Your money engine/, 'the player sees one engine of three ways to earn, not eight revenue streams');
 assert.match(adMarkup, /Free with ads/, 'ad-led services need a single free offer card');
-assert.match(adMarkup, /Change model/, 'a saved model remains changeable');
-assert.match(adMarkup, /aria-label="Edit Free with ads offer" aria-expanded="false"/, 'ad-led services begin with one collapsed editable card');
+assert.match(adMarkup, /Make (Subscription|Rent or buy) your front door/, 'a saved main offer remains changeable');
+assert.match(adMarkup, /aria-expanded="false" aria-label="Edit ad breaks"/, 'ad-led services begin with one collapsed ad breaks control (#107)');
 assert.doesNotMatch(adMarkup, /Sponsored titles|Fund the show/, 'obsolete launch price controls stay out of the new editor');
-assert.doesNotMatch(adMarkup, /Target CPM|Optional ad-free passes/, 'ad controls remain inside the closed editor');
+assert.doesNotMatch(adMarkup, /Target CPM|Ad-free passes|Show an ad every/, 'ad controls remain inside the closed editor');
 assert.match(adMarkup, /Subscription 0 monthly · 0 annual/, 'country drill-down separates monthly and annual buyers');
 assert.match(adMarkup, /Expected ads \$100\/wk/, 'country drill-down exposes conditional ad income');
-const storeMarkup = renderPricing(configureOffer!(base, { kind: 'CORE', coreModel: 'STORE' }));
+const storeMarkup = renderPricing(configureOffer!(base, { kind: 'CORE', coreModel: 'STORE', alone: true }));
 assert.match(storeMarkup, /Rent or buy/, 'store-led services need one uniform-price offer card');
-assert.match(storeMarkup, /aria-label="Edit Rent or buy offer" aria-expanded="false"/, 'the selected store has one collapsed editable card');
+assert.match(storeMarkup, /aria-expanded="false" aria-label="Edit store"/, 'the selected store has one collapsed Store control (#107)');
+// Plans v2 (#43): up to twelve plans
 const sixPlanMarkup = renderPricing(normalizeStreamingPricingConfiguration({
     ...base,
-    plans: Array.from({ length: 6 }, (_, index) => ({ ...base.plans[0], id: `C5-${index}`, name: `Tier ${index}` })),
+    plans: Array.from({ length: 12 }, (_, index) => ({ ...base.plans[0], id: `C5-${index}`, name: `Tier ${index}` })),
 }));
-assert.match(sixPlanMarkup, /disabled=""[^>]*>Six-plan limit/, 'the plan editor caps custom tiers at six');
+assert.match(sixPlanMarkup, /disabled=""[^>]*>Twelve-plan limit/, 'the plan editor caps custom tiers at twelve');
 
 // Existing market/title readiness is not enough if the saved offer has no playable route.
 const readiness = getStreamingLaunchReadiness(fixture);
@@ -143,7 +146,7 @@ assert.equal(paidCoverage?.tone, 'READY',
     'an owned playable subscription title should cover each opening country');
 coveragePlayer.ownedStreamingPlatform.serviceConfiguration.pricing = configureOffer!(
     coveragePlayer.ownedStreamingPlatform.serviceConfiguration.pricing,
-    { kind: 'CORE', coreModel: 'STORE' },
+    { kind: 'CORE', coreModel: 'STORE', alone: true },
 );
 const storeCoverage = getStreamingLaunchReadiness(coveragePlayer).items.find(item => item.id === 'offer-coverage');
 assert.equal(storeCoverage?.tone, 'READY',

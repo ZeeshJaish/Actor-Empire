@@ -1,6 +1,8 @@
 
 import { Stock, Player, PortfolioItem, NewsItem } from '../types';
-import { getStudioStockPerformanceMultiplier } from './studioEcosystem';
+import { STUDIO_CATALOG } from './studioLogic';
+import { valueWorldStudio } from './valuation/studioValuation';
+import { nextSharePrice } from './valuation/sharePrice';
 import { creditCorporateStockReceipt, getRecordedStockBasis, getStockHoldingAllocations, splitStockReceipt } from './stockCashOwnership';
 import { getStudioSaleTreasuryLock } from './studioGroup';
 import { roundStockCash, settleStockCash } from './stockSettlement';
@@ -625,10 +627,38 @@ const shouldIssueSharesThisWeek = (stock: Stock, absoluteWeek: number, lastIssue
     return absoluteWeek % cadence === targetWeek;
 };
 
+/* #185: a sector's long-run growth, for the tickers that are not one of the game's studios */
+const SECTOR_GROWTH: Record<Stock['sector'], number> = { TECH: 0.08, MEDIA: 0.04, FASHION: 0.05, BEVERAGE: 0.04, AUTOMOTIVE: 0.03 };
+
+/**
+ * #185: what a share is worth. A studio's ticker follows its studio's value (the valuation engine: its standing, books,
+ * record, slate, cash and debt) from its starting price at the studio's standing; the others grow with their sector
+ * from their starting price. Measured from an anchor kept on the stock, so a price that ran away is pulled back.
+ */
+export const getStockFairValue = (
+    stock: Stock,
+    player: Pick<Player, 'world'> | undefined,
+    absoluteWeek: number,
+): { fair: number; anchor: NonNullable<Stock['fairAnchor']> } => {
+    const start = INITIAL_STOCKS.find(item => item.id === stock.id);
+    const catalogue = stock.relatedStudioId ? STUDIO_CATALOG[stock.relatedStudioId as keyof typeof STUDIO_CATALOG] : undefined;
+    const anchor = stock.fairAnchor ?? {
+        week: absoluteWeek,
+        price: start?.price ?? stock.price,
+        value: catalogue ? valueWorldStudio({ id: catalogue.id, valuation: catalogue.valuation }, absoluteWeek).equityValue : 0,
+        shares: start?.outstandingShares ?? getStockOutstandingShares(stock),
+    };
+    /* new shares since the anchor dilute what each one is worth */
+    const dilution = (anchor.shares || getStockOutstandingShares(stock)) / Math.max(1, getStockOutstandingShares(stock));
+    const studio = stock.relatedStudioId ? player?.world.studios?.[stock.relatedStudioId] : undefined;
+    if (studio && anchor.value > 0) return { fair: anchor.price * valueWorldStudio(studio, absoluteWeek).equityValue / anchor.value * dilution, anchor };
+    return { fair: anchor.price * Math.exp((SECTOR_GROWTH[stock.sector] ?? 0.04) * (absoluteWeek - anchor.week) / 52) * dilution, anchor };
+};
+
 export const processStockMarket = (
     stocks: Stock[],
     week: number,
-    player?: Pick<Player, 'age' | 'world' | 'businesses' | 'flags'>,
+    player?: Pick<Player, 'age' | 'world' | 'businesses' | 'flags'> & { id?: string },
 ): MarketUpdateResult => {
     const notifications: string[] = [], news: NewsItem[] = [];
     const corporateActions: StockCorporateAction[] = [];
@@ -653,13 +683,21 @@ export const processStockMarket = (
             return { ...stock, lastMarketProcessedAbsoluteWeek: absoluteWeek,
                 outstandingShares: getStockOutstandingShares(stock), price: normalizedPrice, priceHistory: normalizedHistory };
         }
-        const volatility = clampFinite(stock.volatility, 0, .2);
-        const changePercent = (Math.random() - 0.48) * volatility;
-        const supportedReference = getStockReferencePrice(stock);
-        const meanReversion = clampFinite(Math.log(supportedReference / normalizedPrice) * .002, -.0025, .0025);
-        const performance = getStudioStockPerformanceMultiplier(player ? { ...player, currentWeek: week } : undefined, stock);
-        const rawMultiplier = (1 + changePercent + meanReversion) * performance;
-        const newPrice = normalizeStockPrice(stock, normalizedPrice * clampFinite(rawMultiplier, 1 - MAX_WEEKLY_PRICE_MOVE, 1 + MAX_WEEKLY_PRICE_MOVE));
+        /* #185: the price moves towards what the company is worth (15% of the gap a week), with momentum, the sector's
+           mood and noise seeded by the career, the company and the week. The old unseeded random walk and the box-office
+           drift re-applied every week are gone: a studio's hits and flops reach its price through its value. */
+        const valued = getStockFairValue(stock, player, absoluteWeek);
+        const lastMove = normalizedHistory.length >= 2 ? normalizedHistory.at(-1)! / Math.max(0.01, normalizedHistory.at(-2)!) - 1 : 0;
+        const step = nextSharePrice({
+            previous: normalizedPrice,
+            fair: valued.fair,
+            lastMove,
+            sector: stock.sector,
+            absoluteWeek,
+            volatility: stock.volatility,
+            seed: `${player?.id || 'market'}:${stock.id}`,
+        });
+        const newPrice = normalizeStockPrice(stock, normalizedPrice * clampFinite(step.price / normalizedPrice, 1 - MAX_WEEKLY_PRICE_MOVE, 1 + MAX_WEEKLY_PRICE_MOVE));
         let lastPayoutAbsolute = stock.lastDividendPayoutAbsoluteWeek
             ?? stockLegacyMarkerAbsoluteWeek(age, week, stock.lastDividendPayoutWeek);
         let lastPayout = stock.lastDividendPayoutWeek || 0;
@@ -672,7 +710,7 @@ export const processStockMarket = (
         const nextStock: Stock = { ...stock, outstandingShares: getStockOutstandingShares(stock), price: newPrice,
             priceHistory: [...normalizedHistory, newPrice].slice(-20), lastDividendPayoutWeek: lastPayout,
             lastDividendPayoutAbsoluteWeek: lastPayoutAbsolute, lastMarketProcessedAbsoluteWeek: absoluteWeek,
-            lastShareIssueAbsoluteWeek: lastIssue };
+            lastShareIssueAbsoluteWeek: lastIssue, fairAnchor: valued.anchor };
         if (shouldIssueSharesThisWeek(nextStock, absoluteWeek, lastIssue)) {
             const issuePercent = 2 + (stableShareHash(`${nextStock.id}:${absoluteWeek}:issue-percent`) % 5);
             const issuance = applyStockShareIssuance(nextStock, { issuePercent, week, year: age, reason: getAutomaticShareIssueReason(nextStock) });

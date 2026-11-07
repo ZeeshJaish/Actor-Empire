@@ -1,6 +1,6 @@
 import type {Player, WorldStreamingViewingState, WorldStreamingPlatformOffer, StreamingRoyaltyRevenueSource} from '../../types';
 import {allocateStreamingSubscriptionReceipts} from '../streamingEconomyCore';
-import {createStreamingCatalogueReadContext, evaluatePlayerStreamingTitleRoute} from '../streamingContentAvailability';
+import {createPlayerStreamingTitleRouteEvaluator, createStreamingCatalogueReadContext} from '../streamingContentAvailability';
 import type {StreamingTitleAccessRoute} from '../streamingTitleAccess';
 import {createAiTitleAccessResolver} from './worldStreamingAiCatalogue';
 import {allocateStreamingStoreUnits} from './worldStreamingCommercialEconomy';
@@ -63,11 +63,14 @@ export const attachStreamingRoyaltyReceipts = (
                     || {monthlySubscriptionRevenue:0,planAllocations:[],endingPaidAccounts:0,joins:0,reactivations:0}}));
         const totalWeekly = Math.max(0, Math.round(countries.reduce((sum, row) => sum + row.customer!.monthlySubscriptionRevenue, 0) / 4.33));
         const countryPools = allocateStreamingStoreUnits(totalWeekly, countries.map(row => row.customer!.monthlySubscriptionRevenue));
+        // One prepared reader for the player's service: a platform normalise per
+        // title × country × plan made 197-market weeks take 10 s or more.
+        const playerRoute = aiResolve ? null : createPlayerStreamingTitleRouteEvaluator(player, week);
         const resolveEligible = (countryId: string, route: StreamingTitleAccessRoute) => {
             if (aiResolve) return [...new Map(aiResolve(countryId, week, route).map(row => [row.titleId, {
                 projectId: row.titleId, contractId: row.contractId, startsAt: row.startsAtAbsoluteWeek}])).values()];
             return summary.titlePerformance.flatMap(title => {
-                const decision = evaluatePlayerStreamingTitleRoute(player, title.projectId, countryId, week, route);
+                const decision = playerRoute!(title.projectId, countryId, route);
                 return decision.allowed ? [{projectId: title.projectId, contractId: decision.contractId,
                     startsAt: week - title.weeksAvailable + 1}] : [];
             });

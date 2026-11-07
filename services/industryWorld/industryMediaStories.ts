@@ -17,12 +17,13 @@ const TERMINAL_STAGES = new Set<IndustryMediaStoryStage>(['RESOLVED', 'FADED', '
 const RESOLVED_EVENT_TYPES = new Set<IndustryEventFact['type']>([
     'COMPANY_RECOVERED', 'COMPANY_ACQUIRED', 'COMPANY_CLOSED',
     'PROJECT_CANCELLED', 'PROJECT_HIT', 'PROJECT_FLOP', 'PROJECT_SLEEPER',
-    'AWARD_WON',
+    'AWARD_WON', 'PLATFORM_RESTORED',
 ]);
 
 const DEVELOPING_EVENT_TYPES = new Set<IndustryEventFact['type']>([
     'COMPANY_DISTRESS', 'COMPANY_FUNDED', 'COMPANY_RESTRUCTURED',
     'PROJECT_DELAYED', 'PROJECT_OVERRUN', 'PROJECT_HELD', 'PROJECT_SOLD',
+    'PLATFORM_OUTAGE',
 ]);
 
 const COMPANY_EVENT_TYPES = new Set<IndustryEventFact['type']>([
@@ -43,6 +44,24 @@ export const getIndustryMediaSubjectKey = (event: IndustryEventFact): string => 
         if (event.rightsContractId) return `rights:${event.rightsContractId}`;
         if (event.projectId) return `project:${event.projectId}`;
     }
+    /* a streaming service's tech launches are one running story (#66) */
+    if (event.type === 'PLATFORM_TECH_LAUNCHED') return `platform-tech:${event.companyId || event.platformId || event.id}`;
+    /* an outage and its fix are one story (#67) */
+    if (event.type === 'PLATFORM_OUTAGE' || event.type === 'PLATFORM_RESTORED') return `platform-outage:${event.companyId || event.platformId || event.id}`;
+    /* a service's prices and plans are one running story (#68) */
+    if (event.type === 'PLATFORM_PRICE_RAISED' || event.type === 'PLATFORM_ADS_ADDED' || event.type === 'PLATFORM_PRICE_CUT'
+        || event.type === 'PLATFORM_FREE_TIER' || event.type === 'PLATFORM_OFFER_CHANGED') {
+        return `platform-pricing:${event.companyId || event.platformId || event.id}`;
+    }
+    /* #117: a service's look and its app are one running story; its value against the rivals another */
+    if (event.type === 'PLATFORM_REBRANDED' || event.type === 'PLATFORM_APP_REDESIGNED') return `platform-brand:${event.companyId || event.platformId || event.id}`;
+    if (event.type === 'PLATFORM_VALUE_PRAISED' || event.type === 'PLATFORM_VALUE_CRITICISED') return `platform-value:${event.companyId || event.platformId || event.id}`;
+    /* #143: a service in the weekly Top 10 is one running story */
+    if (event.type === 'PLATFORM_CHART_MOMENT') return `platform-chart:${event.companyId || event.platformId || event.id}`;
+    /* #149: a service's campaigns are one running story */
+    if (event.type === 'PLATFORM_CAMPAIGN_MOMENT') return `platform-campaign:${event.companyId || event.platformId || event.id}`;
+    /* how a service's picture compares with its rivals' (#70) */
+    if (event.type === 'PLATFORM_QUALITY_GAP') return `platform-quality:${event.companyId || event.platformId || event.id}`;
     if (event.projectId) return `project:${event.projectId}`;
     if (event.productionId) return `production:${event.productionId}`;
     if (COMPANY_EVENT_TYPES.has(event.type) || event.type === 'PARTNERSHIP_REPEATED') {
@@ -57,7 +76,7 @@ export const getIndustryMediaSubjectKey = (event: IndustryEventFact): string => 
 };
 
 export const getIndustryMediaCategory = (event: IndustryEventFact): IndustryMediaStoryCategory => {
-    if (COMPANY_EVENT_TYPES.has(event.type)) return 'COMPANY';
+    if (COMPANY_EVENT_TYPES.has(event.type) || event.type.startsWith('PLATFORM_')) return 'COMPANY';
     if (event.type === 'RIGHTS_DEAL' || event.type === 'RIGHTS_TRANSFER' || event.type === 'RIGHTS_SALE_ANNOUNCED') return 'RIGHTS';
     if (event.type === 'FRANCHISE_DECISION') return 'FRANCHISE';
     if (event.type === 'AWARD_NOMINATED' || event.type === 'AWARD_WON') return 'AWARDS';
@@ -85,7 +104,8 @@ const channelEligibilityFor = (event: IndustryEventFact): IndustryMediaChannel[]
     ].includes(event.type)) channels.push('NEWS');
     if (event.importance !== 'LOW') channels.push('X');
     if (event.importance === 'HIGH' && [
-        'COMPANY_LAUNCHED', 'PROJECT_CAST', 'PROJECT_RELEASED', 'AWARD_WON',
+        'COMPANY_LAUNCHED', 'PROJECT_CAST', 'PROJECT_RELEASED', 'AWARD_WON', 'PLATFORM_TECH_LAUNCHED', 'PLATFORM_QUALITY_GAP',
+        'PLATFORM_CHART_MOMENT', 'PLATFORM_CAMPAIGN_MOMENT',
     ].includes(event.type)) channels.push('INSTAGRAM');
     if ([
         'PROJECT_GREENLIT', 'PROJECT_CAST', 'FRANCHISE_DECISION', 'PROJECT_RELEASED', 'PROJECT_HIT', 'PROJECT_FLOP',

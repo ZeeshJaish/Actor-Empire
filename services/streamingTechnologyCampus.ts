@@ -15,6 +15,7 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import { resolveStreamingCompanyCapabilities } from './streamingCompany';
+import { getStreamingTechTreeWeeklyUpkeep, grantStreamingTechTreeFromLevels, resolveStreamingPlatformTechDebt, resolveStreamingTechTree } from './streamingTechTreeCatalogue';
 import {
     findStreamingResearchDefinitionForTechnology,
     getStreamingResearchInstallationBlockers,
@@ -245,6 +246,13 @@ const isDefinitionInstalled = (
     || platform.technologyProjects.some(project => project.definitionId === item.id && project.status === 'COMPLETED')
 );
 
+export const STREAMING_PLAYBACK_MOVED_BLOCKER = 'Picture and sound are unlocked in Platform › Tech';
+export const STREAMING_RELIABILITY_MOVED_BLOCKER = 'Reliability is built in Platform › Tech › Stabilization';
+export const STREAMING_DELIVERY_MOVED_BLOCKER = 'Delivery is built in Platform › Tech › Optimisation';
+export const STREAMING_SECURITY_MOVED_BLOCKER = 'Security is built in Platform › Tech › Trust and safety';
+export const STREAMING_RECOMMENDATIONS_MOVED_BLOCKER = 'Recommendations are built in Platform › Tech › Smart AI';
+export const STREAMING_CONTENT_OPERATIONS_RETIRED_BLOCKER = 'Content operations is no longer needed: nothing waits on it';
+
 const getDefinitionBlockers = (
     platform: OwnedStreamingPlatformState,
     item: StreamingTechnologyDefinition,
@@ -255,15 +263,36 @@ const getDefinitionBlockers = (
         if (prerequisite && !isDefinitionInstalled(platform, prerequisite)) blockers.push(`${prerequisite.title} required`);
     }
     if (item.ctoRequired && !activeCto(platform)) blockers.push('Active CTO required');
-    const researchDefinition = findStreamingResearchDefinitionForTechnology(item.id);
-    if (researchDefinition) {
-        const program = platform.researchPrograms.find(candidate => candidate.definitionId === researchDefinition.id);
-        if (!program || !['READY_TO_INSTALL', 'INSTALLING', 'OPERATING'].includes(program.stage)) {
-            blockers.push(`${researchDefinition.title} research and IP clearance required`);
+    /* Research no longer stands before a build (the research pipeline is retired). Picture and
+       sound are unlocked in Platform › Tech now, so a Playback node is built here only to finish
+       research already done for it; its level then grants the matching techs. */
+    if (item.branch === 'PLAYBACK_QUALITY') {
+        const researchDefinition = findStreamingResearchDefinitionForTechnology(item.id);
+        const program = researchDefinition
+            ? platform.researchPrograms.find(candidate => candidate.definitionId === researchDefinition.id)
+            : null;
+        if (!researchDefinition || !program || !['READY_TO_INSTALL', 'INSTALLING', 'OPERATING'].includes(program.stage)) {
+            blockers.push(STREAMING_PLAYBACK_MOVED_BLOCKER);
         } else if (program.stage === 'READY_TO_INSTALL') {
             blockers.push(...getStreamingResearchInstallationBlockers(platform, researchDefinition));
         }
     }
+    /* Stabilization in Platform › Tech took over the Reliability line (it pays tech debt down
+       every week). A Reliability node already being built finishes here, and its level grants
+       the matching Stabilization steps. */
+    if (item.branch === 'RELIABILITY') blockers.push(STREAMING_RELIABILITY_MOVED_BLOCKER);
+    /* Optimisation took over the Delivery line: capacity is load units now, so codecs cut what a
+       viewer needs instead, and servers add the rest. A Delivery node being built finishes here. */
+    if (item.branch === 'DELIVERY_CAPACITY') blockers.push(STREAMING_DELIVERY_MOVED_BLOCKER);
+    /* Trust and safety took over the Security line (#54): Content protection stands for the level. A
+       Security node being built finishes here, and its level grants the matching steps. */
+    if (item.branch === 'SECURITY') blockers.push(STREAMING_SECURITY_MOVED_BLOCKER);
+    /* Smart AI took over the Audience Intelligence line (#59): its recommendations ladder stands for the
+       level. A Recommendations node being built finishes here, and its level grants the matching steps. */
+    if (item.branch === 'DATA_RECOMMENDATIONS') blockers.push(STREAMING_RECOMMENDATIONS_MOVED_BLOCKER);
+    /* #86: nothing asks for Content operations any more (Originals, products, storefronts, reach, regions), so no new
+       step of it is built. A node already being built finishes here, and a level a save has keeps its small effects. */
+    if (item.branch === 'CONTENT_OPERATIONS') blockers.push(STREAMING_CONTENT_OPERATIONS_RETIRED_BLOCKER);
     const staffCapacity = getStreamingTechnologyStaffCapacity(platform);
     if (staffCapacity < item.staffRequired) blockers.push(`${item.staffRequired} engineering staff required`);
     return blockers;
@@ -310,7 +339,8 @@ export const getStreamingTechnologyCampus = (player: Player): StreamingTechnolog
         totalWeeklyOperatingCost: platform.technologyProjects
             .filter(project => project.status === 'COMPLETED')
             .reduce((sum, project) => sum + project.weeklyOperatingCostDelta, 0),
-        technicalDebt: platform.infrastructureSetup?.technicalDebt || 0,
+        // the platform's debt, as the Platform room shows it: the infrastructure's plus the tech tree's
+        technicalDebt: Math.round(resolveStreamingPlatformTechDebt(platform)),
         ctoActive: activeCto(platform),
         facilities,
     };
@@ -455,6 +485,12 @@ export const completeDueStreamingTechnologyProjects = (
         ...platform,
         technologyProjects: projects,
         technologyLevels,
+        // A Playback, Delivery, Reliability, Security or Recommendations project still being built when
+        // its tree group arrived grants the steps its level stands for.
+        techTree: (['PLAYBACK_QUALITY', 'DELIVERY_CAPACITY', 'RELIABILITY', 'SECURITY', 'DATA_RECOMMENDATIONS'] as const)
+            .some(branch => technologyLevels[branch] > platform.technologyLevels[branch])
+            ? grantStreamingTechTreeFromLevels(resolveStreamingTechTree(platform), technologyLevels, absoluteWeek)
+            : platform.techTree,
         capacity: { baselineConcurrentStreams, burstConcurrentStreams },
         infrastructureSetup: platform.infrastructureSetup ? {
             ...platform.infrastructureSetup,
@@ -473,11 +509,14 @@ export const completeDueStreamingTechnologyProjects = (
     return { platform, completedProjects, ledgerEntries };
 };
 
+/** The week's technology bill: finished campus projects, operating research and the
+    tech tree's upkeep (every unlocked tech, starters free). */
 export const getStreamingTechnologyWeeklyCost = (platform: OwnedStreamingPlatformState): number => (
     platform.technologyProjects
         .filter(project => project.status === 'COMPLETED')
         .reduce((sum, project) => sum + project.weeklyOperatingCostDelta, 0)
     + getStreamingResearchWeeklyCost(platform)
+    + getStreamingTechTreeWeeklyUpkeep(resolveStreamingTechTree(platform))
 );
 
 export const getStreamingTechnologyCompanyGate = (player: Player): {

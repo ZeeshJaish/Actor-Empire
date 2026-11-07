@@ -73,7 +73,9 @@ export const TitleDossier: React.FC<{
   t: DossierTitle;
   onClose: () => void;
   onAction?: (id: string) => void;
-}> = ({ brand, t, onClose, onAction }) => {
+  /** #150: its campaigns: how many it has had, and whether one can start now (it streams on the service) */
+  campaigns?: { count: number; canStart: boolean; reason?: string };
+}> = ({ brand, t, onClose, onAction, campaigns }) => {
   const c = brandColor(brand), c2 = brandDeep(brand);
   const tf = typeFace(brand);
   const margin = t.revenue - t.cost;
@@ -200,7 +202,7 @@ export const TitleDossier: React.FC<{
             {t.kind === 'ORIGINAL' ? (
               <>
                 <button className={cx(css.dact, css.primary)} onClick={() => onAction?.('renew')}>
-                  {t.format === 'Series' ? 'RENEW FOR SEASON 2' : 'DEVELOP A SEQUEL'}
+                  {t.format.toLowerCase() === 'series' ? 'RENEW FOR SEASON 2' : 'DEVELOP A SEQUEL'}
                 </button>
                 <div className={css.actnote}>Audience response window: 4 weeks remaining.</div>
                 <button className={css.dact} onClick={() => onAction?.('spinoff')}>COMMISSION A SPIN-OFF</button>
@@ -212,8 +214,15 @@ export const TitleDossier: React.FC<{
                 <button className={cx(css.dact, css.danger)} onClick={() => onAction?.('lapse')}>LET IT LAPSE</button>
               </>
             ) : <p className={css.actnote}>Imported from your production house. Existing grants elsewhere still limit where this title can play.</p>}
-            <button className={css.dact} onClick={() => onAction?.('artwork')}>CHANGE ARTWORK</button>
-            <button className={css.dact} onClick={() => onAction?.('hero')}>PUT ON HOMEPAGE HERO</button>
+            {/* #150: the Campaign Studio replaces the old War Room's artwork and homepage buttons */}
+            {campaigns && (
+              <>
+                <button className={css.dact} disabled={!campaigns.canStart} style={campaigns.canStart ? undefined : { opacity: .45 }}
+                  onClick={() => onAction?.('campaign')}>START A CAMPAIGN</button>
+                {!campaigns.canStart && campaigns.reason && <div className={css.actnote}>{campaigns.reason}</div>}
+                {campaigns.count > 0 && <button className={css.dact} onClick={() => onAction?.('campaigns')}>CAMPAIGNS · {campaigns.count}</button>}
+              </>
+            )}
           </div>
 
           {/* ── press ── */}

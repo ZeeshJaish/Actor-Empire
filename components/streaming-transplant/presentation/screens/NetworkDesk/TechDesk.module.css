@@ -1,0 +1,437 @@
+/* ============================================================================
+   TECH — Platform room · Tech (TechDesk.tsx; plan: codex-handoff/plans/platform-tech-plan.md)
+   1 · what the plans can offer          2 · the groups (tiles, all one size)
+   a tile opens its group in place of the tiles (#78), with "‹ All tech" back:
+   3 · the next upgrade, shown (now | next on one frame; Sound: two rooms) and its action
+   4 · the group's ladder
+
+   --ac  a group's colour (validated set: #3b82f6 · #c98500 · #a855f7 · #199e70)
+   Rules sit under .tech (0-2-0): the HQ shell resets button fonts at 0-1-1.
+   Text wears text tokens; a group's colour lives on marks (icons, nodes, bars, frames).
+   ========================================================================== */
+.tech{--ink:#eef0f5;--ink2:#aab2c2;--ink3:#7d8698;--ink4:#566070;--gold:#f6c445;--goldInk:#ffe08a;--good:#4ade80;--bad:#ff6b6f;
+  padding-top:18px}
+.tech .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tech .head h2{font:900 16px/1.1 'Inter',system-ui,sans-serif;letter-spacing:-.01em;color:var(--ink)}
+.tech .head span{font:500 9.5px/1.3 'Inter',sans-serif;color:var(--ink3)}
+.tech .eyebrow{display:block;font:900 7.5px/1.3 'Inter',sans-serif;letter-spacing:.14em;color:var(--ink3);text-transform:uppercase}
+
+/* ── 1 · what the plans can offer ── */
+.tech .offer{margin-top:12px}
+.tech .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.tech .chip{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px 7px 7px;border-radius:99px;
+  font:800 10.5px/1.15 'Inter',sans-serif;color:var(--ink);transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.tech .chip b{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font:900 10px/1 'Inter',sans-serif}
+.tech .chip b svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+.tech .chip small{font:600 8.5px/1.2 'Inter',sans-serif;color:var(--ink3)}
+.tech .chipOn{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.32)}
+.tech .chipOn b{background:var(--good);color:#06240f}
+.tech .chipOn small{color:#9be7b5}
+.tech .chipOff{background:rgba(255,255,255,.035);border:1px dashed rgba(255,255,255,.16);color:var(--ink2)}
+.tech .chipOff b{background:rgba(255,255,255,.08);color:var(--ink2)}
+.tech .chipOff:active{transform:scale(.95)}
+
+/* tech debt: what pushing quality up has piled on, and what Stabilization pays down a week */
+.tech .debt{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:center;gap:8px;width:100%;margin-top:10px;padding:8px 11px;
+  border-radius:11px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.tech .debt:active{transform:scale(.97)}
+.tech .debt span{font:900 7.5px/1 'Inter',sans-serif;letter-spacing:.14em;color:var(--ink3)}
+.tech .debt b{font:400 18px/1 'Anton','Archivo',sans-serif;color:#fff}
+.tech .debt i{display:block;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.tech .debt i em{display:block;height:100%;border-radius:3px;background:var(--dt)}
+.tech .debt small{font:700 9.5px/1 'Inter',sans-serif;color:var(--ink2);white-space:nowrap}
+.tech .debtOk{--dt:#4ade80}
+.tech .debtWarn{--dt:#ffb020;border-color:rgba(255,176,32,.32)}
+.tech .debtBad{--dt:#ff6b6f;border-color:rgba(255,107,111,.4)}
+.tech .facts li.debtFact{color:#ffcf7a;border-color:rgba(255,176,32,.3);background:rgba(255,176,32,.06)}
+/* #88: an ⓘ beside the bar opens what tech debt is, where it comes from, what it costs now and how it goes down */
+.tech .debtRow{display:flex;align-items:stretch;gap:6px;margin-top:10px}
+.tech .debtRow .debt{flex:1;min-width:0;margin-top:0}
+.tech .debtInfo{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:44px;border-radius:11px;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:var(--ink2);transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.tech .debtInfo:active{transform:scale(.92)}
+.tech .debtInfo svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round}
+.tech .debtInfo svg .dot{fill:currentColor;stroke:none}
+.tech .debtInfoOn{color:#fff;background:color-mix(in srgb,var(--dt) 12%,transparent);border-color:color-mix(in srgb,var(--dt) 45%,transparent)}
+.tech .debtPanel{margin-top:6px;padding:2px 13px;border-radius:13px;background:#080a10;border:1px solid rgba(255,255,255,.08);
+  animation:techDebtPanel .22s ease-out both}
+@keyframes techDebtPanel{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.tech .debtPanel section{padding:11px 0}
+.tech .debtPanel section+section{border-top:1px solid rgba(255,255,255,.06)}
+.tech .debtPanel p{margin-top:6px;font:500 11px/1.5 'Inter',sans-serif;color:var(--ink2)}
+.tech .debtPanel p b{font-weight:800;color:#fff}
+.tech .debtCosts{list-style:none;display:grid;gap:8px;margin-top:9px}
+.tech .debtCosts li{display:grid;grid-template-columns:46px minmax(0,1fr);align-items:baseline;gap:10px}
+.tech .debtCosts b{font:400 17px/1 'Anton','Archivo',sans-serif;color:var(--dt);text-align:right;white-space:nowrap}
+.tech .debtCosts span{font:600 10.5px/1.4 'Inter',sans-serif;color:var(--ink)}
+.tech .debtCosts span small{display:block;margin-top:1px;font:500 10px/1.4 'Inter',sans-serif;color:var(--ink3)}
+.tech .debtGo{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:8px 12px;border-radius:99px;
+  font:800 9px/1 'Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#fff;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.tech .debtGo:active{transform:scale(.95)}
+.tech .debtGo i{font-style:normal;font-size:13px;line-height:1}
+
+/* ── 2 · the groups ── */
+/* every tile one size, as tall as the longest name needs (two lines at most); the name sits on its version at the
+   foot (#78: "all the boxes are of not same size … the text over them is so big") */
+.tech .groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:8px;margin-top:14px}
+/* a line over each section of tiles (#83): its name, then a hairline to the edge */
+.tech .section{grid-column:1/-1;display:flex;align-items:center;gap:9px;margin-top:8px;font:900 8.5px/1.2 'Inter',sans-serif;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink2)}
+.tech .section:first-child{margin-top:0}
+.tech .section::after{content:'';flex:1;min-width:16px;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.14),transparent)}
+.tech .tile{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:'icon name' 'best best' 'foot foot';
+  grid-template-rows:auto 1fr auto;align-items:center;column-gap:8px;row-gap:7px;padding:10px 11px;border-radius:15px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(120% 120% at 100% 0%,color-mix(in srgb,var(--ac) 20%,transparent) 0%,transparent 58%),#0a0c13;
+  border:1px solid rgba(255,255,255,.08);transition:transform .14s cubic-bezier(.3,1.5,.5,1),border-color .2s,box-shadow .2s}
+.tech .tile:active{transform:scale(.95)}
+.tech .tileOn{border-color:color-mix(in srgb,var(--ac) 70%,transparent);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--ac) 40%,transparent),0 14px 28px -18px var(--ac)}
+.tech .tileIcon{grid-area:icon;display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:5px;border-radius:9px;
+  color:var(--ac);background:color-mix(in srgb,var(--ac) 15%,#0b0e15);border:1px solid color-mix(in srgb,var(--ac) 40%,transparent)}
+.tech .tileOn .tileIcon{animation:techIconPop .36s cubic-bezier(.3,1.6,.5,1)}
+@keyframes techIconPop{0%{transform:scale(.8) rotate(-10deg)}100%{transform:none}}
+.tech .tileIcon svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tech .tileIcon svg .iconFill{fill:currentColor;fill-opacity:.35}
+.tech .tileName{grid-area:name;font:900 8px/1.2 'Inter',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb,var(--ac) 45%,#c3c9d4)}
+.tech .tileBest{grid-area:best;align-self:end;font:400 16px/1.12 'Anton','Archivo',sans-serif;letter-spacing:.03em;color:#fff;overflow-wrap:anywhere}
+.tech .tileFoot{grid-area:foot;display:flex;align-items:center;gap:7px;min-width:0}
+.tech .tileFoot small{font:700 9px/1.2 'Inter',sans-serif;color:var(--ink2)}
+.tech .pips{flex:0 0 auto;display:inline-flex;gap:3px}
+.tech .pips i{width:12px;height:5px;border-radius:3px;background:rgba(255,255,255,.12)}
+.tech .pips i.pipOn{background:var(--ac);box-shadow:0 0 8px -1px color-mix(in srgb,var(--ac) 80%,transparent)}
+
+/* ── an opened group: "‹ All tech" back to the tiles; it slides in ── */
+.tech.opened{animation:techEnter .22s cubic-bezier(.2,.8,.2,1) both}
+@keyframes techEnter{0%{opacity:0;transform:translateX(14px)}100%{opacity:1;transform:none}}
+.tech .back{display:inline-flex;align-items:center;gap:7px;padding:7px 13px 7px 10px;border-radius:99px;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);font:800 11px/1 'Inter',sans-serif;color:var(--ink2);
+  transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.tech .back i{font:400 17px/.6 'Inter',sans-serif;font-style:normal;color:var(--ink)}
+.tech .back:active{transform:scale(.94)}
+.tech.opened .stage{margin-top:10px}
+
+/* ── 3 · the next upgrade, shown, and its action ── */
+.tech .stage{margin-top:12px;padding:12px;border-radius:17px;background:#080a10;border:1px solid color-mix(in srgb,var(--ac) 26%,rgba(255,255,255,.07))}
+.tech .stageHead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tech .stageHead .eyebrow{color:color-mix(in srgb,var(--ac) 40%,#a3abba)}
+.tech .energyPill{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:5px 9px 5px 7px;border-radius:99px;
+  background:rgba(246,196,69,.09);border:1px solid rgba(246,196,69,.34)}
+.tech .energyPill b{font:800 12px/1 'Inter',sans-serif;color:var(--goldInk)}
+.tech .boltPill{width:12px;height:12px;fill:var(--gold)}
+.tech .boltInline{display:inline-block;width:10px;height:10px;margin-left:1px;vertical-align:-1px;fill:var(--gold)}
+.tech .boltBtn{width:14px;height:14px;fill:currentColor}
+
+.tech .previewWrap{position:relative;margin-top:10px;border-radius:13px}
+.tech .preview{display:flex;flex-direction:column;gap:8px}
+.tech .frame{position:relative;aspect-ratio:16/9;border-radius:13px;overflow:hidden;background:#05060a;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);touch-action:pan-y}
+.tech .frameSplit{cursor:ew-resize}
+.tech .frame svg{display:block;width:100%;height:100%}
+.tech .previewLit .frame{animation:techFlash .9s ease-out}
+@keyframes techFlash{0%{filter:brightness(1.9) saturate(1.3)}100%{filter:none}}
+/* the compare handle: a white line with a knob, dragged anywhere on the frame */
+.tech .handle{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 10px rgba(0,0,0,.6);pointer-events:none}
+.tech .handle i{position:absolute;top:50%;left:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.45)}
+.tech .handle i::before,.tech .handle i::after{content:'';position:absolute;top:50%;width:0;height:0;margin-top:-4px;border:4px solid transparent}
+.tech .handle i::before{left:3px;border-right-color:#10131c}
+.tech .handle i::after{right:3px;border-left-color:#10131c}
+.tech .zoom{position:absolute;top:7px;right:7px;padding:3px 7px;border-radius:99px;background:rgba(5,6,10,.72);
+  font:800 8px/1.2 'Inter',sans-serif;letter-spacing:.08em;color:#d6dbe6}
+/* Sound: each speaker's sound travels to the viewer; the ceiling's light breathes; the halo
+   tuned to the viewer's ears pulses out; Lossless draws its clean wave */
+.tech .beam{stroke-linecap:round;stroke-dasharray:.1 7;animation:techBeam 1.1s linear infinite}
+@keyframes techBeam{to{stroke-dashoffset:-14.2}}
+.tech .glow{animation:techCone 1.8s ease-in-out infinite}
+.tech .cone{animation:techCone 2.6s ease-in-out infinite}
+@keyframes techCone{0%,100%{opacity:.5}50%{opacity:1}}
+.tech .lossless{stroke-dasharray:180;stroke-dashoffset:180;animation:techDraw 2.4s ease-in-out infinite}
+@keyframes techDraw{0%{stroke-dashoffset:180}55%,100%{stroke-dashoffset:0}}
+.tech .halo{fill:none;stroke-width:1.2;transform-box:fill-box;transform-origin:center;animation:techHalo 1.8s ease-out infinite}
+@keyframes techHalo{0%{opacity:.9;transform:scale(.7)}100%{opacity:0;transform:scale(1.25)}}
+.tech .dialogue{animation:techSay 2.2s ease-in-out infinite}
+@keyframes techSay{0%,100%{opacity:.8}50%{opacity:1}}
+/* Optimisation: lanes of packets stream right; lit racks blink. Stabilization: the heartbeat scrolls */
+.tech .lane{animation:techLane 2s linear infinite}
+@keyframes techLane{to{transform:translateX(40px)}}
+.tech .led{animation:techLed 1.4s ease-in-out infinite}
+@keyframes techLed{0%,100%{opacity:1}50%{opacity:.45}}
+.tech .beat{stroke-dasharray:1;stroke-dashoffset:1;animation:techBeat 2.8s linear infinite}
+@keyframes techBeat{to{stroke-dashoffset:0}}
+/* now and next, read under the picture (never on it, so neither is ever covered) */
+.tech .sides{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.tech .sides span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.tech .sides small{font:900 7.5px/1 'Inter',sans-serif;letter-spacing:.16em;color:var(--ink3)}
+.tech .sides b{font:800 11.5px/1.25 'Inter',sans-serif;color:var(--ink2);overflow-wrap:anywhere}
+.tech .sideNext{text-align:right;align-items:flex-end}
+.tech .sideNext small{color:color-mix(in srgb,var(--ac) 55%,#c3c9d4)}
+.tech .sideNext b{color:#fff}
+
+/* the moment (#81): a tech upgrade over the whole card, on a blueprint grid. The group's chip sits on a circuit board
+   (.levelChip anchors the board, the progress ring, the rings and the bits on the chip's middle). An unlock draws the
+   board and the chip, installs (ten bars, 0–100%), then powers on; a version (.levelVersion) starts powered and charges
+   its next pip with energy (gold). Power-on: the chip flashes, its badge pops or rolls, rings and bits break out, a scan
+   line sweeps the card, the install gives way to the final. */
+.tech .stage{position:relative}
+.tech .levelup{position:absolute;inset:0;z-index:6;overflow:hidden;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(80% 46% at 50% 36%,color-mix(in srgb,var(--ac) 30%,transparent) 0%,transparent 74%),
+    linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px) 50% 0/18px 18px,
+    linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px) 50% 0/18px 18px,rgba(5,7,12,.97);
+  animation-name:techLevelShow;animation-timing-function:ease;animation-fill-mode:both}
+@keyframes techLevelShow{0%{opacity:0}5%{opacity:1}88%{opacity:1}100%{opacity:0}}
+/* #87 (Zeesh: "aadha dikh raha hai … wo animation hamare screen mein show ho jaaye"): the moment plays over the whole
+   screen from a layer on the page's body, wherever the card is scrolled; the page under it stays where it is, and a tap
+   skips it */
+.tech.momentLayer{position:fixed;inset:0;z-index:1000;padding:0;touch-action:none;overscroll-behavior:contain;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+/* solid over the screen: the page's words do not ghost through it (it still fades in and out over the page) */
+.tech.momentLayer .levelup{background-color:#05070c}
+.tech .levelSkip{position:absolute;left:0;right:0;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:3;text-align:center;
+  font:800 8.5px/1 'Inter',sans-serif;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.4);
+  opacity:0;animation:techSkipIn .4s ease-out .6s both}
+@keyframes techSkipIn{to{opacity:1}}
+/* the chip and the words: centred as it starts (a transform, until LevelUp measures), then held there while the card
+   under it changes height */
+.tech .levelStack{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:20px}
+.tech .levelScan{position:absolute;left:0;right:0;top:0;z-index:2;height:2px;opacity:0;
+  background:linear-gradient(90deg,transparent,#fff 25%,#fff 75%,transparent);box-shadow:0 0 16px 4px color-mix(in srgb,var(--ac) 75%,transparent);
+  animation:techScan .7s cubic-bezier(.45,0,.55,1) both}
+@keyframes techScan{0%{opacity:0;top:0}10%{opacity:.95}88%{opacity:.8}100%{opacity:0;top:100%}}
+.tech .levelCore{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px}
+.tech .levelChip{position:relative;width:84px;height:84px}
+/* the board */
+/* the board dims once the chip is on, so the final reads clear of it */
+.tech .levelBoard{position:absolute;left:50%;top:50%;width:560px;height:560px;margin:-280px 0 0 -280px;overflow:visible;animation:techDim .5s ease-out both}
+@keyframes techDim{to{opacity:.45}}
+.tech .levelTrace{fill:none;stroke:color-mix(in srgb,var(--ac) 60%,#8a93a8);stroke-width:1.6;stroke-opacity:.55;stroke-linejoin:round;
+  stroke-dasharray:100;stroke-dashoffset:100;animation:techDrawIn .9s cubic-bezier(.3,.6,.3,1) both}
+@keyframes techDrawIn{to{stroke-dashoffset:0}}
+.tech .levelVia{fill:color-mix(in srgb,var(--ac) 55%,#fff);opacity:0;animation:techAppear .3s ease-out both}
+.tech .levelPad{fill:#05070c;stroke:color-mix(in srgb,var(--ac) 60%,#8a93a8);stroke-width:1.6;opacity:0;animation:techAppear .3s ease-out both}
+@keyframes techAppear{to{opacity:.85}}
+.tech .levelPulse{fill:none;stroke:color-mix(in srgb,var(--ac) 30%,#fff);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:7 100;stroke-dashoffset:7;opacity:0;
+  animation:techPulse .8s cubic-bezier(.5,0,.75,.7) both}
+@keyframes techPulse{0%{stroke-dashoffset:7;opacity:0}12%{opacity:1}88%{opacity:1}100%{stroke-dashoffset:-100;opacity:0}}
+.tech .levelGlow{position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--ac) 50%,transparent) 0%,transparent 66%);animation:techGlow 1.6s ease-in-out 2}
+.tech .levelBig .levelGlow{width:250px;height:250px;margin:-125px 0 0 -125px}
+/* the surge as it powers on: a flash from the chip over the card (softer for a version) */
+.tech .levelFlash{position:absolute;left:50%;top:50%;width:460px;height:460px;margin:-230px 0 0 -230px;border-radius:50%;opacity:0;
+  background:radial-gradient(closest-side,#fff 0%,color-mix(in srgb,var(--ac) 70%,transparent) 30%,transparent 100%);animation:techSurge .6s ease-out both}
+@keyframes techSurge{0%{opacity:0}14%{opacity:.6}100%{opacity:0}}
+.tech .levelVersion .levelFlash{width:320px;height:320px;margin:-160px 0 0 -160px}
+@keyframes techGlow{0%,100%{transform:scale(.85);opacity:.7}50%{transform:scale(1.12);opacity:1}}
+/* the install ring round the chip */
+.tech .levelProgress{position:absolute;left:50%;top:50%;width:124px;height:124px;margin:-62px 0 0 -62px;overflow:visible}
+.tech .levelProgress path{fill:none;stroke-width:3}
+.tech .levelTrack{stroke:rgba(255,255,255,.09)}
+.tech .levelFill{stroke:var(--ac);stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100;
+  animation-name:techDrawIn,techGone;animation-timing-function:linear,ease-out;animation-fill-mode:both}
+@keyframes techGone{to{opacity:0}}
+/* the chip: pins, body and frame draw in, the icon scans in; it flashes as it powers on */
+.tech .levelChipCore{position:absolute;inset:0;animation:techPower .9s ease-out both}
+@keyframes techPower{0%{filter:none}22%{filter:brightness(2.3) drop-shadow(0 0 16px var(--ac))}
+  100%{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--ac) 70%,transparent))}}
+.tech .levelChipArt{display:block;width:100%;height:100%;overflow:visible}
+.tech .levelPin{fill:color-mix(in srgb,var(--ac) 70%,#d6dbe6);opacity:0;animation:techAppear .25s ease-out both}
+.tech .levelBody{fill:#0b0e16;stroke:var(--ac);stroke-width:2.4;stroke-dasharray:1;stroke-dashoffset:1;animation:techBody .8s ease-in-out .2s both}
+@keyframes techBody{0%{stroke-dashoffset:1;fill-opacity:0}65%{stroke-dashoffset:0;fill-opacity:0}100%{stroke-dashoffset:0;fill-opacity:1}}
+.tech .levelInner{fill:color-mix(in srgb,var(--ac) 12%,transparent);stroke:color-mix(in srgb,var(--ac) 55%,transparent);stroke-width:1;
+  stroke-dasharray:1;stroke-dashoffset:1;animation:techBody .7s ease-in-out .45s both}
+.tech .levelIcon{position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;color:var(--ac);
+  clip-path:inset(100% 0 0 0);animation:techScanIn .8s cubic-bezier(.3,.7,.3,1) .75s both}
+@keyframes techScanIn{to{clip-path:inset(0 0 0 0)}}
+.tech .levelIcon svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tech .levelIcon svg .iconFill{fill:currentColor;fill-opacity:.35}
+/* the version badge: an unlock's V1 pops on; a version's rolls V1 → V2 */
+.tech .levelBadge{position:absolute;right:-10px;top:-10px;height:20px;min-width:30px;padding:0 6px;border-radius:7px;overflow:hidden;
+  background:color-mix(in srgb,var(--ac) 82%,#000);box-shadow:0 0 0 2px #05070c,0 4px 12px -2px var(--ac);
+  font:400 13px/20px 'Anton','Archivo',sans-serif;letter-spacing:.05em;color:#fff;text-align:center}
+.tech .levelBadge b{display:block;height:20px;font-weight:400}
+.tech .levelBig .levelBadge{animation:techPop .45s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes techPop{0%{transform:scale(0)}100%{transform:none}}
+.tech .levelRoll{display:flex;flex-direction:column;animation:techRoll .4s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes techRoll{to{transform:translateY(-20px)}}
+.tech .levelRing{position:absolute;left:50%;top:50%;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;opacity:0;
+  border:3px solid color-mix(in srgb,var(--ac) 65%,#fff 35%);animation:techLevelRing 1.15s cubic-bezier(.15,.7,.3,1) both}
+@keyframes techLevelRing{0%{opacity:0;transform:scale(.2)}6%{opacity:.95}100%{opacity:0;transform:scale(2.8)}}
+/* bits: small squares that spin out */
+.tech .levelBits{position:absolute;left:50%;top:50%;width:0;height:0}
+.tech .levelBits i{position:absolute;left:-2.5px;top:-2.5px;width:5px;height:5px;border-radius:1px;opacity:0;
+  background:color-mix(in srgb,var(--ac) 45%,#fff 55%);animation:techBit .95s cubic-bezier(.15,.7,.3,1) both}
+.tech .levelBits i:nth-child(3n){background:var(--ac)}
+@keyframes techBit{0%{opacity:0;transform:translate(0,0) rotate(0) scale(.4)}15%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(200deg) scale(1)}}
+/* the version pips under the chip */
+.tech .levelPips{display:flex;gap:5px}
+.tech .levelPips i{position:relative;width:22px;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.1)}
+.tech .levelPips i.levelPipOn{background:var(--ac);box-shadow:0 0 8px -1px var(--ac)}
+.tech .levelPips i.levelPipNew{animation:techPipOn .3s ease-out both}
+@keyframes techPipOn{to{background:var(--ac);box-shadow:0 0 10px 0 var(--ac)}}
+.tech .levelPips i em{position:absolute;inset:0;transform-origin:left;transform:scaleX(0);background:var(--gold);
+  animation-name:techCharge,techGone;animation-timing-function:linear,ease-out;animation-fill-mode:both}
+@keyframes techCharge{to{transform:none}}
+/* under it: the install, then the final in its place, on a dark plate over the board */
+.tech .levelText{position:relative;z-index:1;display:grid;justify-items:center}
+.tech .levelText::before{content:'';position:absolute;z-index:-1;left:50%;top:50%;width:340px;height:190px;margin:-95px 0 0 -170px;
+  background:radial-gradient(closest-side,rgba(5,7,12,.92) 45%,transparent)}
+.tech .levelInstall{grid-area:1/1;display:flex;flex-direction:column;align-items:center;gap:10px;animation:techGone .25s ease-out both}
+.tech .levelSegs{display:flex;gap:3px}
+.tech .levelSegs i{width:10px;height:13px;border-radius:2px;background:rgba(255,255,255,.08);animation:techSegOn .2s ease-out both}
+@keyframes techSegOn{to{background:var(--ac);box-shadow:0 0 8px -2px var(--ac)}}
+.tech .levelInstall small{display:flex;gap:7px;font:800 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.18em;color:var(--ink2)}
+.tech .levelInstall small b{min-width:4ch;font-weight:800;letter-spacing:.04em;color:#fff;text-align:right}
+.tech .levelFinal{grid-area:1/1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:0 18px;text-align:center;opacity:0;
+  animation:techLevelFinal .55s cubic-bezier(.2,.8,.2,1.2) both}
+@keyframes techLevelFinal{0%{opacity:0;transform:scale(.88)}100%{opacity:1;transform:none}}
+.tech .levelFinal small{font:900 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:color-mix(in srgb,var(--ac) 45%,#fff 55%)}
+/* the name lands with a glitch: split colours that settle into its glow */
+.tech .levelFinal b{max-width:290px;font:400 30px/1.05 'Anton','Archivo',sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#fff;
+  overflow-wrap:anywhere;text-shadow:0 0 24px color-mix(in srgb,var(--ac) 85%,transparent);animation:techGlitch .5s steps(1) both}
+@keyframes techGlitch{0%{text-shadow:-3px 0 #22d3ee,3px 0 #ff2d6f;transform:translateX(2px)}
+  25%{text-shadow:2px 0 #22d3ee,-2px 0 #ff2d6f;transform:translateX(-2px)}50%{text-shadow:-1px 0 #22d3ee,1px 0 #ff2d6f;transform:none}
+  75%,100%{text-shadow:0 0 24px color-mix(in srgb,var(--ac) 85%,transparent);transform:none}}
+.tech .levelBig .levelFinal b{font-size:38px}
+/* a long name ("Kids profiles and parental controls") a size down, so it takes two lines */
+.tech .levelLong .levelFinal b,.tech .levelLong.levelBig .levelFinal b{font-size:27px}
+.tech .levelFinal em{max-width:270px;font:700 12px/1.4 'Inter',sans-serif;font-style:normal;color:#e8ecf4}
+.tech .levelFinal i{margin-top:-3px;font:600 10.5px/1.4 'Inter',sans-serif;font-style:normal;color:#b9c0cf}
+/* a version: the board and the chip are on already, and energy (gold) runs in */
+.tech .levelVersion .levelTrace,.tech .levelVersion .levelBody,.tech .levelVersion .levelInner{animation:none;stroke-dashoffset:0}
+.tech .levelVersion .levelVia,.tech .levelVersion .levelPad,.tech .levelVersion .levelPin{animation:none;opacity:.85}
+.tech .levelVersion .levelIcon{animation:none;clip-path:none}
+.tech .levelVersion .levelPulse{stroke:#ffe08a}
+.tech .levelVersion .levelFill{stroke:var(--gold)}
+
+.tech .action{margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.07)}
+.tech .actionTitle{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}
+.tech .actionTitle b{font:400 21px/1.05 'Anton','Archivo',sans-serif;letter-spacing:.02em;color:#fff;overflow-wrap:anywhere}
+.tech .vname{font:800 10px/1 'Inter',sans-serif;font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--ac) 50%,#d6dbe6)}
+.tech .future{display:inline-block;margin-left:2px;font:900 8px/1 'Inter',sans-serif;font-style:normal;letter-spacing:.1em;color:#d9c8ff;vertical-align:3px}
+.tech .actionLine{margin-top:5px;font:500 10.5px/1.45 'Inter',sans-serif;color:var(--ink2)}
+.tech .needs{margin-top:8px;font:700 10.5px/1.4 'Inter',sans-serif;color:#ffcf7a}
+.tech .facts{list-style:none;display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.tech .facts li{padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+  font:600 9.5px/1.25 'Inter',sans-serif;color:var(--ink2)}
+.tech .facts li.feeds{color:#9be7b5;border-color:rgba(74,222,128,.28);background:rgba(74,222,128,.06)}
+.tech .primary{display:grid;gap:4px;width:100%;margin-top:12px;padding:12px 13px;border-radius:13px;text-align:left;color:#fff;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--ac) 88%,#fff 6%),color-mix(in srgb,var(--ac) 70%,#000 22%));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 12px 24px -14px var(--ac);transition:transform .1s cubic-bezier(.3,1.5,.5,1)}
+.tech .primary:active:not(:disabled){transform:scale(.97)}
+.tech .primary span{font:900 13.5px/1.2 'Inter',sans-serif;text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.tech .primary small{font:600 9.5px/1.3 'Inter',sans-serif;color:rgba(255,255,255,.86)}
+.tech .primary:disabled{background:rgba(255,255,255,.05);box-shadow:none;color:var(--ink3)}
+.tech .primary:disabled small{color:var(--ink4)}
+.tech .primary.busy{background:linear-gradient(180deg,color-mix(in srgb,var(--ac) 88%,#fff 6%),color-mix(in srgb,var(--ac) 70%,#000 22%));color:#fff;opacity:.78}
+.tech .primary.busy small{color:rgba(255,255,255,.86)}
+.tech .secondary{margin-top:10px;padding:9px 13px;border-radius:11px;border:1px solid color-mix(in srgb,var(--ac) 45%,transparent);
+  background:color-mix(in srgb,var(--ac) 9%,transparent);font:800 11px/1.2 'Inter',sans-serif;color:#fff;transition:transform .1s}
+.tech .secondary:active{transform:scale(.96)}
+.tech .actionDone .actionLine{color:#9be7b5}
+
+.tech .energyRow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:10px}
+.tech .energyCount{font:600 11px/1 'Inter',sans-serif;color:var(--ink2);white-space:nowrap}
+.tech .energyCount b{font:800 18px/1 'Inter',sans-serif;color:#fff;letter-spacing:-.02em}
+.tech .energyButtons{display:flex;align-items:center;gap:6px}
+.tech .plus{display:inline-flex;align-items:center;justify-content:center;gap:2px;min-width:76px;height:42px;padding:0 14px;border-radius:13px;
+  background:linear-gradient(180deg,#ffdc6a,#f0b52c);color:#1d1503;font:900 15px/1 'Inter',sans-serif;letter-spacing:-.01em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.12),0 10px 20px -10px rgba(246,196,69,.85);
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;transition:transform .08s}
+.tech .plus:active:not(:disabled){transform:scale(.94)}
+.tech .plus:disabled{background:rgba(255,255,255,.06);color:var(--ink4);box-shadow:none}
+.tech .fill{height:42px;padding:0 12px;border-radius:13px;border:1px solid rgba(246,196,69,.45);background:rgba(246,196,69,.07);
+  font:800 11px/1 'Inter',sans-serif;color:var(--goldInk);white-space:nowrap;transition:transform .08s}
+.tech .fill:active:not(:disabled){transform:scale(.95)}
+.tech .fill:disabled{opacity:.4}
+.tech .segments{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;height:8px;margin-top:10px}
+.tech .segments i{border-radius:3px;background:rgba(255,255,255,.08);transition:background .2s,box-shadow .2s}
+.tech .segments i.segOn{background:var(--ac);box-shadow:0 0 10px -2px color-mix(in srgb,var(--ac) 80%,transparent)}
+.tech .segments i.segFresh{animation:techSeg .38s ease-out;filter:brightness(1.25)}
+@keyframes techSeg{0%{transform:scaleY(1.9)}100%{transform:none}}
+.tech .noEnergy{margin-top:7px;font:500 9px/1.4 'Inter',sans-serif;color:#c9b37a}
+/* #84: a version's price beside its energy, and when it is paid (or that the treasury is short) */
+.tech .versionCost{margin-left:7px;font:800 11px/1 'Inter',sans-serif;font-style:normal;color:#9be7b5;white-space:nowrap}
+.tech .versionCostShort{color:#ff9a9d}
+.tech .paidAt{margin-top:7px;font:500 9px/1.4 'Inter',sans-serif;color:var(--ink3)}
+.tech .needsMoney{margin-top:7px;font:600 9.5px/1.4 'Inter',sans-serif;color:#ffc9cb}
+.tech .feedback{margin-top:10px;padding:8px 10px;border-radius:10px;font:600 10px/1.45 'Inter',sans-serif}
+.tech .feedback.good{background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.28);color:#bff3d0}
+.tech .feedback.bad{background:rgba(255,107,111,.07);border:1px solid rgba(255,107,111,.3);color:#ffc9cb}
+
+/* ── 4 · the ladder ── */
+.tech .ladder{margin-top:12px}
+.tech .rungs{list-style:none;position:relative;display:flex;flex-direction:column;gap:5px}
+/* the rail the steps hang on */
+.tech .rungs::before{content:'';position:absolute;left:21px;top:16px;bottom:16px;width:2px;border-radius:2px;
+  background:linear-gradient(color-mix(in srgb,var(--ac) 60%,transparent),rgba(255,255,255,.07))}
+.tech .rungsSide::before{display:none}
+.tech .rung{position:relative;display:flex;align-items:center;gap:11px;width:100%;padding:8px 10px;border-radius:13px;
+  border:1px solid transparent;transition:transform .12s cubic-bezier(.3,1.5,.5,1),background .2s,border-color .2s}
+.tech .rung:active{transform:scale(.97)}
+.tech .rungOn{background:color-mix(in srgb,var(--ac) 10%,#0a0c13);border-color:color-mix(in srgb,var(--ac) 50%,transparent)}
+.tech .node{position:relative;z-index:1;flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;
+  font:900 11px/1 'Inter',sans-serif;color:#fff;background:#0b0e15;border:2px solid rgba(255,255,255,.14)}
+.tech .node svg{width:11px;height:11px;fill:none;stroke:var(--ink3);stroke-width:1.6;stroke-linecap:round}
+.tech .rungOWNED .node{background:var(--ac);border-color:color-mix(in srgb,var(--ac) 60%,#fff);box-shadow:0 0 12px -2px var(--ac)}
+.tech .rungOPEN .node{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 16%,#0b0e15);animation:techOpen 2s ease-in-out infinite}
+@keyframes techOpen{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ac) 50%,transparent)}50%{box-shadow:0 0 0 5px transparent}}
+.tech .rungText{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.tech .rungText b{font:400 17px/1.05 'Anton','Archivo',sans-serif;letter-spacing:.02em;color:#fff;overflow-wrap:anywhere}
+.tech .rungText b .future{margin-left:5px}
+.tech .rungText small{font:600 9.5px/1.3 'Inter',sans-serif;color:var(--ink3)}
+.tech .rungOWNED .rungText small{color:var(--ink2)}
+.tech .rungLOCKED .rungText b{color:#9aa2b2}
+.tech .openTag{flex:0 0 auto;padding:5px 8px;border-radius:99px;font:900 8px/1 'Inter',sans-serif;letter-spacing:.12em;color:#fff;
+  background:color-mix(in srgb,var(--ac) 30%,transparent);border:1px solid color-mix(in srgb,var(--ac) 60%,transparent)}
+.tech .sideHead{margin:12px 0 6px;font:900 7.5px/1.3 'Inter',sans-serif;letter-spacing:.14em;color:var(--ink3)}
+
+/* narrower than an iPhone (320–360px): the tiles and the ladder keep every word */
+@media (max-width:359px){
+  .tech .tile{padding:9px 9px;column-gap:6px}
+  .tech .tileBest{font-size:15px}
+  .tech .tileIcon{width:24px;height:24px;padding:4.5px}
+  .tech .plus{min-width:66px;padding:0 11px}
+  .tech .fill{padding:0 10px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .tech .tile,.tech .rung,.tech .chip,.tech .primary,.tech .plus,.tech .fill,.tech .back{transition:none}
+  .tech.opened{animation:none}
+  .tech .tileOn .tileIcon,.tech .rungOPEN .node,.tech .previewLit .frame,.tech .segments i.segFresh{animation:none}
+  .tech .beam,.tech .cone,.tech .halo,.tech .dialogue,.tech .glow,.tech .lane,.tech .led{animation:none}
+  .tech .beat{animation:none;stroke-dashoffset:0}
+  .tech .lossless{animation:none;stroke-dashoffset:0}
+  /* the moment: the chip powered on and the final at once; nothing draws, runs, flies or sweeps */
+  .tech .levelScan,.tech .levelPulse,.tech .levelGlow,.tech .levelFlash,.tech .levelProgress,.tech .levelRing,.tech .levelBits,.tech .levelInstall{display:none}
+  .tech .levelTrace,.tech .levelBody,.tech .levelInner{animation:none;stroke-dashoffset:0}
+  .tech .levelVia,.tech .levelPad,.tech .levelPin{animation:none;opacity:.85}
+  .tech .levelBoard{animation:none;opacity:.45}
+  .tech .levelIcon{animation:none;clip-path:none}
+  .tech .levelChipCore,.tech .levelBig .levelBadge,.tech .levelFinal b{animation:none}
+  .tech .levelRoll{animation:none;transform:translateY(-20px)}
+  .tech .levelPips i.levelPipNew{animation:none;background:var(--ac)}
+  .tech .levelPips i em{display:none}
+  .tech .levelFinal{animation:none;opacity:1}
+  .tech .levelSkip{animation:none;opacity:1}
+  .tech .debtInfo,.tech .debtGo{transition:none}
+  .tech .debtPanel{animation:none}
+}
+
+/* ── #79 the worlds (TechScenes.tsx): a TV's light flickers, a copy slips out to a pirate, a spark on the dome,
+   a heart rises at a watch party, a coin drops into the jar, a car drives through the film ── */
+.tech .tv{animation:techTv 2.6s ease-in-out infinite}
+@keyframes techTv{0%,100%{opacity:.82}35%{opacity:1}52%{opacity:.62}70%{opacity:.95}}
+.tech .slip{animation:techSlip 3.6s ease-in infinite both}
+@keyframes techSlip{0%{opacity:0;transform:none}12%{opacity:.95}80%{opacity:.75}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+.tech .spark{transform-box:fill-box;transform-origin:center;animation:techSparkle 2.2s ease-out infinite both}
+@keyframes techSparkle{0%,60%,100%{opacity:0;transform:scale(.4)}70%{opacity:1;transform:scale(1.3)}85%{opacity:.4;transform:scale(.8)}}
+.tech .rise{transform-box:fill-box;transform-origin:center;animation:techRise 1.8s ease-out infinite both}
+@keyframes techRise{0%{opacity:0;transform:translateY(4px) scale(.7)}25%{opacity:1}100%{opacity:0;transform:translateY(-14px) scale(1.1)}}
+.tech .coin{animation:techCoin 3s ease-in infinite both}
+@keyframes techCoin{0%{opacity:0;transform:none}10%{opacity:1}45%{transform:translate(calc(var(--dx) * .55),calc(var(--dy) * .12))}85%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy))}}
+.tech .drive{animation:techDrive 7s linear infinite}
+@keyframes techDrive{from{transform:translateX(-30px)}to{transform:translateX(350px)}}
+@media (prefers-reduced-motion:reduce){
+  .tech .tv,.tech .spark,.tech .rise,.tech .drive{animation:none}
+  .tech .slip,.tech .coin{animation:none;opacity:0}
+}

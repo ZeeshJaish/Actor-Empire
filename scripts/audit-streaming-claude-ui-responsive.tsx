@@ -71,7 +71,8 @@ const assertNamedButtons = async (page: BrowserPage, label: string) => {
           await page.locator('.sf-scroll').evaluate((element: HTMLElement) => { element.scrollTop = element.scrollHeight; });
           const overlap = await page.evaluate(() => {
             const body = document.querySelector('.sf-scroll');
-            const footer = document.querySelector('.lw-foot');
+            /* #157: the Build's foot is Define the Launch's HUD */
+            const footer = document.querySelector('.lw-hud');
             if (!body || !footer) return false;
             const last = body.lastElementChild?.getBoundingClientRect();
             const foot = footer.getBoundingClientRect();
@@ -146,18 +147,19 @@ const assertNamedButtons = async (page: BrowserPage, label: string) => {
     assert.equal(await landedRooms.locator('..').getAttribute('open'), '',
       'Room detail disclosure must expose landed-room evidence.');
 
-    await page.getByRole('button', { name: 'NEXT · MONEY' }).click();
+    await page.getByRole('button', { name: /Next\s*Money/i }).click();
     await page.getByRole('heading', { name: 'CAN THE COMPANY AFFORD ALL OF THIS?' }).waitFor();
-    await page.getByRole('button', { name: 'NEXT · TEST' }).click();
+    await page.getByRole('button', { name: /Next\s*Test/i }).click();
     const loadButton = page.getByRole('button', { name: 'TEST THE LOAD' });
     assert.equal(await loadButton.isDisabled(), true, 'The lab must represent an unavailable rehearsal handler honestly.');
     await page.getByText(/rehearsal service is unavailable/i).waitFor();
-    await page.getByRole('button', { name: 'NEXT · LAUNCH' }).click();
+    await page.getByRole('button', { name: /Next\s*Launch/i }).click();
     await page.getByRole('heading', { name: 'IS THIS THE NETWORK YOU WILL PAY FOR?' }).waitFor();
-    const commissionBelow = page.getByRole('button', { name: 'COMMISSION BELOW' });
-    assert.equal(await commissionBelow.getAttribute('aria-describedby'), 'bw-commission-guidance',
-      'The locked commission dock must point to the exact launch blockers.');
-    await page.locator('.lw-foot .sf-btn--ghost').click();
+    /* #157: on Launch the HUD's big button commissions; it waits, disabled, while the agreement lists blockers */
+    const commission = page.locator('.lw-hud-next');
+    assert.match(await commission.innerText(), /Commission/i, 'The last stage\'s big button commissions.');
+    assert.equal(await commission.isDisabled(), true, 'It cannot commission while the launch blockers are open.');
+    await page.locator('.lw-hud-back').click();
     await page.getByRole('heading', { name: 'WHAT WILL OPENING NIGHT ACTUALLY FEEL LIKE?' }).waitFor();
 
     await page.goto(`${baseUrl}/scripts/fixtures/streaming-opening-programme.html?state=action`, { waitUntil: 'networkidle' });

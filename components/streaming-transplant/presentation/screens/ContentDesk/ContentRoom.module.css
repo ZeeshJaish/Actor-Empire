@@ -10,7 +10,6 @@
    ========================================================================== */
 
 .room{--cc:var(--epx-cd-c,#f04452)}
-.eyebrow{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7d8698}
 
 /* ── poster art ── */
 .art{position:relative;display:block;flex:0 0 auto}
@@ -18,44 +17,123 @@
 .rank{position:absolute;left:-4px;bottom:-6px;min-width:22px;padding:2px 5px;border-radius:7px;background:#050609;border:1px solid rgba(255,255,255,.18);
   font:400 15px/1 'Anton','Archivo',sans-serif;font-style:normal;color:#fff;text-align:center}
 
-/* ── spotlight ── */
-.room .spotlight{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;width:100%;margin-top:14px;padding:12px;border-radius:18px;overflow:hidden;
-  background:linear-gradient(135deg,hsl(var(--h) 45% 16% / .9),#0c0f15 62%);border:1px solid rgba(255,255,255,.09);text-align:left}
-.spotArt{width:96px}
-.spotBody{display:flex;flex-direction:column;min-width:0;padding-top:2px}
-.spotTitle{margin-top:6px;font:900 19px/1.1 'Inter',system-ui,sans-serif;letter-spacing:-.02em;color:#fff}
-.spotMeta{margin-top:4px;font-size:9.5px;color:#a5adbc}
-.spotFigures{display:flex;align-items:center;gap:16px;margin-top:auto;padding-top:12px}
-.spotFigures>div:first-child b{display:block;font:400 30px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#fff}
-.spotFigures>div:first-child span{font-size:9px;color:#a5adbc}
-.spotRing{position:relative;display:grid;place-items:center;width:58px;height:58px}
-.spotRing svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
-.spotRing b{font:400 15px/1 'Anton','Archivo',sans-serif;color:#fff}
-.spotRing span{position:absolute;bottom:-12px;font-size:7.5px;color:#8b93a5;white-space:nowrap}
+/* ── spotlight: a cinematic header ──
+   the title's art blurred behind, poster and name side by side, and the week
+   in three equal columns underneath (watched · finish · rating). */
+.room .spotlight{position:relative;isolation:isolate;display:grid;grid-template-columns:88px minmax(0,1fr);grid-template-areas:'art body' 'stats stats';
+  align-items:center;gap:13px 14px;width:100%;margin-top:14px;padding:14px;border-radius:18px;overflow:hidden;text-align:left;
+  background:#0b0d13;border:1px solid rgba(255,255,255,.09)}
+.spotBackdrop{position:absolute;inset:-28px;z-index:-2;opacity:.6;filter:blur(24px) saturate(1.3);pointer-events:none}
+.spotBackdrop>*{width:100%;height:100%;border-radius:0}
+.room .spotlight::after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(100deg,rgba(9,11,16,.25) 0%,rgba(9,11,16,.84) 48%,rgba(9,11,16,.93) 100%)}
+.spotArt{grid-area:art;width:88px}
+.spotArt>*{box-shadow:0 0 0 2px color-mix(in srgb,var(--fmt) 72%,transparent),0 16px 28px -12px rgba(0,0,0,.95)}
+.spotBody{grid-area:body;display:flex;flex-direction:column;gap:7px;min-width:0}
+.room .spotEyebrow{display:inline-flex;align-items:center;gap:6px;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#ffb35c}
+.spotEyebrow i{width:6px;height:6px;border-radius:50%;background:#ff7a3d;box-shadow:0 0 8px #ff7a3d}
+.room .spotTitle{font:900 19px/1.08 'Inter',system-ui,sans-serif;letter-spacing:-.02em;color:#fff;text-wrap:balance;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.spotTags{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.room .spotTags small{font:600 9.5px/1.2 'Inter',system-ui,sans-serif;color:#a5adbc}
+.spotStats{grid-area:stats;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+.spotStats>span{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.spotStats>span+span::before{content:'';position:absolute;left:0;top:2px;bottom:2px;width:1px;background:rgba(255,255,255,.08)}
+.room .spotStats b{display:inline-flex;align-items:center;gap:4px;font:400 22px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#fff}
+.room .spotStats small{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#7d8698}
+.spotBar{display:block;width:56%;height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
+.spotBar em{display:block;height:100%;border-radius:2px;background:var(--cc)}
+.room .spotRated b{color:#f5c518}
+.spotRated svg{width:15px;height:15px;fill:currentColor;stroke:none}
+.room .spotNote{grid-area:stats;font:500 9.5px/1.4 'Inter',system-ui,sans-serif;color:#8b93a5}
 .ringTrack{fill:none;stroke:rgba(255,255,255,.1);stroke-width:3.2}
 .ringFill{fill:none;stroke:var(--cc);stroke-width:3.2;stroke-linecap:round}
-.spotNote{margin-top:auto;padding-top:10px;font-size:9.5px;color:#8b93a5}
 
-/* ── the poster rail ── */
-.rail{display:grid;grid-auto-flow:column;grid-auto-columns:92px;gap:10px;margin:0 -14px;padding:2px 14px 10px;overflow-x:auto;scroll-snap-type:x proximity;scroll-padding-inline:14px;scrollbar-width:none}
+/* ── where a title comes from: tinted badges in the mix legend's colours ── */
+.room .src{display:inline-flex;align-items:center;padding:2px 6px;border-radius:5px;font:800 7.5px/1.25 'Archivo','Inter',sans-serif;
+  letter-spacing:.1em;text-transform:uppercase;font-style:normal;white-space:nowrap}
+.srcORIGINAL{background:rgba(245,181,68,.14);color:#ffcf7a;box-shadow:inset 0 0 0 1px rgba(245,181,68,.42)}
+.srcLICENSED{background:rgba(34,211,238,.1);color:#86e6f7;box-shadow:inset 0 0 0 1px rgba(34,211,238,.34)}
+.srcOWNED{background:rgba(167,139,250,.13);color:#cbbcff;box-shadow:inset 0 0 0 1px rgba(167,139,250,.42)}
+.room .metaLine{display:flex;align-items:center;flex-wrap:wrap;gap:3px 6px}
+
+/* ── film and series, as the studio slate marks them ── */
+.film{--fmt:#3b82f6;--fmtText:#93c5fd}
+.series{--fmt:#ef4444;--fmtText:#fca5a5}
+
+/* ── on your service: poster cards like the studio slate ──
+   rank on a ribbon top-left, views top-right, then rating, name and format
+   along the bottom; a blue (film) or red (series) frame. The rail scrolls by
+   touch and trackpad natively and by mouse drag (ContentPanels' useDragScroll). */
+.rail{display:flex;gap:10px;margin:0 -14px;padding:2px 14px 10px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-inline:14px;scrollbar-width:none;touch-action:pan-x pan-y}
 .rail::-webkit-scrollbar{display:none}
-.room .railItem{display:flex;flex-direction:column;gap:5px;min-width:0;text-align:left;scroll-snap-align:start}
-.railItem b{margin-top:3px;font:800 10px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.railItem small{font-size:8.5px;color:#7d8698}
+.rail[data-dragging]{scroll-snap-type:none;cursor:grabbing}
+.rail[data-dragging] .card{pointer-events:none}
+@media (hover:hover) and (pointer:fine){.rail{cursor:grab}}
+.room .card{position:relative;flex:0 0 128px;height:192px;border-radius:12px;overflow:hidden;scroll-snap-align:start;text-align:left;
+  background:#0c0f15;border:2px solid color-mix(in srgb,var(--fmt) 62%,transparent);box-shadow:0 12px 22px -14px color-mix(in srgb,var(--fmt) 75%,#000)}
+.room .card:active{transform:scale(.98)}
+.cardArt{position:absolute;inset:0}
+.cardArt>*{width:100%;height:100%;border-radius:0}
+.cardShade{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(to top,rgba(4,5,8,.97) 0%,rgba(4,5,8,.72) 36%,transparent 64%),linear-gradient(to bottom,rgba(4,5,8,.42),transparent 26%)}
+/* the rank: a ribbon hanging from the top edge, in the format's colour */
+.cardRank{position:absolute;top:-2px;left:9px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.55))}
+.cardRank>span{display:flex;flex-direction:column;align-items:center;gap:2px;width:28px;padding:7px 0 11px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--fmt) 78%,#fff 22%),color-mix(in srgb,var(--fmt) 84%,#000 16%));
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 84%,0 100%)}
+.room .cardRank small{font:900 5.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.16em;color:rgba(255,255,255,.82)}
+.room .cardRank b{font:400 18px/1 'Anton','Archivo',sans-serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+/* top-right: views over the rating in one small frosted tile opposite the
+   ribbon, ending level with it: the icons in a column, the figures right-aligned */
+.cardStats{position:absolute;top:7px;right:7px;display:flex;flex-direction:column;gap:4px;padding:5px 7px;border-radius:8px;
+  background:rgba(6,8,12,.52);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.room .cardStats>span{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.cardStats i{display:flex}
+.cardStats svg{width:10px;height:10px}
+.cardViews svg{color:var(--fmtText);stroke-width:2.4}
+.cardRating svg{color:#f5c518;fill:currentColor;stroke:none}
+.room .cardStats b{font:800 10px/1 'Inter',system-ui,sans-serif;letter-spacing:-.01em;color:#fff;font-variant-numeric:tabular-nums}
+/* along the bottom: the whole name, then format · genre */
+.cardFoot{position:absolute;left:9px;right:9px;bottom:9px;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.room .cardFoot b{width:100%;font-weight:800;line-height:1.12;font-family:'Inter',system-ui,sans-serif;letter-spacing:-.01em;color:#fff;text-wrap:balance;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;text-shadow:0 1px 6px rgba(0,0,0,.75)}
+.room .nameL{font-size:14.5px}
+.room .nameM{font-size:12.5px}
+.room .nameS{font-size:11.5px}
+.room .nameXs{font-size:10.5px}
+.room .cardFoot small{max-width:100%;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--fmtText);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.room .cardFoot small.tagTight{font-size:7px;letter-spacing:.06em}
 
-/* ── catalogue mix ── */
-.mix{display:flex;flex-direction:column;gap:11px;padding:12px;border-radius:16px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
-.mixRow{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:6px 10px}
+/* ── catalogue mix: every segment's colour is named underneath ── */
+.mix{display:flex;flex-direction:column;gap:13px;padding:12px;border-radius:16px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.mixRow{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:7px 10px}
 .mixRow>span{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7d8698}
-.mixRow>small{grid-column:2;font-size:9px;color:#8b93a5}
-.mixRow>small b{color:#eef0f5;font-weight:800}
 .mixBar{display:flex;gap:2px;height:9px;border-radius:5px;overflow:hidden;background:#080a0f}
 .mixBar em{display:block;min-width:4px;flex-basis:0}
-.t1{background:var(--cc)}
-.t2{background:color-mix(in srgb,var(--cc) 62%,#1b212b)}
-.t3{background:color-mix(in srgb,var(--cc) 38%,#1b212b)}
-.t4{background:color-mix(in srgb,var(--cc) 22%,#1b212b)}
-.t5{background:#2a313d}
+.legend{grid-column:2;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:9px;color:#8b93a5}
+.legend>span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.legend>span>i{width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+.legend b{color:#eef0f5;font-weight:800}
+.cFilm{background:#3b82f6}
+.cSeries{background:#ef4444}
+.cOriginal{background:#f5b544}
+.cLicensed{background:#22d3ee}
+.cOwned{background:#a78bfa}
+.g1{background:#34d399}
+.g2{background:#f472b6}
+.g3{background:#a3e635}
+.g4{background:#fb923c}
+.gOther{background:#3a4150}
+
+/* ── the library list: a film/series frame on the thumbnail, and load more ── */
+.thumb .art>*{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--fmt) 70%,transparent),0 8px 16px -10px rgba(0,0,0,.9)}
+.room .more{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:6px;padding:11px 12px;border-radius:13px;
+  background:#0c0f15;border:1px dashed rgba(255,255,255,.16);font:800 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#dfe3ea}
+.room .more small{font:600 9px/1 'Inter',system-ui,sans-serif;letter-spacing:0;text-transform:none;color:#7d8698}
+.room .more:active{background:rgba(255,255,255,.05)}
+.listCount{display:block;margin:2px 2px 6px;font-size:9px;color:#7d8698}
 
 /* ── a quiet alert that leads to Rights ── */
 .room .alert{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:11px 12px;border-radius:13px;text-align:left;
@@ -70,44 +148,188 @@
 .room .renewalArt{width:52px;align-self:start}
 .renewalBody{display:flex;flex-direction:column;gap:5px;min-width:0}
 .renewalTop{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.renewalTop b{font:800 13px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.renewalTop b{min-width:0;font:800 13px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;text-wrap:balance}
 .renewalTop em{flex:0 0 auto;font:400 15px/1 'Anton','Archivo',sans-serif;font-style:normal;color:#f5c46a}
 .renewalHot .renewalTop em{color:#ff8b8f}
 .renewalBody>small{font-size:9px;color:#7d8698}
+/* #168: a renewal your team decided */
+.decidedBy{align-self:flex-start;padding:2px 7px;border-radius:99px;font:800 8.5px/1.4 'Inter',system-ui,sans-serif;letter-spacing:.04em;
+  color:#efd39a;background:rgba(214,172,92,.12);border:1px solid rgba(214,172,92,.45)}
 .renewalBody>p{font-size:10px;line-height:1.45;color:#c2c8d3}
 .drain{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
 .drain em{display:block;height:100%;border-radius:3px;background:#f5b544}
 .renewalHot .drain em{background:#ff5a5f}
 .renewalActions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:3px}
-.room .primary{padding:10px 12px;border-radius:11px;background:var(--cc);font:900 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--epx-brand-ink,#fff)}
-.room .secondary{padding:9px 11px;border-radius:11px;border:1px solid rgba(255,255,255,.14);font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#c9cfda}
+/* renew: white on a brand-colour gradient (the brand ink was black on blue), the
+   price set apart in its own darker chip */
+.room .renew{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 4px 4px 10px;border-radius:11px;color:#fff;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--cc) 84%,#fff 16%),color-mix(in srgb,var(--cc) 78%,#000 22%));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 8px 18px -10px color-mix(in srgb,var(--cc) 90%,transparent);
+  font:900 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.28)}
+.renew svg{width:11px;height:11px;stroke-width:2.6}
+.room .renew .price{margin-left:2px;padding:6px 8px;border-radius:8px;background:rgba(5,7,11,.3);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);
+  font:400 12.5px/1 'Anton','Archivo',sans-serif;letter-spacing:.03em;text-transform:none}
+.room .renew:active{transform:scale(.97)}
+.room .secondary{display:inline-flex;align-items:center;min-height:32px;padding:0 12px;border-radius:11px;border:1px solid rgba(255,255,255,.14);font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#c9cfda}
 .room .link{padding:9px 4px;font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.08em;color:#8b93a5}
 .feedback{margin-top:12px;padding:10px 12px;border-radius:12px;font-size:10.5px;line-height:1.45}
 .feedback.good{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);color:#a7f3c0}
 .feedback.bad{background:rgba(255,90,95,.08);border:1px solid rgba(255,90,95,.32);color:#ffb3b6}
 
-/* ── the rights runway ── */
-.runway{position:relative;padding:22px 12px 10px;border-radius:16px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
-.runwayTicks{position:absolute;top:8px;left:calc(12px + 88px + 8px);right:calc(12px + 34px);height:10px}
+/* ── the rights runway ──
+   each licence as its whole name and weeks left over a bar on the shared year
+   scale; the first eight show, Load more adds ten */
+.runway{position:relative;padding:24px 12px 8px;border-radius:16px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.runwayTicks{position:absolute;top:9px;left:12px;right:12px;height:10px}
 .runwayTicks span{position:absolute;transform:translateX(-50%);font:800 6.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;color:#5f6875;white-space:nowrap}
 .runwayTicks span:first-child{transform:none}
 .runwayTicks span:last-child{transform:translateX(-100%)}
-.room .runwayRow{display:grid;grid-template-columns:88px minmax(0,1fr) 34px;align-items:center;gap:8px;width:100%;padding:6px 0;text-align:left;border-top:1px solid rgba(255,255,255,.05)}
+.room .runwayRow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'name left' 'track track';align-items:baseline;gap:6px 10px;width:100%;padding:8px 0;text-align:left;border-top:1px solid rgba(255,255,255,.05)}
 .room .runwayRow:first-of-type{border-top:none}
-.runwayName{font:700 10px/1.2 'Inter',system-ui,sans-serif;color:#dfe3ea;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.runwayTrack{display:block;height:8px;border-radius:4px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 1px,transparent 1px 25%),#080a0f;overflow:hidden}
+.runwayName{grid-area:name;min-width:0;font:700 10.5px/1.25 'Inter',system-ui,sans-serif;color:#dfe3ea;text-wrap:balance}
+.runwayTrack{grid-area:track;display:block;height:6px;border-radius:3px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 1px,transparent 1px 25%),#080a0f;overflow:hidden}
 .runwayTrack em{display:block;height:100%;border-radius:4px}
 .runwayTrack em.hot{background:#ff5a5f}
 .runwayTrack em.warm{background:#f5b544}
 .runwayTrack em.calm{background:color-mix(in srgb,var(--cc) 70%,#1b212b)}
 .runwayTrack em.beyond{border-radius:4px 0 0 4px;-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}
-.room .runwayRow small{font:400 12px/1 'Anton','Archivo',sans-serif;color:#a5adbc;text-align:right}
+.room .runwayRow small{grid-area:left;font:400 12px/1 'Anton','Archivo',sans-serif;color:#a5adbc;text-align:right}
+.room .runwayRow small.hot{color:#ff8b8f}
+.room .runwayRow small.warm{color:#f5c46a}
+.room .runwayMore{margin-top:4px}
 
 /* ── kept for good ── */
 .kept{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.room .keptItem{display:flex;flex-direction:column;gap:5px;min-width:0;text-align:left}
-.keptItem b{margin-top:3px;font:800 10px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.keptItem small{font:800 6.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;color:color-mix(in srgb,var(--cc) 65%,#fff)}
+/* its cards: the rail's poster card at grid width, a badge in the foot saying
+   why the title stays (no rank: the grid is not ordered by viewers) */
+.room .card.cardCompact{flex:none;width:100%;height:auto;aspect-ratio:2/3;border-radius:10px}
+.room .cardCompact .cardFoot{left:7px;right:7px;bottom:7px;gap:4px}
+.room .cardCompact .nameL{font-size:12px}
+.room .cardCompact .nameM{font-size:11px}
+.room .cardCompact .nameS{font-size:10px}
+.room .cardCompact .nameXs{font-size:9.5px}
+.room .cardCompact .cardFoot small{font-size:6.5px;letter-spacing:.1em}
+.room .cardCompact .cardFoot small.tagTight{font-size:6px;letter-spacing:.04em}
+.room .cardCompact .cardStats{top:6px;right:6px;gap:3px;padding:4px 6px}
+.room .cardCompact .cardStats b{font-size:9px}
+.room .cardCompact .cardStats svg{width:9px;height:9px}
+.room .keptNote{margin:-4px 0 12px;font:500 10px/1.45 'Inter',system-ui,sans-serif;color:#8b93a5}
+/* folded: one row with a stack of posters, a "+N" tile and the count per kind */
+.room .keptStack{display:flex;align-items:center;gap:16px;width:100%;padding:12px 14px;border-radius:16px;text-align:left;
+  background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
+.room .keptStack:active{transform:scale(.99)}
+.keptFan{display:flex;flex:0 0 auto;padding-left:18px}
+.keptFan>span{position:relative;width:44px;margin-left:-18px;border-radius:6px;overflow:hidden;
+  box-shadow:0 0 0 2px #0c0f15,0 8px 14px -8px rgba(0,0,0,.9)}
+.keptFan>span>*{border-radius:6px}
+.keptMore{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;aspect-ratio:2/3;
+  background:linear-gradient(180deg,#1b2131,#10141d)}
+.room .keptMore b{font:400 15px/1 'Anton','Archivo',sans-serif;letter-spacing:.02em;color:#fff}
+.room .keptMore small{font:800 6px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8b93a5}
+.keptSum{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0}
+.keptKinds{display:flex;flex-wrap:wrap;gap:5px}
+.room .keptKinds em{gap:4px}
+.room .keptKinds b{font-weight:900}
+.room .keptSum>small{font:800 8px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb,var(--cc) 70%,#fff)}
+/* open: the grid, then Load more and Show less */
+.keptFoot{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:8px}
+
+/* ── the slate planner, once live ──
+   the release weeks as a list by game year; a run of empty weeks is one line;
+   a row opens in place with campaign chips, ✕ and the shelf as posters */
+.plan{display:flex;flex-direction:column;gap:14px}
+.planReady{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(245,181,68,.08),#0c0f15 70%);border:1px solid rgba(245,181,68,.28)}
+.planReadyText{display:flex;flex-direction:column;align-items:flex-start;gap:9px;min-width:0}
+.room .planReady p{font:500 10.5px/1.45 'Inter',system-ui,sans-serif;color:#c2c8d3}
+.room .planReady p b{font-weight:800;color:#ffcf7a}
+.room .autoBtn{padding:8px 13px;border-radius:10px;color:#fff;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--cc) 84%,#fff 16%),color-mix(in srgb,var(--cc) 78%,#000 22%));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 8px 18px -10px color-mix(in srgb,var(--cc) 90%,transparent);
+  font:900 8.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.28)}
+.planTools{display:flex;flex-wrap:wrap;gap:8px}
+.room .clearBtn{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,90,95,.4);background:rgba(255,90,95,.06);
+  font:900 8.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#ff8b8f}
+/* Auto-fill's two ways when premieres are already planned */
+.room .autoChoice{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:11px 12px;border-radius:12px;text-align:left;
+  background:#080a0f;border:1px solid color-mix(in srgb,var(--cc) 40%,rgba(255,255,255,.1))}
+.room .autoChoice b{font:800 11.5px/1.2 'Inter',system-ui,sans-serif;color:#fff}
+.room .autoChoice small{font:500 9px/1.4 'Inter',system-ui,sans-serif;color:#8b93a5}
+.room .autoChoice:disabled{opacity:.45}
+.autoPlan.clearPlan{border-color:rgba(255,90,95,.45)}
+.room .clearGo{padding:11px 12px;border-radius:11px;color:#fff;background:linear-gradient(180deg,#f0565b,#c93338);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 18px -10px rgba(240,86,91,.8);
+  font:900 9px/1.3 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.28)}
+.autoPlan{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:14px;background:#0c0f15;
+  border:1px solid color-mix(in srgb,var(--cc) 45%,rgba(255,255,255,.08))}
+.autoPlan>header{display:flex;flex-direction:column;gap:4px;padding-bottom:4px}
+.room .autoPlan>header b{font:900 12px/1.2 'Inter',system-ui,sans-serif;color:#fff}
+.room .autoPlan>header small{font:500 9px/1.45 'Inter',system-ui,sans-serif;color:#8b93a5}
+.autoRow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}
+.room .autoRow span{font:700 10.5px/1.3 'Inter',system-ui,sans-serif;color:#eef0f5}
+.room .autoRow em{flex:0 0 auto;font:800 8px/1.3 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;font-style:normal;color:color-mix(in srgb,var(--cc) 70%,#fff)}
+.autoActions{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding-top:6px}
+.planYear{display:flex;flex-direction:column;gap:6px}
+.planYear>header{display:flex;align-items:baseline;justify-content:space-between;padding:0 2px 2px}
+.room .planYear>header b{font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#eef0f5}
+.room .planYear>header small{font-size:9px;color:#7d8698}
+/* a week (or a folded run of empty weeks) */
+.slRows{display:flex;flex-direction:column;gap:6px}
+.sl{border-radius:14px;background:#0c0f15;border:1px solid rgba(255,255,255,.07);overflow:hidden}
+.sl.slRun{background:transparent;border-style:dashed;border-color:rgba(255,255,255,.1)}
+.sl.slNow{border-color:color-mix(in srgb,var(--cc) 45%,transparent)}
+.sl.slOpen{background:#0c0f15;border-style:solid;border-color:color-mix(in srgb,var(--cc) 55%,rgba(255,255,255,.1))}
+.room .slHead{display:grid;grid-template-columns:50px minmax(0,1fr) 16px;align-items:center;gap:10px;width:100%;padding:10px 12px;text-align:left}
+.slWhen{display:flex;flex-direction:column;gap:4px}
+.room .slWhen b{font:400 16px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#eef0f5}
+.room .slWhen small{font:800 6.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#6f7686}
+.room .sl.slNow .slWhen small,.room .sl.slOpen .slWhen small{color:color-mix(in srgb,var(--cc) 70%,#fff)}
+.room .sl.slRun:not(.slOpen) .slWhen b{color:#6f7686}
+.slList{display:flex;flex-direction:column;gap:7px;min-width:0}
+.slItem{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:center;gap:8px;min-width:0}
+.slArt{width:22px;border-radius:3px;overflow:hidden;box-shadow:0 0 0 1.5px color-mix(in srgb,var(--fmt) 70%,transparent)}
+.slText{display:flex;flex-direction:column;gap:3px;min-width:0}
+.room .slText b{font:800 11px/1.25 'Inter',system-ui,sans-serif;color:#eef0f5;text-wrap:balance}
+.room .slText small{display:flex;align-items:center;gap:5px;font:600 8.5px/1 'Inter',system-ui,sans-serif;color:#8b93a5}
+.room .slEmpty{font:600 10px/1.3 'Inter',system-ui,sans-serif;color:#6f7686}
+.room .slChevron{font:500 16px/1 'Inter',system-ui,sans-serif;font-style:normal;color:#6f7686;text-align:center}
+/* the open row */
+.slBody{display:flex;flex-direction:column;gap:10px;padding:0 12px 12px}
+.slLine{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:start;gap:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+.room .slLineArt{width:36px;border-radius:5px;overflow:hidden;box-shadow:0 0 0 2px color-mix(in srgb,var(--fmt) 70%,transparent)}
+.slInfo{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.room .slInfo>b{font:800 12px/1.25 'Inter',system-ui,sans-serif;color:#eef0f5;text-wrap:balance}
+.room .slInfo .metaLine{font-size:9px;color:#8b93a5}
+.room .slRemove{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,90,95,.35);background:rgba(255,90,95,.06);
+  font:800 11px/1 'Inter',system-ui,sans-serif;color:#ff8b8f}
+.room .wkEmpty{font:500 10px/1.45 'Inter',system-ui,sans-serif;color:#7d8698}
+.room .wkRisk{font:700 9px/1.3 'Inter',system-ui,sans-serif;color:#ff8b8f}
+.room .wkNote{font:500 9px/1.4 'Inter',system-ui,sans-serif;color:#7d8698}
+.room .wkMsg{padding:8px 10px;border-radius:10px;font:600 10px/1.45 'Inter',system-ui,sans-serif}
+.room .wkMsg.good{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.3);color:#a7f3c0}
+.room .wkMsg.bad{background:rgba(255,90,95,.08);border:1px solid rgba(255,90,95,.32);color:#ffb3b6}
+/* the shelf as posters: one tap premieres the title in the open week */
+.slReady{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06)}
+.room .slReady>small{font:800 7.5px/1.3 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8b93a5}
+.slRail{display:flex;gap:9px;margin:0 -12px;padding:0 12px 2px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;touch-action:pan-x pan-y}
+.slRail::-webkit-scrollbar{display:none}
+.slRail[data-dragging] .slPick{pointer-events:none}
+.room .slPick{flex:0 0 66px;display:flex;flex-direction:column;gap:5px;text-align:left}
+.slPickArt{width:66px;border-radius:7px;overflow:hidden;box-shadow:0 0 0 2px color-mix(in srgb,var(--fmt) 70%,transparent)}
+.room .slPick b{font:800 9px/1.2 'Inter',system-ui,sans-serif;color:#eef0f5;text-wrap:balance}
+.room .slPick small{font:600 7.5px/1.2 'Inter',system-ui,sans-serif;color:#8b93a5}
+.room .slPick:disabled{opacity:.38}
+.room .slPick:active:not(:disabled) .slPickArt{transform:scale(.95)}
+/* a folded run, opened: its weeks to pick from */
+.slChips{display:flex;gap:6px;margin:0 0 -2px;padding:0 12px;overflow-x:auto;scrollbar-width:none}
+.slChips::-webkit-scrollbar{display:none}
+.room .slChip{flex:0 0 auto;padding:7px 10px;border-radius:9px;background:#080a0f;border:1px solid rgba(255,255,255,.1);
+  font:400 13px/1 'Anton','Archivo',sans-serif;letter-spacing:.02em;color:#8b93a5}
+.room .slChip.slChipOn{border-color:var(--cc);color:#fff;background:color-mix(in srgb,var(--cc) 18%,#080a0f)}
+.room .go{padding:11px 12px;border-radius:11px;color:#fff;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--cc) 84%,#fff 16%),color-mix(in srgb,var(--cc) 78%,#000 22%));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 8px 18px -10px color-mix(in srgb,var(--cc) 90%,transparent);
+  font:900 9px/1.3 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;text-shadow:0 1px 1px rgba(0,0,0,.28)}
 
 /* ── the slate ── */
 .slate{display:flex;flex-direction:column;gap:6px}

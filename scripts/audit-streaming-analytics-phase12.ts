@@ -231,7 +231,8 @@ assert(!serviceSource.includes('Math.random'), 'Analytics, cohort allocation and
     'Unknown is not zero',
 ].forEach(fragment => assert(componentSource.includes(fragment), `Phase 12 experience should include ${fragment}.`));
 assert(graphSource.includes('StreamingLineGraph') && graphSource.includes('StreamingWaterfallGraph') && graphSource.includes('StreamingMarketRing'), 'Phase 12 should provide one shared accessible graph system.');
-assert(hqSource.includes('<StreamingAnalyticsCenter') && hqSource.includes('Enter Analytics Center'), 'Live Platform HQ should expose the complete Analytics Center.');
+/* #176: the weekly brief (and its "Enter Analytics Center" card) is gone; the rooms' ANALYTICS chips open it */
+assert(hqSource.includes('<StreamingAnalyticsCenter') && hqSource.includes('setShowAnalyticsCenter(true)'), 'Live Platform HQ should expose the complete Analytics Center.');
 assert(styleSource.includes('@media (min-width: 620px)') && styleSource.includes('@media (min-width: 1024px)'), 'Analytics should deliberately scale across tablet and desktop layouts.');
 assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'Analytics motion should respect reduced-motion preferences.');
 

@@ -56,7 +56,6 @@ const milestoneCopy: Partial<Record<OwnedStreamingLedgerEntry['type'], { title: 
     ORIGINAL_GREENLIT: { title: 'The first Original', caption: 'The company stopped being only a distributor and backed its own creative identity.' },
     LAUNCH_COMMITTED: { title: 'Premiere night', caption: 'The public stream went live and the first audience arrived.' },
     MILESTONE_REACHED: { title: 'A number becomes history', caption: 'A real operating milestone entered the permanent company record.' },
-    STREAMING_AWARDS_RESOLVED: { title: 'The industry notices', caption: 'The platform stepped onto the awards stage.' },
     REGIONAL_LAUNCH_COMPLETED: { title: 'A new region lights up', caption: 'The signal crossed another border.' },
     STREAMING_PLATFORM_ACQUIRED: { title: 'The empire expands', caption: 'A rival platform became part of the company’s future.' },
     IPO_LISTED: { title: 'The bell rings', caption: 'The private platform entered public markets.' },
@@ -481,25 +480,15 @@ export const createStreamingLegacyMontage = (
     };
 };
 
-export const getStreamingEraWeeklyEffects = (platform: OwnedStreamingPlatformState) => {
-    const mandate = platform.legacy.currentMandate;
-    return {
-        mandate,
-        acquisitionRateDelta: mandate === 'AUDIENCE_GROWTH' ? 0.003
-            : mandate === 'GLOBAL_EXPANSION' && platform.competitiveWorld.regionalLaunches.filter(item => item.status === 'ACTIVE').length > 1 ? 0.0025
-                : 0,
-        churnRateDelta: mandate === 'TRUST_AND_RESILIENCE' ? -0.0012
-            : mandate === 'TECHNOLOGY_LEADERSHIP' ? -0.0007
-                : mandate === 'CASH_DISCIPLINE' ? -0.0004
-                    : mandate === 'AUDIENCE_GROWTH' ? 0.0005
-                        : mandate === 'BALANCED' ? -0.0002 : 0,
-        engagementRateDelta: mandate === 'ORIGINALS_PRESTIGE' && platform.originalCommissions.some(item => item.status === 'RELEASED') ? 0.008
-            : mandate === 'BALANCED' ? 0.0015 : 0,
-        playbackBoost: mandate === 'TECHNOLOGY_LEADERSHIP' ? 0.18
-            : mandate === 'TRUST_AND_RESILIENCE' ? 0.08
-                : mandate === 'BALANCED' ? 0.03 : 0,
-    };
-};
+/** #166 (plan §21.12): eras and their mandates no longer move the weekly model; small passive percentages went
+    against the rule "actions, not passive %". The mandate is still recorded with a succession. */
+export const getStreamingEraWeeklyEffects = (platform: OwnedStreamingPlatformState) => ({
+    mandate: platform.legacy.currentMandate,
+    acquisitionRateDelta: 0,
+    churnRateDelta: 0,
+    engagementRateDelta: 0,
+    playbackBoost: 0,
+});
 
 const rebaseAbsoluteWeeks = (value: unknown, offset: number, key = ''): unknown => {
     if (Array.isArray(value)) return value.map(item => rebaseAbsoluteWeeks(item, offset));

@@ -12,7 +12,10 @@ const fixturePath='scripts/fixtures/issued-builtin-identities.json';
 // Issued fixtures were captured from the pre-alias source and are intentionally frozen.
 {
  const issued=JSON.parse(readFileSync(fixturePath,'utf8'));
- assert.deepEqual(NPC_DATABASE.map(n=>n.id),issued.npcs.map((n:any)=>n.id),'Default aliasing must neither add duplicate people nor remove/reorder existing identities');
+ const issuedIds=new Set(issued.npcs.map((n:any)=>n.id));const currentIds=NPC_DATABASE.map(n=>n.id);
+ assert.equal(new Set(currentIds).size,currentIds.length,'Default aliasing must not add duplicate people');
+ // #178 adds new fictional industry people; every issued identity stays, in its order.
+ assert.deepEqual(currentIds.filter(id=>issuedIds.has(id)),issued.npcs.map((n:any)=>n.id),'Default aliasing must neither remove nor reorder existing identities');
  assert.deepEqual(DEFAULT_GLOBAL_CREATOR_PROFILES.map(n=>n.id),issued.creators.map((n:any)=>n.id));
  const tom=issued.npcs.find((n:any)=>n.name==='Tom Holland');assert.ok(tom);
  assert.equal(NPC_DATABASE.find(n=>n.id===tom.id)?.name,'Tommy Holland','Default Tom Holland should receive the approved subtle alias');

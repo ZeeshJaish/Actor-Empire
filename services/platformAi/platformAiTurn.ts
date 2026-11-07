@@ -38,6 +38,7 @@ import { choosePlatformAiPremiere } from './platformAiReleaseReadiness';
 import { processPlatformAiRightsResaleWeek } from './platformAiRightsResale';
 import { executePlatformIntelligenceProposals } from './platformIntelligenceExecution';
 import { preparePlatformAiLaunchMarketingWeek } from './platformAiLaunchMarketing';
+import { preparePlatformAiCampaignsWeek } from './platformAiCampaigns';
 
 const PLATFORM_TURN_ORDER: PlatformId[] = ['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU', 'YOUTUBE'];
 const MAX_PREMIERE_SEARCH_WEEKS = 52;
@@ -526,6 +527,15 @@ export const processPlatformAiWorldTurn = (
             absoluteWeek,
         });
         nextWorld = updatePlatform(nextWorld, platformId, marketing.platform);
+        // #152: its campaigns run through the campaign engine once its launch marketing has taken its share of the
+        // week's cash; their spend joins the same discretionary-cost line.
+        const campaigns = preparePlatformAiCampaignsWeek({
+            player: { ...player, world: nextWorld },
+            platform: nextWorld.platforms![platformId],
+            absoluteWeek,
+            alreadySpentMillions: marketing.discretionaryCostMillions,
+        });
+        nextWorld = updatePlatform(nextWorld, platformId, campaigns.platform);
 
         const economyPlayer = { ...player, world: nextWorld };
         markCurrentPlatformCanonical(nextWorld, platformId, player.id, absoluteWeek);
@@ -533,7 +543,7 @@ export const processPlatformAiWorldTurn = (
             player: economyPlayer,
             platform: nextWorld.platforms![platformId],
             absoluteWeek,
-            discretionaryCostMillions: marketing.discretionaryCostMillions,
+            discretionaryCostMillions: Math.round((marketing.discretionaryCostMillions + campaigns.discretionaryCostMillions) * 1_000_000) / 1_000_000,
         });
         nextWorld = updatePlatform(nextWorld, platformId, economy.platform);
         if(economy.changed && economy.platform.ai?.royaltyAccruals){

@@ -5,15 +5,20 @@
    launch (or scattered over the launch wizard and the Audience room) lives
    here, in the Platform room:
 
-     WAYS TO EARN     subscription, free with ads, rent or buy: lit when on,
-                      the main one crowned, each with what it earned
-     PLANS            each plan as a price card, with a bar of who is on which
-     AD BREAKS/STORE  the ad cadence and the store's two prices
+     WAYS TO EARN     the money engine (#104): the main way crowned, each with
+                      what it earned
+     PLANS            the plan builder (PlanBuilder.tsx): plans side by side, a
+                      bar of who is on which; while editing, every cell is a tap
+     BREAKS, STORE    #108: the Pricing step's controls (OfferControls, #107):
+     AND DEALS        ad breaks, store prices and who can buy, Pay yearly and
+                      First three months, passes, early access
      CHANGE PRICING   a staged editor: nothing saves until "Apply from next
-                      week"; a receipt of every change; an on-demand forecast
-     ACCOUNT SHARING  the policy card (moved here from the Audience room)
-     STOREFRONT       the home-screen layouts, drawn as small wireframes
-     IDENT            the playback ident, as set at launch
+                      week"; a receipt of every change; an on-demand forecast;
+                      a pinned bar with the count and the last change
+     ACCOUNT SHARING  the policy card (moved here from the Audience room), its
+                      posture a dial, enforcement levels, its figures gauges
+     BRAND STUDIO     #116: the front page and the ident moved to the brand
+                      studio (the HQ logo); one line here opens it
 
    Presentation only: the HQ hands in the data and the canonical actions.
    ========================================================================== */
@@ -23,19 +28,21 @@ import css from './presentation/screens/NetworkDesk/PlatformOffer.module.css';
 import { cx } from './presentation/cx';
 import { compact } from './audienceAtlasModel';
 import { SharingPolicyCard } from './SharingPolicyCard';
-import { PLAN_FEATURES } from '../studio-finance/finance/launch';
+import { PlanBuilder } from './PlanBuilder';
+import { MoneyEngine, type MoneyEngineSlot } from './MoneyEngine';
+import { OfferControls, type OfferControlId } from './OfferControls';
 import { configureStreamingPricingOffer, projectStreamingCommercialOffers } from '../../services/streamingCommercialOffers';
-import {
-  STREAMING_AD_INTERVAL_PRESETS,
-  adIntervalForMinutesPerHour,
-  adMinutesPerHourForInterval,
-  normalizeStreamingPricingConfiguration,
-} from '../../services/streamingPricingEconomy';
-import type { StreamingSharingPolicyFigures } from '../../services/streamingSharingPolicy';
+import { describeStreamingPlanChanges, getStreamingPlanBuilderView, type StreamingPlanBuilderView } from '../../services/streamingPlanBuilder';
+import { STREAMING_FREE_TIER_ID } from '../../services/streamingPlanOffer';
+import { STREAMING_STORE_ID, resolveStreamingStoreEditions } from '../../services/streamingStoreEditions';
+import { getStreamingTechDefinition } from '../../services/streamingTechTreeCatalogue';
+import { adIntervalForMinutesPerHour, normalizeStreamingPricingConfiguration } from '../../services/streamingPricingEconomy';
+import type { StreamingSharingControl, StreamingSharingPolicyFigures } from '../../services/streamingSharingPolicy';
 import type {
   OwnedStreamingPricingConfiguration,
   StreamingEnforcementInvestment,
   StreamingSharingPosture,
+  StreamingTechId,
   WorldStreamingCustomerAccessPolicy,
 } from '../../types';
 
@@ -44,13 +51,20 @@ export interface PlatformOfferData {
   pricing: OwnedStreamingPricingConfiguration;
   /** Paid accounts and monthly revenue per plan id, from the customer ledger. */
   planStats: Record<string, { accounts: number; monthlyRevenue: number }>;
+  /** Homes watching free with ads at the last settlement (#46); absent on older callers. */
+  freeAdViewers?: number;
+  /** Rentals and purchases at the last settlement (#47); absent on older callers. */
+  storeBuyers?: number;
   /** What each way of earning brought in, as monthly figures (last settled week). */
   earnings: { subscription: number; ads: number; store: number; settled: boolean };
   storefront: {
     currentId: string | null;
-    layouts: Array<{ id: string; name: string; line: string; composition: string; category: string; locked: string | null }>;
+    /** locked: the Tech step's name that unlocks it (#109), lockTech its id */
+    layouts: Array<{ id: string; name: string; line: string; composition: string; category: string; locked: string | null; lockTech?: StreamingTechId | null }>;
   };
   ident: { label: string; detail: string };
+  /** the plan builder's rows, locks and starters (Phase 2 #45) */
+  planBuilder?: StreamingPlanBuilderView;
 }
 
 export interface PricingForecastSummary {
@@ -70,12 +84,16 @@ export interface PlatformOfferActions {
   applyStorefront?: (layoutId: string) => { ok: boolean; message: string };
   /** Before launch the offer is set in Define the Launch. */
   editBeforeLaunch?: () => void;
+  /** #116: the front page and the ident live in the brand studio */
+  openBrandStudio?: () => void;
 }
 
 export interface PlatformSharingProps {
   policy: WorldStreamingCustomerAccessPolicy;
   settled: StreamingSharingPolicyFigures;
   settledPolicy?: Pick<WorldStreamingCustomerAccessPolicy, 'sharingPosture' | 'enforcementInvestment'>;
+  /** Sharing control in Tech (#56) */
+  control?: StreamingSharingControl;
   available: boolean;
   appliesNextWeek: boolean;
   onApply: (policy: { sharingPosture: StreamingSharingPosture; enforcementInvestment: StreamingEnforcementInvestment }) => void;
@@ -83,7 +101,6 @@ export interface PlatformSharingProps {
 
 const money = (value: number) => `$${compact(Math.max(0, Math.round(value)))}`;
 const price = (value: number) => (value <= 0 ? 'Free' : `$${value.toFixed(2)}`);
-const FEATURE_NAME = new Map(PLAN_FEATURES.map(feature => [feature.id, feature.name]));
 type Offer = 'SUBSCRIPTION' | 'ADS' | 'STORE';
 const OFFERS: Offer[] = ['SUBSCRIPTION', 'ADS', 'STORE'];
 const STREAM_OF: Record<Offer, 'subs' | 'ads' | 'rentals'> = { SUBSCRIPTION: 'subs', ADS: 'ads', STORE: 'rentals' };
@@ -96,7 +113,10 @@ const OFFER_WORDS: Record<Offer, { name: string; line: string }> = {
 /* plan colours: the brand accent, then quieter steps of it */
 const PLAN_TINTS = [100, 72, 50, 34, 24, 16];
 
-const isOn = (pricing: OwnedStreamingPricingConfiguration, offer: Offer) => pricing.streams.includes(STREAM_OF[offer]);
+/* #103 (plan §18.3): Free with ads is on when its free tier is open; ads on plans are the plans' own */
+const isOn = (pricing: OwnedStreamingPricingConfiguration, offer: Offer) => (offer === 'ADS'
+  ? Boolean(projectStreamingCommercialOffers(pricing).freeAdOffer)
+  : pricing.streams.includes(STREAM_OF[offer]));
 /* The main way of earning. Old saves carry no explicit choice ('LEGACY'), and
    read the way the build summary reads them: the first stream that is on. */
 const coreOf = (pricing: OwnedStreamingPricingConfiguration): Offer | null => {
@@ -112,8 +132,13 @@ const adBreakWords = (minutesPerHour: number) => {
 };
 
 /* Every difference between the saved offer and the draft, in words — the
-   receipt the player reads before applying. */
-const changesBetween = (saved: OwnedStreamingPricingConfiguration, draft: OwnedStreamingPricingConfiguration): string[] => {
+   receipt the player reads before applying. Plans read through the plan
+   builder: added, removed, renamed, and every changed cell. */
+export const changesBetween = (
+  saved: OwnedStreamingPricingConfiguration,
+  draft: OwnedStreamingPricingConfiguration,
+  builder: StreamingPlanBuilderView,
+): string[] => {
   const lines: string[] = [];
   const savedCore = coreOf(saved);
   const draftCore = coreOf(draft);
@@ -123,34 +148,57 @@ const changesBetween = (saved: OwnedStreamingPricingConfiguration, draft: OwnedS
     /* a new main offer was switched on to become it: one line says both */
     if (!isOn(saved, offer) && isOn(draft, offer) && !(offer === draftCore && savedCore !== draftCore)) lines.push(`${OFFER_WORDS[offer].name} on`);
   });
-  if (isOn(draft, 'SUBSCRIPTION')) {
-    draft.plans.forEach(plan => {
-      const before = saved.plans.find(row => row.id === plan.id);
-      if (!before) lines.push(`${plan.name} added at ${price(plan.monthly)}`);
-      else if (before.monthly !== plan.monthly) lines.push(`${plan.name} ${price(before.monthly)} → ${price(plan.monthly)}`);
-    });
-  }
+  if (isOn(draft, 'SUBSCRIPTION') || projectStreamingCommercialOffers(draft).freeAdOffer) lines.push(...describeStreamingPlanChanges(saved, draft, builder));
   if (isOn(draft, 'ADS') && isOn(saved, 'ADS') && saved.ads.minutesPerHour !== draft.ads.minutesPerHour) {
     lines.push(`Ad breaks: ${adBreakWords(saved.ads.minutesPerHour).toLowerCase()} → ${adBreakWords(draft.ads.minutesPerHour).toLowerCase()}`);
   }
   if (isOn(draft, 'STORE') && isOn(saved, 'STORE')) {
     if (saved.rentals.rent !== draft.rentals.rent) lines.push(`Rent ${price(saved.rentals.rent)} → ${price(draft.rentals.rent)}`);
     if (saved.rentals.buy !== draft.rentals.buy) lines.push(`Buy ${price(saved.rentals.buy)} → ${price(draft.rentals.buy)}`);
+    if (saved.rentals.windowWeeks !== draft.rentals.windowWeeks) lines.push(`Rental length ${saved.rentals.windowWeeks} → ${draft.rentals.windowWeeks} weeks`);
+    // the store's top edition (#47), named by its picture
+    const topName = (pricing: OwnedStreamingPricingConfiguration) => {
+      const picture = resolveStreamingStoreEditions(pricing, builder.tree).topPicture;
+      return picture ? getStreamingTechDefinition(picture)?.name || picture : null;
+    };
+    const was = saved.storeTopEdition;
+    const now = draft.storeTopEdition;
+    const name = topName(draft);
+    if (name && JSON.stringify(was) !== JSON.stringify(now)) {
+      lines.push(now ? `${name} edition: rent ${price(now.rent)}, buy ${price(now.buy)}` : `${name} edition at the HD prices`);
+    }
+  }
+  /* #108: what the Pricing step's controls change, now that the Offer tab has them (plan §18.3, 7) */
+  const was = projectStreamingCommercialOffers(saved);
+  const now = projectStreamingCommercialOffers(draft);
+  const off = (value: number) => (value > 0 ? `${value}% off` : 'off');
+  if (isOn(draft, 'SUBSCRIPTION')) {
+    if (saved.annualDiscount !== draft.annualDiscount) lines.push(`Pay yearly: ${off(saved.annualDiscount)} → ${off(draft.annualDiscount)}`);
+    const introPlan = (pricing: OwnedStreamingPricingConfiguration) => pricing.plans.find(plan => plan.id === pricing.introOfferPlanId)?.name || 'every plan';
+    if (saved.introOffer !== draft.introOffer || (draft.introOffer > 0 && introPlan(saved) !== introPlan(draft))) {
+      lines.push(`First three months: ${off(saved.introOffer)} → ${off(draft.introOffer)}${draft.introOffer > 0 ? ` on ${introPlan(draft)}` : ''}`);
+    }
+  }
+  const pass = (value: number | null) => (value === null ? 'off' : price(value));
+  if (was.adFreePasses.oneHourPrice !== now.adFreePasses.oneHourPrice) lines.push(`1 hour ad-free pass: ${pass(was.adFreePasses.oneHourPrice)} → ${pass(now.adFreePasses.oneHourPrice)}`);
+  if (was.adFreePasses.dayPrice !== now.adFreePasses.dayPrice) lines.push(`24 hours ad-free pass: ${pass(was.adFreePasses.dayPrice)} → ${pass(now.adFreePasses.dayPrice)}`);
+  const buyers = (offers: typeof now) => (offers.storeOffer?.eligibility.kind === 'MEMBERSHIP_PLANS'
+    ? `members of ${offers.storeOffer.eligibility.planIds.length} plan${offers.storeOffer.eligibility.planIds.length === 1 ? '' : 's'}` : 'everyone');
+  if (was.storeOffer && now.storeOffer && buyers(was) !== buyers(now)) lines.push(`Who can rent or buy: ${buyers(was)} → ${buyers(now)}`);
+  const early = (benefit?: { premiumAccess: boolean; earlyAccessWeeks: number }) => (benefit?.premiumAccess
+    ? benefit.earlyAccessWeeks > 0 ? `${benefit.earlyAccessWeeks} week${benefit.earlyAccessWeeks === 1 ? '' : 's'} early` : 'on release day' : 'off');
+  if (was.freeAdOffer && now.freeAdOffer && early(was.freeAdOffer.benefits) !== early(now.freeAdOffer.benefits)) {
+    lines.push(`Free tier early access: ${early(was.freeAdOffer.benefits)} → ${early(now.freeAdOffer.benefits)}`);
+  }
+  if (was.storeOffer && now.storeOffer && early(was.storeOffer.benefits) !== early(now.storeOffer.benefits)) {
+    lines.push(`Store early access: ${early(was.storeOffer.benefits)} → ${early(now.storeOffer.benefits)}`);
   }
   return lines;
 };
 
-/* ── glyphs ──────────────────────────────────────────────────────────────── */
-const OfferGlyph: React.FC<{ offer: Offer }> = ({ offer }) => (
-  <svg viewBox="0 0 24 24" className={css.glyph} aria-hidden="true">
-    {offer === 'SUBSCRIPTION' && <><rect x="3" y="5.5" width="18" height="13" rx="2.6" /><path d="M3 10h18M7 15h4" /></>}
-    {offer === 'ADS' && <><path d="M4 10v4h3.2l5.8 4V6L7.2 10H4z" /><path d="M16.4 9.2a4 4 0 010 5.6M18.8 7a7 7 0 010 10" /></>}
-    {offer === 'STORE' && <><path d="M5.5 8.5h13l-1.1 10.5H6.6L5.5 8.5z" /><path d="M9 8.5V7a3 3 0 016 0v1.5" /></>}
-  </svg>
-);
 
 /* ── a storefront as a tiny wireframe ─────────────────────────────────────── */
-const Wireframe: React.FC<{ composition: string }> = ({ composition }) => {
+export const Wireframe: React.FC<{ composition: string }> = ({ composition }) => {
   const r = (x: number, y: number, w: number, h: number, key: string, strong = false) => (
     <rect key={key} x={x} y={y} width={w} height={h} rx={1.6} className={strong ? css.wireStrong : css.wire} />
   );
@@ -167,22 +215,18 @@ const Wireframe: React.FC<{ composition: string }> = ({ composition }) => {
   return <svg viewBox="0 0 60 48" className={css.wireframe} aria-hidden="true">{shapes}</svg>;
 };
 
-/* ── a small −/+ control for a price ──────────────────────────────────────── */
-const Stepper: React.FC<{ value: number; step: number; min: number; max: number; format: (value: number) => string; onChange: (value: number) => void; label: string }> = ({ value, step, min, max, format, onChange, label }) => (
-  <div className={css.stepper} role="group" aria-label={label}>
-    <button type="button" onClick={() => onChange(Math.max(min, Math.round((value - step) * 100) / 100))} disabled={value <= min} aria-label={`Lower ${label}`}>−</button>
-    <b>{format(value)}</b>
-    <button type="button" onClick={() => onChange(Math.min(max, Math.round((value + step) * 100) / 100))} disabled={value >= max} aria-label={`Raise ${label}`}>+</button>
-  </div>
-);
-
 export const PlatformOffer: React.FC<{
   accent: string;
   offer: PlatformOfferData;
   actions: PlatformOfferActions;
   sharing?: PlatformSharingProps;
-}> = ({ accent, offer, actions, sharing }) => {
+  /** a locked plan step's Go to Tech: the Tech tab, opened on the tech it needs */
+  onGoToTech?: (techId: StreamingTechId) => void;
+  /** #116: the front page and the ident live in the brand studio */
+  onOpenBrandStudio?: () => void;
+}> = ({ accent, offer, actions, sharing, onGoToTech, onOpenBrandStudio }) => {
   const saved = offer.pricing;
+  const builder = useMemo(() => offer.planBuilder ?? getStreamingPlanBuilderView(null), [offer.planBuilder]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<OwnedStreamingPricingConfiguration>(saved);
   const [forecast, setForecast] = useState<{ now: PricingForecastSummary | null; next: PricingForecastSummary | null } | null>(null);
@@ -201,11 +245,12 @@ export const PlatformOffer: React.FC<{
     forecastTimers.current.forEach(window.clearTimeout);
   }, []);
   useEffect(() => { cancelForecast(); setForecast(null); }, [saved]);
-  const [layoutPick, setLayoutPick] = useState<string | null>(null);
+  /* #108: the open control (ad breaks, store, deals) while editing */
+  const [control, setControl] = useState<OfferControlId | null>(null);
   /* follow the saved offer when it changes underneath (e.g. after Apply) */
   useEffect(() => { if (!editing) setDraft(saved); }, [editing, saved]);
 
-  const changes = useMemo(() => (editing ? changesBetween(saved, draft) : []), [editing, saved, draft]);
+  const changes = useMemo(() => (editing ? changesBetween(saved, draft, builder) : []), [editing, saved, draft, builder]);
   const changed = editing && JSON.stringify(normalizeStreamingPricingConfiguration(draft)) !== JSON.stringify(normalizeStreamingPricingConfiguration(saved));
   const shown = editing ? draft : saved;
   const core = coreOf(shown);
@@ -213,32 +258,38 @@ export const PlatformOffer: React.FC<{
   const dropsSubscriptions = isOn(saved, 'SUBSCRIPTION') && !isOn(draft, 'SUBSCRIPTION');
   const nothingOn = !OFFERS.some(item => isOn(shown, item));
   const planAccounts = shown.plans.reduce((sum, plan) => sum + (offer.planStats[plan.id]?.accounts ?? 0), 0);
-  /* the layout in use first, then the ones ready to use, then the locked ones */
-  const layouts = useMemo(() => {
-    const rank = (layout: PlatformOfferData['storefront']['layouts'][number]) => (layout.id === offer.storefront.currentId ? 0 : layout.locked ? 2 : 1);
-    return [...offer.storefront.layouts].sort((a, b) => rank(a) - rank(b));
-  }, [offer.storefront]);
-  const unlocked = layouts.filter(layout => !layout.locked).length;
+  const savedAccounts = saved.plans.reduce((sum, plan) => sum + (offer.planStats[plan.id]?.accounts ?? 0), 0);
+  /* accounts on a plan the draft removes choose again at the next settlement */
+  const removedAccounts = editing ? saved.plans.filter(plan => !draft.plans.some(row => row.id === plan.id))
+    .reduce((sum, plan) => sum + (offer.planStats[plan.id]?.accounts ?? 0), 0) : 0;
 
   const update = (next: OwnedStreamingPricingConfiguration) => { cancelForecast(); setDraft(normalizeStreamingPricingConfiguration(next)); setForecast(null); setFeedback(null); };
   const toggle = (item: Offer) => update(configureStreamingPricingOffer(draft, { kind: 'TOGGLE', offer: item, enabled: !isOn(draft, item) }));
-  /* Choosing a new main way of earning resets the offer to that one stream, so
-     the others that were on are switched straight back on, and a subscription
-     service that ran ads only on its cheaper plans does not grow a free tier. */
-  const makeCore = (item: Offer) => {
-    const kept = OFFERS.filter(other => other !== item && isOn(draft, other));
-    const rebuilt = kept.reduce(
-      (next, other) => configureStreamingPricingOffer(next, { kind: 'TOGGLE', offer: other, enabled: true }),
-      configureStreamingPricingOffer(draft, { kind: 'CORE', coreModel: CORE_OF[item] }),
-    );
-    const hadFreeTier = Boolean(projectStreamingCommercialOffers(draft).freeAdOffer);
-    update(kept.includes('ADS') && !hadFreeTier
-      ? { ...rebuilt, commercialOffers: { ...rebuilt.commercialOffers!, freeAdAccess: false } }
-      : rebuilt);
+  /* #103 (plan §18.3): a new main offer only moves the front door; the others stay as they are, with their plans,
+     ads and levels (it reset the offer and switched the rest back on, Light and Heavy ads coming back Standard) */
+  const makeCore = (item: Offer) => update(configureStreamingPricingOffer(draft, { kind: 'CORE', coreModel: CORE_OF[item] }));
+  /* #104: a money engine slot: the last settled week's money a month, or what the state is */
+  const slotOf = (item: Offer): MoneyEngineSlot => {
+    const on = isOn(shown, item);
+    const earned = item === 'SUBSCRIPTION' ? offer.earnings.subscription : item === 'ADS' ? offer.earnings.ads : offer.earnings.store;
+    const settled = on && offer.live && isOn(saved, item) && offer.earnings.settled;
+    const paid = shown.plans.filter(plan => plan.monthly > 0);
+    return {
+      on,
+      value: settled ? money(earned) : null,
+      note: settled ? 'a month, last week' : !offer.live ? 'from launch' : !isOn(saved, item) ? 'new, from next week' : 'settles next week',
+      detail: item === 'SUBSCRIPTION' ? `${paid.length} plan${paid.length === 1 ? '' : 's'} · ${compact(planAccounts)} accounts`
+        : item === 'ADS' ? adBreakWords(shown.ads.minutesPerHour)
+          : `Rent ${price(shown.rentals.rent)} · Buy ${price(shown.rentals.buy)}`,
+    };
   };
-  const setPlanPrice = (planId: string, monthly: number) => update({ ...draft, plans: draft.plans.map(plan => (plan.id === planId ? { ...plan, monthly } : plan)) });
   const startEditing = () => { cancelForecast(); setDraft(saved); setEditing(true); setFeedback(null); setForecast(null); };
-  const stopEditing = () => { cancelForecast(); setEditing(false); setDraft(saved); setForecast(null); };
+  const stopEditing = () => { cancelForecast(); setEditing(false); setDraft(saved); setForecast(null); setControl(null); };
+  /* the plans table's free Ads cell and the store's price open their control (one editor each, plan §18.3) */
+  const openControl = (id: OfferControlId) => {
+    setControl(id);
+    window.requestAnimationFrame(() => document.getElementById(`offer-control-${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  };
 
   /* The forecast rebuilds the market's response to a price, so it runs only
      when asked, and only after the button has already shown it is working. */
@@ -287,41 +338,20 @@ export const PlatformOffer: React.FC<{
         </div>
       )}
 
-      {/* ── the three ways to earn ── */}
-      <div className={css.secHead}><h2>Ways to earn</h2><span>{offer.live ? (offer.earnings.settled ? 'last settled week, per month' : 'settles next week') : 'planned for launch'}</span></div>
-      <div className={css.models}>
-        {OFFERS.map(item => {
-          const on = isOn(shown, item);
-          const earned = item === 'SUBSCRIPTION' ? offer.earnings.subscription : item === 'ADS' ? offer.earnings.ads : offer.earnings.store;
-          return (
-            <div key={item} className={cx(css.model, on && css.modelOn, core === item && on && css.modelCore)}>
-              <div className={css.modelTop}>
-                <OfferGlyph offer={item} />
-                <span>{core === item && on ? 'MAIN' : on ? 'ON' : 'OFF'}</span>
-              </div>
-              <b>{OFFER_WORDS[item].name}</b>
-              <small>{item === 'ADS' && on && !freeTier ? 'ads on cheaper plans' : OFFER_WORDS[item].line}</small>
-              {/* a figure when there is one; otherwise a small word for the state */}
-              {on && offer.live && isOn(saved, item) && offer.earnings.settled
-                ? <em>{money(earned)}<i>/mo</i></em>
-                : <em className={css.modelState}>{!on ? '—' : !offer.live ? 'FROM LAUNCH' : !isOn(saved, item) ? 'NEW' : 'NEXT WEEK'}</em>}
-              {editing && (
-                <div className={css.modelActions}>
-                  {!(core === item && on) && <button type="button" onClick={() => toggle(item)}>{on ? 'Turn off' : 'Turn on'}</button>}
-                  {on && core !== item && <button type="button" onClick={() => makeCore(item)}>Make main</button>}
-                  {core === item && on && <span>Your main offer</span>}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {/* ── #104 the money engine (plan §18.4): the ways to earn as a loadout, the same as Define the Launch's; each
+           slot's money the last settled week's (the three cards with Turn on / Make main) ── */}
+      <MoneyEngine className={css.engine} main={core} editable={editing}
+        aside={offer.live ? (offer.earnings.settled ? 'last settled week' : 'settles next week') : 'planned for launch'}
+        slots={{ SUBSCRIPTION: slotOf('SUBSCRIPTION'), ADS: slotOf('ADS'), STORE: slotOf('STORE') }}
+        onMain={makeCore} onToggle={item => toggle(item)} />
       {nothingOn && <p className={css.hint}>No way of earning is set yet.</p>}
 
-      {/* ── plans as price cards ── */}
-      {isOn(shown, 'SUBSCRIPTION') && shown.plans.length > 0 && (
+      {/* ── plans, side by side (Free with ads first and Rent or buy last, when they run) ── */}
+      {((isOn(shown, 'SUBSCRIPTION') && shown.plans.length > 0) || freeTier || isOn(shown, 'STORE')) && (
         <>
-          <div className={css.secHead}><h2>Plans</h2><span>{offer.live ? 'who is on each' : 'as planned for launch'}</span></div>
+          <div className={css.secHead}><h2>{isOn(shown, 'SUBSCRIPTION') ? 'Plans'
+            : [freeTier ? 'Free with ads' : null, isOn(shown, 'STORE') ? 'Rent or buy' : null].filter(Boolean).join(' · ')}</h2>
+            <span>{offer.live ? 'who is on each' : 'as planned for launch'}</span></div>
           {offer.live && !editing && planAccounts > 0 && (
             <div className={css.planShare} aria-label="Paid accounts by plan">
               {shown.plans.map((plan, index) => {
@@ -333,72 +363,38 @@ export const PlatformOffer: React.FC<{
               })}
             </div>
           )}
-          <div className={css.plans}>
-            {shown.plans.map((plan, index) => {
-              const stats = offer.planStats[plan.id];
-              const share = planAccounts > 0 ? Math.round((stats?.accounts ?? 0) / planAccounts * 100) : 0;
-              const before = saved.plans.find(row => row.id === plan.id);
-              const moved = editing && before && before.monthly !== plan.monthly;
-              return (
-                <article key={plan.id} className={cx(css.plan, moved && css.planMoved)} style={{ ['--tint' as string]: `${PLAN_TINTS[index] ?? 16}%` }}>
-                  <header><i className={css.planDot} /><b>{plan.name}</b>{plan.ads && <em>with ads</em>}</header>
-                  {editing
-                    ? <Stepper label={`${plan.name} price`} value={plan.monthly} step={0.5} min={plan.ads ? 0 : 0.99} max={99.99} format={price} onChange={value => setPlanPrice(plan.id, value)} />
-                    : <strong>{price(plan.monthly)}{plan.monthly > 0 && <small>/mo</small>}</strong>}
-                  {moved && <s className={css.was}>was {price(before!.monthly)}</s>}
-                  <div className={css.features}>
-                    {plan.featureIds.filter(id => id !== 'noads' || !plan.ads).slice(0, 4).map(id => <span key={id}>{FEATURE_NAME.get(id) || id}</span>)}
-                    {!plan.featureIds.length && <span>Standard</span>}
-                  </div>
-                  {offer.live && !editing && (
-                    <footer>
-                      <span><b>{compact(stats?.accounts ?? 0)}</b> accounts{planAccounts > 0 ? ` · ${share}%` : ''}</span>
-                      <span>{money(stats?.monthlyRevenue ?? 0)}/mo</span>
-                    </footer>
-                  )}
-                </article>
-              );
-            })}
-          </div>
+          <PlanBuilder
+            pricing={shown}
+            builder={builder}
+            saved={editing ? saved : undefined}
+            onChange={editing ? update : undefined}
+            onGoToTech={onGoToTech}
+            onOpenControl={editing ? openControl : undefined}
+            footer={offer.live ? {
+              label: editing ? 'On it now' : 'On it',
+              cells: {
+                ...Object.fromEntries(shown.plans.map(plan => {
+                  const accounts = offer.planStats[plan.id]?.accounts ?? 0;
+                  return [plan.id, saved.plans.some(row => row.id === plan.id) ? {
+                    value: compact(accounts),
+                    detail: savedAccounts > 0 ? `${Math.round(accounts / savedAccounts * 100)}%` : undefined,
+                  } : undefined];
+                })),
+                // homes watching free; a free tier switched on in this edit has none yet
+                ...(projectStreamingCommercialOffers(saved).freeAdOffer && offer.freeAdViewers !== undefined
+                  ? { [STREAMING_FREE_TIER_ID]: { value: compact(offer.freeAdViewers), detail: 'homes' } } : {}),
+                ...(isOn(saved, 'STORE') && offer.storeBuyers !== undefined
+                  ? { [STREAMING_STORE_ID]: { value: compact(offer.storeBuyers), detail: 'a week' } } : {}),
+              },
+              empty: 'new',
+            } : undefined}
+          />
         </>
       )}
 
-      {/* ── ads and store terms ── */}
-      {(isOn(shown, 'ADS') || isOn(shown, 'STORE')) && (
-        <div className={css.terms}>
-          {isOn(shown, 'ADS') && (
-            <div className={css.term}>
-              <span>AD BREAKS</span>
-              {editing ? (
-                <div className={css.segments} role="group" aria-label="How often an ad break plays">
-                  {STREAMING_AD_INTERVAL_PRESETS.map(interval => {
-                    const minutes = adMinutesPerHourForInterval(interval);
-                    return (
-                      <button key={interval} type="button" aria-pressed={Math.abs(draft.ads.minutesPerHour - minutes) < .0001}
-                        onClick={() => update({ ...draft, ads: { ...draft.ads, minutesPerHour: minutes } })}>
-                        {interval}<small>min</small>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : <b>{adBreakWords(shown.ads.minutesPerHour)}</b>}
-              <small>{editing ? 'One 30-second break every so many minutes. ' : ''}More breaks earn more an hour but push viewers away.</small>
-            </div>
-          )}
-          {isOn(shown, 'STORE') && (
-            <div className={css.term}>
-              <span>STORE PRICES</span>
-              {editing ? (
-                <div className={css.termSteppers}>
-                  <Stepper label="Rental price" value={draft.rentals.rent} step={0.5} min={0.99} max={12} format={value => `Rent ${price(value)}`} onChange={value => update({ ...draft, rentals: { ...draft.rentals, rent: value } })} />
-                  <Stepper label="Purchase price" value={draft.rentals.buy} step={1} min={1.99} max={30} format={value => `Buy ${price(value)}`} onChange={value => update({ ...draft, rentals: { ...draft.rentals, buy: value } })} />
-                </div>
-              ) : <b>Rent {price(shown.rentals.rent)} · Buy {price(shown.rentals.buy)}</b>}
-              <small>One price for every eligible title · rental window {shown.rentals.windowWeeks} week{shown.rentals.windowWeeks === 1 ? '' : 's'}.</small>
-            </div>
-          )}
-        </div>
-      )}
+      {/* ── #108 breaks, store and deals: the Pricing step's controls (#107), read-only until Change pricing ── */}
+      <OfferControls pricing={shown} tree={builder.tree} onChange={editing ? update : undefined}
+        open={editing ? control : null} onOpen={setControl} />
 
       {/* ── change pricing ── */}
       {!offer.live ? (
@@ -412,8 +408,9 @@ export const PlatformOffer: React.FC<{
           <span className={css.eyebrow}>{changes.length ? `YOUR CHANGES · ${changes.length}` : 'NOTHING CHANGED YET'}</span>
           {changes.length > 0
             ? <ul className={css.receipt}>{changes.map(line => <li key={line}>{line}</li>)}</ul>
-            : <p className={css.editorNote}>Use − and + on a price, pick an ad cadence, or switch a way of earning on or off above.</p>}
+            : <p className={css.editorNote}>Tap any cell of the plans to change it, add or remove a plan, pick an ad cadence, or switch a way of earning on or off above.</p>}
           {dropsSubscriptions && <p className={css.warn}>Turning subscriptions off ends every paid account at the next weekly settlement.</p>}
+          {!dropsSubscriptions && removedAccounts > 0 && <p className={css.warn}>{compact(removedAccounts)} accounts are on plans you remove. At the next weekly settlement they choose another plan, or leave.</p>}
           {actions.forecast && changed && (
             forecast ? (
               <div className={css.forecast}>
@@ -460,6 +457,7 @@ export const PlatformOffer: React.FC<{
             policy={sharing.policy}
             settled={sharing.settled}
             settledPolicy={sharing.settledPolicy}
+            control={sharing.control}
             settledAvailable={sharing.available}
             appliesNextWeek={sharing.appliesNextWeek}
             onApply={sharing.onApply}
@@ -467,48 +465,33 @@ export const PlatformOffer: React.FC<{
         </>
       )}
 
-      {/* ── storefront ── */}
-      <div className={css.secHead}><h2>Storefront</h2><span>{unlocked} of {layouts.length} ready · swipe</span></div>
-      <div className={css.storefronts}>
-        {layouts.map(layout => {
-          const current = layout.id === offer.storefront.currentId;
-          const picked = layoutPick === layout.id;
-          return (
-            <button key={layout.id} type="button" disabled={Boolean(layout.locked)}
-              className={cx(css.storefront, current && css.storefrontCurrent, picked && css.storefrontPicked)}
-              onClick={() => setLayoutPick(current || picked ? null : layout.id)} aria-pressed={picked}>
-              <Wireframe composition={layout.composition} />
-              <b>{layout.name}</b>
-              <small>{layout.locked ? `Needs ${layout.locked}` : current ? 'IN USE' : layout.category.toLowerCase()}</small>
-            </button>
-          );
-        })}
-      </div>
-      {layoutPick && (() => {
-        const layout = offer.storefront.layouts.find(item => item.id === layoutPick);
-        return layout ? (
-          <div className={css.storefrontApply}>
-            <p><b>{layout.name}</b>{layout.line}</p>
-            {offer.live && actions.applyStorefront
-              ? <button type="button" className={css.primary} onClick={() => { const result = actions.applyStorefront!(layout.id); setFeedback(result); if (result.ok) setLayoutPick(null); }}>Use this storefront</button>
-              : actions.editBeforeLaunch && <button type="button" className={css.secondary} onClick={actions.editBeforeLaunch}>Choose it in Define the Launch →</button>}
-          </div>
-        ) : null;
+      {/* ── the front page and the ident: in the brand studio (#116, plan §18.4/§18.6) ── */}
+      {(() => {
+        const current = offer.storefront.layouts.find(layout => layout.id === offer.storefront.currentId);
+        return (
+          <button type="button" className={css.brandLink} onClick={onOpenBrandStudio ?? actions.openBrandStudio} disabled={!(onOpenBrandStudio ?? actions.openBrandStudio)}>
+            <Wireframe composition={current?.composition ?? 'hero'} />
+            <span>
+              <b>{current?.name ?? 'Cinema'} front page · {offer.ident.label} ident</b>
+              <small>Both live in the brand studio, with the logo, colours and type</small>
+            </span>
+            <em>Brand studio ›</em>
+          </button>
+        );
       })()}
-
-      {/* ── ident ── */}
-      <div className={css.secHead}><h2>Playback ident</h2><span>set at launch</span></div>
-      <div className={css.ident}>
-        <svg viewBox="0 0 24 24" className={css.glyph} aria-hidden="true"><path d="M4 12h1.5M7.5 8v8M11 5v14M14.5 8.5v7M18 10.5v3M20.5 12H20" /></svg>
-        <div><b>{offer.ident.label}</b><small>{offer.ident.detail}</small></div>
-      </div>
 
       {/* while editing, the commit stays in reach wherever the page is scrolled */}
       {editing && (
         <div className={css.tray}>
-          <span><b>{changes.length || 'No'}</b> change{changes.length === 1 ? '' : 's'}</span>
-          <button type="button" className={css.secondary} onClick={stopEditing}>Cancel</button>
-          <button type="button" className={css.primary} onClick={apply} disabled={!changed}>Apply from next week</button>
+          {/* #108: the count and the last change, so the bar says what Apply will do */}
+          <span className={css.trayWhat}>
+            <small>{changes.length ? `YOUR CHANGES · ${changes.length}` : 'NO CHANGES YET'}</small>
+            <em>{changes.at(-1) ?? 'Change anything above'}</em>
+          </span>
+          <div className={css.trayActs}>
+            <button type="button" className={css.secondary} onClick={stopEditing}>Cancel</button>
+            <button type="button" className={css.primary} onClick={apply} disabled={!changed}>Apply from next week</button>
+          </div>
         </div>
       )}
     </div>

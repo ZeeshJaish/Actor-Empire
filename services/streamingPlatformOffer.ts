@@ -6,9 +6,13 @@ import type {
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { normalizeStreamingPricingConfiguration } from './streamingPricingEconomy';
-import { STREAMING_STOREFRONT_LAYOUTS, getStreamingStorefrontLockReason, normalizeStreamingStorefrontLayoutId } from './streamingStorefront';
+import { STREAMING_STOREFRONT_LAYOUTS, getStreamingStorefrontLock, normalizeStreamingStorefrontLayoutId } from './streamingStorefront';
 import { getOwnedPlatformPackageCountryIds } from './streamingContentAvailability';
-import type { StreamingSharingPolicyFigures } from './streamingSharingPolicy';
+import { getStreamingPlanBuilderView, type StreamingPlanBuilderView } from './streamingPlanBuilder';
+import type { StreamingSharingControl, StreamingSharingPolicyFigures } from './streamingSharingPolicy';
+import {
+    resolveStreamingTechTree, streamingTechCrackdownFactor, streamingTechExtraMemberShare, streamingTechSharingFactor,
+} from './streamingTechTreeCatalogue';
 
 /**
  * The Platform room's Offer page in one cheap read: the saved offer, what each
@@ -22,16 +26,22 @@ export interface StreamingPlatformOfferView {
     live: boolean;
     pricing: OwnedStreamingPricingConfiguration;
     planStats: Record<string, { accounts: number; monthlyRevenue: number }>;
+    /** Homes watching free with ads at the last weekly settlement (#46's free column). */
+    freeAdViewers: number;
+    /** Rentals and purchases at the last weekly settlement (#47's store column). */
+    storeBuyers: number;
     earnings: { subscription: number; ads: number; store: number; settled: boolean };
     storefront: {
         currentId: string | null;
         layouts: Array<{ id: string; name: string; line: string; composition: string; category: string; locked: string | null }>;
     };
     ident: { label: string; detail: string };
-    sharing: { settled: StreamingSharingPolicyFigures; available: boolean };
+    sharing: { settled: StreamingSharingPolicyFigures; available: boolean; control: StreamingSharingControl };
     /** The countries the saved offer is sold in, for the pricing forecast. */
     offerCountryIds: string[];
     absoluteWeek: number;
+    /** The plan builder's rows, locks and starters, from the tech the service owns (Phase 2 #45). */
+    planBuilder: StreamingPlanBuilderView;
 }
 
 const WEEKS_PER_MONTH = 4.33;
@@ -62,6 +72,8 @@ export const getStreamingPlatformOfferView = (player: Player): StreamingPlatform
         live,
         pricing: normalizeStreamingPricingConfiguration(configuration.pricing),
         planStats,
+        freeAdViewers: round(viewing?.accessMix.freeViewingAccounts ?? 0),
+        storeBuyers: round((revenue?.rentalTransactions ?? 0) + (revenue?.purchaseTransactions ?? 0)),
         earnings: {
             subscription: round(customers?.playerMonthlySubscriptionRevenue ?? 0),
             ads: round((revenue?.advertisingRevenue ?? 0) * WEEKS_PER_MONTH),
@@ -70,14 +82,19 @@ export const getStreamingPlatformOfferView = (player: Player): StreamingPlatform
         },
         storefront: {
             currentId,
-            layouts: STREAMING_STOREFRONT_LAYOUTS.map(layout => ({
-                id: layout.id,
-                name: layout.name,
-                line: layout.line,
-                composition: layout.composition,
-                category: layout.category,
-                locked: getStreamingStorefrontLockReason(platform, layout.id),
-            })),
+            layouts: STREAMING_STOREFRONT_LAYOUTS.map(layout => {
+                // #109: a locked layout names its Tech step, and the tab opens it
+                const lock = getStreamingStorefrontLock(platform, layout.id);
+                return {
+                    id: layout.id,
+                    name: layout.name,
+                    line: layout.line,
+                    composition: layout.composition,
+                    category: layout.category,
+                    locked: lock ? lock.tech : null,
+                    lockTech: lock ? lock.techId : null,
+                };
+            }),
         },
         ident: {
             label: custom ? `Your own sound · ${custom.originalName}` : sound ? titleCase(sound) : 'Not chosen yet',
@@ -93,10 +110,22 @@ export const getStreamingPlatformOfferView = (player: Player): StreamingPlatform
                 sharedHomes: round(customers?.playerExternalSharedHouseholds ?? 0),
                 piracyReach: round(customers?.playerPiracyReach ?? 0),
                 accessLoadAccounts: round(customers?.playerAccessLoadAccounts ?? platform.metrics.subscribers),
+                extraMembers: round(customers?.playerExtraMemberHouseholds ?? 0),
             },
+            // Sharing control in Tech (#56): what it does to the policy's figures
+            control: (() => {
+                const tree = resolveStreamingTechTree(platform);
+                return {
+                    crackdownFactor: streamingTechCrackdownFactor(tree),
+                    sharingCheck: streamingTechSharingFactor(tree),
+                    extraMemberShare: streamingTechExtraMemberShare(tree),
+                    sellsExtraMember: normalizeStreamingPricingConfiguration(configuration.pricing).plans.some(plan => plan.featureIds.includes('extraseat')),
+                };
+            })(),
         },
         offerCountryIds: live ? getOwnedPlatformPackageCountryIds(platform) : [],
         absoluteWeek,
+        planBuilder: getStreamingPlanBuilderView(platform),
     };
 };
 
@@ -125,7 +154,14 @@ export const getStreamingPlatformHeadline = (player: Player): StreamingPlatformH
     const pricing = normalizeStreamingPricingConfiguration(platform.serviceConfiguration.pricing);
     const subscription = pricing.streams.includes('subs') && pricing.plans.some(plan => plan.monthly > 0);
     const freeAds = pricing.streams.includes('ads') && Boolean(pricing.commercialOffers?.freeAdAccess);
-    const kind: StreamingPlatformHeadline['kind'] = subscription ? 'ACCOUNTS' : freeAds ? 'AD_HOMES' : pricing.streams.includes('rentals') ? 'BUYERS' : 'ACCOUNTS';
+    const store = pricing.streams.includes('rentals');
+    /* #103 (plan §18.3): the main offer is the front door, so the headline is its number: subscribers, homes watching
+       free, or buyers (it was subscribers whenever paid plans were on). An old save with no main offer reads as before. */
+    const core = pricing.commercialOffers?.coreModel;
+    const kind: StreamingPlatformHeadline['kind'] = core === 'ADVERTISING' && freeAds ? 'AD_HOMES'
+        : core === 'STORE' && store ? 'BUYERS'
+            : core === 'SUBSCRIPTION' && subscription ? 'ACCOUNTS'
+                : subscription ? 'ACCOUNTS' : freeAds ? 'AD_HOMES' : store ? 'BUYERS' : 'ACCOUNTS';
     const row = player.world?.worldStreamingViewing?.lastProcessedAbsoluteWeek === absoluteWeek
         ? player.world.worldStreamingViewing.platforms?.PLAYER : null;
     const revenue = row?.revenue;

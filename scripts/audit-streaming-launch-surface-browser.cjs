@@ -31,19 +31,13 @@ const pixels = value => Number.parseFloat(value || '0');
     assert.match(tokens.backgroundImage, /linear-gradient/i,
       'The wizard canvas uses layered charcoal rather than a flat black fill');
 
-    const rail = await page.locator('.lw-rail').evaluate(element => {
+    // #110: the money and the way on share one HUD bar at the foot
+    const hud = await page.locator('.lw-hud').evaluate(element => {
       const style = getComputedStyle(element);
       return { radius: style.borderRadius, marginLeft: style.marginLeft };
     });
-    assert.ok(pixels(rail.radius) >= 16, 'The money rail is a rounded inset surface');
-    assert.ok(pixels(rail.marginLeft) >= 10, 'The money rail no longer touches both screen edges');
-
-    const footer = await page.locator('.lw-foot').evaluate(element => {
-      const style = getComputedStyle(element);
-      return { radius: style.borderRadius, marginLeft: style.marginLeft };
-    });
-    assert.ok(pixels(footer.radius) >= 16, 'The action dock is a rounded floating surface');
-    assert.ok(pixels(footer.marginLeft) >= 10, 'The action dock no longer touches both screen edges');
+    assert.ok(pixels(hud.radius) >= 16, 'The HUD is a rounded floating surface');
+    assert.ok(pixels(hud.marginLeft) >= 10, 'The HUD no longer touches both screen edges');
 
     assert.ok(pixels(await page.locator('.lw-country').first().evaluate(element => getComputedStyle(element).borderRadius)) >= 16,
       'Country cards inherit the softer card geometry');

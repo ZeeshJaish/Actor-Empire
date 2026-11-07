@@ -116,9 +116,12 @@ export function health(data: StudioFinanceData, summary: PeriodSummary): Finance
   const margin = summary.revenue > 0
     ? ((summary.accountingProfit ?? (summary.revenue - summary.incurredOperatingCost)) / summary.revenue) * 100
     : summary.expense > 0 ? -100 : 0;
-  const runway = netWeekly >= 0
-    ? Number.POSITIVE_INFINITY
-    : data.cash / Math.abs(netWeekly);
+  /* #175: a host that keeps its own runway (one formula on all its money screens) wins over the period's pace */
+  const runway = data.runwayWeeks !== undefined
+    ? data.runwayWeeks ?? Number.POSITIVE_INFINITY
+    : netWeekly >= 0
+      ? Number.POSITIVE_INFINITY
+      : data.cash / Math.abs(netWeekly);
   const debtPressure = income > 0
     ? (data.capital.debt.weeklyPayment / income) * 100
     : data.capital.debt.weeklyPayment > 0 ? 100 : 0;

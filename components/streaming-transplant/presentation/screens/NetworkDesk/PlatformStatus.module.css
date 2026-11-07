@@ -1,0 +1,154 @@
+/* STATUS's health board and open incidents (#49). Every rule sits under .board (0-2-0), so the
+   room sheet's :where(*) reset never wins on load order. */
+
+/* ── an open incident ── */
+.board .inc{position:relative;margin-bottom:8px;padding:12px 12px 12px 14px;border-radius:13px;overflow:hidden;
+  background:rgba(255,176,32,.06);border:1px solid rgba(255,176,32,.3)}
+.board .inc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:#ffb020}
+.board .inc.major{background:rgba(255,90,95,.07);border-color:rgba(255,90,95,.38)}
+.board .inc.major::before{background:#ff5a5f}
+.board .inc.open::before{animation:epx-st-beat 1.4s ease-in-out infinite}
+@keyframes epx-st-beat{0%,100%{opacity:1}50%{opacity:.35}}
+.board .inctop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.board .sev{flex:0 0 auto;font-size:7.5px;font-weight:900;letter-spacing:.14em;padding:3px 7px;border-radius:99px;
+  background:rgba(255,176,32,.18);color:#ffcf6a}
+.board .inc.major .sev{background:rgba(255,90,95,.2);color:#ff9a9d}
+.board .stage{min-width:0;font-size:9px;font-weight:800;color:#8b93a5;text-align:right}
+.board .inc.open .stage{color:#ff9a9d}
+.board .inc.repairing .stage{color:#93c5fd}
+.board .inctitle{display:block;margin-top:8px;font-size:13px;font-weight:900;line-height:1.3;color:#fff;overflow-wrap:anywhere}
+.board .incwhere{display:block;margin-top:3px;font-size:9.5px;line-height:1.45;color:#aeb6c4}
+/* #101: what it does each week, one quiet line */
+.board .damage{margin-top:6px;font-size:9.5px;font-weight:700;line-height:1.45;color:#ff9a9d;overflow-wrap:anywhere}
+.board .damage span{white-space:nowrap}
+.board .respond{display:inline-flex;align-items:center;margin-top:10px;padding:9px 14px;border-radius:10px;
+  font-size:10.5px;font-weight:900;letter-spacing:.02em;color:#07080c;background:#fff;
+  transition:transform .12s cubic-bezier(.3,1.5,.5,1)}
+.board .respond:active{transform:scale(.95)}
+
+/* being waited out (#50): still harmful, but answered */
+.board .inc.waiting .stage{color:#c4b5fd}
+.board .inc.waiting::before{animation:none}
+
+/* ── its repair (#50): Repair now, Fix, Wait it out; #101 side by side, each its name over its price ── */
+.board .repairs{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:6px;margin-top:11px}
+.board .rp{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:50px;padding:8px 6px;border-radius:11px;
+  text-align:center;transition:transform .12s cubic-bezier(.3,1.5,.5,1),opacity .15s}
+.board .rp:active:not(:disabled){transform:scale(.95)}
+.board .rp b{font-size:11.5px;font-weight:900;line-height:1.15;letter-spacing:.01em;overflow-wrap:anywhere}
+.board .rp span{min-width:0;display:inline-flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0 3px;
+  font-size:9.5px;font-weight:700;line-height:1.3;text-align:center}
+.board .rp.rpenergy{background:#fff;color:#07080c}
+.board .rp.rpenergy span{color:#3b4250}
+.board .rp.rpfix{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);color:#eef0f5}
+.board .rp.rpfix span{color:#aeb6c4}
+.board .rp.rpwait{background:transparent;border:1px dashed rgba(255,255,255,.16);color:#c6ccda}
+.board .rp.rpwait span{color:#8b93a5}
+.board .rp:disabled{opacity:.42;cursor:default}
+.board .bolt{display:inline-block;width:11px;height:11px;margin:0 1px 0 -1px;vertical-align:-1px;fill:#e0a800}
+.board .rp.rpfix .bolt,.board .rp.rpwait .bolt{fill:#ffcf3f}
+.board .rprefuse{margin-top:6px;font-size:9.5px;line-height:1.45;color:#ffcf6a}
+.board .links{display:flex;flex-wrap:wrap;align-items:center;gap:2px 16px;margin-top:9px}
+.board .links .respond{margin-top:0}
+.board .more{display:inline-flex;font-size:10px;font-weight:800;color:#93c5fd}
+.board .more:active{opacity:.6}
+.board .feedback{margin-top:12px;padding:10px 12px;border-radius:11px;font-size:10.5px;line-height:1.45;font-weight:700}
+.board .feedback.good{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.3);color:#86efac}
+.board .feedback.bad{background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.3);color:#ffcf6a}
+
+/* ── a board row: servers, tech, products ── */
+.board .rows{border-radius:13px;overflow:hidden;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.028)}
+.board .row{display:flex;align-items:flex-start;gap:10px;padding:11px 12px}
+.board .row + .row{border-top:1px solid rgba(255,255,255,.06)}
+.board .rdot{flex:0 0 auto;width:8px;height:8px;margin-top:4px;border-radius:50%;background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,.55)}
+.board .row.slow .rdot{background:#ffb020;box-shadow:0 0 8px rgba(255,176,32,.7)}
+.board .row.down .rdot{background:#ff5a5f;box-shadow:0 0 9px rgba(255,90,95,.85)}
+.board .row.off .rdot{background:#5f6875;box-shadow:none}
+.board .rtext{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.board .rtext b{font-size:12px;font-weight:800;color:#eef0f5;overflow-wrap:anywhere}
+.board .rtext span{font-size:9.5px;line-height:1.45;color:#8b93a5;overflow-wrap:anywhere}
+.board .rtext em{font-style:normal;font-size:9.5px;line-height:1.45;font-weight:700;color:#ffcf6a;overflow-wrap:anywhere}
+.board .row.down .rtext em{color:#ff9a9d}
+.board .rstate{flex:0 0 auto;font-size:9px;font-weight:800;color:#4ade80}
+.board .row.slow .rstate{color:#ffb020}
+.board .row.down .rstate{color:#ff5a5f}
+.board .row.off .rstate{color:#6f7686}
+
+/* ── #101 lines (Zeesh: "city wise … ek line server ka … server yellow kahin gir raha to samajh aa jayega"): a bar a
+   week for the last 30 weeks (#102: from the launch while the service is younger), the service strips' colours ── */
+.board .line{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:1px;height:12px;min-width:0}
+.board .line.big{gap:2px;height:20px}
+.board .line i{min-width:0;border-radius:1.5px;background:#2f9e5f;transform-origin:bottom;animation:epx-st-grow .4s cubic-bezier(.2,.8,.3,1) both}
+.board .line i:nth-child(3n+2){animation-delay:.03s}
+.board .line i:nth-child(3n){animation-delay:.06s}
+.board .line i.dslow{background:#ffb020}
+.board .line i.ddown{background:#ff5a5f}
+.board .line i.dnone{background:#20262e}
+@keyframes epx-st-grow{from{transform:scaleY(.2);opacity:.3}to{transform:none;opacity:1}}
+.board .laxis{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;color:#5f6875}
+.board .lgrey{display:inline-flex;align-items:center;gap:4px;font-size:8px;color:#5f6875}
+.board .lgrey i{width:6px;height:8px;border-radius:1.5px;background:#20262e;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+
+/* ── #102 (Zeesh: "tech ka ek pura row ho jaye simple single … same goes with servers, ek single row ho"): the servers
+   and the tech, a line each, the worst of its rows each week; a tap opens its rows, a region opens to its cities ── */
+.board .fold{border-radius:13px;overflow:hidden;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07)}
+.board .fold.slow{border-color:rgba(255,176,32,.3)}
+.board .fold.down{border-color:rgba(255,90,95,.38)}
+.board .fhead{display:grid;grid-template-columns:minmax(0,1fr) auto 8px;align-items:center;gap:9px 10px;width:100%;padding:11px 12px 10px;
+  color:inherit;text-align:left;transition:background .15s}
+.board .fhead:active{background:rgba(255,255,255,.03)}
+.board .fhead .line,.board .fhead .laxis{grid-column:1/-1}
+.board .fhead .laxis{margin-top:-4px}
+.board .fsum{min-width:0;font-size:12px;font-weight:800;line-height:1.3;color:#eef0f5;overflow-wrap:anywhere}
+.board .fword{font-size:9.5px;font-weight:800;color:#4ade80}
+.board .fold.slow .fword{color:#ffb020}
+.board .fold.down .fword{color:#ff5a5f}
+.board .chev{width:7px;height:7px;border:solid #7d8698;border-width:0 1.6px 1.6px 0;transform:translateY(-2px) rotate(45deg);transition:transform .2s ease}
+.board .fold.isopen > .fhead .chev{transform:translateY(1px) rotate(-135deg)}
+.board .fwhy{display:block;margin:-1px 12px 11px;font-style:normal;font-size:9.5px;font-weight:700;line-height:1.45;color:#ffcf6a;overflow-wrap:anywhere}
+.board .fold.down .fwhy{color:#ff9a9d}
+.board .frows{padding:0 12px 2px;border-top:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.14);animation:epx-st-open .25s ease both}
+.board .frows > .lgrey{display:flex;padding:9px 0 1px}
+.board .frows > * + *,.board .lcities > *{border-top:1px solid rgba(255,255,255,.05)}
+.board .frows > .lgrey + *{border-top:0}
+@keyframes epx-st-open{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+/* a line row: a region, a city, or a tech group: its name, its line, its light, and why when it is not working */
+.board .lrow{display:grid;grid-template-columns:minmax(0,1fr) clamp(118px,46%,176px) 7px;align-items:center;gap:4px 10px;padding:8px 0}
+.board .lname{min-width:0;font-size:11px;font-weight:700;line-height:1.3;color:#d5d9e2;overflow-wrap:anywhere}
+.board .ldot{width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,.55)}
+.board .lrow.slow .ldot{background:#ffb020;box-shadow:0 0 7px rgba(255,176,32,.75)}
+.board .lrow.down .ldot{background:#ff5a5f;box-shadow:0 0 8px rgba(255,90,95,.85);animation:epx-st-beat 1s ease-in-out infinite}
+.board .lrow.slow .lname,.board .lrow.down .lname{color:#fff}
+.board .lwhy{grid-column:1/-1;font-style:normal;font-size:9.5px;font-weight:700;line-height:1.4;color:#ffcf6a;overflow-wrap:anywhere}
+.board .lrow.down .lwhy{color:#ff9a9d}
+/* a region: a chevron before its name; open, its cities under it, their names under its name */
+.board .lfold{width:100%;color:inherit;text-align:left;transition:background .15s}
+.board .lfold:active{background:rgba(255,255,255,.03)}
+.board .lfold .lname{display:flex;align-items:center;gap:7px}
+.board .lfold .chev{flex:0 0 auto;width:6px;height:6px;transform:rotate(-45deg)}
+.board .lfold.isopen .chev{transform:translateY(-2px) rotate(45deg)}
+.board .lcities{animation:epx-st-open .25s ease both}
+.board .lcities .lname{padding-left:13px}
+
+/* ── #102 the incident history (Zeesh: "zyada se zyada ek saal ka incident"): the last year's, a line each; a tap
+   tells what happened ── */
+.board .past{border-radius:13px;overflow:hidden;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.028)}
+.board .pitem + .pitem{border-top:1px solid rgba(255,255,255,.06)}
+.board .phead{display:grid;grid-template-columns:7px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:10px 12px;
+  color:inherit;text-align:left;transition:background .15s}
+.board .phead:active{background:rgba(255,255,255,.03)}
+.board .pdot{width:7px;height:7px;border-radius:50%;background:#ffb020}
+.board .pitem.major .pdot{background:#ff5a5f}
+.board .pname{min-width:0;font-size:11px;font-weight:700;line-height:1.3;color:#d5d9e2;overflow-wrap:anywhere}
+.board .pwhen{font-size:9.5px;font-weight:700;color:#7d8698;white-space:nowrap}
+.board .pnote{margin:-3px 12px 11px 29px;font-size:9.5px;line-height:1.45;color:#8b93a5;overflow-wrap:anywhere;animation:epx-st-open .2s ease both}
+.board .pnote b{display:block;margin-bottom:2px;font-size:10.5px;font-weight:800;line-height:1.35;color:#eef0f5}
+.board .pmore{margin:10px 2px 0}
+/* #169: what your team answered */
+.board .byChip{display:inline-block;margin-top:7px;padding:2px 8px;border-radius:99px;font-size:8.5px;font-weight:800;line-height:1.4;letter-spacing:.04em;
+  color:#efd39a;background:rgba(214,172,92,.12);border:1px solid rgba(214,172,92,.45)}
+.board .pby{display:block;margin-top:2px;font-size:8.5px;font-weight:800;font-style:normal;letter-spacing:.04em;color:#d9b97a}
+
+@media (prefers-reduced-motion:reduce){ .board .inc.open::before{animation:none} }
+@media (prefers-reduced-motion:reduce){ .board .line i,.board .frows,.board .lcities,.board .pnote,.board .lrow.down .ldot{animation:none} .board .chev,.board .fhead,.board .lfold,.board .phead{transition:none} }

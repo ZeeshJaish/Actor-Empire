@@ -39,8 +39,9 @@ assert(
 /* The rule that replaced the ladder, and the stronger one: you are never shown
    a room you cannot take. The old marketplace advertised a 96-rack campus in
    every city on earth and then refused it. */
+// #109: a listing's status is OPEN or LIMITED only (RESEARCH_REQUIRED, never assigned, is gone)
 assert(
-    first.every(listing => listing.status !== 'RESEARCH_REQUIRED'),
+    first.every(listing => listing.status === 'OPEN' || listing.status === 'LIMITED'),
     'A listing on offer must be one the player can actually lease.',
 );
 assert(

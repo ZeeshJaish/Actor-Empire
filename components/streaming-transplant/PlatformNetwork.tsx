@@ -4,11 +4,11 @@
 
      MAP          markets washed by how well they are served, each room's
                   field, each site (NetworkMap)
-     GAUGES       peak load against capacity, the audience served to the
-                  standard, the network's weekly running cost
+     GAUGES       peak load against capacity, the markets served (the
+                  engine's 80% rule), the network's weekly running cost
      REVISION     a network change under construction, when there is one
      NEEDS WORK   the thin and dark markets, by name
-     SITES        every site: role, racks, reach, latency
+     SITES        every site: role, racks, reach
      CHANGE       the door to the Build map
 
    Load is one network-wide figure from the weekly loop. There is no per-city
@@ -38,11 +38,12 @@ export const PlatformNetwork: React.FC<{
   const [siteId, setSiteId] = useState<string | null>(null);
   const [allMarkets, setAllMarkets] = useState(false);
   const [allSites, setAllSites] = useState(false);
-  const cityById = new Map<string, NetworkState['cities'][number]>(state.cities.map(city => [city.id.toUpperCase(), city]));
   /* unreached first, then thin; biggest audiences first within each */
   const needsWork = map.markets.filter(market => market.state !== 'SERVED')
     .sort((left, right) => (left.state === right.state ? right.audience - left.audience : left.state === 'DARK' ? -1 : 1));
   const loadTone = state.peakLoad >= 85 ? css.bad : state.peakLoad >= 70 ? css.warn : css.good;
+  /* the engine's rule, as the live Network desk counts it (#92: the page's own 50% "served well" is gone) */
+  const servedMarkets = map.markets.filter(market => market.served >= .8).length;
 
   if (!map.built) {
     return (
@@ -65,13 +66,13 @@ export const PlatformNetwork: React.FC<{
           <span>PEAK LOAD</span>
           <b className={loadTone}>{state.peakLoad}%</b>
           <i className={css.bar}><em className={loadTone} style={{ width: `${Math.min(100, state.peakLoad)}%` }} /></i>
-          <small>{map.capacityStreams > 0 ? `${compact(map.peakStreams)} of ${compact(map.capacityStreams)} streams at the busiest hour` : state.headroom}</small>
+          <small>{map.capacityStreams > 0 ? `${compact(map.peakStreams)} load of ${compact(map.capacityStreams)} at the busiest hour` : 'nothing carried yet'}</small>
         </div>
         <div className={css.gauge}>
-          <span>SERVED WELL</span>
-          <b>{Math.round(map.served * 100)}%</b>
-          <i className={css.bar}><em className={css.accentFill} style={{ width: `${Math.round(map.served * 100)}%` }} /></i>
-          <small>{Math.round(map.reached * 100)}% reached at all</small>
+          <span>MARKETS SERVED</span>
+          <b>{servedMarkets}/{map.markets.length}</b>
+          <i className={css.bar}><em className={css.accentFill} style={{ width: `${map.markets.length ? Math.round(servedMarkets / map.markets.length * 100) : 0}%` }} /></i>
+          <small>80% of their people reached or more</small>
         </div>
         <div className={css.gauge}>
           <span>RUNNING COST</span>
@@ -113,18 +114,17 @@ export const PlatformNetwork: React.FC<{
       <div className={css.sites}>
         {/* the selected site always shows, even when the list is folded */}
         {(allSites ? map.sites : map.sites.filter((site, index) => index < SITES_SHOWN || site.id === siteId)).map(site => {
-          const city = cityById.get(site.id);
           return (
             <button key={site.id} type="button" className={cx(css.site, site.id === siteId && css.siteOn)}
               onClick={() => setSiteId(site.id === siteId ? null : site.id)} aria-pressed={site.id === siteId}>
               <i className={cx(css.siteDot, site.role === 'CORE ORIGIN' && css.siteCore)} aria-hidden="true" />
               <div className={css.siteMain}>
                 <b>{site.name}</b>
-                <span>{site.countryCode} · {site.racks} rack{site.racks === 1 ? '' : 's'}{city?.campus ? ` · ${city.campus}` : ''}</span>
+                <span>{site.countryCode} · {site.racks} rack{site.racks === 1 ? '' : 's'}</span>
               </div>
               <div className={css.siteSide}>
                 <em>{site.role}</em>
-                <span>{compact(Math.round(site.reachKm))} km reach{city ? ` · ${city.latencyMs} ms` : ''}</span>
+                <span>{compact(Math.round(site.reachKm))} km reach</span>
               </div>
             </button>
           );

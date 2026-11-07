@@ -1,0 +1,176 @@
+/* The brand studio (#116): one screen for the look the world sees. The draft brand's colour (--epx-brand)
+   lights what is picked; Anton-free, the type is the brand's own in the preview. */
+.studio { position: fixed; inset: 0; z-index: 60; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column;
+  background: #07080c; color: #eef0f5; font-family: 'Archivo', system-ui, sans-serif; }
+.studio :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; }
+.studio :where(*) { box-sizing: border-box; min-width: 0; }
+.head { display: flex; align-items: center; gap: 12px; padding: max(12px, env(safe-area-inset-top)) 14px 10px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.studio .back { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); font-size: 17px; }
+.head span { display: flex; flex-direction: column; gap: 2px; }
+.head small { font-size: 9px; font-weight: 800; letter-spacing: .2em; color: var(--epx-brand, #8b93a5); }
+.head b { font-size: 16px; font-weight: 800; letter-spacing: .04em; }
+.scroll { flex: 1; overflow-y: auto; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* the live preview */
+.preview { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 14px 0; padding: 16px 14px;
+  border: 1px solid rgba(255,255,255,.08); border-radius: 18px; overflow: hidden; }
+.lockup { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lockupSTACK { flex-direction: column; align-items: flex-start; gap: 6px; }
+.lockup b { font-size: 22px; line-height: 1; color: #fff; overflow-wrap: anywhere; }
+.pmark { flex: none; display: block; width: 40px; height: 40px; filter: drop-shadow(0 0 14px currentColor); }
+.pmark svg, .pmark img, .pbarmark svg, .pbarmark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* #120: the phone shows the app itself (its top bar and front page, as the app draws them) in the draft look */
+.phone { flex: none; display: block; width: 106px; height: 196px; padding: 3px; border-radius: 15px; border: 1.5px solid rgba(255,255,255,.2); background: #05060a;
+  box-shadow: 0 12px 26px rgba(0,0,0,.45); }
+.pscreen, .fscreen { position: relative; display: block; overflow: hidden; border-radius: 11px; background: #07080c; }
+.pscreen { width: 97px; height: 187px; }
+.pscreen > div { position: absolute; left: 0; top: 0; transform: scale(.2587); transform-origin: 0 0; }
+
+/* tabs */
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 14px 14px 0; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.04); }
+.studio .tab { min-height: 40px; border-radius: 10px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #8b93a5; text-align: center; }
+.studio .tabOn { background: var(--epx-brand, #6d5dfb); color: var(--epx-brand-ink, #fff); box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+
+.pane { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.label { margin-top: 6px; font-size: 9px; font-weight: 900; letter-spacing: .2em; color: #8b93a5; }
+.note { font-size: 11px; line-height: 1.5; color: #8b93a5; }
+.note b { color: #eef0f5; }
+.studio .on { border-color: var(--epx-brand, #6d5dfb) !important; box-shadow: 0 0 0 1px var(--epx-brand, #6d5dfb), 0 0 16px color-mix(in srgb, var(--epx-brand, #6d5dfb) 35%, transparent); }
+
+.marks { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.studio .mark { display: grid; place-items: center; aspect-ratio: 1; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); }
+.mark svg { width: 70%; height: 70%; }
+.studio .upload { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border-radius: 14px; border: 1px dashed rgba(255,255,255,.2); font-size: 12px; color: #c6ccda; }
+.upload i { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.06); font-style: normal; font-size: 18px; }
+.upload img { width: 34px; height: 34px; object-fit: contain; border-radius: 8px; }
+
+.swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); justify-items: center; gap: 8px; }
+.studio .swatch { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; }
+.slider { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 9px; font-weight: 900; letter-spacing: .16em; color: #8b93a5; }
+.slider input { width: 100%; accent-color: var(--epx-brand, #6d5dfb); }
+
+.types { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.studio .type { display: flex; flex-direction: column; gap: 4px; min-height: 58px; padding: 9px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); }
+.type b { font-size: 15px; color: #fff; line-height: 1.1; overflow-wrap: anywhere; }
+.type small, .lockupPick small { font-size: 9.5px; color: #8b93a5; }
+.lockups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.studio .lockupPick { display: flex; flex-direction: column; gap: 3px; min-height: 56px; padding: 9px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); }
+.lockupPick b { font-size: 11.5px; color: #fff; }
+
+/* #119 (Zeesh: "आइडेंट म्यूजिक के लिए समझ ही नहीं आ रहा" … "इसका प्रीव्यू क्या है कैसे"): off the Look tab the preview
+   and the tabs stay in sight; the Ident tab's preview is the ident itself, playing */
+.top { background: #07080c; }
+.topSticky { position: sticky; top: 0; z-index: 20; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,.06); box-shadow: 0 14px 22px -14px rgba(0,0,0,.9); }
+.label span { font-weight: 700; letter-spacing: .04em; color: #5f6878; }
+.stagePreview { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px; background: #0b0d13; }
+.stage { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 14px 30px rgba(0,0,0,.5); }
+.stamp { position: absolute; top: 8px; right: 8px; z-index: 6; padding: 4px 8px; border-radius: 99px; background: rgba(0,0,0,.66);
+  border: 1px solid rgba(255,210,122,.5); font-size: 9px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: #ffd27a; }
+.stageFoot { display: flex; align-items: center; gap: 10px; padding: 0 2px; }
+.stageFoot > span { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.stageFoot b { font-size: 13px; font-weight: 800; color: #fff; }
+.stageFoot em { font-style: normal; font-size: 10.5px; line-height: 1.35; color: #8b93a5; overflow-wrap: anywhere; }
+.studio .replay { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 15px; border-radius: 99px;
+  background: var(--epx-brand, #6d5dfb); color: var(--epx-brand-ink, #fff); font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase;
+  box-shadow: 0 6px 16px rgba(0,0,0,.4), inset 0 1px rgba(255,255,255,.22); }
+.studio .replay:active { transform: scale(.96); }
+.replay svg { width: 12px; height: 12px; }
+
+/* the sounds: the shape of its notes, its name, what it sounds like; lit while it sounds */
+.sounds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.studio .sound { position: relative; display: flex; flex-direction: column; gap: 3px; min-height: 78px; padding: 8px 9px 9px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.03); }
+.swave { display: flex; align-items: center; gap: 2px; width: 54px; max-width: 58%; height: 18px; margin-bottom: 3px; }
+.swave i { flex: 1; max-width: 4px; border-radius: 2px; background: #3d4453; transform-origin: center; }
+.studio .sound.on .swave i { background: var(--epx-brand, #6d5dfb); }
+.studio .sound.playing .swave i { background: var(--epx-brand, #6d5dfb); animation: bsBounce .3s ease-in-out infinite alternate; animation-delay: calc(var(--n) * -.07s); }
+@keyframes bsBounce { from { transform: scaleY(.35); } to { transform: scaleY(1.12); } }
+.sound b { font-size: 12px; font-weight: 800; color: #fff; }
+.sound small { font-size: 9.5px; line-height: 1.3; color: #8b93a5; overflow-wrap: anywhere; }
+.inuse { position: absolute; top: 7px; right: 7px; z-index: 8; padding: 2px 5px; border-radius: 99px; font-style: normal; font-size: 7.5px; font-weight: 900;
+  letter-spacing: .12em; color: var(--epx-brand-ink, #fff); background: var(--epx-brand, #6d5dfb); }
+
+/* the kits: a row of stills, each the kit's own frame */
+.kits { display: grid; grid-auto-flow: column; grid-auto-columns: 152px; gap: 8px; margin: 0 -14px; padding: 2px 14px 6px; overflow-x: auto;
+  scroll-snap-type: x mandatory; scrollbar-width: none; }
+.kits::-webkit-scrollbar { display: none; }
+.studio .kit { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 6px 6px 9px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.03); scroll-snap-align: start; }
+.kthumb { position: relative; display: block; aspect-ratio: 16 / 9; margin-bottom: 4px; border-radius: 9px; overflow: hidden; }
+.kitLocked .kthumb > div { filter: saturate(.6) brightness(.7); }
+.klock { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px;
+  font-style: normal; color: #fff; background: linear-gradient(180deg, rgba(5,6,10,.25), rgba(5,6,10,.72)); }
+.klock svg { width: 13px; height: 13px; padding: 6px; border-radius: 50%; background: rgba(0,0,0,.72); box-shadow: 0 0 0 1px rgba(255,210,122,.6); box-sizing: content-box; color: #ffd27a; }
+.klock small { font-size: 7.5px; font-weight: 900; line-height: 1.3; letter-spacing: .08em; text-transform: uppercase; color: #ffd27a; text-align: center; overflow-wrap: anywhere; }
+.kit b { padding: 0 4px; font-size: 12px; font-weight: 800; color: #fff; }
+.kit small { padding: 0 4px; font-size: 9.5px; line-height: 1.3; color: #8b93a5; }
+.kmeta { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 2px 4px 0; }
+.kmeta em { font-style: normal; font-size: 15px; font-weight: 900; color: #fff; }
+.kmeta span { font-size: 9.5px; font-weight: 700; color: #8b93a5; }
+.kit .inuse { top: 11px; right: 11px; }
+
+/* what the kit makes, as the frames viewers will see */
+.get { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); }
+.get .label { margin-top: 0; }
+.surfaces { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.surfaceOff .sframe { display: grid; place-items: center; background: repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 1px, transparent 1px 7px), #0b0d13; }
+.surfaceOff .sframe em { font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #5f6878; text-align: center; padding: 0 6px; }
+.surfaceOff small { color: #5f6878; }
+.surface { display: flex; flex-direction: column; gap: 5px; }
+.sframe { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.09); }
+.surface small { font-size: 8.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #8b93a5; text-align: center; }
+.studio .locked { opacity: .7; background: repeating-linear-gradient(135deg, rgba(255,255,255,.02) 0 1px, transparent 1px 8px), rgba(255,255,255,.02); }
+
+/* #120: the picked front page in a phone, with whether it can be used and what it does */
+.frontPreview { align-items: center; justify-content: flex-start; gap: 14px; padding: 12px; background: #0b0d13; }
+.fphone { flex: none; display: block; width: 120px; height: 212px; padding: 4px; border-radius: 17px; border: 1.5px solid rgba(255,255,255,.2); background: #05060a;
+  box-shadow: 0 14px 30px rgba(0,0,0,.5); }
+.fscreen { width: 109px; height: 201px; border-radius: 12px; }
+.fscreen > div { position: absolute; left: 0; top: 0; transform: scale(.2907); transform-origin: 0 0; }
+.finfo { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.finfo > b { font-size: 19px; font-weight: 800; line-height: 1.1; color: #fff; overflow-wrap: anywhere; }
+.finfo > em { font-style: normal; font-size: 11px; line-height: 1.45; color: #9aa2b2; }
+.fstate { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 99px; font-size: 9px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.fstate svg { width: 10px; height: 10px; }
+.fstateUse { background: var(--epx-brand, #6d5dfb); color: var(--epx-brand-ink, #fff); }
+.fstateReady { background: rgba(84,214,140,.14); color: #6fe3a1; box-shadow: inset 0 0 0 1px rgba(84,214,140,.4); }
+.fstateLocked { background: rgba(255,196,80,.12); color: #ffd27a; box-shadow: inset 0 0 0 1px rgba(255,196,80,.45); }
+.fneeds { font-style: normal; font-size: 11px; line-height: 1.4; color: #ffd27a; }
+.fneeds b { color: #fff; }
+.fx { display: flex; flex-direction: column; gap: 3px; }
+.fx i { position: relative; padding-left: 14px; font-style: normal; font-size: 10.5px; line-height: 1.35; color: #c6ccda; }
+.fx i::before { content: '✓'; position: absolute; left: 0; top: 0; font-weight: 900; color: #6fe3a1; }
+.fx i.fxDown::before { content: '!'; left: 3px; color: #ffb86b; }
+
+/* the tiles: the ready ones, then the locked ones; each the app's own home in miniature */
+.fronts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.studio .front { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 5px 5px 8px; border-radius: 13px;
+  border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.03); content-visibility: auto; contain-intrinsic-size: 110px 220px; }
+.fthumb { position: relative; display: block; aspect-ratio: 375 / 600; margin-bottom: 4px; border-radius: 9px; overflow: hidden; background: #07080c; }
+.fthumbIn { position: absolute; left: 0; top: 0; transform: scale(var(--pz, .28)); transform-origin: 0 0; }
+/* #64's rule, carried over with the rail: a long name wraps, and the lock line is never clamped */
+.front b { padding: 0 3px; font-size: 11px; color: #fff; overflow-wrap: anywhere; }
+.front small { padding: 0 3px; font-size: 8.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6fe3a1; overflow-wrap: anywhere; }
+.frontLocked .fthumbIn { filter: grayscale(.7) brightness(.5); }
+.frontLocked small { color: #ffd27a; }
+.flock { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; }
+.flock svg { width: 15px; height: 15px; padding: 8px; border-radius: 50%; background: rgba(0,0,0,.75); color: #ffd27a; box-shadow: 0 0 0 1px rgba(255,210,122,.65), 0 6px 16px rgba(0,0,0,.5); box-sizing: content-box; }
+.fuse { position: absolute; left: 5px; right: 5px; bottom: 5px; padding: 4px 0; border-radius: 6px; font-style: normal; text-align: center; font-size: 8px; font-weight: 900;
+  letter-spacing: .12em; text-transform: uppercase; background: var(--epx-brand, #6d5dfb); color: var(--epx-brand-ink, #fff); box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.lockedLabel { display: flex; align-items: center; gap: 6px; margin-top: 12px; color: #ffd27a; }
+.lockedLabel svg { width: 11px; height: 11px; }
+.studio button:disabled { cursor: default; }
+
+.tail { height: 120px; }
+.bar { position: absolute; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 10px;
+  padding: 10px 10px 10px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(14,17,25,.97);
+  box-shadow: 0 -10px 30px rgba(0,0,0,.4); }
+.barWhat { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.barWhat small { font-size: 9px; font-weight: 900; letter-spacing: .16em; color: var(--epx-brand, #8b93a5); }
+.barWhat em { font-style: normal; font-size: 11.5px; line-height: 1.35; color: #c6ccda; }
+.studio .apply { flex: none; min-height: 48px; padding: 0 16px; border-radius: 14px; background: var(--epx-brand, #6d5dfb); color: var(--epx-brand-ink, #fff);
+  font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; box-shadow: 0 8px 20px rgba(0,0,0,.35), inset 0 1px rgba(255,255,255,.22); }
+.studio .apply:disabled { background: rgba(255,255,255,.08); color: #8b93a5; box-shadow: none; }

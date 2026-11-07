@@ -87,6 +87,7 @@ import {
     reconcilePlatformAiExternalCommitmentObligations,
 } from './platformAiExternalCommitments';
 import { normalizePlatformIntelligenceMigrationState } from './platformIntelligenceMigration';
+import { normalizeCampaignBook } from '../campaigns/campaignBook';
 
 const TECHNOLOGY_BRANCHES: StreamingTechnologyBranch[] = [
     'DELIVERY_CAPACITY', 'PLAYBACK_QUALITY', 'RELIABILITY', 'DATA_RECOMMENDATIONS',
@@ -2739,6 +2740,7 @@ export const normalizePlatformAiState = (
             .map(([id,week])=>[id,Math.round(finiteNonNegative(week))]))} : {}),
         decisionHistory: normalizeDecisionHistory(existing?.decisionHistory),
         launchMarketingHistory: normalizePlatformAiLaunchMarketingHistory(existing?.launchMarketingHistory),
+        ...(existing?.campaignBook ? { campaignBook: normalizeCampaignBook(existing.campaignBook) } : {}),
         distressEpisodes: normalizePlatformAiDistressEpisodes(
             existing?.distressEpisodes,
             platform.id,

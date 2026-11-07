@@ -4,25 +4,52 @@
 .br :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
 .br :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
 
-.br .brtop{display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 12px;
-  background:linear-gradient(#0a0c11,#08090e);border-bottom:1px solid rgba(255,255,255,.07)}
-.br .brback{flex:0 0 auto;width:34px;height:34px;border-radius:11px;font-size:17px;color:#aeb6c4;
-  display:flex;align-items:center;justify-content:center}
-.br .brback:active{background:rgba(255,255,255,.07)}
-.br .brtitle{flex:1;min-width:0}
-.br .brtitle b{display:block;font-size:14px;font-weight:900;letter-spacing:.14em}
-.br .brtitle span{font-size:8px;font-weight:900;letter-spacing:.2em;color:#6f7686}
-.br .brmark{flex:0 0 auto;width:24px;height:24px;color:var(--epx-br-c);opacity:.9}
+/* the room's head: its name in the game's display face, its colour rising from the corner, a
+   thin line of it under the head, and two matching tiles: the way back and the service's mark */
+.br .brtop{position:relative;display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 13px;isolation:isolate;
+  background:radial-gradient(110% 150% at 100% 0%,color-mix(in srgb,var(--epx-br-c) 22%,transparent) 0%,transparent 60%),linear-gradient(#0b0d13,#08090e);
+  border-bottom:1px solid rgba(255,255,255,.07)}
+.br .brtop::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,color-mix(in srgb,var(--epx-br-c) 75%,transparent) 55%,transparent 100%);opacity:.6}
+.br .brback{flex:0 0 auto;width:34px;height:34px;border-radius:11px;font-size:17px;color:#d4dae4;
+  display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.br .brback:active{background:rgba(255,255,255,.11);transform:scale(.9)}
+.br .brtitle{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.br .brtitle b{display:block;font:400 22px/1 'Anton','Archivo',sans-serif;letter-spacing:.045em;color:#fff;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.br .brtitle span{display:flex;align-items:center;gap:6px;min-width:0;font-size:7.5px;font-weight:900;letter-spacing:.14em;
+  color:color-mix(in srgb,var(--epx-br-c) 38%,#8d96a6);line-height:1.35}
+.br .brtitle span::before{content:'';flex:0 0 auto;width:14px;height:2px;border-radius:2px;background:var(--epx-br-c);
+  box-shadow:0 0 8px color-mix(in srgb,var(--epx-br-c) 70%,transparent)}
+.br .brmark{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:7px;border-radius:11px;
+  color:var(--epx-br-c);background:color-mix(in srgb,var(--epx-br-c) 14%,#0b0e15);border:1px solid color-mix(in srgb,var(--epx-br-c) 42%,transparent)}
+/* opening the room (Zeesh: make the tap feel fun): the room rises into place on a small spring, its name
+   slides in and its mark pops. CSS only, nothing waits on it; reduced motion skips it */
+.br{animation:epx-br-in .28s cubic-bezier(.2,.9,.3,1.12) backwards}
+.br .brtitle{animation:epx-br-name .34s .04s cubic-bezier(.2,.9,.3,1.15) backwards}
+.br .brmark{animation:epx-br-mark .36s .08s cubic-bezier(.3,1.6,.5,1) backwards}
+@keyframes epx-br-in{from{opacity:0;transform:translateY(16px) scale(.98)}}
+@keyframes epx-br-name{from{opacity:0;transform:translateX(-14px)}}
+@keyframes epx-br-mark{from{opacity:0;transform:scale(.3) rotate(-25deg)}}
+@media (prefers-reduced-motion:reduce){.br{animation:none}}
 .br .brmark svg{width:100%;height:100%;display:block}
 
-.br .brstats{display:flex;background:#08090e;border-bottom:1px solid rgba(255,255,255,.07)}
-.br .brstats div{flex:1;padding:10px 11px;border-right:1px solid rgba(255,255,255,.06)}
+/* the room's four figures: the tiles share the width evenly, but a tile is never narrower than what it
+   says, so no label or figure is ever cut; on a screen too narrow for all four, the strip scrolls */
+.br .brstats{display:flex;overflow-x:auto;scrollbar-width:none;background:#08090e;border-bottom:1px solid rgba(255,255,255,.07)}
+.br .brstats::-webkit-scrollbar{display:none}
+.br .brstats div{flex:1 1 0;min-width:max-content;padding:10px 12px 11px;border-right:1px solid rgba(255,255,255,.06)}
 .br .brstats div:last-child{border-right:none}
-.br .brstats span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.14em;color:#6f7686}
-.br .brstats b{display:block;margin-top:3px;font-size:15px;font-weight:800}
+.br .brstats span{display:block;font-size:7.5px;font-weight:900;letter-spacing:.14em;color:#6f7686;white-space:nowrap}
+.br .brstats b{display:block;margin-top:5px;font:400 20px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9;
+  white-space:nowrap;font-feature-settings:'tnum' 1}
 .br .brstats b.green{color:#4ade80}
 .br .brstats b.bad{color:#ff5a5f}
 .br .brstats b.muted{color:#6f7686;font-size:13px}
+/* narrower than an iPhone (360px Androids): tighter tiles and slightly smaller figures */
+@media (max-width:374px){.br .brstats div{padding-inline:9px}.br .brstats b{font-size:17px}
+  .br .brtitle span{font-size:7px;letter-spacing:.1em}}
 
 .br .brtabs{display:flex;gap:5px;padding:11px 14px 0}
 .br .brtabs button{position:relative;flex:1;padding:9px 3px;border-radius:10px;background:rgba(255,255,255,.04);
@@ -30,7 +57,8 @@
   color:#8b93a5;text-align:center}
 .br .brtabs button.on{background:color-mix(in srgb,var(--epx-br-c) 15%,transparent);
   border-color:color-mix(in srgb,var(--epx-br-c) 50%,transparent);color:var(--epx-br-c)}
-.br .tdot{position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;background:#ff5a5f;
+/* a tab's alert sits on its corner, ringed in the room's black, so it never covers the tab's name */
+.br .tdot{position:absolute;top:-4px;right:-4px;width:10px;height:10px;border:2px solid #050609;border-radius:50%;background:#ff5a5f;
   box-shadow:0 0 7px rgba(255,90,95,.9)}
 
 .br .brscroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 14px}

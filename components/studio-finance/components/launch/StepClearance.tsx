@@ -7,10 +7,15 @@
    the one you are looking at opens underneath. One market, one glance.
 
    Money is charged only on confirmation.
+
+   #111: the count is a gauge with a legend, so the bar's four colours say what
+   they are; the review's five stages are named under their dots; and the note
+   under the gauge reads the whole board (it said "Nothing filed yet" with every
+   market cleared).
    ========================================================================== */
 
 import { useState } from 'react';
-import { CLEARANCE_STAGES, type ClearanceOutcome, type ClearanceState } from '../../finance/launch';
+import { CLEARANCE_STAGES, type ClearanceOutcome, type ClearanceStage, type ClearanceState } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
 import { money } from '../../finance/format';
 import { FlagField, flagAccent } from '../FlagField';
@@ -33,6 +38,11 @@ const OUTCOME: Record<ClearanceOutcome, { label: string; tone: 'good' | 'warn' |
 };
 
 const NEEDS_PLAYER: ClearanceOutcome[] = ['DOCUMENT_REQUIRED', 'PAYMENT_REQUIRED', 'REJECTED', 'REVISABLE'];
+
+/* The five stages in a word each, under their dots. */
+const STAGE_WORD: Record<ClearanceStage, string> = {
+  FILED: 'Filed', RIGHTS: 'Access', REGULATORY: 'Review', COMPLIANCE: 'Data', APPROVAL: 'Approval',
+};
 
 export function StepClearance({ data, draft, chosen, free, handlers, initialCountryId, operations }: StepProps) {
   const byCountry = new Map(data.clearance.map((c) => [c.countryId, c]));
@@ -89,12 +99,23 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
           {unfiled.length > 0 && <i className="is-none" style={{ width: `${(unfiled.length / chosen.length) * 100}%` }} />}
         </div>
 
+        <ul className="cl-legend" aria-hidden="true">
+          {cleared > 0 && <li className="is-ok"><i />{cleared} cleared</li>}
+          {waiting > 0 && <li className="is-wait"><i />{waiting} in review</li>}
+          {needsYou > 0 && <li className="is-you"><i />{needsYou} need you</li>}
+          {unfiled.length > 0 && <li className="is-none"><i />{unfiled.length} not filed</li>}
+        </ul>
+
         <p className="cl-hero-note">
           {needsYou > 0
             ? `${needsYou} market${needsYou > 1 ? 's are' : ' is'} waiting on you.`
-            : waiting > 0
-              ? `${waiting} under review. Everything else stays open while you wait.`
-              : cleared === chosen.length ? 'All filed markets are cleared. Review a country below for its ongoing obligations.' : 'Nothing filed yet. Reviews run 4–6 weeks once they start.'}
+            : cleared === chosen.length
+              ? (operations ? 'All filed markets are cleared. Review a country below for its ongoing obligations.' : 'Every market is cleared for opening day.')
+              : waiting > 0
+                ? `${waiting} under review. Everything else stays open while you wait.`
+                : unfiled.length === chosen.length
+                  ? 'Nothing filed yet. Reviews run 4–6 weeks once they start.'
+                  : `${unfiled.length} still to file.`}
         </p>
       </section>
 
@@ -155,6 +176,11 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
                 className={`cl-dot${done || (walking && si < stageIndex) ? ' is-done' : ''}${walking && si === stageIndex && !done ? ' is-now' : ''}`}
                 title={stage.label}
               />
+            ))}
+          </div>
+          <div className="cl-track-names" aria-hidden="true">
+            {CLEARANCE_STAGES.map((stage, si) => (
+              <span key={stage.id} className={done || (walking && si <= stageIndex) ? 'is-done' : undefined}>{STAGE_WORD[stage.id]}</span>
             ))}
           </div>
 

@@ -6,13 +6,27 @@ import type {
     StreamingCommercialCoreModel,
     StreamingCommercialOfferBenefit,
     StreamingCommercialOfferIntent,
+    StreamingPlanAdLevel,
     StreamingRevenueStreamId,
 } from '../types';
+import {
+    STREAMING_MAX_PLANS,
+    STREAMING_PLAN_AD_LEVELS,
+    applyStreamingPlanOfferFeatures,
+    normalizeStreamingPlanOffer,
+} from './streamingPlanOffer';
 
 export const STREAMING_MINIMUM_PAID_PLAN_PRICE = .99;
 export const STREAMING_MAXIMUM_PLAN_PRICE = 100;
+/** #103 (plan §18.3): one range for the store's prices, wherever they are set; the top edition (#47) a little above */
+export const STREAMING_STORE_RENT_MAX = 12;
+export const STREAMING_STORE_BUY_MAX = 30;
+export const STREAMING_STORE_TOP_RENT_MAX = 20;
+export const STREAMING_STORE_TOP_BUY_MAX = 40;
 export const STREAMING_INTRO_OFFER_WEEKS = 13;
 export const STREAMING_ANNUAL_BILLING_SHARE = .33;
+/** Pay yearly (#71): the discount at which the market's one in three pays yearly. */
+export const STREAMING_REFERENCE_ANNUAL_DISCOUNT = 15;
 /* How deep a discount may go. A year off every tier is a standing decision, so
    it stays inside what real services do; an introductory offer is time-boxed
    and routinely extreme — 70 to 90 per cent off the first months is ordinary
@@ -67,7 +81,7 @@ const normalizeCommercialOffers = (
             : streams.includes('rentals') ? 'STORE' : 'LEGACY';
     const requestedCore = source.coreModel;
     const inactiveAdPlans = source.inactiveAdPlans && typeof source.inactiveAdPlans === 'object'
-        ? source.inactiveAdPlans as Record<string, { monthly?: unknown }> : {};
+        ? source.inactiveAdPlans as Record<string, { monthly?: unknown; adLevel?: unknown }> : {};
     const coreModel: StreamingCommercialCoreModel = requestedCore === 'SUBSCRIPTION' && streams.includes('subs') && plans.length
         ? 'SUBSCRIPTION' : requestedCore === 'ADVERTISING' && streams.includes('ads')
             ? 'ADVERTISING' : requestedCore === 'STORE' && streams.includes('rentals')
@@ -81,8 +95,13 @@ const normalizeCommercialOffers = (
         coreModelSelected: source.coreModelSelected !== false,
         inactiveAdPlans: Object.fromEntries(plans.flatMap(plan => {
             const monthly = inactiveAdPlans[plan.id]?.monthly;
+            // #103: with the plan's ad level, so it comes back as it was
+            const adLevel = inactiveAdPlans[plan.id]?.adLevel;
             return typeof monthly === 'number' && Number.isFinite(monthly) && monthly >= 0
-                ? [[plan.id, { monthly: normalizeStreamingPlanPrice(monthly, true) }]] : [];
+                ? [[plan.id, {
+                    monthly: normalizeStreamingPlanPrice(monthly, true),
+                    ...(adLevel !== 'NONE' && STREAMING_PLAN_AD_LEVELS.includes(adLevel as StreamingPlanAdLevel) ? { adLevel: adLevel as StreamingPlanAdLevel } : {}),
+                }]] : [];
         })),
         coreModel,
         freeAdAccess: streams.includes('ads') && (coreModel === 'ADVERTISING' || (typeof source.freeAdAccess === 'boolean'
@@ -123,26 +142,55 @@ export const streamingDiscountedMonthly = (listPrice: number, discountPercent: n
 export const normalizeStreamingPricingConfiguration = (
     pricing: OwnedStreamingPricingConfiguration,
 ): OwnedStreamingPricingConfiguration => {
-    const streams = [...new Set(pricing.streams)].slice(0, 8) as StreamingRevenueStreamId[];
-    const advertisingEnabled = streams.includes('ads');
-    const plans = pricing.plans.slice(0, 6).map((plan, index): OwnedStreamingPricingPlan => {
-        const ads = advertisingEnabled && plan.ads === true;
+    /* #103 (Zeesh: "ऑफर का नया रोल ठीक है", plan §18.3): ads on a paid plan belong to that plan, and Free with ads is
+       the free tier alone, so turning the free tier off no longer takes the ads off "Basic with ads". The ads stream
+       follows from the two: on while the free tier is open or a plan on sale has ads (it took every plan's ads away
+       when it went off). */
+    const requested = [...new Set(pricing.streams)].slice(0, 8) as StreamingRevenueStreamId[];
+    const source = pricing.commercialOffers as Partial<StreamingCommercialOfferIntent> | undefined;
+    /* the free tier as the offer intent reads it below: with the ads stream, when Free with ads is the main offer
+       (chosen, or the service's only way to earn) or the saved choice (or an old save's free plan) opens it */
+    const subscriptionsSold = requested.includes('subs') && pricing.plans.length > 0;
+    const leading = source?.coreModel === 'SUBSCRIPTION' && subscriptionsSold ? 'SUBSCRIPTION'
+        : source?.coreModel === 'ADVERTISING' && requested.includes('ads') ? 'ADVERTISING'
+            : source?.coreModel === 'STORE' && requested.includes('rentals') ? 'STORE'
+                : subscriptionsSold ? 'SUBSCRIPTION' : requested.includes('ads') ? 'ADVERTISING' : 'OTHER';
+    const freeTier = requested.includes('ads') && (leading === 'ADVERTISING' || (typeof source?.freeAdAccess === 'boolean'
+        ? source.freeAdAccess : !requested.includes('subs') || pricing.plans.some(plan => plan.ads === true && Number(plan.monthly) === 0)));
+    /* while subscriptions are off a plan is not on sale, so its ads wait with it (remembered with their level in
+       inactiveAdPlans) and come back with it: every reader sees an ad plan only beside an ads stream */
+    const subscriptionsOn = requested.includes('subs');
+    const planAds = subscriptionsOn && pricing.plans.some(plan => plan.ads === true);
+    const streams: StreamingRevenueStreamId[] = [...requested.filter(stream => stream !== 'ads'), ...(freeTier || planAds ? ['ads' as const] : [])];
+    const plans = pricing.plans.slice(0, STREAMING_MAX_PLANS).map((plan, index): OwnedStreamingPricingPlan => {
+        const ads = subscriptionsOn && plan.ads === true;
+        /* Plans v2 (Phase 2): an offer, checked row by row, and an ad level on an ad plan. The
+           plan's features follow its offer, so engines reading features see the same plan. */
+        const offer = normalizeStreamingPlanOffer(plan.offer);
+        const adLevel = ads && plan.adLevel && plan.adLevel !== 'NONE' && STREAMING_PLAN_AD_LEVELS.includes(plan.adLevel)
+            ? plan.adLevel : undefined;
+        const { offer: _offer, adLevel: _adLevel, ...rest } = plan;
         return {
-            ...plan,
+            ...rest,
             id: String(plan.id || `PLAN_${index + 1}`).slice(0, 50),
             name: String(plan.name || `Plan ${index + 1}`).slice(0, 40),
             monthly: normalizeStreamingPlanPrice(Number(plan.monthly), ads),
             featureIds: (() => {
-                const ids = [...new Set((Array.isArray(plan.featureIds) ? plan.featureIds : []).map(String))];
+                const saved = [...new Set((Array.isArray(plan.featureIds) ? plan.featureIds : []).map(String))];
+                // with an offer, its features go after the plan's own and "noads" last, so a second pass writes the same list
+                const ids = offer ? applyStreamingPlanOfferFeatures(saved.filter(id => id !== 'noads'), offer) : saved;
                 const resolved = ids.filter(id => !(
                     (id === 'hd' && ids.includes('uhd'))
-                    || (id === 'streams2' && ids.includes('streams4'))
+                    || (id === 'streams2' && (ids.includes('streams4') || ids.includes('streams6')))
+                    || (id === 'streams4' && ids.includes('streams6'))
                     || (id === 'noads' && ads)
                 ));
                 if (!ads && !resolved.includes('noads')) resolved.push('noads');
                 return resolved.slice(0, 20);
             })(),
             ads,
+            ...(adLevel ? { adLevel } : {}),
+            ...(offer ? { offer } : {}),
         };
     });
     /* An offer aimed at a plan that no longer exists is an offer on every plan,
@@ -150,7 +198,15 @@ export const normalizeStreamingPricingConfiguration = (
     const introOfferPlanId = pricing.introOfferPlanId && plans.some(plan => plan.id === pricing.introOfferPlanId)
         ? pricing.introOfferPlanId
         : undefined;
-    const commercialOffers = normalizeCommercialOffers(pricing.commercialOffers, streams, plans);
+    const offerIntent = normalizeCommercialOffers(pricing.commercialOffers, streams, plans);
+    // #103: the ad plans waiting while subscriptions are off (see above)
+    const waiting = subscriptionsOn ? [] : pricing.plans.slice(0, STREAMING_MAX_PLANS).flatMap((plan, index) => (plan.ads === true ? [[plans[index].id, {
+        monthly: normalizeStreamingPlanPrice(Number(plan.monthly), true),
+        ...(plan.adLevel && plan.adLevel !== 'NONE' && STREAMING_PLAN_AD_LEVELS.includes(plan.adLevel) ? { adLevel: plan.adLevel } : {}),
+    }] as const] : []));
+    const commercialOffers: StreamingCommercialOfferIntent = waiting.length
+        ? { ...offerIntent, inactiveAdPlans: { ...offerIntent.inactiveAdPlans, ...Object.fromEntries(waiting) } }
+        : offerIntent;
     const canonicalPlans = plans.map(plan => {
         const benefit = commercialOffers.benefits.plans[plan.id];
         const early = Boolean(benefit?.premiumAccess && benefit.earlyAccessWeeks > 0);
@@ -159,8 +215,19 @@ export const normalizeStreamingPricingConfiguration = (
             ...(early ? ['early'] : []),
         ] };
     });
+    // Free with ads' and Rent or buy's own quality (#46, #47): kept when every row is a real
+    // step, else dropped; the store's top edition when both its prices are real.
+    const { freeAdOffer: rawFreeAdOffer, storeQuality: rawStoreQuality, storeTopEdition: rawTopEdition, ...rest } = pricing;
+    const freeAdOffer = normalizeStreamingPlanOffer(rawFreeAdOffer);
+    const storeQuality = normalizeStreamingPlanOffer(rawStoreQuality);
+    const topRent = normalizeStreamingTransactionPrice(Number(rawTopEdition?.rent));
+    const topBuy = normalizeStreamingTransactionPrice(Number(rawTopEdition?.buy));
+    const storeTopEdition = rawTopEdition && topRent > 0 && topBuy > 0 ? { rent: topRent, buy: topBuy } : undefined;
     return {
-        ...pricing,
+        ...rest,
+        ...(freeAdOffer ? { freeAdOffer } : {}),
+        ...(storeQuality ? { storeQuality } : {}),
+        ...(storeTopEdition ? { storeTopEdition } : {}),
         streams,
         plans: canonicalPlans,
         commercialOffers,
@@ -190,12 +257,28 @@ export const streamingIntroOfferAppliesTo = (
     introOfferPlanId?: string,
 ): boolean => !introOfferPlanId || introOfferPlanId === planId;
 
+/** Pay yearly (#71): the share of subscribers who pay yearly at a discount. The odds that one does grow in
+    step with the discount for paying up front: at 15% they are `share`'s (the market's one in three, or a
+    cohort's own split), twice the discount is twice the odds (30% off about one in two, 50% off about three
+    in five), and with nothing off nobody pays yearly. */
+export const streamingAnnualBillingShare = (
+    discountPercent: number,
+    share = STREAMING_ANNUAL_BILLING_SHARE,
+): number => {
+    const discount = clamp(discountPercent, 0, STREAMING_MAXIMUM_ANNUAL_DISCOUNT);
+    if (discount === STREAMING_REFERENCE_ANNUAL_DISCOUNT || share <= 0 || share >= 1) return share;
+    const odds = share / (1 - share) * discount / STREAMING_REFERENCE_ANNUAL_DISCOUNT;
+    return odds / (1 + odds);
+};
+
 export const effectiveMonthlyStreamingPlanPrice = (
     monthly: number,
     annualDiscountPercent: number,
     introOfferPercent: number,
     weeksSinceOfferStart: number,
     introApplies = true,
+    /** who pays yearly: the market's one in three, or the player's at its discount (#71) */
+    annualShare = STREAMING_ANNUAL_BILLING_SHARE,
 ): number => {
     const listPrice = round2(clamp(monthly, 0, STREAMING_MAXIMUM_PLAN_PRICE));
     const annual = streamingDiscountedMonthly(listPrice, annualDiscountPercent, STREAMING_MAXIMUM_ANNUAL_DISCOUNT);
@@ -203,8 +286,8 @@ export const effectiveMonthlyStreamingPlanPrice = (
         ? streamingDiscountedMonthly(listPrice, introOfferPercent, STREAMING_MAXIMUM_INTRO_OFFER)
         : listPrice;
     return round2(
-        STREAMING_ANNUAL_BILLING_SHARE * annual
-        + (1 - STREAMING_ANNUAL_BILLING_SHARE) * intro,
+        annualShare * annual
+        + (1 - annualShare) * intro,
     );
 };
 
@@ -231,6 +314,8 @@ export const firstYearStreamingPlanRevenuePerSubscriber = (
     annualDiscountPercent: number,
     introOfferPercent: number,
     introApplies = true,
+    /** who pays yearly: the market's one in three, or the player's at its discount (#71) */
+    annualShare = STREAMING_ANNUAL_BILLING_SHARE,
 ): number => {
     const listPrice = round2(clamp(monthly, 0, STREAMING_MAXIMUM_PLAN_PRICE));
     const annualRevenue = streamingDiscountedMonthly(listPrice, annualDiscountPercent, STREAMING_MAXIMUM_ANNUAL_DISCOUNT) * 12;
@@ -239,8 +324,8 @@ export const firstYearStreamingPlanRevenuePerSubscriber = (
         : listPrice;
     const monthlyRevenue = introMonthly * 3 + listPrice * 9;
     return round2(
-        annualRevenue * STREAMING_ANNUAL_BILLING_SHARE
-        + monthlyRevenue * (1 - STREAMING_ANNUAL_BILLING_SHARE)
+        annualRevenue * annualShare
+        + monthlyRevenue * (1 - annualShare)
     );
 };
 
@@ -280,6 +365,8 @@ export const getStreamingBlendedMonthlyPrice = (
             pricing.annualDiscount,
             pricing.introOffer,
             weeksSinceOfferStart,
+            true,
+            streamingAnnualBillingShare(pricing.annualDiscount),
         ) * weights[index]
     ), 0) / totalWeight);
 };

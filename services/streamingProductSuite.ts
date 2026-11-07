@@ -17,10 +17,10 @@ import {
 import { resolveStreamingCatalogTitle } from './streamingCatalog';
 import { getStreamingOriginalLiveStatus } from './streamingOriginals';
 import {
-    findStreamingResearchDefinitionForProduct,
     markStreamingResearchInstallationOperating,
     markStreamingResearchInstallationStarted,
 } from './streamingResearchLifecycle';
+import { grantStreamingTechTreeFromLevels, resolveStreamingTechTree } from './streamingTechTreeCatalogue';
 
 export interface StreamingProductDefinition {
     id: StreamingProductLineId;
@@ -387,44 +387,36 @@ const getProductBlockers = (
     const technology = platform.technologyLevels;
     const active = (id: StreamingProductLineId): boolean => id === 'CORE' || Boolean(activeRecord(platform, id));
     if (definition.id === 'KIDS') {
-        const researchDefinition = findStreamingResearchDefinitionForProduct('KIDS');
-        const researchProgram = researchDefinition
-            ? platform.researchPrograms.find(program => program.definitionId === researchDefinition.id)
-            : null;
-        if (!researchProgram || !['READY_TO_INSTALL', 'INSTALLING', 'OPERATING'].includes(researchProgram.stage)) {
-            blockers.push('Kids Mode research and IP clearance required');
-        }
-        if (technology.SECURITY < 10) blockers.push('Security Level 10 required');
-        if (technology.CONTENT_OPERATIONS < 10) blockers.push('Content Operations Level 10 required');
+        // Kids Mode no longer waits for research (the research pipeline is retired).
+        if (technology.SECURITY < 10) blockers.push('Security Level 10 required (Trust and safety in Tech)');
         if (platform.catalogProjectIds.length < 3) blockers.push('At least 3 catalog titles required');
         if (countFamilyTitles(player) < 1) blockers.push('At least 1 family-ready title required');
     }
     if (definition.id === 'FREE') {
-        if (technology.DELIVERY_CAPACITY < 20) blockers.push('Delivery Capacity Level 20 required');
-        if (technology.DATA_RECOMMENDATIONS < 10) blockers.push('Audience Intelligence Level 10 required');
+        if (technology.DELIVERY_CAPACITY < 20) blockers.push('Delivery Capacity Level 20 required (Optimisation in Tech)');
+        if (technology.DATA_RECOMMENDATIONS < 10) blockers.push('Audience Intelligence Level 10 required (Smart AI in Tech)');
         if (platform.capacity.baselineConcurrentStreams < 1_000_000) blockers.push('1M normal concurrent streams required');
         if (platform.catalogProjectIds.length < 6) blockers.push('At least 6 catalog titles required');
     }
     if (definition.id === 'LIVE') {
-        if (technology.DELIVERY_CAPACITY < 30) blockers.push('Delivery Capacity Level 30 required');
-        if (technology.RELIABILITY < 25) blockers.push('Reliability Level 25 required');
-        if (technology.CONTENT_OPERATIONS < 22) blockers.push('Content Operations Level 22 required');
+        if (technology.DELIVERY_CAPACITY < 30) blockers.push('Delivery Capacity Level 30 required (Optimisation in Tech)');
+        if (technology.RELIABILITY < 25) blockers.push('Reliability Level 25 required (Stabilization in Tech)');
         if (platform.capacity.burstConcurrentStreams < 6_000_000) blockers.push('6M burst streams required');
     }
     if (definition.id === 'FAN') {
-        if (technology.DATA_RECOMMENDATIONS < 10) blockers.push('Audience Intelligence Level 10 required');
-        if (technology.SECURITY < 10) blockers.push('Security Level 10 required');
+        if (technology.DATA_RECOMMENDATIONS < 10) blockers.push('Audience Intelligence Level 10 required (Smart AI in Tech)');
+        if (technology.SECURITY < 10) blockers.push('Security Level 10 required (Trust and safety in Tech)');
         if (countReleasedOriginals(player) < 1) blockers.push('At least 1 released Original required');
     }
     if (definition.id === 'STORE') {
-        if (technology.SECURITY < 25) blockers.push('Security Level 25 required');
-        if (technology.ADVERTISING_COMMERCE < 20 && !active('FREE')) blockers.push('EMPIRE+ Free or Commerce Level 20 required');
+        if (technology.SECURITY < 25) blockers.push('Security Level 25 required (Trust and safety in Tech)');
+        if (technology.ADVERTISING_COMMERCE < 20 && !active('FREE')) blockers.push('EMPIRE+ Free or Commerce Level 20 required (Ads tech in Tech)');
         if (!active('FAN') && !active('FREE')) blockers.push('Fan or Free audience surface required');
     }
     if (definition.id === 'INTERACTIVE') {
         if (technology.PLAYBACK_QUALITY < 45) blockers.push('Playback Quality Level 45 required');
-        if (technology.RELIABILITY < 30) blockers.push('Reliability Level 30 required');
-        if (technology.DATA_RECOMMENDATIONS < 24) blockers.push('Audience Intelligence Level 24 required');
+        if (technology.RELIABILITY < 30) blockers.push('Reliability Level 30 required (Stabilization in Tech)');
+        if (technology.DATA_RECOMMENDATIONS < 24) blockers.push('Audience Intelligence Level 24 required (Smart AI in Tech)');
         if (platform.capacity.burstConcurrentStreams < 10_000_000) blockers.push('10M burst streams required');
         if (!active('LIVE')) blockers.push('EMPIRE+ Live required');
         if (!active('FAN')) blockers.push('EMPIRE+ Fan required');
@@ -641,6 +633,11 @@ export const completeDueStreamingProductDevelopments = (
         ...platform,
         productLines,
         technologyLevels,
+        // Product Experience 25 used to open Downloads in plans; since #52 they need Playback's
+        // Downloads, so a launch that lifts the level to 25 or more gives that step (and only it).
+        techTree: technologyLevels.PRODUCT_EXPERIENCE >= 25 && technologyLevels.PRODUCT_EXPERIENCE > platform.technologyLevels.PRODUCT_EXPERIENCE
+            ? grantStreamingTechTreeFromLevels(resolveStreamingTechTree(platform), { PRODUCT_EXPERIENCE: 25 }, absoluteWeek)
+            : platform.techTree,
         milestoneKeys: Array.from(new Set([
             ...platform.milestoneKeys,
             'product-lab-operational',

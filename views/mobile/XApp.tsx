@@ -12,7 +12,7 @@ import {
     IndustryMediaInstitution,
     IndustryMediaPersonality,
 } from '../../types';
-import { generateXFeed, generateTrendingTopics, isIndustryInfoPost } from '../../services/xLogic';
+import { generateTrendingTopics, isIndustryInfoPost, isXPostThisWeek, openXFeed, xPostWeekOfYear } from '../../services/xLogic';
 import { NPC_DATABASE } from '../../services/npcLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from '../../services/youtubeLogic';
 import {
@@ -28,6 +28,7 @@ import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Home, Search, PenTool, Heart, Repeat, MessageCircle, MoreHorizontal, Check, User, Mail, Calendar, MapPin, Link as LinkIcon, Bell, Star, XCircle, Flame, ShieldCheck, Laugh, Megaphone, Film, Users, MessageSquareQuote } from 'lucide-react';
 import { IndustryClaimBadge, IndustryClaimContextPanel, IndustrySourceTrackRecord, getIndustryClaimPresentation } from './IndustryClaimContext';
 import { IndustryNarrativeContext } from './IndustryNarrativeContext';
+import { StoredMediaImage } from '../../components/StoredMediaImage';
 import { applyProjectPromotionAttribution, getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
 import './x-app-responsive.css';
 
@@ -280,15 +281,8 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
             .sort((left, right) => right.calls - left.calls || right.lastResolvedAbsoluteWeek - left.lastResolvedAbsoluteWeek)[0]
         : undefined;
 
-    // Initialize feed if empty or outdated
-    const [feed, setFeed] = useState<XPost[]>(() => {
-        if (player.x.feed.length === 0 || player.x.lastPostWeek !== player.currentWeek) {
-            const newFeed = generateXFeed(player);
-            // Side effect: update player logic would normally be higher up, but for sim we do it on action
-            return newFeed;
-        }
-        return player.x.feed;
-    });
+    // The saved feed, with this week's chatter added once a week (#65); saved on the first action
+    const [feed, setFeed] = useState<XPost[]>(() => openXFeed(player));
 
     const trending = generateTrendingTopics(player);
     const npcStates = (player.instagram?.npcStates || {}) as Record<string, NPCState>;
@@ -682,7 +676,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <div className="flex items-center gap-1 mb-0.5">
                         <span className={`font-bold text-white truncate max-w-[140px] ${canOpenAuthorProfile ? 'hover:underline' : ''}`} onClick={(e) => { e.stopPropagation(); if (canOpenAuthorProfile) handleProfileClick(post.authorId); }}>{post.authorName}</span>
                         {post.isVerified && <div className="text-blue-400"><Check size={14} className="bg-white rounded-full text-blue-500 fill-blue-500" /></div>}
-                        <span className="text-zinc-500 text-sm truncate">{post.authorHandle} · {post.timestamp === player.currentWeek ? '2h' : '1d'}</span>
+                        <span className="text-zinc-500 text-sm truncate">{post.authorHandle} · {isXPostThisWeek(post, player) ? '2h' : '1d'}</span>
                     </div>
                     {isIndustryPost && (
                         <div className="mb-2 inline-flex rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-blue-300">
@@ -700,6 +694,9 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                     <div className="text-sm text-zinc-200 leading-normal mb-3 whitespace-pre-wrap">
                         {post.content}
                     </div>
+                    {post.contentMediaId && (
+                        <StoredMediaImage mediaId={post.contentMediaId} className="mb-3 block w-full max-h-80 rounded-2xl border border-zinc-800 object-cover object-[center_35%]" />
+                    )}
                     {post.quoteOfId && (
                         <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
                             {tr('x.quotedPost')}
@@ -761,9 +758,12 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                 </div>
                             </div>
                             <div className="mt-4 whitespace-pre-wrap text-[17px] leading-relaxed text-white">{selectedPost.content}</div>
+                            {selectedPost.contentMediaId && (
+                                <StoredMediaImage mediaId={selectedPost.contentMediaId} className="mt-3 block w-full max-h-[420px] rounded-2xl border border-zinc-800 object-cover object-[center_35%]" />
+                            )}
                             {selectedClaimContext && <div className="mt-3"><IndustryClaimBadge claim={selectedClaimContext.claim} /></div>}
                             <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-black uppercase tracking-widest">
-                                <span className="rounded-full bg-zinc-900 px-3 py-1 text-zinc-400">{selectedPost.timestamp === player.currentWeek ? tr('x.thisWeek') : tr('x.weekLabel', { week: selectedPost.timestamp })}</span>
+                                <span className="rounded-full bg-zinc-900 px-3 py-1 text-zinc-400">{isXPostThisWeek(selectedPost, player) ? tr('x.thisWeek') : tr('x.weekLabel', { week: xPostWeekOfYear(selectedPost.timestamp) })}</span>
                                 {(selectedPost.controversyScore || 0) > 0 && <span className="rounded-full bg-red-500/10 px-3 py-1 text-red-300">{tr('x.heatValue', { value: selectedPost.controversyScore || 0 })}</span>}
                             </div>
                         </div>

@@ -7,13 +7,14 @@ import type {
 import { createDeterministicId } from '../deterministicRandom';
 import { projectStreamingCommercialOffers } from '../streamingCommercialOffers';
 import { normalizeStreamingPricingConfiguration } from '../streamingPricingEconomy';
+import { STREAMING_FREE_TIER_PIRACY, streamingFreeTierChoiceFactor } from '../streamingPlanOffer';
 import { evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
 import { evaluateStreamingStoreBuyer } from '../streamingTitleAccess';
 import { normalizeWorldPopulationState } from './worldPopulation';
 import { normalizeWorldAudienceEconomyState } from './worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldAudienceParticipation';
 import { allocateWorldStreamingCohort } from './worldStreamingCompetition';
-import { getWorldStreamingOffers, getWorldStreamingOfferExposure, getWorldStreamingStoreStrength } from './worldStreamingOffers';
+import { getWorldStreamingDeviceReachFactor, getWorldStreamingOfferMarketing, getWorldStreamingOffers, getWorldStreamingOfferExposure, getWorldStreamingStoreStrength } from './worldStreamingOffers';
 
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, Number.isFinite(value) ? value : low));
 const integer = (value: number): number => Math.max(0, Math.round(Number.isFinite(value) ? value : 0));
@@ -76,19 +77,23 @@ export const allocateStreamingAudienceChoice = (
         const budgetPerHome = path.reachableHouseholds > 0 ? path.totalBudget / path.reachableHouseholds : 0;
         const alternatives = countryOffers.flatMap(offer => {
             const projected = projectStreamingCommercialOffers(offer.commercialConfiguration);
-            const exposure = getWorldStreamingOfferExposure(offer);
+            const exposure = getWorldStreamingOfferExposure(offer, countryId);
             const countryCatalogue = offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
-            const quality = clamp((countryCatalogue * .28 + offer.localizationStrengthIndex * .16
-                + offer.reliabilityIndex * .17 + offer.reputationIndex * .16 + offer.marketingIndex * .11
+            const quality = clamp((countryCatalogue * .28
+                + (offer.localizationStrengthByCountry?.[countryId] ?? offer.localizationStrengthIndex) * .16
+                + offer.reliabilityIndex * .17 + offer.reputationIndex * .16 + getWorldStreamingOfferMarketing(offer, countryId) * .11
                 + offer.loyaltyIndex * .12) / 100, .05, 1);
+            // a free tier's own quality (#46) draws more or fewer households; unset, ×1 as before.
+            // Smarter ad breaks (#61): the player's ad minutes cost viewers less; a rival's factor is 1
             const free = projected.freeAdOffer && countryCatalogue > 0 ? [{ offer, kind: 'FREE_AD' as const, exposure,
                 weight: quality * (1 + cohort.priceSensitivityIndex / 120)
-                    * clamp(1 - projected.freeAdOffer.adMinutesPerHour / 35, .3, 1) * exposure }] : [];
+                    * clamp(1 - projected.freeAdOffer.adMinutesPerHour * (offer.adPenaltyFactor ?? 1) / 35, .3, 1) * exposure
+                    * streamingFreeTierChoiceFactor(offer.freeAdQualityIndex) * getWorldStreamingDeviceReachFactor(offer) }] : [];
             const store = projected.storeOffer && projected.storeOffer.eligibility.kind === 'PUBLIC'
-                && getWorldStreamingStoreStrength(offer,countryId)>0 && getWorldStreamingOfferExposure(offer)>0
+                && getWorldStreamingStoreStrength(offer,countryId)>0 && getWorldStreamingOfferExposure(offer, countryId)>0
                 && projected.storeOffer.rent <= budgetPerHome
                 ? [{ offer, kind: 'STORE' as const, exposure, weight: quality * .72
-                    * clamp(1 - projected.storeOffer.rent / Math.max(1, budgetPerHome) * .45, .2, 1) * exposure }]
+                    * clamp(1 - projected.storeOffer.rent / Math.max(1, budgetPerHome) * .45, .2, 1) * exposure * getWorldStreamingDeviceReachFactor(offer) }]
                 : [];
             return [...free, ...store];
         });
@@ -115,6 +120,12 @@ export const allocateStreamingAudienceChoice = (
             : 0;
         const active = Math.min(remainder, Math.round(remainder * interest * exposureAvailability));
         const chosen = distribute(active, alternatives.map(row => row.weight));
+        /* #57: a free tier draws pirates in: of the homes left outside every service, the piracy-prone
+           come to the player's free tier (none without one, so a service without a free tier is as before) */
+        const playerFree = alternatives.findIndex(row => row.kind === 'FREE_AD' && row.offer.isPlayer);
+        const drawn = playerFree < 0 ? 0 : Math.min(remainder - active, Math.round((remainder - active) * cohort.piracyTendencyIndex / 100
+            * STREAMING_FREE_TIER_PIRACY.draw * streamingFreeTierChoiceFactor(alternatives[playerFree].offer.freeAdQualityIndex) * alternatives[playerFree].exposure));
+        if (drawn > 0) chosen[playerFree] += drawn;
         alternatives.forEach((row, index) => {
             const households = chosen[index];
             if (!households) return;
@@ -123,7 +134,7 @@ export const allocateStreamingAudienceChoice = (
             if (row.kind === 'FREE_AD') freeAdHouseholds += households;
             else storeHouseholds += households;
         });
-        outsideHouseholds += remainder - active;
+        outsideHouseholds += remainder - active - drawn;
         pathRows.push({ billingPath: path.billingPath, reachableHouseholds: path.reachableHouseholds,
             primarySubscriptions, monthlySpend: round2(subscriptionAllocations.reduce((sum, row) => sum + row.monthlySpend, 0)),
             allocations: subscriptionAllocations });
@@ -140,8 +151,10 @@ export const allocateStreamingAudienceChoice = (
         const projected=projectStreamingCommercialOffers(offer.commercialConfiguration);
         const catalogue=offer.catalogueStrengthByCountry?.[countryId] ?? offer.catalogueStrengthIndex;
         if(!projected.freeAdOffer || catalogue<=0) return [];
-        const fit=clamp((catalogue*.4+offer.reliabilityIndex*.2+offer.reputationIndex*.15+offer.localizationStrengthIndex*.15+offer.loyaltyIndex*.1)/100,0,1);
-        const weight=fit*(1+cohort.priceSensitivityIndex/120)*clamp(1-projected.freeAdOffer.adMinutesPerHour/35,.3,1)*getWorldStreamingOfferExposure(offer);
+        const localization=offer.localizationStrengthByCountry?.[countryId] ?? offer.localizationStrengthIndex;
+        const fit=clamp((catalogue*.4+offer.reliabilityIndex*.2+offer.reputationIndex*.15+localization*.15+offer.loyaltyIndex*.1)/100,0,1);
+        const weight=fit*(1+cohort.priceSensitivityIndex/120)*clamp(1-projected.freeAdOffer.adMinutesPerHour/35,.3,1)*getWorldStreamingOfferExposure(offer, countryId)
+            *streamingFreeTierChoiceFactor(offer.freeAdQualityIndex)*getWorldStreamingDeviceReachFactor(offer);
         const reached=allocations.filter(row=>row.platformId===offer.platformId && row.kind!=='STORE').reduce((sum,row)=>sum+row.households,0);
         return [{offer,weight,remaining:Math.max(0,reachable-reached)}];
     });
@@ -170,7 +183,7 @@ export const allocateStreamingAudienceChoice = (
         const interest = clamp(.16 + participation.streamingInterestIndex / 155
             + cohort.entertainmentAppetiteIndex / 420, .08, .84);
         const households = Math.min(reachable - Math.min(reachable, alreadyReached), integer(
-            Math.max(0, reachable - alreadyReached) * interest * getWorldStreamingOfferExposure(offer)
+            Math.max(0, reachable - alreadyReached) * interest * getWorldStreamingOfferExposure(offer, countryId) * getWorldStreamingDeviceReachFactor(offer)
             * clamp(catalogue / 100, 0, 1)
             * clamp(1 - store.rent / Math.max(1, monthlyBudget) * .45, 0, 1)));
         return households ? [{platformId: offer.platformId, kind: 'STORE' as const,

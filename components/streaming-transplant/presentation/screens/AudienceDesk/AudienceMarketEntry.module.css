@@ -15,8 +15,12 @@
 @keyframes entryIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
 /* ── the top bar ── */
-.top{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;padding:14px 14px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
-.top.top .back{width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);font:700 18px/1 'Inter',system-ui,sans-serif;color:#dfe4ec}
+.top{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;padding:14px 14px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
+/* #139: the Audience room's back tile (.ad .adback): 34 px, the arrow centred */
+.top.top .back{display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:11px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font:400 17px/1 'Inter',system-ui,sans-serif;color:#d4dae4;
+  transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
+.top.top .back:active{background:rgba(255,255,255,.11);transform:scale(.9)}
 .top small{display:block;font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:#7d8698}
 .top div>b{display:block;margin-top:4px;font:900 17px/1.1 'Inter',system-ui,sans-serif;letter-spacing:-.01em}
 .purse{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
@@ -48,31 +52,21 @@
 .secHead span{font-size:9.5px;color:#7d8698}
 .secHead.secHead button{padding:6px 10px;border-radius:99px;border:1px solid color-mix(in srgb,var(--entry-accent) 55%,transparent);font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb,var(--entry-accent) 65%,#fff)}
 
-/* ── a country you could enter ── */
-.cards{display:flex;flex-direction:column;gap:7px}
-.card{padding:10px 11px 11px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075);transition:border-color .16s ease,background .16s ease}
-.cardOn{border-color:rgba(255,255,255,.55);background:#10141c}
-.cardBody{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;text-align:left}
-.cardFlag{display:block;width:34px;height:23px;border-radius:5px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.16)}
-.cardFlag svg{display:block;width:100%;height:100%}
-.cardName{min-width:0}
-.cardName b{display:block;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cardName small{display:block;margin-top:3px;font-size:9px;color:#8b93a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cardViewers{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-.cardViewers b{font:400 19px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#f3f5f9}
-.cardViewers small{font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#7d8698}
-.cardFacts{display:flex;flex-wrap:wrap;gap:5px;margin:9px 0 9px 44px}
-.cardFacts span{display:flex;align-items:center;gap:5px;padding:4px 7px;border-radius:99px;background:rgba(255,255,255,.045);font-size:9px;font-weight:700;color:#b6bdca}
-.cardFacts span i{width:6px;height:6px;border-radius:50%;background:var(--tone)}
-.card .pick{display:block;width:calc(100% - 44px);margin-left:44px;padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.12);
-  font:800 9.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#dfe4ec;transition:background .16s ease}
-.card .pickOn{background:#fff;border-color:#fff;color:#0b0e14}
+/* ── a country you could enter: the Define the Launch card (#139) ── */
+.cards{display:flex;flex-direction:column;gap:10px}
+/* the finance tokens (.sf) without the finance page's own frame */
+:global(.sf).cardScope{height:auto;min-height:0;max-width:none;display:block;overflow:visible;background:none}
 .cards .more{padding:11px;border-radius:12px;border:1px dashed rgba(255,255,255,.14);font:800 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8b93a5}
 .empty{display:flex;flex-direction:column;gap:5px;margin-top:16px;padding:16px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
 .empty b{font-size:13px;font-weight:900}
 .empty span{font-size:10px;line-height:1.5;color:#8b93a5}
 
 /* ── clearance files ── */
+.cardFlag{display:block;width:34px;height:23px;border-radius:5px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.16)}
+.cardFlag svg{display:block;width:100%;height:100%}
+.cardName{min-width:0}
+.cardName b{display:block;font-size:13px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cardName small{display:block;margin-top:3px;font-size:9px;color:#8b93a5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .files{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .file{padding:11px;border-radius:15px;background:#0c0f15;border:1px solid rgba(255,255,255,.075)}
 .file header{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px}
@@ -106,9 +100,4 @@
 
 @media (prefers-reduced-motion:reduce){.entry{animation:none}}
 
-/* ── network reach for a country you could enter ── */
-.cardFacts .cover_SERVED i{background:#4ade80}
-.cardFacts .cover_THIN i{background:#f5b544}
-.cardFacts .cover_DARK{color:#ffb4b4;background:rgba(255,107,107,.1)}
-.cardFacts .cover_DARK i{background:#ff6b6b}
 .trayWarn{margin-top:9px;padding:8px 10px;border-radius:10px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.22);font-size:9.5px;line-height:1.45;color:#fca5a5}

@@ -422,10 +422,7 @@ const readUi = (fileName: string): string => fs.readFileSync(
     path.join(process.cwd(), 'components', fileName),
     'utf8',
 );
-const platformWarsSource = readUi('StreamingPlatformWars.tsx');
-assert.ok(platformWarsSource.includes('StreamingPlatformBrand'), 'Platform Wars must render shared platform identities.');
-assert.ok(platformWarsSource.includes('resolveStreamingPlatformBrandById'), 'Core rivals must resolve their identity from stable IDs.');
-assert.ok(!platformWarsSource.includes('RIVAL_COLORS'), 'Platform Wars must not maintain a second platform-colour map.');
+/* #141: the Platform Wars room is removed; the wizards still draw rivals with the shared brand. */
 for (const wizardFile of ['StreamingDefineLaunchWizard.tsx', 'StreamingMarketExpansionWizard.tsx']) {
     const wizardSource = readUi(wizardFile);
     assert.ok(

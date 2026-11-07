@@ -26,6 +26,7 @@ import {
     getStreamingIncorporationBreakdown,
     STREAMING_INCORPORATION_ECONOMY,
 } from './streamingEconomy';
+import { convertStreamingTechTreeFromLevels } from './streamingTechTreeCatalogue';
 
 export {
     getStreamingIncorporationBreakdown,
@@ -372,6 +373,8 @@ export const incorporateOwnedStreamingPlatform = (
         infrastructureStrategy: 'UNDECIDED',
         capacity: emptyOperations.capacity,
         technologyLevels: emptyOperations.technologyLevels,
+        // A new company starts with the starter techs only (480p, 8-bit, Stereo).
+        techTree: convertStreamingTechTreeFromLevels(0),
         technologyProjects: [],
         researchPrograms: [],
         campusProjects: [],

@@ -111,6 +111,8 @@ export interface TitleFinance {
   contentAmortization?: number;
   /** Percent change in contribution vs the previous period, e.g. -12.4. */
   trend: number;
+  /** #163: no revenue in the period before, so no trend: shown as NEW */
+  isNew?: boolean;
   /** Host override. Omit and derive.ts classifies it from margin + trend. */
   status?: TitleStatus;
 }
@@ -218,6 +220,12 @@ export interface StudioFinanceData {
   status?: FinanceStatus;
   /** Host override for the "What changed?" line, per period. */
   whatChanged?: Partial<Record<PeriodKey, string>>;
+  /** #175: the host's own runway (weeks at its recent pace; null while the company makes money). When set, every
+      runway on these pages reads it, so it matches the host's other money screens. */
+  runwayWeeks?: number | null;
+  /** #175: 'founder' keeps Capital to the founder's own money and the bank; owners, investors and listing live in
+      the host's own rooms (the streaming Boardroom's OWNERSHIP and MARKETS). Absent = every route, as before. */
+  capitalScope?: 'all' | 'founder';
 }
 
 /** Everything the screen hands back to the game. */
@@ -238,4 +246,7 @@ export interface StudioFinanceHandlers {
   /** Optional deep link to a territory screen. Without it the market cards are
       read-only rather than pretending to lead somewhere. */
   onOpenMarket?: (marketId: string) => void;
+  /** #175: with capitalScope 'founder', where owners and investors live, and where the company goes public. */
+  onOpenOwnership?: () => void;
+  onOpenMarkets?: () => void;
 }

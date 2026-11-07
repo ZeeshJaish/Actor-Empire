@@ -1,3 +1,5 @@
+import type { Gender } from '../../types';
+
 export interface StreamingIpoPresentationCheck {
   id: string;
   label: string;
@@ -31,6 +33,10 @@ export interface StreamingIpoPresentationInputs {
   initialNewShares: number;
   simulationSeed: string;
   absoluteWeek: number;
+  /** #184: the valuation engine's equity value; when set, it is the fair value every gate measures against */
+  fairValue?: number;
+  /** #189: the faces at the table, by name: the founder, the executives and the directors */
+  people?: Record<string, { gender?: Gender | null; avatar?: string | null }>;
 }
 
 export interface StreamingIpoPresentationMark {

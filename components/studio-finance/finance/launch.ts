@@ -10,8 +10,9 @@
    charged until the player confirms a paid step.
    ========================================================================== */
 
-import type { CustomPoster, StreamingCommercialOfferIntent, StreamingPricingPlanColorId } from '../../../types';
+import type { CustomPoster, StreamingCommercialOfferIntent, StreamingPricingPlanColorId, StreamingTechId } from '../../../types';
 import type { WorldStreamingLaunchPricingForecast } from '../../../services/worldEconomy/worldStreamingPricingForecast';
+import type { StreamingPlanBuilderView } from '../../../services/streamingPlanBuilder';
 import { compactCount, money } from './format';
 /* The one pricing model. A second, cruder one used to live in this file — 30%
    of the annual discount and 25% of the intro, blended flat across every plan
@@ -21,6 +22,7 @@ import { compactCount, money } from './format';
 import {
   effectiveMonthlyStreamingPlanPrice,
   STREAMING_ANNUAL_BILLING_SHARE,
+  streamingAnnualBillingShare,
   streamingBillingPathPrice,
   streamingIntroOfferAppliesTo,
 } from '../../../services/streamingPricingEconomy';
@@ -347,6 +349,8 @@ export interface AnchorTitle {
   poster?: CustomPoster;
   linked: boolean;
   note?: string;
+  /** #122: its genre where the catalogue knows it ("Thriller"), for the app's key art in the front page previews */
+  genre?: string;
 }
 
 export interface CatalogueState {
@@ -452,8 +456,13 @@ export interface LaunchData {
   forecast: { audience: number; peakConcurrent: number; bandwidthGbps: number; edgeSites: number };
   blockers: LaunchBlocker[];
   blueprintSaved: boolean;
-  /** key namespaces: stream:, feature:, storefront:, ident:. */
+  /** why a front page or ident kit cannot be chosen yet, keyed `storefront:<id>` and `ident:<id>` ("Unlock Smart TV apps
+      in Tech"). #109: the stream: and feature: keys nobody read are gone. */
   capabilityLocks: Record<string, string>;
+  /** #109 (plan §18.5): the Tech step each lock needs, by the same keys, and its name, so "Unlock: Smart TV apps ›" opens it */
+  capabilityLockTech?: Record<string, { techId: StreamingTechId; tech: string }>;
+  /** The plan builder's rows, locks and starter plans, from the tech the service owns (Phase 2 #45). */
+  planBuilder?: StreamingPlanBuilderView;
 }
 
 /** What the player has changed but not yet handed back to the game. */
@@ -531,8 +540,8 @@ export interface LaunchHandlers {
       with nothing selected rather than silently keeping the previous pick. */
   onClearIdent?: () => void;
   onClearViewerOffer?: () => void;
-  /** Research-gated identity previews lead to the canonical Technology Campus. */
-  onOpenTechnology?: () => void;
+  /** Research-gated choices lead to Tech; a locked plan step opens on the tech it needs. */
+  onOpenTechnology?: (techId?: StreamingTechId) => void;
   onRemoveCustomIdentAudio?: () => void;
   onSaveViewerOffer?: (storefrontId: string) => void;
   onSavePricing?: (pricing: PricingSettings) => void;
@@ -1009,6 +1018,7 @@ export function forecastPricing(
   const openingPriceByPlan = new Map(plans.map(plan => [plan.id, effectiveMonthlyStreamingPlanPrice(
     plan.monthly, settings.annualDiscount, settings.introOffer, 0,
     streamingIntroOfferAppliesTo(plan.id, settings.introOfferPlanId),
+    streamingAnnualBillingShare(settings.annualDiscount),
   )]));
   const openingEntryPrice = plans.length > 0 ? Math.min(...openingPriceByPlan.values()) : 0;
   const subReach = plans.length > 0
@@ -1093,8 +1103,9 @@ export function forecastPricing(
     const monthlyRaw = cohortPlanPathSubscribers.get(`MONTHLY:${plan.id}`) || 0;
     const annualRaw = cohortPlanPathSubscribers.get(`ANNUAL:${plan.id}`) || 0;
     const pathTotal = monthlyRaw + annualRaw;
-    const annualBillingSubscribers = cohortSignals.length && pathTotal > 0
-      ? subs * annualRaw / pathTotal : subs * STREAMING_ANNUAL_BILLING_SHARE;
+    /* Pay yearly (#71): the pools say who subscribes; who pays yearly follows the discount, as in the world */
+    const annualBillingSubscribers = subs * streamingAnnualBillingShare(settings.annualDiscount,
+      cohortSignals.length && pathTotal > 0 ? annualRaw / pathTotal : STREAMING_ANNUAL_BILLING_SHARE);
     const monthlyBillingSubscribers = subs - annualBillingSubscribers;
     const introApplies = streamingIntroOfferAppliesTo(plan.id, settings.introOfferPlanId);
     const monthlyPrice = streamingBillingPathPrice(plan.monthly, settings.annualDiscount, settings.introOffer, 0, 'MONTHLY', introApplies);

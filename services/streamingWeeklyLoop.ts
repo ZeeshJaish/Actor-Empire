@@ -80,11 +80,25 @@ import { getStreamingAdditionalOperatingExpense } from './streamingOperatingExpe
 import { createStreamingMarketTaxAssessment, getStreamingCountryServedAudience } from './streamingMarketEconomics';
 import { finalizeStreamingMaintenanceTax } from './streamingMarketTaxSettlement';
 import { completeDueStreamingInfrastructureExpansion } from './streamingInfrastructure';
+import { completeDueStreamingNetworkOrders, recountStreamingNetworkCapacity } from './streamingNetworkOrders';
 import {
     calculateStreamingFundingPressure,
     getStreamingBlendedMonthlyPrice,
 } from './streamingPricingEconomy';
 import { streamingSharingEnforcementWeeklyCost } from './streamingSharingPolicy';
+import {
+    resolveStreamingDeliveryLoad,
+    streamingDeliveryPhaseIn,
+    streamingDeliveryWeeklyCost,
+} from './streamingDeliveryLoad';
+import {
+    payDownStreamingTechDebt,
+    resolveStreamingPlatformTechDebt,
+    resolveStreamingTechTree,
+    streamingTechOverloadFactor,
+    streamingTechPlaybackBoost,
+} from './streamingTechTreeCatalogue';
+import { streamingCampaignWeekCost } from './campaigns/streamingCampaignEffects';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -460,6 +474,9 @@ export const processOwnedStreamingPlatformWeek = (
     player = launchMarketing.player;
     const infrastructureCompletion = completeDueStreamingInfrastructureExpansion(player);
     player = infrastructureCompletion.player;
+    // #89: each region's network order due this week goes into service, and a network counted before #89 is recounted once
+    player = completeDueStreamingNetworkOrders(player).player;
+    player = recountStreamingNetworkCapacity(player).player;
     let normalizedPlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
 
     /* Start the service-standard clock the first week anyone looks.
@@ -478,6 +495,20 @@ export const processOwnedStreamingPlatformWeek = (
             ownedStreamingPlatform: {
                 ...player.ownedStreamingPlatform,
                 serviceStandardFromWeek: absoluteWeek,
+            },
+        };
+    }
+
+    /* Start rivals' tech pace the first week a live service runs under it (#69): stamped, not derived
+       from the launch, for the same reason as the service standard above. A career years deep sees
+       its rivals move on from here, not jump ahead by every year it has already played. */
+    if (normalizedPlatform.launchCommit && normalizedPlatform.rivalTechFromWeek === undefined) {
+        normalizedPlatform = { ...normalizedPlatform, rivalTechFromWeek: absoluteWeek };
+        player = {
+            ...player,
+            ownedStreamingPlatform: {
+                ...player.ownedStreamingPlatform,
+                rivalTechFromWeek: absoluteWeek,
             },
         };
     }
@@ -639,17 +670,35 @@ export const processOwnedStreamingPlatformWeek = (
     const accessLoadAccounts = Math.max(worldCustomerOutcome?.accessLoadAccounts ?? previousSubscribers,
         worldViewingOutcome?.streamLoadAccounts || 0);
     const peakConcurrentStreams = Math.max(1, Math.round(accessLoadAccounts * peakActivityRate));
+    /* Load units (Phase 2): a viewer needs what their plan's picture streams (1080p = 1, 4K 2.4),
+       after Optimisation. A save from before keeps its load through its calibration, so only what
+       changes from here moves it (streamingDeliveryLoad.ts). Capacity is counted in the same units. */
+    const deliveryAllocations = worldCustomerOutcome?.planAllocations.length
+        ? worldCustomerOutcome.planAllocations
+        : worldCompetitionPlanAllocations.map(row => ({ planId: row.planId, paidAccounts: row.households }));
+    // free and store viewers stream their own quality once it is set (#46, #47)
+    const deliveryLoad = resolveStreamingDeliveryLoad(platform, deliveryAllocations, worldViewingOutcome ? {
+        free: worldViewingOutcome.accessMix.freeViewingAccounts || 0,
+        store: worldViewingOutcome.accessMix.storeViewingAccounts || 0,
+        others: worldViewingOutcome.accessMix.paidViewingAccounts + worldViewingOutcome.accessMix.sharedViewingAccounts,
+    } : undefined);
+    const peakLoadUnits = Math.max(1, Math.round(peakConcurrentStreams * deliveryLoad.viewerLoad));
     const burstCapacity = Math.max(1, platform.capacity.burstConcurrentStreams * infrastructureOperationsEffects.capacityMultiplier);
-    const capacityUtilizationPercent = peakConcurrentStreams / burstCapacity * 100;
+    const capacityUtilizationPercent = peakLoadUnits / burstCapacity * 100;
+    // Load testing (Stabilization) and No buffering (Playback, #52) leave only part of an overload's harm.
+    const playbackTree = resolveStreamingTechTree(platform);
     const overloadPenalty = capacityUtilizationPercent > 100
-        ? Math.min(12, (capacityUtilizationPercent - 100) * 0.16)
+        ? Math.min(12, (capacityUtilizationPercent - 100) * 0.16) * streamingTechOverloadFactor(playbackTree)
         : 0;
-    const technicalDebt = platform.infrastructureSetup?.technicalDebt || 0;
+    // The infrastructure's debt (campus builds) plus the tech tree's (pushing quality fast).
+    const technicalDebt = resolveStreamingPlatformTechDebt(platform);
     const reliabilityTarget = platform.infrastructureSetup?.reliabilityTarget || 97;
     const playbackSuccessRate = clamp(
         reliabilityTarget
         + platform.technologyLevels.PLAYBACK_QUALITY * 0.004
         + platform.technologyLevels.RELIABILITY * 0.002
+        // Playback's steps (#52): Fast start, No buffering, Low-latency streaming
+        + streamingTechPlaybackBoost(playbackTree)
         - overloadPenalty
         - technicalDebt * 0.035
         + (plan?.playbackBoost || 0)
@@ -784,8 +833,10 @@ export const processOwnedStreamingPlatformWeek = (
     );
     const averageActiveSubscribers = (previousSubscribers + subscribers) / 2;
     const organicAverageActiveSubscribers = (previousSubscribers + organicSubscribers) / 2;
+    // Sharing control (#56): extra members' fees are subscription money too
+    const extraMemberRevenue = roundMoney((worldCustomerOutcome?.extraMemberMonthlyRevenue || 0) / 4.33);
     const subscriptionRevenue = worldCustomerOutcome
-        ? roundMoney(worldCustomerOutcome.monthlySubscriptionRevenue / 4.33)
+        ? roundMoney(worldCustomerOutcome.monthlySubscriptionRevenue / 4.33) + extraMemberRevenue
         : roundMoney(calculateStreamingSubscriptionRevenueFullCurrency({
             subscribers: averageActiveSubscribers,
             monthlyArpu: weightedArpu,
@@ -823,6 +874,8 @@ export const processOwnedStreamingPlatformWeek = (
         .reduce((sum, loan) => sum + loan.outstandingPrincipal * loan.weeklyInterestRate, 0));
     const weeklyPlanCost = plan?.cashCost || 0;
     const growthPlanCost = growthAction?.cashCost || 0;
+    /* #145: what the campaign engine spent this week */
+    const campaignCost = roundMoney(streamingCampaignWeekCost(platform, absoluteWeek));
     const rightsComplianceCost = rightsCompliance.complianceCost;
     const technologyCampusCost = getStreamingTechnologyWeeklyCost(platform);
     const productSuiteCost = productEffects.weeklyOperatingCost;
@@ -845,17 +898,36 @@ export const processOwnedStreamingPlatformWeek = (
        you max out and forget. The generation itself carries no hold cost — that
        is what the research program's own `weeklyOperatingCost` is for. */
     const fibreHoldCost = roundMoney(fibreWeeklyHoldCost(platform.fibre));
+    /* The bandwidth bill (Phase 2): the week's viewing hours by picture, after Optimisation and
+       tech debt. The first close under load units fixes the calibration; a save that ran weeks
+       before then pays the bill in eighths over 8 weeks. */
+    const deliveryEconomics = platform.deliveryEconomics ?? {
+        schemaVersion: 1 as const,
+        loadCalibration: deliveryLoad.loadCalibration,
+        calibratedAtAbsoluteWeek: absoluteWeek,
+        ...(platform.lastProcessedAbsoluteWeek !== null ? { costPhaseInFromWeek: absoluteWeek } : {}),
+    };
+    const deliveryPhaseIn = streamingDeliveryPhaseIn(deliveryEconomics, absoluteWeek);
+    const streamingDeliveryCost = streamingDeliveryWeeklyCost(platform, {
+        hoursViewed: worldViewingOutcome?.totalHoursViewed,
+        accessLoadAccounts,
+        averageViewerLoad: deliveryLoad.averageViewerLoad,
+        phaseIn: deliveryPhaseIn,
+    });
     const contentRecognition = recognizeStreamingContentCost(platform, absoluteWeek, player.world.streamingRightsContracts, player.world);
     const contentAmortization = contentRecognition.expense;
-    const deductibleOperatingCost = roundMoney(partnerRevenueShareCost+fibreHoldCost+infrastructureCost+leadershipCost+financingCost
-        +weeklyPlanCost+growthPlanCost+rightsComplianceCost+technologyCampusCost+productSuiteCost+governanceCost
+    const deductibleOperatingCost = roundMoney(partnerRevenueShareCost+fibreHoldCost+infrastructureCost+streamingDeliveryCost+leadershipCost+financingCost
+        +weeklyPlanCost+growthPlanCost+campaignCost+rightsComplianceCost+technologyCampusCost+productSuiteCost+governanceCost
         +competitiveOperationsCost+acquisitionIntegrationCost+crisisRecoveryCost+infrastructureOperationsCost
         +audienceEnforcementCost+worldViewingCommercialOperatingCost);
     const countryRevenues=Object.fromEntries(platform.marketOperations.filter(row=>row.countryId).map(row=>{
         const countryId=row.countryId!;
-        const customer=player.world.worldStreamingCustomers?.countries?.[countryId]?.platformSummaries.find(x=>x.platformId==='PLAYER');
+        const customerCountry=player.world.worldStreamingCustomers?.countries?.[countryId];
+        const customer=customerCountry?.platformSummaries.find(x=>x.platformId==='PLAYER');
         const viewing=player.world.worldStreamingViewing?.countries?.[countryId]?.platformPerformance?.PLAYER;
-        return [countryId,(customer?.monthlySubscriptionRevenue||0)/4.33+(viewing?.revenue.totalIncrementalRevenue||0)];
+        // extra members (#56) are billed where their host account is
+        const extraMembers=(customerCountry?.cohorts||[]).reduce((sum,cohort)=>sum+cohort.planCells.reduce((cells,cell)=>cells+(cell.platformId==='PLAYER'?cell.extraMemberMonthlyRevenue||0:0),0),0);
+        return [countryId,((customer?.monthlySubscriptionRevenue||0)+extraMembers)/4.33+(viewing?.revenue.totalIncrementalRevenue||0)];
     }));
     const countryActiveAudience=Object.fromEntries(platform.marketOperations.filter(row=>row.countryId).map(row=>[row.countryId!,getStreamingCountryServedAudience(player,'PLAYER',row.countryId!,absoluteWeek)]));
     const taxBasis={deductibleOperatingCost,contentAmortization,countryRevenues,countryActiveAudience,
@@ -1060,7 +1132,7 @@ export const processOwnedStreamingPlatformWeek = (
         ...(competitiveEffects.activePressureMoves.length ? [{
             id: 'platform-war',
             label: 'A rival move reached this week',
-            detail: `${competitiveEffects.activePressureMoves.length} funded competitive move${competitiveEffects.activePressureMoves.length === 1 ? '' : 's'} changed audience pressure. Open Platform Wars to inspect the responsible CEO and response history.`,
+            detail: `${competitiveEffects.activePressureMoves.length} funded competitive move${competitiveEffects.activePressureMoves.length === 1 ? '' : 's'} changed audience pressure.`,
             impact: 'NEGATIVE' as const,
         }] : []),
         ...(acquisitionEffects.activeIntegrations.length ? [{
@@ -1386,6 +1458,10 @@ export const processOwnedStreamingPlatformWeek = (
             worldCustomerPiracyReach: worldCustomerOutcome?.piracyReach,
             worldCustomerAccessLoadAccounts: worldCustomerOutcome?.accessLoadAccounts,
             worldCustomerMonthlySubscriptionRevenue: worldCustomerOutcome?.monthlySubscriptionRevenue,
+            ...(worldCustomerOutcome?.extraMemberHouseholds ? {
+                worldCustomerExtraMemberHouseholds: worldCustomerOutcome.extraMemberHouseholds,
+                worldCustomerExtraMemberRevenue: extraMemberRevenue,
+            } : {}),
             worldCustomerPlanAllocations: worldCustomerOutcome?.planAllocations.map(row => ({ ...row })),
             audienceEnforcementCost: worldCustomerOutcome ? audienceEnforcementCost : undefined,
             worldViewingAccounts: worldViewingOutcome?.totalViewingAccounts,
@@ -1411,6 +1487,7 @@ export const processOwnedStreamingPlatformWeek = (
             financingCost,
             weeklyPlanCost,
             growthPlanCost,
+            campaignCost,
             rightsComplianceCost,
             marketPolicyCost,
             marketIncomeTax:marketCosts.marketIncomeTax, marketRevenueLevy:marketCosts.marketRevenueLevy,
@@ -1434,6 +1511,10 @@ export const processOwnedStreamingPlatformWeek = (
             additionalOperatingExpense: getStreamingAdditionalOperatingExpense(platform, absoluteWeek),
             accountingContribution,
             peakConcurrentStreams,
+            peakLoadUnits,
+            viewerLoad: Math.round(deliveryLoad.viewerLoad * 10_000) / 10_000,
+            streamingDeliveryCost,
+            streamingDeliveryPhaseIn: deliveryPhaseIn,
             capacityUtilizationPercent: roundPercent(capacityUtilizationPercent),
             playbackSuccessRate: roundPercent(playbackSuccessRate),
             appliedDecisionId: decision?.id || null,
@@ -1509,8 +1590,15 @@ export const processOwnedStreamingPlatformWeek = (
             }
             : item
     ));
+    // Stabilization pays tech debt down once a week: the tree's own first, then the infrastructure's.
+    const debtPaydown = payDownStreamingTechDebt(resolveStreamingTechTree(platform), platform.infrastructureSetup?.technicalDebt || 0, absoluteWeek);
     const weeklyCommittedPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        techTree: debtPaydown.tree,
+        deliveryEconomics,
+        infrastructureSetup: platform.infrastructureSetup
+            ? { ...platform.infrastructureSetup, technicalDebt: debtPaydown.infrastructureDebt }
+            : platform.infrastructureSetup,
         // Persist verified release truth so recovery does not depend on a
         // bounded event ledger retaining a legacy authorization forever.
         originalCommissions: platform.originalCommissions.map(commission =>

@@ -84,3 +84,61 @@
 @keyframes brEnter{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.enter{animation:none}}
 
+/* ── #166: the board review, a quarter the way the board reads it ── */
+.room .review{display:flex;flex-direction:column;gap:7px;width:100%;padding:14px;border-radius:15px;text-align:left;
+  background:linear-gradient(160deg,rgba(214,172,92,.09),#0b0d13 62%);border:1px solid rgba(214,172,92,.32)}
+.room .reviewTop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.room .reviewTop b{font:900 8.5px/1 'Inter',system-ui,sans-serif;letter-spacing:.16em;color:#efd39a}
+.room .reviewTop em{font:800 9.5px/1 'Inter',system-ui,sans-serif;font-style:normal;padding:4px 8px;border-radius:99px;color:#e8ecf3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+.room .review strong{font:800 14px/1.3 'Inter',system-ui,sans-serif;color:#eef0f5}
+.room .reviewFigs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:2px}
+.room .reviewFigs>span{display:flex;flex-direction:column;gap:4px;padding:8px 9px;border-radius:10px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.06)}
+.room .reviewFigs small{font:800 7.5px/1 'Inter',system-ui,sans-serif;letter-spacing:.14em;color:#6f7686}
+.room .reviewFigs b{font:400 15px/1 'Anton','Archivo',sans-serif;color:#eef0f5;white-space:nowrap}
+.room .reviewNotes{display:flex;flex-direction:column;gap:3px}
+.room .reviewHit,.room .reviewMiss{display:grid;grid-template-columns:12px minmax(0,1fr);gap:4px;font:600 10.5px/1.4 'Inter',system-ui,sans-serif}
+.room .reviewHit{color:#8fe0b0}
+.room .reviewMiss{color:#ffb3b6}
+.room .reviewHit i,.room .reviewMiss i{font-style:normal;font-size:8px;line-height:15px}
+/* #176: the tier sets the card's colour: breakout gold, growth green, steady blue, under pressure red */
+.room .tierBREAKOUT{--tier:214,172,92}
+.room .tierGROWING{--tier:74,222,128}
+.room .tierSTEADY{--tier:110,150,230}
+.room .tierUNDER_PRESSURE{--tier:255,107,112}
+.room .review{background:linear-gradient(160deg,rgba(var(--tier,214,172,92),.1),#0b0d13 62%);border-color:rgba(var(--tier,214,172,92),.34)}
+.room .reviewTop b{color:rgb(var(--tier,239,211,154))}
+.room .reviewTop em{color:rgb(var(--tier,232,236,243));background:rgba(var(--tier,255,255,255),.1);border-color:rgba(var(--tier,255,255,255),.4)}
+
+/* ── #166's M&A card became THE DEAL ROOM (#177, BoardroomDeals.module.css) ── */
+
+/* ── #175: MONEY as the summary: the pace or the runway, and the cash line ── */
+.room .cash{position:relative;display:flex;flex-direction:column;margin-top:16px;padding:16px 15px 12px;border-radius:16px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08)}
+.room .cashEyebrow{font:800 8px/1 'Archivo','Inter',sans-serif;letter-spacing:.2em;color:#7d8698}
+.room .cashFigure{margin-top:8px;font:400 38px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em}
+.room .warnText{color:#fbbf24}
+.room .cashLineCopy{margin-top:6px;font-style:normal;font-size:10.5px;line-height:1.4;color:#8b93a5}
+.room .cashLine{position:relative;display:block;height:64px;margin-top:12px}
+.room .cashLine svg{display:block;width:100%;height:100%;overflow:visible}
+.room .cashLine polygon{fill:var(--soft)}
+.room .cashLine polyline{fill:none;stroke:var(--tone);stroke-width:2;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.room .cashLine i{position:absolute;right:-3px;width:7px;height:7px;border-radius:50%;transform:translateY(-50%);
+  background:var(--tone);box-shadow:0 0 0 3px var(--soft);animation:cashDot 2.4s ease-in-out infinite}
+.room .cashUp{--tone:#4ade80;--soft:rgba(74,222,128,.13)}
+.room .cashDown{--tone:#ff8b8f;--soft:rgba(255,139,143,.13)}
+@keyframes cashDot{50%{box-shadow:0 0 0 6px transparent}}
+.room .cashFoot{display:flex;justify-content:space-between;gap:8px;margin-top:7px;font-size:9px;color:#7d8698;white-space:nowrap}
+.room .cashFoot b{color:#eef0f5;font-weight:800}
+
+/* this week in one bar and three numbers */
+.room .week{display:flex;flex-direction:column;gap:11px;padding:13px;border-radius:15px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07)}
+.room .split{display:flex;gap:2px;height:8px;border-radius:5px;overflow:hidden}
+.room .splitIn{background:#4ade80}
+.room .splitOut{background:#ff6b70}
+.room .weekCells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.room .weekCells > span{display:flex;flex-direction:column;gap:5px;min-width:0}
+.room .weekCells small{font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.16em;color:#7d8698}
+.room .weekCells b{font:400 18px/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;white-space:nowrap}
+.room .weekMost{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:10px;line-height:1.35;color:#8b93a5}
+.room .weekMost b{color:#c8cfdb;font-weight:700}
+@media (prefers-reduced-motion:reduce){.room .cashLine i{animation:none}}

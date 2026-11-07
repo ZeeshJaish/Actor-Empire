@@ -7,11 +7,12 @@
    tap it. A player who built a network on this map recognises it at once —
    "this is where my markets are" — and now it is alive:
 
-     PLATFORM    your countries, washed in your colour as in the wizard, with
-                 lights sized by your audience there (paid accounts, homes
-                 watching free, or buyers, by your business model)
-     MARKET      the whole industry: lights sized by the people watching, in
-                 the colour of the service that leads each country
+     PLATFORM    your countries filled in four steps of your colour, deeper
+                 with more of your audience there (paid accounts, homes watching
+                 free, or buyers, by your business model)
+     MARKET      who leads: every country in the colour of the service with the
+                 most paying homes there; your countries keep a white edge
+                 (#138: the bubbles these two drew are gone)
      OPERATIONS  where you stand: live, on its way, paused, open ground
 
    Tap a continent to fly to it, tap a country there to open its card, tap the
@@ -42,7 +43,7 @@ import { lightCountryPath, lightHasCountry, lightLandOutside, lightMergedPath, l
 import { REGION_MAP_OVERLAYS } from '../../services/regionMap';
 import { getCountryPosition, getCountryShapeId } from '../../services/worldEconomy/worldCountryGeography';
 import { WORLD_COUNTRY_DEFINITIONS } from '../../services/worldEconomy/worldCountryRegistry';
-import { AUDIENCE_WORDS, REGION_SHORT_LABELS, compact, type AtlasCountry, type AtlasRegionId, type AtlasRegionSummary, type AudienceKind } from './audienceAtlasModel';
+import { REGION_SHORT_LABELS, compact, type AtlasCountry, type AtlasRegionId, type AtlasRegionSummary } from './audienceAtlasModel';
 
 export type AtlasMode = 'PLATFORM' | 'MARKET' | 'OPERATIONS';
 
@@ -62,8 +63,6 @@ export interface AudienceAtlasProps {
   selectedCountryId?: string | null;
   /** Countries picked on the market-entry page, drawn bright over open ground. */
   picked?: ReadonlySet<string>;
-  /** What "your audience" means for this service (accounts, ad homes, buyers). */
-  audienceKind?: AudienceKind;
   onFocusRegion: (regionId: AtlasRegionId | null) => void;
   onSelectCountry: (countryId: string) => void;
   /** The figure at the foot of the picture, left. */
@@ -228,12 +227,6 @@ export const AUDIENCE_ATLAS_WARMUP: ReadonlyArray<() => void> = [
   },
 ];
 
-/* The light on a country. Area, not radius, follows the number, so a country
-   with four times the audience looks four times as big, not sixteen. */
-const radiusPx = (value: number, max: number, minPx: number, maxPx: number): number => (
-  value <= 0 || max <= 0 ? 0 : minPx + (maxPx - minPx) * Math.sqrt(Math.min(1, value / max))
-);
-
 /* Open water beside each continent: the Pacific off California, off Peru, the
    Atlantic off Ireland and off West Africa, the Indian Ocean, the Tasman Sea. */
 const REGION_LABEL_LONLAT: Record<AtlasRegionId, [number, number]> = {
@@ -264,23 +257,20 @@ const chipWidth = (text: string, perChar: number, extra: number): number => (tex
 
 /* The key in the top corner, per mode. Rendered from here, and measured from
    here so country labels keep clear of it. */
-type LegendItem = { key: 'keyLive' | 'keyLight' | 'keyViewer' | 'keyOpening' | 'keyPicked'; label: string };
+type LegendItem = { key: 'keyLive' | 'keyScale' | 'keyLeader' | 'keyOpening' | 'keyPicked'; label: string };
+/* #138: YOURS reads as a scale of your colour, WHO LEADS as each leader's colour; nothing is a bubble any more */
 const LEGEND: Record<AtlasMode, LegendItem[]> = {
-  PLATFORM: [{ key: 'keyLive', label: 'Live' }, { key: 'keyLight', label: 'Your accounts' }],
-  MARKET: [{ key: 'keyViewer', label: "Viewers · leader's colour" }],
+  PLATFORM: [{ key: 'keyScale', label: 'Fewer → more' }, { key: 'keyOpening', label: 'On its way' }],
+  MARKET: [{ key: 'keyLeader', label: 'Most paying homes' }],
   OPERATIONS: [{ key: 'keyLive', label: 'Live' }, { key: 'keyOpening', label: 'On its way' }],
 };
+/* YOURS: a live country's step by its share of your biggest market's audience */
+const STEP_FLOORS = [0, .04, .15, .4];
 const PICKED_KEY: LegendItem = { key: 'keyPicked', label: 'Picked' };
-
-/* How many lights the world view keeps (and its hard ceiling), and the most a
-   single region draws. See `lights` below. */
-const WORLD_LIGHTS = 14;
-const WORLD_LIGHTS_MAX = 24;
-const REGION_LIGHTS_MAX = 60;
 
 /* The world itself: sea, shelf, relief and land, exactly as the Build map draws
    them. It never changes, so it is its own memoised layer — a camera move or a
-   new number repaints the markets and lights, not the whole planet's diffing. */
+   new number repaints the markets, not the whole planet's diffing. */
 export const AtlasWorld = React.memo(function AtlasWorld({ uid, onSea }: { uid: string; onSea: () => void }) {
   const world = lightWorld();
   return (
@@ -321,7 +311,7 @@ export const AtlasWorld = React.memo(function AtlasWorld({ uid, onSea }: { uid: 
 /* ========================================================================== */
 
 export const AudienceAtlas = React.memo(function AudienceAtlas({
-  mode, countries, regions, accent, focusRegion, selectedCountryId, picked, audienceKind = 'ACCOUNTS',
+  mode, countries, regions, accent, focusRegion, selectedCountryId, picked,
   onFocusRegion, onSelectCountry, reading, aside, gauge,
 }: AudienceAtlasProps) {
   const uid = useId().replace(/:/g, '');
@@ -396,44 +386,52 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
     });
     return { path: ids.length ? lightMergedPath(ids) : '', markers };
   }, [picked]);
+  /* the scale's unit (paid accounts, homes watching free, buyers) is on the YOURS switch above the map; at 320 px a
+     longer chip would run into the World chip */
   const legendItems = useMemo(() => (
-    mode === 'OPERATIONS' && picked && picked.size > 0 ? [...LEGEND.OPERATIONS, PICKED_KEY]
-      : mode === 'PLATFORM' ? [LEGEND.PLATFORM[0], { ...LEGEND.PLATFORM[1], label: AUDIENCE_WORDS[audienceKind].legend }]
-        : LEGEND[mode]
-  ), [audienceKind, mode, picked]);
+    mode === 'OPERATIONS' && picked && picked.size > 0 ? [...LEGEND.OPERATIONS, PICKED_KEY] : LEGEND[mode]
+  ), [mode, picked]);
 
-  /* Which countries get a light. In the world view only the ones that carry the
-     picture: the biggest dozen or so, plus any at least 4% the size of the
-     leader. With 197 live markets a light on every one turns the map into
-     confetti, and the rest already read as your territory. Inside a region
-     every country with an audience is lit, sized against that region's leader. */
-  const lights = useMemo(() => {
-    if (mode === 'OPERATIONS') return [];
-    const valueOf = (country: AtlasCountry) => (mode === 'PLATFORM' ? country.view.playerAudience : country.view.activeViewers);
-    /* Biggest first, so small lights sit on top of large ones and stay tappable. */
-    const rows = countries
-      .filter(country => (!focusRegion || country.regionId === focusRegion) && valueOf(country) > 0)
-      .sort((left, right) => valueOf(right) - valueOf(left));
-    const max = rows.length ? valueOf(rows[0]) : 0;
-    const kept = focusRegion
-      ? rows.slice(0, REGION_LIGHTS_MAX)
-      : rows.filter((country, rank) => rank < WORLD_LIGHTS || valueOf(country) >= max * 0.04).slice(0, WORLD_LIGHTS_MAX);
-    return kept
-      .map(country => {
+  /* #138 (Zeesh: "ब्लू बबल क्या दर्शाना चाह रहा है … रादर देन हम लोग इसका हाईलाइट कर सकते हैं"): the countries
+     themselves are filled; the bubbles are gone.
+     - YOURS: each live country in one of four steps of your colour, deeper with more of your audience (its share of
+       your biggest market). One merged shape per step, as the territory is drawn.
+     - WHO LEADS: every country in the colour of the service with the most paying homes there, the way an election
+       map reads; one merged shape per leader. Your live countries keep a white edge on top. */
+  const fills = useMemo(() => {
+    const steps: string[][] = [[], [], [], []];
+    const stepMarkers: Array<{ id: string; point: [number, number]; step: number }> = [];
+    const leaders = new Map<string, { id: string; name: string; color: string; ids: string[]; count: number; markers: Array<{ id: string; point: [number, number] }> }>();
+    if (mode === 'PLATFORM') {
+      const live = countries.filter(country => country.state === 'LIVE');
+      const max = Math.max(1, ...live.map(country => country.view.playerAudience));
+      live.forEach(country => {
+        const share = country.view.playerAudience / max;
+        const step = STEP_FLOORS.reduce((found, floor, index) => (share >= floor ? index : found), 0);
         const geo = geoOf(country.id);
-        if (!geo.point) return null;
+        if (geo.shapeId && lightHasCountry(geo.shapeId)) steps[step].push(geo.shapeId);
+        else if (geo.point) stepMarkers.push({ id: country.id, point: geo.point, step });
+      });
+    }
+    if (mode === 'MARKET') {
+      countries.forEach(country => {
         const leader = country.view.platformHouseholds[0];
-        const color = mode === 'PLATFORM' ? accent : (leader?.id === 'PLAYER' ? accent : leader?.color || '#e8eef6');
-        return { country, point: geo.point, value: valueOf(country), share: valueOf(country) / Math.max(1, max), color };
-      })
-      .filter(Boolean) as Array<{ country: AtlasCountry; point: [number, number]; value: number; share: number; color: string }>;
-  }, [accent, countries, focusRegion, mode]);
-
-  const maxLightPx = focusRegion ? 17 : 12;
-  const minLightPx = focusRegion ? 2.6 : 1.8;
-  /* A slow ring on the strongest few, so the map reads as alive without
-     animating every country on it. */
-  const pulsing = useMemo(() => new Set(lights.slice(0, mode === 'PLATFORM' ? 6 : 4).map(light => light.country.id)), [lights, mode]);
+        if (!leader) return;
+        const entry = leaders.get(leader.id) ?? { id: leader.id, name: leader.name, color: leader.id === 'PLAYER' ? accent : leader.color, ids: [], count: 0, markers: [] };
+        entry.count += 1;
+        const geo = geoOf(country.id);
+        if (geo.shapeId && lightHasCountry(geo.shapeId)) entry.ids.push(geo.shapeId);
+        else if (geo.point) entry.markers.push({ id: country.id, point: geo.point });
+        leaders.set(leader.id, entry);
+      });
+    }
+    return {
+      steps: steps.map(list => (list.length ? lightMergedPath(list) : '')),
+      stepMarkers,
+      leaders: [...leaders.values()].sort((left, right) => right.count - left.count || left.name.localeCompare(right.name))
+        .map(entry => ({ ...entry, path: entry.ids.length ? lightMergedPath(entry.ids) : '' })),
+    };
+  }, [accent, countries, mode]);
 
   const focusCountries = useMemo(() => (
     focusRegion ? countries.filter(country => country.regionId === focusRegion) : []
@@ -466,11 +464,8 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
     const u = target.w / Math.max(1, fw);
     const toScreen = (point: [number, number]): [number, number] => [(point[0] - target.x) / u, (point[1] - target.y) / u];
     const toMap = (point: [number, number]): [number, number] => [target.x + point[0] * u, target.y + point[1] * u];
-    const lightOf = new Map<string, number>(lights.map(light => [light.country.id, light.value]));
-    const lightMax = lights[0]?.value ?? 0;
-    const radiusOf = (countryId: string): number => (
-      lightOf.has(countryId) ? Math.max(1.2, radiusPx(lightOf.get(countryId)!, lightMax, minLightPx, maxLightPx)) : 3
-    );
+    /* a country's own point, kept clear of its neighbours' labels */
+    const radiusOf = (_countryId: string): number => 3;
     /* What is laid over the picture, measured from its own text: the World /
        region chip, each key chip, the reading and its answer. */
     const chrome: LabelRect[] = [
@@ -545,7 +540,7 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
       placed.push({ country: item.country, name, valueText, anchor: fit.anchor, nameAt: toMap(fit.nameAt), valueAt: toMap(fit.valueAt), rects: fit.rects });
     }
     return placed;
-  }, [asideText, focusCountries, focusLabel, focusRegion, frameSize.h, frameSize.w, legendItems, lights, maxLightPx, minLightPx, mode, readingText, target]);
+  }, [asideText, focusCountries, focusLabel, focusRegion, frameSize.h, frameSize.w, legendItems, mode, readingText, target]);
 
   /* Clicks on the sea come back out. Kept stable so the world layer never re-renders. */
   const seaAction = useRef<() => void>(() => undefined);
@@ -578,8 +573,22 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
         <g className={css.markets}>
           {territory.opening && <path d={territory.opening} className={cx(css.market, css.market_opening)} vectorEffect="non-scaling-stroke" />}
           {territory.paused && <path d={territory.paused} className={cx(css.market, css.market_paused)} vectorEffect="non-scaling-stroke" />}
-          {territory.live && <path d={territory.live} className={cx(css.market, css.market_live, mode === 'MARKET' && css.marketQuiet)} vectorEffect="non-scaling-stroke" />}
-          {territory.markers.map(marker => (
+          {mode === 'PLATFORM' && fills.steps.map((path, step) => (path
+            ? <path key={step} d={path} className={cx(css.market, css.market_step, css[`step${step}`])} vectorEffect="non-scaling-stroke" /> : null))}
+          {mode === 'PLATFORM' && fills.stepMarkers.map(marker => (
+            <circle key={marker.id} cx={marker.point[0]} cy={marker.point[1]} r={(focusRegion ? 3.4 : 2.4) * unit}
+              className={cx(css.market, css.market_step, css[`step${marker.step}`])} vectorEffect="non-scaling-stroke" />
+          ))}
+          {mode === 'MARKET' && fills.leaders.map(leader => (
+            <g key={leader.id} style={{ ['--lead' as string]: leader.color }}>
+              {leader.path && <path d={leader.path} className={cx(css.market, css.market_lead)} vectorEffect="non-scaling-stroke" />}
+              {leader.markers.map(marker => (
+                <circle key={marker.id} cx={marker.point[0]} cy={marker.point[1]} r={(focusRegion ? 3.4 : 2.4) * unit} className={cx(css.market, css.market_lead)} vectorEffect="non-scaling-stroke" />
+              ))}
+            </g>
+          ))}
+          {mode === 'OPERATIONS' && territory.live && <path d={territory.live} className={cx(css.market, css.market_live)} vectorEffect="non-scaling-stroke" />}
+          {territory.markers.filter(marker => mode === 'OPERATIONS' || marker.tone !== 'live').map(marker => (
             <circle key={marker.id} cx={marker.point[0]} cy={marker.point[1]} r={(focusRegion ? 3.4 : 2.4) * unit}
               className={cx(css.market, css[`market_${marker.tone}`])} vectorEffect="non-scaling-stroke" />
           ))}
@@ -591,26 +600,12 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
         </g>
         {/* every country's edge, over the territory, so it still reads as countries */}
         <path d={lightWorld().borders} className={css.coast} vectorEffect="non-scaling-stroke" />
+        {/* WHO LEADS: your live countries keep a white edge over the leaders' colours */}
+        {mode === 'MARKET' && territory.live && <path d={territory.live} className={css.yourEdge} vectorEffect="non-scaling-stroke" />}
 
         {/* the selected country, held in a white edge */}
         {selectedCountryId && pathOf(selectedCountryId) && (
           <path d={pathOf(selectedCountryId)} className={css.selected} vectorEffect="non-scaling-stroke" />
-        )}
-
-        {/* lights: the audience, sized by how many */}
-        {lights.length > 0 && (
-          <g className={css.lights}>
-            {lights.map(light => {
-              const r = radiusPx(light.value, lights[0].value, minLightPx, maxLightPx) * unit;
-              return (
-                <g key={light.country.id} className={css.light} style={{ ['--tone' as string]: light.color }}>
-                  <circle cx={light.point[0]} cy={light.point[1]} r={r * 1.85} className={css.lightGlow} />
-                  <circle cx={light.point[0]} cy={light.point[1]} r={Math.max(r, 1.2 * unit)} className={css.lightCore} strokeWidth={0.9 * unit} />
-                  {r > 3 * unit && <circle cx={light.point[0] - r * 0.28} cy={light.point[1] - r * 0.28} r={r * 0.3} className={css.lightSpark} />}
-                </g>
-              );
-            })}
-          </g>
         )}
 
         {/* labels: regions in the world view, countries inside a region */}
@@ -654,17 +649,6 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
           </g>
         )}
       </svg>
-
-      {/* The slow rings live in an overlay of their own, on their own layer, so
-          their animation never repaints the map underneath. */}
-      {pulsing.size > 0 && (
-        <svg className={css.atlasPulse} viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-          {lights.filter(light => pulsing.has(light.country.id)).map(light => {
-            const r = radiusPx(light.value, lights[0].value, minLightPx, maxLightPx) * unit;
-            return <circle key={light.country.id} cx={light.point[0]} cy={light.point[1]} r={r * 1.15} className={css.lightRing} style={{ ['--tone' as string]: light.color }} />;
-          })}
-        </svg>
-      )}
 
       {/* where you are, as the way back out — the Build map's chip */}
       <nav className={css.crumb} aria-label="Map scope">

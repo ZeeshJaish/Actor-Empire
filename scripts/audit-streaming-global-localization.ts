@@ -4,6 +4,7 @@ import { getStreamingOpeningCatalogueView } from '../services/streamingOpeningCa
 import { linkContentMarketOwnedTitles } from '../services/streamingContentMarket';
 import { activateStreamingLanguagePackage, getStreamingGlobalLocalizationView } from '../services/streamingGlobalLocalization';
 import { getStreamingTechnologyWeeklyCost } from '../services/streamingTechnologyCampus';
+import { STREAMING_LANGUAGE_PACKAGES } from '../services/streamingLocalizationCapabilities';
 
 const installed = (capabilityId: string) => ({
     capabilityId,
@@ -57,7 +58,7 @@ assert.equal(getStreamingTechnologyWeeklyCost(activated.player.ownedStreamingPla
     'An active language network must enter the canonical weekly platform cost.');
 const localizationView = getStreamingGlobalLocalizationView(activated.player);
 assert.equal(localizationView.packages.find(item => item.id === 'INDIA_CORE')?.active, true);
-assert.equal(localizationView.activeLanguageCount, 4);
+assert.equal(localizationView.activeLanguageCount, STREAMING_LANGUAGE_PACKAGES.find(item => item.id === 'INDIA_CORE')!.languageIds.length, 'Every language of the set-up group is active (South Asia: 11 since #28)');
 const duplicate = activateStreamingLanguagePackage(activated.player, 'INDIA_CORE');
 assert.equal(duplicate.changed, false, 'An active language network cannot be purchased twice.');
 assert.equal(duplicate.player.ownedStreamingPlatform.treasuryCash, activated.player.ownedStreamingPlatform.treasuryCash);

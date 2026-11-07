@@ -13,12 +13,13 @@ const fixtureUrl = `${base}/scripts/fixtures/streaming-launch-s3.html`;
       page.on('pageerror', error => failures.push(error.message));
       await page.goto(fixtureUrl, { waitUntil: 'networkidle' });
       await page.getByRole('tab', { name: /North America/i }).waitFor();
-      assert.match(await page.locator('.lw-regionhead').innerText(), /23 chosen/i);
-      assert.match(await page.locator('.lw-regionhead').innerText(), /30E to file together/i);
+      // #111: the region bar's readouts (chosen, viewers, filing energy)
+      assert.match(await page.locator('.lw-regionsum').innerText(), /Chosen\s*23/i);
+      assert.match(await page.locator('.lw-regionsum').innerText(), /To file\s*\d+E/i);
       const tab = page.getByRole('tab', { name: /North America/i });
       assert.match(await tab.innerText(), /23/);
       await page.screenshot({ path: `/tmp/streaming-launch-s3-markets-${width}x${height}.png` });
-      await page.locator('.lw-group').filter({ hasText: 'Caribbean' }).getByRole('button', { name: 'Full report' }).click();
+      await page.locator('.lw-group').filter({ hasText: 'Caribbean' }).getByRole('button', { name: 'Pick countries' }).click();
       await page.getByRole('dialog').waitFor();
       await page.getByRole('group', { name: 'Group market map' }).waitFor();
       assert.equal(await page.locator('.lw-group-map-country').count(), 13);

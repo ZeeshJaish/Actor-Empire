@@ -64,11 +64,14 @@ const data = {
   forecast: { audience: 0, peakConcurrent: 0, bandwidthGbps: 0, edgeSites: 0 },
   blockers: [],
   blueprintSaved: false,
+  // #109 (plan §18.5): a lock names the Tech step that unlocks it; the stream: and feature: keys nobody read are gone
   capabilityLocks: {
-    'ident:genre': 'Product Experience level 20',
-    'storefront:chapters': 'Content Operations 18',
-    'stream:ads': 'Commerce level 20 or EMPIRE+ Free',
-    'feature:hd': 'Playback Quality level 20',
+    'ident:genre': 'Unlock Because you watched in Tech',
+    'storefront:chapters': 'Unlock Smart TV apps in Tech',
+  },
+  capabilityLockTech: {
+    'ident:genre': { techId: 'AI_BECAUSE', tech: 'Because you watched' },
+    'storefront:chapters': { techId: 'APPS_TV', tech: 'Smart TV apps' },
   },
 } as unknown as LaunchData;
 
@@ -98,28 +101,29 @@ const visibleText = (markup: string) => markup
   .replace(/\s+/g, ' ')
   .trim();
 
-const lockCount = (markup: string) => (markup.match(/data-research-lock="true"/g) || []).length;
+const lockCount = (markup: string) => (markup.match(/data-tech-lock="true"/g) || []).length;
 
 const identMarkup = renderToStaticMarkup(<StepIdent {...props} />);
-assert.equal(lockCount(identMarkup), 1, 'Every locked ident package should carry the shared research-lock marker.');
-assert.match(visibleText(identMarkup), /Research locked.*Product Experience level 20/);
+assert.equal(lockCount(identMarkup), 1, 'Every locked ident package should carry the shared tech-lock marker.');
+assert.match(visibleText(identMarkup), /Unlock: Because you watched/, 'A locked kit names the Tech step that unlocks it');
+assert.doesNotMatch(visibleText(identMarkup), /Research locked|Product Experience/, 'No research copy, no levels');
 
 const storefrontMarkup = renderToStaticMarkup(<StepStorefront {...props} />);
-assert.equal(lockCount(storefrontMarkup), 1, 'Every locked storefront layout should carry the shared research-lock marker.');
-assert.match(visibleText(storefrontMarkup), /Research locked.*Content Operations 18/);
+assert.equal(lockCount(storefrontMarkup), 1, 'Every locked storefront layout should carry the shared tech-lock marker.');
+assert.match(visibleText(storefrontMarkup), /Chapters Smart TV apps/, 'A locked tile names its Tech step');
 
 const lockedStorefrontMarkup = renderToStaticMarkup(
   <StepStorefront {...props} draft={{ ...draft, storefrontId: 'chapters' }} />,
 );
 assert.match(
   visibleText(lockedStorefrontMarkup),
-  /Research preview/,
-  'A locked storefront shown on the main stage should be named as a research preview.',
+  /Preview · unlock in Tech[\s\S]*Unlock: Smart TV apps[\s\S]*Unlock Chapters: Smart TV apps ›/,
+  'A locked storefront on the main stage is a preview, with the way to its Tech step.',
 );
+assert.doesNotMatch(visibleText(lockedStorefrontMarkup), /Research/, 'No research copy');
 
 const pricingMarkup = renderToStaticMarkup(<StepPricing {...props} />);
-assert.equal(lockCount(pricingMarkup), 1, 'Collapsed pricing keeps revenue-model research requirements visible without rendering every plan editor.');
-assert.match(visibleText(pricingMarkup), /Research locked.*Commerce level 20 or EMPIRE\+ Free/);
+assert.equal(lockCount(pricingMarkup), 0, 'Pricing has no front page or kit locks (the revenue-model research locks nobody read are gone).');
 
 const blueprintPlans = [
   { id: 'essential', name: 'Essential', monthly: 8, featureIds: [], ads: false },
@@ -159,4 +163,4 @@ assert.match(
   'The household ladder must publish its real plan count so every price receives an equal layout slot.',
 );
 
-console.log('Streaming launch research-lock UX audit passed.');
+console.log('Streaming launch tech-lock UX audit passed (#109: locks name their Tech step).');

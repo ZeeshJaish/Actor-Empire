@@ -7,21 +7,20 @@
      — settled, due when you commission, reserved for opening night — with a
      line across it where the treasury runs out, if it does. Beside it, the
      whole launch, what is available, and what is left after.
-   · The lever is the marketing ceiling: a dial across the team's four
-     recommendations and a fifth position for any amount. The figure above it
-     counts to the new value; the forecast further down moves with it.
-   · Then the campaign's shape — what it says, when, where the money goes —
-     the forecast it produces, and the commercial setup it will sell.
+   · The launch campaign (#151, #158) is the launch's marketing: what it
+     pushes, its picture, its picks, a week of them × its weeks before
+     opening, and its opening night. It is built in the Campaign Studio's
+     builder; the marketing ceiling it used to sit under is gone, so its own
+     money is the bill's "Launch campaign" line.
+   · Then the forecast it produces, and the commercial setup it will sell.
 
-   Nothing here is a bare form control. Weights are steppers, choices are
-   tiles and dials, and the only typed number lives in a sheet behind the
-   dial's last position.
+   Nothing here is a bare form control.
    ========================================================================== */
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import type {
+  CampaignFormatId,
   OwnedStreamingLaunchMarketingDraft,
-  StreamingLaunchMarketingAllocationMode,
   StreamingLaunchMarketingObjective,
   StreamingLaunchMarketingTimeline,
 } from '../../../../types';
@@ -30,50 +29,37 @@ import type { RoomCounterpart, SpendLine } from '../../finance/build';
 import { roomCounterparts } from '../../finance/build';
 import { regionOfCity, regionsOf } from '../../finance/placer';
 import { compactCount, money, moneyPrecise, pct as formatPct } from '../../finance/format';
-import { budgetAmountAt, budgetPositionFor } from '../../finance/networkBudget';
-import { Dial, Figure, Hud, Split, Step, Tile, Verdict, type KitPartTone } from '../kit';
+import { Figure, Hud, Verdict, type KitPartTone } from '../kit';
+import { LAUNCH_DOORS, LaunchCampaignBuilder, launchCreativeSubject } from '../../../campaigns/studio/LaunchCampaignBuilder';
+import { FormatGlyph } from '../../../campaigns/studio/formatGlyphs';
+import launchCss from '../../../campaigns/studio/LaunchCampaign.module.css';
+import { CAMPAIGN_FORMATS, CAMPAIGN_FORMAT_ORDER, campaignMomentOf } from '../../../../services/campaigns/campaignFormats';
+import { LAUNCH_CAMPAIGN_MAX_WEEKS } from '../../../../services/streamingLaunchMarketing';
+import { creativeFramesOf } from '../../../campaigns/creatives/creativeFrames';
+import { useMadeForYou } from '../../../campaigns/creatives/CreativeStep';
+import { useKeptCreative } from '../../../campaigns/creatives/creativeMedia';
+import { DoorPicture, FormatPicture } from '../../../campaigns/scenes/FormatPicture';
 
-const OBJECTIVES: Array<{ id: StreamingLaunchMarketingObjective; label: string; line: string }> = [
-  { id: 'PLATFORM_INTRODUCTION', label: 'Introduce the platform', line: 'Build broad familiarity and trial.' },
-  { id: 'CATALOGUE_SHOWCASE', label: 'Showcase the catalogue', line: 'Sell range, discovery and household value.' },
-  { id: 'FLAGSHIP_ORIGINAL', label: 'Lead with an original', line: 'Concentrate attention around the opening title.' },
-  { id: 'VALUE_PROPOSITION', label: 'Sell the value', line: 'Lead with plans, bundles and flexible access.' },
+/* #151: the launch builder's words for what the opening pushes, and when */
+const OBJECTIVES: Array<{ id: StreamingLaunchMarketingObjective; label: string }> = [
+  { id: 'PLATFORM_INTRODUCTION', label: 'The service' },
+  { id: 'CATALOGUE_SHOWCASE', label: 'The catalogue' },
+  { id: 'FLAGSHIP_ORIGINAL', label: 'A flagship original' },
+  { id: 'VALUE_PROPOSITION', label: 'The price' },
 ];
 
-const TIMELINES: Array<{ id: StreamingLaunchMarketingTimeline; label: string; line: string }> = [
-  { id: 'FRONT_LOADED', label: 'Front-loaded', line: 'Build early awareness; some fades before opening.' },
-  { id: 'BALANCED', label: 'Balanced', line: 'Steady pressure and the most stable forecast.' },
-  { id: 'LAST_WEEK_PUSH', label: 'Last-week push', line: 'A louder opening moment with more volatility.' },
+const TIMELINES: Array<{ id: StreamingLaunchMarketingTimeline; label: string }> = [
+  { id: 'FRONT_LOADED', label: 'Tease early' },
+  { id: 'BALANCED', label: 'Steady' },
+  { id: 'LAST_WEEK_PUSH', label: 'Opening-week push' },
 ];
 
-/** Budget drags are local; forecast/save happens once on release. */
-function MarketingBudget({ value, treasury, available, recommendations, onCommit }: {
-  value: number; treasury: number; available: number;
-  recommendations: Record<'lean' | 'balanced' | 'heavy' | 'event', number>;
-  onCommit: (value: number) => void;
-}) {
-  const maximum = Math.max(0, Math.floor(treasury));
-  const [text, setText] = useState(String(value));
-  const pending = useRef(value);
-  useEffect(() => { setText(String(value)); pending.current = value; }, [value]);
-  const amount = /^\d+$/.test(text.trim()) ? Number(text) : NaN;
-  const valid = Number.isSafeInteger(amount) && amount >= 0 && amount <= maximum;
-  const band = !valid ? 'Enter a valid amount' : amount === 0 ? 'Organic'
-    : amount < (recommendations.lean + recommendations.balanced) / 2 ? 'Lean'
-      : amount < (recommendations.balanced + recommendations.heavy) / 2 ? 'Balanced' : amount < (recommendations.heavy + recommendations.event) / 2 ? 'Heavy' : 'Event';
-  const commit = () => { if (valid && amount !== value) onCommit(amount); };
-  const position = budgetPositionFor(valid ? amount : 0, maximum);
-  return <div className="bw-budget bw-marketing-budget">
-    <div className="bw-budget-label"><b>{valid ? money(amount) : '—'}</b><span className="bw-marketing-band">{band}</span></div>
-    <label className="bw-budget-amount"><span aria-hidden="true">$</span><input aria-label="Marketing budget amount" type="text" inputMode="numeric" value={text} aria-invalid={!valid} onChange={event => setText(event.target.value)} onBlur={commit} onKeyDown={event => { if (event.key === 'Enter') commit(); }}/><span>USD</span></label>
-    <input className="bw-budget-slider" type="range" min="0" max="1000" step="1" value={position} aria-label="Marketing budget slider" aria-valuetext={valid ? money(amount) : 'Enter a valid amount'} onChange={event => { const next = budgetAmountAt(Number(event.target.value), maximum); pending.current = next; setText(String(next)); }} onPointerUp={() => { if (pending.current !== value) onCommit(pending.current); }} onKeyUp={commit} onBlur={commit} style={{ '--budget-fill': `${position / 10}%` } as CSSProperties}/>
-    <div className="bw-budget-range"><span>$0 · Organic</span><span>{money(maximum)} treasury</span></div>
-    <p>{money(Math.max(0, available))} available after the network and operating reserve.</p>
-    {!valid && <p className="bw-budget-error" role="status">Enter whole dollars between $0 and {money(maximum)}.</p>}
-    {valid && amount > available && <p className="bw-budget-error" role="status">This leaves a {money(amount - Math.max(0, available))} funding shortfall. Reduce the plan or add funds before commissioning.</p>}
-    <p>Balanced recommendation: {money(recommendations.balanced)}. Forecast updates when you finish adjusting.</p>
-  </div>;
-}
+/* #158: every format's creative frame; a campaign's picture is drawn in its lead format's (search ads show the square
+   one; a door, the wide one) */
+const ALL_FRAMES = creativeFramesOf(CAMPAIGN_FORMAT_ORDER);
+const frameFor = (formatId: CampaignFormatId | null) => (formatId
+  ? ALL_FRAMES.find((frame) => frame.formats.includes(formatId)) ?? ALL_FRAMES.find((frame) => frame.key === '1:1')
+  : ALL_FRAMES.find((frame) => frame.key === '16:9')) ?? null;
 
 /* The bill's parts, by when the money moves. A part's tone is its identity
    everywhere on the page: the bar, and the swatch beside its lines. */
@@ -85,7 +71,6 @@ const BILL_GROUPS: Array<{ id: string; label: string; tone: KitPartTone; match: 
 
 const pct = (value: number): string => formatPct(value * 100, 1);
 const whole = (value: number): string => String(Math.round(value));
-const ceilingFigure = (value: number): string => (value > 0 ? money(value) : 'Organic launch');
 
 /* The other way of getting this room's compute, in one sentence, with the
    week the dearer-today option becomes the cheaper one. The engine did the
@@ -172,6 +157,8 @@ export function StageMoney({ data, draft: build, totals, plan, handlers, campaig
   const draft = marketing?.draft;
   const forecast = marketing?.forecast;
   const setMarketing = (patch: Partial<OwnedStreamingLaunchMarketingDraft>) => handlers.onChangeMarketing?.(patch);
+  /* #151: the launch campaign opens in the Campaign Studio's builder, in launch mode */
+  const [buildingCampaign, setBuildingCampaign] = useState(false);
   /* A stage handed a partial draft (the marketing audits pass one with no
      facilities) has no rooms to bill. */
   const rooms = build?.facilities ? roomCounterparts(data, build) : [];
@@ -219,8 +206,6 @@ export function StageMoney({ data, draft: build, totals, plan, handlers, campaig
   const netSaves = rentedWeekly - yoursWeekly;
   const netCrossover = netSaves > 0 && yoursOnce > rentedOnce ? Math.ceil((yoursOnce - rentedOnce) / netSaves) : null;
 
-  const ceiling = draft?.budgetCeiling ?? 0;
-
   const groups = BILL_GROUPS
     .map((group) => {
       const lines = plan.lines.filter(group.match);
@@ -254,6 +239,31 @@ export function StageMoney({ data, draft: build, totals, plan, handlers, campaig
   const concurrencyDelta = forecast ? Math.max(0, forecast.concurrentStreams.likely - baselineConcurrency) : 0;
   const objective = OBJECTIVES.find((option) => option.id === draft?.objective);
   const timeline = TIMELINES.find((option) => option.id === draft?.timeline);
+
+  /* #158: the launch campaign is the launch's marketing: a week of its picks × its weeks before opening, and its
+     opening night, all in its own money (the plan's `budgetCeiling`) */
+  const ceiling = draft?.budgetCeiling ?? 0;
+  const campaignOn = ceiling > 0;
+  const buildWeeks = Math.max(1, Math.min(LAUNCH_CAMPAIGN_MAX_WEEKS, totals?.weeks ?? LAUNCH_CAMPAIGN_MAX_WEEKS));
+  const night = Math.min(ceiling, draft?.openingNight ?? 0);
+  const campaignWeeks = draft?.weeks ?? null;
+  const weekly = campaignWeeks ? Math.round((ceiling - night) / campaignWeeks) : null;
+  const campaignFormats = draft?.formatIds ?? [];
+  /* a plan from before the builder's picks has a channel mix only: no picks, no picture */
+  const picked = Boolean(draft?.formatIds);
+  const campaignDoors = picked ? LAUNCH_DOORS.filter((door) => (draft?.channelAllocations[door.id] ?? 0) > 0) : [];
+  const openingIds = forecast?.countryForecasts.map((country) => country.countryId) ?? [];
+  const openingName = (id: string) => forecast?.countryForecasts.find((country) => country.countryId === id)?.countryName ?? id;
+  const moment = campaignMomentOf(campaignFormats, openingIds, draft?.places);
+  /* its picture: its opening night where it happens, else a place it runs, else its first pick (a door: the store) */
+  const leadFormat = moment?.formatId ?? campaignFormats.find((id) => CAMPAIGN_FORMATS[id].group === 'OUT_OF_HOME') ?? campaignFormats[0] ?? null;
+  const leadFrame = campaignOn && (leadFormat || campaignDoors.length) ? frameFor(leadFormat) : null;
+  const serviceName = marketing?.serviceName || 'EMPIRE+';
+  const brandHue = marketing?.brandHue ?? 212;
+  const subject = launchCreativeSubject(draft?.objective ?? 'PLATFORM_INTRODUCTION', marketing?.flagship ?? null, serviceName, brandHue);
+  const made = useMadeForYou(leadFrame ? subject : null, leadFrame ? [leadFrame] : [], Boolean(leadFrame) && !buildingCampaign);
+  const keptLead = useKeptCreative(leadFrame && leadFormat ? draft?.creativeIds?.[leadFrame.formats[0]] ?? null : null);
+  const leadCreative = keptLead ?? (leadFrame ? made[leadFrame.key] ?? null : null);
 
   return (
     <>
@@ -294,7 +304,9 @@ export function StageMoney({ data, draft: build, totals, plan, handlers, campaig
           <p className="bw-vault-foot">
             {short
               ? `Treasury ends here — ${money(plan.shortfall)} short. The plan is kept, and commissioning waits for the money.`
-              : `of ${money(plan.available)} in the treasury. Charged when you commission, except marketing, which is spent week by week up to its ceiling.`}
+              : draft?.weeks
+                ? `of ${money(plan.available)} in the treasury. All of it is charged when you commission, the launch campaign's weeks before opening too.`
+                : `of ${money(plan.available)} in the treasury. Charged when you commission, except the launch campaign, which is paid week by week up to opening.`}
           </p>
         </div>
 
@@ -450,78 +462,76 @@ export function StageMoney({ data, draft: build, totals, plan, handlers, campaig
       </>}
       <p className="bw-money-divider"><b>{campaignOnly ? 'Opening campaign' : 'The launch'}</b><em>what it costs to be heard</em></p>
 
-      {/* ---- the lever: how much to authorize for marketing ------------------ */}
-      <section className="bw-money bw-money--ceiling" aria-label="Marketing ceiling">
-        <p className="kit-title"><b>Marketing ceiling</b><em>authorization only</em></p>
-        {!marketing || !draft ? (
-          <Verdict label="Waiting" tone="flat" line="Marketing recommendations become available when Day-One markets are confirmed." />
-        ) : (
-          <>
-            <MarketingBudget value={ceiling} treasury={data.treasury.available} available={Math.max(0, data.treasury.available - (plan.commissionNow ?? 0) - (totals?.weeklyCost ?? 0) * 12)} recommendations={marketing.recommendations} onCommit={budgetCeiling => setMarketing({ budgetCeiling })} />
-            {forecast && <p className="bw-money-why">{forecast.customerAcquisitionCost === null ? 'No paid acquisition' : `${moneyPrecise(forecast.customerAcquisitionCost)} per acquired household`}</p>}
-            <p className="bw-money-why">The campaign spends week by week and stops at this line; the money is reserved, not spent, until it does.</p>
-          </>
-        )}
-      </section>
-
-      {/* ---- the campaign: what it says, when, and where the money goes ------ */}
+      {/* ---- the launch campaign (#151, #158): the launch's marketing, built like every later campaign in the
+          Studio's builder. The ceiling it used to sit under is gone: its picks, weeks and opening night are its money. */}
       {marketing && draft && forecast && (
-        <section className="bw-money bw-money--campaign" aria-label="Campaign plan">
-          <p className="kit-title"><b>Campaign plan</b><em>{objective?.label}{timeline ? ` · ${timeline.label}` : ''}</em></p>
-          <div className="kit-tiles" role="group" aria-label="Campaign objective">
-            {OBJECTIVES.map((option) => (
-              <Tile key={option.id} name={option.label} line={option.line} on={draft.objective === option.id} onClick={() => setMarketing({ objective: option.id })} />
-            ))}
+        <section className="bw-money bw-money--campaign" aria-label="Launch campaign">
+          <p className="kit-title"><b>Launch campaign</b><em>{campaignOn
+            ? `${objective?.label}${campaignWeeks ? ` · ${campaignWeeks} ${campaignWeeks === 1 ? 'week' : 'weeks'} before opening` : timeline ? ` · ${timeline.label}` : ''}`
+            : 'organic opening'}</em></p>
+          <div className={launchCss.card}>
+            {leadFrame && (
+              <div className={launchCss.cardPicture}>
+                {leadFormat ? (
+                  <FormatPicture formatId={leadFormat} countryId={moment?.formatId === leadFormat ? moment.countryId : openingIds.find((id) => CAMPAIGN_FORMATS[leadFormat].sites?.[id]) ?? null}
+                    creative={leadCreative} subjectName={subject.title} brandName={serviceName} hue={brandHue} />
+                ) : (
+                  <DoorPicture doorId={campaignDoors[0].id} creative={leadCreative} subjectName={subject.title} brandName={serviceName} hue={brandHue} />
+                )}
+                {moment && <small>{CAMPAIGN_FORMATS[moment.formatId].name} · {moment.site ? `${moment.site}, ` : ''}{openingName(moment.countryId)} · opening night</small>}
+              </div>
+            )}
+            {campaignOn ? (
+              <>
+                {picked && (campaignFormats.length || campaignDoors.length) ? (
+                  <div className={launchCss.cardFormats}>
+                    {campaignFormats.map((id) => <span key={id}><FormatGlyph id={id} />{CAMPAIGN_FORMATS[id].name}</span>)}
+                    {campaignDoors.map((door) => <span key={door.id}><i aria-hidden="true">{door.id === 'DEVICE_STORES' ? '⇩' : '☏'}</i>{door.name}</span>)}
+                  </div>
+                ) : (
+                  <p className="bw-money-why">{marketing.channels.filter((channel) => (draft.channelAllocations[channel.id] || 0) > 0).map((channel) => channel.label).join(' · ') || 'No channels picked yet.'}</p>
+                )}
+                <div className={launchCss.cardMoney}>
+                  <span><small>A week</small><b>{weekly ? money(weekly) : '—'}</b><em>{weekly ? 'of what it runs' : campaignWeeks ? 'no weeks' : 'across the build'}</em></span>
+                  <span><small>Weeks</small><b>{campaignWeeks ?? buildWeeks}</b><em>{campaignWeeks ? 'before opening' : 'the whole build'}</em></span>
+                  <span><small>In all</small><b>{money(ceiling)}</b><em>{night ? `${money(night)} of it on opening night` : campaignWeeks ? 'paid at commission' : 'spent across the build'}</em></span>
+                </div>
+                {campaignWeeks !== null && campaignWeeks > buildWeeks && (
+                  <p className={launchCss.cardWarn}>The build takes {buildWeeks} {buildWeeks === 1 ? 'week' : 'weeks'} now: its {campaignWeeks} weeks of money would be spent in them. Edit it to fit.</p>
+                )}
+              </>
+            ) : (
+              <p className="bw-money-why">No campaign: the service opens on word of mouth alone. Build one, and what it runs, its weeks and its money show here and on the bill.</p>
+            )}
+            <div className={launchCss.cardActions}>
+              <button type="button" className="bw-money-jump" disabled={!marketing.forecastFor || data.commissioned} onClick={() => setBuildingCampaign(true)}>
+                {data.commissioned ? 'Commissioned' : campaignOn ? 'Edit the launch campaign →' : 'Build the launch campaign →'}
+              </button>
+              {campaignOn && !data.commissioned && <button type="button" className={launchCss.cardQuiet} onClick={() => setMarketing({ budgetCeiling: 0, openingNight: 0 })}>Open without it</button>}
+            </div>
           </div>
-          <Dial
-            label="Timing"
-            value={draft.timeline}
-            options={TIMELINES.map((option) => ({ id: option.id, name: option.label, line: option.line }))}
-            onPick={(id) => setMarketing({ timeline: id as StreamingLaunchMarketingTimeline })}
-          />
-          <details className="bw-money-more">
-            <summary>Channels and countries</summary>
-            <ul className="bw-weights" aria-label="Channel weights">
-              {marketing.channels.map((channel) => {
-                const weight = draft.channelAllocations[channel.id] || 0;
-                const setWeight = (next: number) => setMarketing({
-                  channelAllocations: { ...draft.channelAllocations, [channel.id]: Math.round(Math.max(0, Math.min(1, next)) * 100) / 100 },
-                });
-                return (
-                  <li key={channel.id} className={channel.available ? 'bw-weight' : 'bw-weight is-locked'}>
-                    <span className="bw-weight-text"><b>{channel.label}</b><em>{channel.available ? channel.line : channel.reason || 'Research required'}</em></span>
-                    {channel.available
-                      ? <Step label={`${channel.label} weight`} value={`${Math.round(weight * 100)}%`} onDown={() => setWeight(weight - 0.05)} onUp={() => setWeight(weight + 0.05)} atMin={weight <= 0} atMax={weight >= 1} />
-                      : <em className="bw-weight-lock">Locked</em>}
-                  </li>
-                );
-              })}
-            </ul>
-            <Dial
-              label="Country money"
-              value={draft.allocationMode}
-              options={[
-                { id: 'AUTO', name: 'Auto', line: 'Spread by market size and readiness.' },
-                { id: 'MANUAL', name: 'Manual', line: 'Weight each country yourself.' },
-              ]}
-              onPick={(id) => setMarketing({ allocationMode: id as StreamingLaunchMarketingAllocationMode })}
-            />
-            <ul className="bw-weights" aria-label="Country allocation">
-              {forecast.countryForecasts.map((country) => {
-                const weight = draft.countryWeights[country.countryId] || 0;
-                const setWeight = (next: number) => setMarketing({ countryWeights: { ...draft.countryWeights, [country.countryId]: Math.max(0, next) } });
-                return (
-                  <li key={country.countryId} className="bw-weight">
-                    <span className="bw-weight-text"><b>{country.countryName}</b><em>{money(country.allocatedAmount)} · {pct(country.likelyAwarenessLift)} paid lift</em></span>
-                    {draft.allocationMode === 'MANUAL' && (
-                      <Step label={`${country.countryName} weight`} value={String(weight)} onDown={() => setWeight(weight - 1)} onUp={() => setWeight(weight + 1)} atMin={weight <= 0} />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </details>
         </section>
+      )}
+      {buildingCampaign && marketing?.forecastFor && draft && forecast && (
+        <LaunchCampaignBuilder
+          draft={draft}
+          channels={marketing.channels}
+          forecastFor={marketing.forecastFor}
+          rateCardFor={marketing.rateCardFor}
+          maxWeeks={buildWeeks}
+          countries={forecast.countryForecasts.map((country) => ({ countryId: country.countryId, countryName: country.countryName }))}
+          hasFlagshipOriginal={Boolean(marketing.hasFlagshipOriginal)}
+          hasSellablePlan={marketing.hasSellablePlan !== false}
+          priceHook={marketing.priceHook ?? null}
+          flagship={marketing.flagship ?? null}
+          catalogue={marketing.catalogue ?? []}
+          serviceName={serviceName}
+          brandHue={brandHue}
+          accent={marketing.accent || '#3b82f6'}
+          spare={Math.max(0, data.treasury.available - ((plan.commissionNow ?? 0) - (draft.weeks ? ceiling : 0)) - (totals?.weeklyCost ?? 0) * 12)}
+          onCancel={() => setBuildingCampaign(false)}
+          onSave={(patch) => { setMarketing(patch); setBuildingCampaign(false); }}
+        />
       )}
 
       {/* ---- the forecast: before the campaign, and with this plan ----------- */}

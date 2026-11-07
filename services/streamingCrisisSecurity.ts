@@ -1,8 +1,10 @@
 import type {
     OwnedStreamingCrisis,
+    OwnedStreamingCrisisSecurityState,
     OwnedStreamingLedgerEntry,
     OwnedStreamingPlatformState,
     OwnedStreamingShadowOperation,
+    OwnedStreamingTitleWeekPerformance,
     OwnedStreamingWeeklySnapshot,
     PlatformId,
     Player,
@@ -12,15 +14,30 @@ import type {
     StreamingCrisisType,
     StreamingIncidentPolicy,
     StreamingShadowOperationType,
+    StreamingTechId,
     StreamingTrustInitiativeType,
 } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import {
+    getStreamingTechDefinition,
+    getStreamingTechGroup,
+    resolveStreamingPlatformTechDebt,
+    resolveStreamingTechTree,
+    streamingTechBreachFactor,
+    streamingTechIncidentTargets,
+    streamingTechLadderProgress,
+    streamingTechLeakFactor,
+    streamingTechScrutinyFactor,
+    streamingTechTrustMain,
+    streamingTechVersion,
+} from './streamingTechTreeCatalogue';
+import {
     compactOwnedStreamingPlatformForPersistence,
     normalizeOwnedStreamingPlatformState,
     queueOwnedStreamingCinematic,
 } from './ownedStreamingPlatform';
+import { streamingIncidentChance, streamingIncidentIsTakedown, streamingIncidentSpacingWeeks, streamingIncidentSpeed, streamingIncidentWaitEndsAt } from './streamingIncidentRepair';
 
 const clamp = (value: number, minimum = 0, maximum = 100): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -272,6 +289,9 @@ export const getStreamingCrisisWeeklyEffects = (
         engagementRateDelta: -0.012 * severity * recoveringMultiplier,
         playbackDelta: activeCrisis.type === 'PLATFORM_OUTAGE'
             ? -2.2 * severity * recoveringMultiplier
+            /* #53: slow streams and a crashing app show in the week's playback too; a broken feature does not */
+            : activeCrisis.type === 'SLOW_STREAMING' ? -1.2 * severity * recoveringMultiplier
+            : activeCrisis.type === 'APP_CRASH' ? -0.6 * severity * recoveringMultiplier
             : activeCrisis.type === 'ACCOUNT_BREACH' ? -0.4 * severity * recoveringMultiplier : 0,
         weeklyRecoveryCost: activeCrisis.stage === 'RECOVERING' ? activeCrisis.weeklyRecoveryCost : 0,
         activeCrisis,
@@ -307,21 +327,171 @@ const CRISIS_COPY: Record<StreamingCrisisType, { title: string; detail: string }
         title: 'An internal allegation reached leadership',
         detail: 'An employee raised a credible concern about operating conduct. The response will shape loyalty, evidence and public trust.',
     },
+    /* #53: what Playback and Apps and devices can break (the app or feature is named when it opens) */
+    APP_CRASH: {
+        title: 'An app keeps crashing',
+        detail: 'Viewers on one kind of screen cannot keep a title playing. The app needs a fix before they give up on it.',
+    },
+    FEATURE_BROKEN: {
+        title: 'A feature stopped working',
+        detail: 'Viewers who rely on it are hitting errors. It needs a fix before they look elsewhere.',
+    },
+    SLOW_STREAMING: {
+        title: 'Streams are slow to start',
+        detail: 'Titles take long to start and stall at peak hours. Viewers notice before the network does.',
+    },
 };
 
-const chooseCrisisType = (
+/** The screen each app runs on, as an incident names it (#53; the viewer app's banner too, #58). */
+export const STREAMING_APP_SCREEN_NAMES: Partial<Record<StreamingTechId, string>> = {
+    APPS_PHONE: 'phone and web', APPS_TV: 'Smart TV', APPS_CONSOLE: 'console', APPS_CAR: 'car screen', APPS_HOLO: 'VR and holo',
+};
+
+/** A crisis's title and detail; an app crash or a broken feature is named after what broke (#53). */
+export const getStreamingCrisisCopy = (type: StreamingCrisisType, techId: StreamingTechId | undefined): { title: string; detail: string } => {
+    const definition = techId ? getStreamingTechDefinition(techId) : null;
+    if (type === 'APP_CRASH' && techId && STREAMING_APP_SCREEN_NAMES[techId]) {
+        return {
+            title: `The ${STREAMING_APP_SCREEN_NAMES[techId]} app keeps crashing`,
+            detail: `Viewers watching on the ${STREAMING_APP_SCREEN_NAMES[techId]} app cannot keep a title playing. It needs a fix before they give up on it.`,
+        };
+    }
+    if (type === 'FEATURE_BROKEN' && definition) {
+        return {
+            title: `${definition.name} stopped working`,
+            detail: `Viewers who rely on ${definition.name} are hitting errors. It needs a fix before they look elsewhere.`,
+        };
+    }
+    return CRISIS_COPY[type];
+};
+
+/**
+ * The title a leak puts on pirate sites (#55): one watched this week, picked by its hours, a new
+ * release (its first four weeks) three times as likely. Its own draw, so the crisis's kind and
+ * severity are drawn as before. No title watched this week: null, and the leak stays unnamed.
+ */
+export const pickStreamingLeakedTitle = (
+    platform: Pick<OwnedStreamingPlatformState, 'simulationSeed'>,
+    snapshot: Pick<OwnedStreamingWeeklySnapshot, 'absoluteWeek' | 'operations'>,
+): OwnedStreamingTitleWeekPerformance | null => {
+    const titles = (snapshot.operations?.titlePerformance || []).filter(item => item.viewingAccounts > 0 && item.hoursViewed > 0 && item.title);
+    if (!titles.length) return null;
+    const rng = createDeterministicRng(`${platform.simulationSeed}:leak-title:${snapshot.absoluteWeek}`);
+    return pickWeighted(titles.map(item => ({ value: item, weight: item.hoursViewed * (item.weeksAvailable <= 4 ? 3 : 1) })), rng());
+};
+
+/** A named leak's title and detail (#55). */
+export const getStreamingLeakCopy = (title: string): { title: string; detail: string } => ({
+    title: `“${title}” is on pirate sites`,
+    detail: `Copies of “${title}” are spreading on pirate sites. Every week they stay up, people watch them there instead of on your service.`,
+});
+
+/** Picks by weight; r in [0, 1). Entries of weight 0 are never picked. */
+const pickWeighted = <T,>(entries: Array<{ value: T; weight: number }>, r: number): T => {
+    const live = entries.filter(entry => entry.weight > 0);
+    const total = live.reduce((sum, entry) => sum + entry.weight, 0);
+    let left = r * total;
+    for (const entry of live) {
+        left -= entry.weight;
+        if (left < 0) return entry.value;
+    }
+    return live[live.length - 1].value;
+};
+
+/**
+ * Which crisis opens, and for an app crash or a broken feature what broke (#53). Load first: a
+ * failing night is an outage, and a busy one without No buffering slows streams down. Then the
+ * old triggers (rights, loyalty, security, recommendations). Otherwise a draw: the old six at one
+ * each, an app crash weighted by the apps owned and a broken feature by Playback's side lines
+ * (Basic breaks most, Polished or Flagship less), slow streaming at 0.3 with No buffering. Trust and
+ * safety (#54) makes breaches rarer (Account security) and leaks rarer (Content protection).
+ */
+/**
+ * #74, Zeesh: every kind of incident can come, and each kind's own tech keeps it away ("agar piracy wala
+ * cheez humne bahut achha upgrade kar chuka hai to piracy wale cases bahut kam ya minimal aayenge"). Each kind
+ * has a share of a service's incidents *(start)*, and its tech cuts it: Stabilization an outage, a crash or a
+ * broken feature (to a quarter at Self-healing version 3), Optimisation and Adaptive streaming slow streaming,
+ * newer app and feature versions their own breakdowns, Content protection a leak, Account security a breach.
+ * Backlash, rights problems and allegations have no tech; their own causes bring them first.
+ */
+export const STREAMING_INCIDENT_SHARES: Record<StreamingCrisisType, number> = {
+    PLATFORM_OUTAGE: .2, SLOW_STREAMING: .15, APP_CRASH: .15, FEATURE_BROKEN: .1,
+    CONTENT_LEAK: .15, ACCOUNT_BREACH: .1, RECOMMENDATION_BACKLASH: .05, RIGHTS_COMPLIANCE: .05, EMPLOYEE_ALLEGATION: .05,
+};
+const fragility = (targets: Array<{ weight: number }>): number => (
+    targets.length ? targets.reduce((sum, item) => sum + item.weight, 0) / targets.length : 0
+);
+/** Each kind's share of a service's incidents after its tech's cut (#74) */
+export const streamingIncidentWeights = (platform: OwnedStreamingPlatformState): Array<{ value: StreamingCrisisType; weight: number }> => {
+    const tree = resolveStreamingTechTree(platform);
+    const stabilization = 1 - .75 * streamingTechLadderProgress(tree, 'STABILIZATION');
+    const optimisation = 1 - .75 * streamingTechLadderProgress(tree, 'OPTIMISATION');
+    const adaptive = streamingTechVersion(tree, 'PLAY_ADAPTIVE') >= 1;
+    return [
+        { value: 'PLATFORM_OUTAGE', weight: STREAMING_INCIDENT_SHARES.PLATFORM_OUTAGE * stabilization },
+        { value: 'SLOW_STREAMING', weight: STREAMING_INCIDENT_SHARES.SLOW_STREAMING * optimisation * (adaptive ? .3 : 1) },
+        { value: 'APP_CRASH', weight: STREAMING_INCIDENT_SHARES.APP_CRASH * stabilization * fragility(streamingTechIncidentTargets(tree, 'APP_CRASH')) },
+        { value: 'FEATURE_BROKEN', weight: STREAMING_INCIDENT_SHARES.FEATURE_BROKEN * stabilization * fragility(streamingTechIncidentTargets(tree, 'FEATURE_BROKEN')) },
+        { value: 'CONTENT_LEAK', weight: STREAMING_INCIDENT_SHARES.CONTENT_LEAK * streamingTechLeakFactor(tree) },
+        { value: 'ACCOUNT_BREACH', weight: STREAMING_INCIDENT_SHARES.ACCOUNT_BREACH * streamingTechBreachFactor(tree) },
+        { value: 'RECOMMENDATION_BACKLASH', weight: STREAMING_INCIDENT_SHARES.RECOMMENDATION_BACKLASH },
+        { value: 'RIGHTS_COMPLIANCE', weight: STREAMING_INCIDENT_SHARES.RIGHTS_COMPLIANCE },
+        { value: 'EMPLOYEE_ALLEGATION', weight: STREAMING_INCIDENT_SHARES.EMPLOYEE_ALLEGATION },
+    ];
+};
+/** The share of incidents a service's tech lets through: 1 with none, about a third fully protected (#74) */
+export const streamingIncidentExposure = (platform: OwnedStreamingPlatformState): number => (
+    streamingIncidentWeights(platform).reduce((sum, row) => sum + row.weight, 0)
+);
+
+export const chooseStreamingCrisisType = (
     platform: OwnedStreamingPlatformState,
-    snapshot: OwnedStreamingWeeklySnapshot,
+    snapshot: Pick<OwnedStreamingWeeklySnapshot, 'operations'>,
     rng: () => number,
-): StreamingCrisisType => {
+): { type: StreamingCrisisType; techId?: StreamingTechId } => {
     const operations = snapshot.operations;
-    if ((operations?.capacityUtilizationPercent || 0) >= 96 || (operations?.playbackSuccessRate || 100) < 97.8) return 'PLATFORM_OUTAGE';
-    if (platform.rightsObligations.some(item => item.status === 'BREACHED')) return 'RIGHTS_COMPLIANCE';
-    if (platform.crisisSecurity.employeeLoyalty < 48) return 'EMPLOYEE_ALLEGATION';
-    if (platform.technologyLevels.SECURITY < 2) return rng() < 0.58 ? 'ACCOUNT_BREACH' : 'CONTENT_LEAK';
-    if (platform.technologyLevels.DATA_RECOMMENDATIONS > platform.technologyLevels.SECURITY + 2) return 'RECOMMENDATION_BACKLASH';
-    const types: StreamingCrisisType[] = ['PLATFORM_OUTAGE', 'ACCOUNT_BREACH', 'CONTENT_LEAK', 'RECOMMENDATION_BACKLASH', 'RIGHTS_COMPLIANCE', 'EMPLOYEE_ALLEGATION'];
-    return types[Math.floor(rng() * types.length)] || 'PLATFORM_OUTAGE';
+    const tree = resolveStreamingTechTree(platform);
+    const adaptive = streamingTechVersion(tree, 'PLAY_ADAPTIVE') >= 1;
+    if ((operations?.capacityUtilizationPercent || 0) >= 96 || (operations?.playbackSuccessRate || 100) < 97.8) return { type: 'PLATFORM_OUTAGE' };
+    if ((operations?.capacityUtilizationPercent || 0) >= 85 && !adaptive) return { type: 'SLOW_STREAMING' };
+    if (platform.rightsObligations.some(item => item.status === 'BREACHED')) return { type: 'RIGHTS_COMPLIANCE' };
+    if (platform.crisisSecurity.employeeLoyalty < 48) return { type: 'EMPLOYEE_ALLEGATION' };
+    /* technology levels run 0–100: these were written for 0–10 (#51) */
+    if (platform.technologyLevels.SECURITY < 20) return { type: rng() < 0.58 ? 'ACCOUNT_BREACH' : 'CONTENT_LEAK' };
+    if (platform.technologyLevels.DATA_RECOMMENDATIONS > platform.technologyLevels.SECURITY + 20) return { type: 'RECOMMENDATION_BACKLASH' };
+    const apps = streamingTechIncidentTargets(tree, 'APP_CRASH');
+    const features = streamingTechIncidentTargets(tree, 'FEATURE_BROKEN');
+    /* #74: each kind's share after its tech's cut */
+    const type = pickWeighted<StreamingCrisisType>(streamingIncidentWeights(platform), rng());
+    if (type === 'APP_CRASH' || type === 'FEATURE_BROKEN') {
+        const targets = type === 'APP_CRASH' ? apps : features;
+        return { type, techId: pickWeighted(targets.map(item => ({ value: item.id, weight: item.weight })), rng()) };
+    }
+    return { type };
+};
+
+/** What the opening record says caused it. */
+const crisisCauseFor = (
+    type: StreamingCrisisType,
+    techId: StreamingTechId | undefined,
+    platform: OwnedStreamingPlatformState,
+    operations: OwnedStreamingWeeklySnapshot['operations'],
+    pressure: number,
+): string => {
+    if (type === 'PLATFORM_OUTAGE') {
+        return `${(operations?.capacityUtilizationPercent || 0).toFixed(0)}% peak-capacity use and ${(operations?.playbackSuccessRate || 0).toFixed(2)}% playback success`;
+    }
+    if (type === 'SLOW_STREAMING') {
+        const adaptive = streamingTechVersion(resolveStreamingTechTree(platform), 'PLAY_ADAPTIVE') >= 1;
+        return `${(operations?.capacityUtilizationPercent || 0).toFixed(0)}% peak load${adaptive ? '' : ', without No buffering'}`;
+    }
+    if ((type === 'APP_CRASH' || type === 'FEATURE_BROKEN') && techId) {
+        const definition = getStreamingTechDefinition(techId);
+        const version = streamingTechVersion(resolveStreamingTechTree(platform), techId);
+        const versionName = definition ? getStreamingTechGroup(definition.group)?.versionNames[Math.max(0, version - 1)] : null;
+        return `${definition?.name || 'The app'}${versionName ? ` at ${versionName}` : ''} with tech debt ${Math.round(resolveStreamingPlatformTechDebt(platform))}`;
+    }
+    return `${platform.technologyLevels.SECURITY} security maturity with ${pressure.toFixed(0)} pressure`;
 };
 
 const resolveDueRecoveryAndEvidence = (
@@ -340,6 +510,23 @@ const resolveDueRecoveryAndEvidence = (
     let globalPrestige = platform.competitiveWorld.globalPrestige;
 
     const crises = state.crises.map(crisis => {
+        /* Nobody repaired it (#50): it runs its course 6 or 10 weeks after it opened, at full harm all
+           along, and viewers noticed. Before, an unanswered crisis stayed open for ever and blocked
+           every later incident. */
+        if (crisis.stage === 'DETECTED' && absoluteWeek >= streamingIncidentWaitEndsAt(crisis, streamingIncidentSpeed(platform, crisis))) {
+            publicTrust = clamp(publicTrust - 3);
+            securityPressure = clamp(securityPressure - 5);
+            ledger.push(ledgerEntry(platform, absoluteWeek, 'CRISIS_RECOVERED', `${crisis.idempotencyKey}:ran-its-course`, `${crisis.title} ran its course with nobody fixing it.`, { crisisId: crisis.id }));
+            const weeks = absoluteWeek - crisis.detectedAtAbsoluteWeek;
+            return {
+                ...crisis,
+                stage: 'RESOLVED' as const,
+                resolvedAtAbsoluteWeek: absoluteWeek,
+                outcomeNote: streamingIncidentIsTakedown(crisis)
+                    ? `The pirated copies faded after ${weeks} weeks: nobody filed takedowns, and its viewers watched them for free.`
+                    : `It ran its course after ${weeks} weeks: nobody fixed it, and viewers noticed.`,
+            };
+        }
         if (crisis.stage !== 'RECOVERING' || crisis.recoveryReadyAtAbsoluteWeek === null || crisis.recoveryReadyAtAbsoluteWeek > absoluteWeek) return crisis;
         const recoveryKey = `${crisis.idempotencyKey}:recovered`;
         publicTrust = clamp(publicTrust + (crisis.communication === 'FULL_DISCLOSURE' ? 6 : 3));
@@ -349,7 +536,11 @@ const resolveDueRecoveryAndEvidence = (
             ...crisis,
             stage: 'RESOLVED',
             resolvedAtAbsoluteWeek: absoluteWeek,
-            outcomeNote: 'Service recovered through the funded response plan. The incident remains part of the company record, but operations are stable again.',
+            outcomeNote: crisis.statusRepair?.path === 'FIX'
+                ? streamingIncidentIsTakedown(crisis)
+                    ? `Taken down by ${crisis.statusRepair.cash >= 1_000_000 ? `$${String(+(crisis.statusRepair.cash / 1_000_000).toFixed(1))}M of` : 'the'} takedown requests, ${absoluteWeek - crisis.statusRepair.atAbsoluteWeek} weeks after they were filed.`
+                    : `Repaired by the ${crisis.statusRepair.cash >= 1_000_000 ? `$${String(+(crisis.statusRepair.cash / 1_000_000).toFixed(1))}M` : 'funded'} fix, ${absoluteWeek - crisis.statusRepair.atAbsoluteWeek} weeks after it was funded.`
+                : 'Service recovered through the funded response plan. The incident remains part of the company record, but operations are stable again.',
         };
         ledger.push(ledgerEntry(platform, absoluteWeek, 'CRISIS_RECOVERED', recoveryKey, `${crisis.title} reached verified recovery.`, { crisisId: crisis.id }));
         return recovered;
@@ -358,7 +549,7 @@ const resolveDueRecoveryAndEvidence = (
     const shadowOperations = state.shadowOperations.map(operation => {
         if (operation.status !== 'EVIDENCE_PENDING' || operation.evidenceDueAtAbsoluteWeek > absoluteWeek) return operation;
         const rng = createDeterministicRng(`${platform.simulationSeed}:shadow-evidence:${operation.id}`);
-        const defence = platform.technologyLevels.SECURITY * 2
+        const defence = platform.technologyLevels.SECURITY * 0.2
             + (platform.leadership.appointments.some(item => item.status === 'ACTIVE' && item.role === 'SECURITY_TRUST_HEAD') ? 7 : 0);
         const exposureChance = clamp(operation.exposureRiskPercent - defence, 5, 92);
         const exposed = rng() * 100 < exposureChance;
@@ -431,6 +622,35 @@ const resolveDueRecoveryAndEvidence = (
     return platform;
 };
 
+/** The trust a new platform starts with (ownedStreamingPlatform.ts's default). */
+const STREAMING_STARTING_PUBLIC_TRUST = 72;
+/** Marks a save past the one-time trust restoration (#39). */
+export const STREAMING_PUBLIC_TRUST_RESTORED_KEY = 'public-trust-restored';
+
+/**
+ * The week's chance of a new crisis, before the gates (none open, six weeks since the last). Load,
+ * failing playback, tech debt, security pressure, staff loyalty and integrations raise it; Security
+ * and Reliability lower it. The two technology terms were written for 0–10 levels on 0–100 ones,
+ * which pinned the risk at its 0.02 floor for any level above 3 (#51 reads them at a tenth).
+ */
+export const streamingCrisisRisk = (
+    platform: OwnedStreamingPlatformState,
+    snapshot: Pick<OwnedStreamingWeeklySnapshot, 'operations'>,
+    state: Pick<OwnedStreamingCrisisSecurityState, 'securityPressure' | 'employeeLoyalty'>,
+): number => clamp(
+    0.045
+    + Math.max(0, (snapshot.operations?.capacityUtilizationPercent || 0) - 82) / 145
+    + Math.max(0, 98.8 - (snapshot.operations?.playbackSuccessRate || 99.8)) / 18
+    + resolveStreamingPlatformTechDebt(platform) / 150
+    + state.securityPressure / 430
+    + Math.max(0, 60 - state.employeeLoyalty) / 420
+    + platform.corporateDevelopment.integrations.filter(item => item.status === 'IN_PROGRESS').length * 0.035
+    - platform.technologyLevels.SECURITY * 0.0018
+    - platform.technologyLevels.RELIABILITY * 0.0012,
+    0.02,
+    0.78,
+);
+
 export const commitStreamingCrisisSecurityWeek = (
     value: OwnedStreamingPlatformState,
     player: Player,
@@ -440,15 +660,20 @@ export const commitStreamingCrisisSecurityWeek = (
     const state = platform.crisisSecurity;
     if (state.lastEvaluatedAbsoluteWeek !== null && state.lastEvaluatedAbsoluteWeek >= snapshot.absoluteWeek) return platform;
 
+    /* Trust moves +0.35 a week while playback holds 99% and −0.2 when it slips. It read
+       `trust + playback >= 99 ? 0.35 : -0.2`, which set trust itself to 0.35 (or 0) every
+       week. A save that ran under that is given back the starting 72 once, at its next close. */
+    const trustRestorePending = !platform.milestoneKeys.includes(STREAMING_PUBLIC_TRUST_RESTORED_KEY);
+    const trustBase = trustRestorePending && state.lastEvaluatedAbsoluteWeek !== null ? STREAMING_STARTING_PUBLIC_TRUST : state.publicTrust;
     let nextState = {
         ...state,
         lastEvaluatedAbsoluteWeek: snapshot.absoluteWeek,
-        publicTrust: clamp(state.publicTrust + (snapshot.operations?.playbackSuccessRate || 0) >= 99 ? 0.35 : -0.2),
+        publicTrust: clamp(trustBase + ((snapshot.operations?.playbackSuccessRate || 0) >= 99 ? 0.35 : -0.2)),
         securityPressure: clamp(
             state.securityPressure
             + Math.max(0, (snapshot.operations?.capacityUtilizationPercent || 0) - 82) * 0.12
-            + Math.max(0, 2 - platform.technologyLevels.SECURITY) * 1.5
-            - platform.technologyLevels.SECURITY * 0.35,
+            + Math.max(0, 20 - platform.technologyLevels.SECURITY) * 0.15
+            - platform.technologyLevels.SECURITY * 0.035,
         ),
     };
     const ledger: OwnedStreamingLedgerEntry[] = [];
@@ -500,28 +725,21 @@ export const commitStreamingCrisisSecurityWeek = (
         || nextState.infrastructureOperations.incidents.some(item => item.stage !== 'RESOLVED');
     const lastCrisisWeek = nextState.crises.at(-1)?.detectedAtAbsoluteWeek ?? -100;
     const operations = snapshot.operations;
-    const technicalDebt = platform.infrastructureSetup?.technicalDebt || 0;
-    const risk = clamp(
-        0.045
-        + Math.max(0, (operations?.capacityUtilizationPercent || 0) - 82) / 145
-        + Math.max(0, 98.8 - (operations?.playbackSuccessRate || 99.8)) / 18
-        + technicalDebt / 150
-        + nextState.securityPressure / 430
-        + Math.max(0, 60 - nextState.employeeLoyalty) / 420
-        + platform.corporateDevelopment.integrations.filter(item => item.status === 'IN_PROGRESS').length * 0.035
-        - platform.technologyLevels.SECURITY * 0.018
-        - platform.technologyLevels.RELIABILITY * 0.012,
-        0.02,
-        0.78,
-    );
+    const risk = streamingCrisisRisk(platform, snapshot, nextState);
     const rng = createDeterministicRng(`${platform.simulationSeed}:crisis-week:${snapshot.absoluteWeek}`);
     let detectedCrisis: OwnedStreamingCrisis | null = null;
-    if (!unresolved && snapshot.absoluteWeek - lastCrisisWeek >= 6 && rng() < risk) {
-        const type = chooseCrisisType(platform, snapshot, rng);
+    /* #73, #74: a bigger service has more to go wrong, sooner, as much as its tech lets through; how bad it is still follows the risk */
+    if (!unresolved && snapshot.absoluteWeek - lastCrisisWeek >= streamingIncidentSpacingWeeks(snapshot.subscribers)
+        && rng() < streamingIncidentChance(risk, snapshot.subscribers, streamingIncidentExposure(platform))) {
+        const { type, techId } = chooseStreamingCrisisType(platform, snapshot, rng);
         const severity = getSeverity(risk + rng() * 0.18);
         const multiplier = SEVERITY_MULTIPLIER[severity];
         const key = `streaming-crisis:${snapshot.absoluteWeek}:${type}`;
-        const copy = CRISIS_COPY[type];
+        /* #55: a leak names the title on pirate sites, and reaches the people who watch it */
+        const leaked = type === 'CONTENT_LEAK' ? pickStreamingLeakedTitle(platform, snapshot) : null;
+        const copy = leaked ? getStreamingLeakCopy(leaked.title) : getStreamingCrisisCopy(type, techId);
+        const trust = leaked ? streamingTechTrustMain(resolveStreamingTechTree(platform)) : null;
+        const trustVersion = trust ? getStreamingTechGroup('TRUST')?.versionNames[Math.max(0, trust.version - 1)] : null;
         detectedCrisis = {
             id: createDeterministicId('streaming_crisis', platform.simulationSeed, key),
             idempotencyKey: key,
@@ -530,11 +748,14 @@ export const commitStreamingCrisisSecurityWeek = (
             stage: 'DETECTED',
             title: copy.title,
             detail: copy.detail,
-            cause: type === 'PLATFORM_OUTAGE'
-                ? `${(operations?.capacityUtilizationPercent || 0).toFixed(0)}% peak-capacity use and ${(operations?.playbackSuccessRate || 0).toFixed(2)}% playback success`
-                : `${platform.technologyLevels.SECURITY} security maturity with ${nextState.securityPressure.toFixed(0)} pressure`,
+            cause: leaked
+                ? `${trust ? `${trust.name}${trustVersion ? ` at ${trustVersion}` : ''}: ` : ''}leak risk ${Math.round(streamingTechLeakFactor(resolveStreamingTechTree(platform)) * 100)}%`
+                : crisisCauseFor(type, techId, platform, operations, nextState.securityPressure),
             detectedAtAbsoluteWeek: snapshot.absoluteWeek,
-            affectedSubscribers: Math.round(snapshot.subscribers * clamp(0.025 * multiplier, 0.01, 0.22)),
+            // a named leak reaches the share of the title's viewers who take the pirated copy
+            affectedSubscribers: leaked
+                ? Math.round(clamp(leaked.viewingAccounts * .3 * multiplier, snapshot.subscribers * .01, snapshot.subscribers * .22))
+                : Math.round(snapshot.subscribers * clamp(0.025 * multiplier, 0.01, 0.22)),
             estimatedRevenueAtRisk: roundMoney((operations?.subscriptionRevenue || 0) * 0.16 * multiplier),
             responseDoctrine: null,
             compensation: null,
@@ -544,11 +765,15 @@ export const commitStreamingCrisisSecurityWeek = (
             recoveryReadyAtAbsoluteWeek: null,
             resolvedAtAbsoluteWeek: null,
             outcomeNote: null,
+            ...(techId ? { techId } : {}),
+            ...(leaked ? { projectId: leaked.projectId } : {}),
         };
         nextState = {
             ...nextState,
             publicTrust: clamp(nextState.publicTrust - 2.5 * multiplier),
-            regulatoryScrutiny: clamp(nextState.regulatoryScrutiny + (type === 'ACCOUNT_BREACH' || type === 'RIGHTS_COMPLIANCE' ? 5 : 2) * multiplier),
+            // Privacy (#54) keeps part of it from reaching the regulator
+            regulatoryScrutiny: clamp(nextState.regulatoryScrutiny + (type === 'ACCOUNT_BREACH' || type === 'RIGHTS_COMPLIANCE' ? 5 : 2) * multiplier
+                * streamingTechScrutinyFactor(resolveStreamingTechTree(platform))),
             securityPressure: clamp(nextState.securityPressure + 9 * multiplier),
             crises: [...nextState.crises, detectedCrisis],
         };
@@ -564,6 +789,7 @@ export const commitStreamingCrisisSecurityWeek = (
         ...platform,
         crisisSecurity: nextState,
         eventLedger: [...platform.eventLedger, ...ledger],
+        milestoneKeys: trustRestorePending ? [...platform.milestoneKeys, STREAMING_PUBLIC_TRUST_RESTORED_KEY] : platform.milestoneKeys,
     }, player.id);
     const newFacts = new Map(ledger.map(item => [item.idempotencyKey, item]));
     const regulatorFact = [...ledger].reverse().find(item => item.type === 'REGULATORY_CASE_OPENED');
@@ -572,7 +798,8 @@ export const commitStreamingCrisisSecurityWeek = (
     if (crisisFact) {
         platform = queueOwnedStreamingCinematic(platform, {
             idempotencyKey: `${detectedCrisis!.idempotencyKey}:scene`,
-            type: detectedCrisis!.type === 'PLATFORM_OUTAGE' ? 'PLATFORM_OUTAGE' : 'CRISIS_EXPOSURE',
+            // the technical kinds (#53) share the outage's scene: the signal breaks
+            type: ['PLATFORM_OUTAGE', 'SLOW_STREAMING', 'APP_CRASH', 'FEATURE_BROKEN'].includes(detectedCrisis!.type) ? 'PLATFORM_OUTAGE' : 'CRISIS_EXPOSURE',
             priority: detectedCrisis!.severity === 'CRITICAL' ? 'MAJOR' : 'IMPORTANT',
             availableAtAbsoluteWeek: snapshot.absoluteWeek,
             title: detectedCrisis!.title,
@@ -673,7 +900,7 @@ export const getStreamingCrisisResponsePreview = (
     const recoveryWeeks = Math.max(2, Math.round(
         5
         - (doctrine === 'SERVICE_FIRST' ? 1 : 0)
-        - (platform.technologyLevels.RELIABILITY >= 3 ? 1 : 0)
+        - (platform.technologyLevels.RELIABILITY >= 30 ? 1 : 0)
         + (doctrine === 'TRANSPARENT_FIRST' ? 1 : 0),
     ));
     const trustScore = (compensation === 'FULL' ? 2 : compensation === 'TARGETED' ? 1 : -1)
@@ -754,7 +981,7 @@ export const launchStreamingShadowOperation = (
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const securityHead = platform.leadership.appointments.some(item => item.status === 'ACTIVE' && item.role === 'SECURITY_TRUST_HEAD');
     const successEstimatePercent = clamp(definition.baseSuccessPercent + platform.competitiveWorld.globalPrestige * 0.08 - rival.technology * 1.1, 18, 88);
-    const exposureRiskPercent = clamp(definition.baseExposurePercent - platform.technologyLevels.SECURITY * 2.5 - (securityHead ? 5 : 0), 5, 92);
+    const exposureRiskPercent = clamp(definition.baseExposurePercent - platform.technologyLevels.SECURITY * 0.25 - (securityHead ? 5 : 0), 5, 92);
     const key = `streaming-shadow:${type}:${targetPlatformId}:${absoluteWeek}`;
     const rng = createDeterministicRng(`${platform.simulationSeed}:${key}`);
     const succeeded = rng() * 100 < successEstimatePercent;

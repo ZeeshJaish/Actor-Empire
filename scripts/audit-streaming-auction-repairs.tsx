@@ -17,7 +17,7 @@ const check=(name:string, fn:()=>void)=>{try{fn();checks++;console.log(`PASS ${n
 const fixture=(rivalCount=0)=>{
  const p=contentMarketFixture();
  p.world.studios['seller-cm1']={...Object.values(p.world.studios)[0],id:'seller-cm1' as any,name:'Fixture studio'};
- p.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(p.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'STORE'});
+ p.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(p.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'STORE',alone:true});
  const ecosystem=normalizeStreamingPlatformEcosystem(undefined,getAbsoluteWeek(p.age,p.currentWeek));
  Object.values(ecosystem.operators).forEach((o,i)=>{o.cashMillions=i<rivalCount?500_000:0;o.activeCountryIds=['US','IN'];});
  p.world.streamingPlatformEcosystem=ecosystem;
@@ -95,7 +95,7 @@ check('restricted title cannot offer rental backend',()=>{
  assert.equal(rejected.changed,false,'Rental-only service cannot promise backend on subscription-only title grant');assert.match(rejected.detail!,/matching title rights/);
 });
 check('subscription-only console clearly explains backend unavailable',()=>{
- const subscription=fixture(5);subscription.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(subscription.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'SUBSCRIPTION'} as any);
+ const subscription=fixture(5);subscription.ownedStreamingPlatform.serviceConfiguration.pricing=configureStreamingPricingOffer(subscription.ownedStreamingPlatform.serviceConfiguration.pricing,{kind:'CORE',coreModel:'SUBSCRIPTION',alone:true} as any);
  const subLot=getStreamingBuyerAuctionLots(subscription).find(l=>l.allowedTerms.futureGreenlightAllowed)!;const subRoom=openStreamingBuyerAuction(subscription,subLot.id,1000);
  const html=renderToStaticMarkup(<StreamingBuyerAuctionRoom player={subRoom.player} session={subRoom.session!} onUpdatePlayer={()=>{}} onExit={()=>{}}/>);
  assert.match(html,/Backend unavailable/);assert.match(html,/advertising or rental/);

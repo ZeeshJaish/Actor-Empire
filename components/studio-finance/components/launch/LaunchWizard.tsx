@@ -4,11 +4,13 @@
    Seven steps that together answer one question: what is this service going to
    be on opening night? The shell owns three things the steps all depend on:
 
-   · the spine — where the player is, and which steps carry a problem;
-   · the money rail — the studio's money against the plan, on every screen,
-     with the way out of a shortfall attached to it. Funding used to be step
-     one; it is not a step, it is a condition of every step, and a page the
-     player walks past once is the wrong place for it;
+   · the launch sequence — seven stages along the top, each lit when settled,
+     the one you are on drawn big (#110);
+   · the HUD — one bar at the foot: this step's number, the money left after
+     the plan, what still blocks the step, Back as an icon and the next stage
+     as the big button (#110). Funding is not a step, it is a condition of
+     every step, so the money is on every screen with the way out of a
+     shortfall one tap away;
    · the draft — selections live here until a paid step is confirmed, so that
      planning is genuinely free.
    ========================================================================== */
@@ -21,8 +23,9 @@ import type { LinkedBudgetSummary } from '../../finance/budgetLinks';
 import { brandVars } from '../../finance/brand';
 import { money } from '../../finance/format';
 import { Row, Sheet } from '../ui';
-import { PlanStrip } from '../kit';
 import { LaunchBudgetContent } from '../BudgetSheets';
+import { LaunchHud } from './LaunchHud';
+import { StepIcon, TickIcon } from './StageIcons';
 import { StepMarkets } from './StepMarkets';
 import { StepClearance } from './StepClearance';
 import { StepIdent } from './StepIdent';
@@ -72,7 +75,6 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
     };
   });
   const initialAutosaveSent = useRef(false);
-  const trackRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (initialAutosaveSent.current) return;
@@ -85,30 +87,6 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
 
   const brand = useMemo(() => brandVars(data.company.brandHex), [data.company.brandHex]);
   const index = Math.max(0, STEPS.findIndex((s) => s.id === stepId));
-  useEffect(() => {
-    const track = trackRef.current;
-    const active = track?.querySelector<HTMLElement>('.lw-stop.is-now');
-    if (!track || !active) return;
-    const alignActive = () => {
-      // Keep the rail anchored like Build. Scroll only when the selected stop
-      // is outside the visible rail, rather than clipping earlier stops merely
-      // to center a middle step.
-      const left = active.offsetLeft;
-      const right = left + active.offsetWidth;
-      if (left < track.scrollLeft) track.scrollLeft = Math.max(0, left - 12);
-      else if (right > track.scrollLeft + track.clientWidth) track.scrollLeft = right - track.clientWidth + 12;
-    };
-    alignActive();
-    window.addEventListener('resize', alignActive);
-    const observer = new ResizeObserver(alignActive);
-    observer.observe(track);
-    observer.observe(active);
-    return () => {
-      window.removeEventListener('resize', alignActive);
-      observer.disconnect();
-    };
-  }, [index]);
-  const step = STEPS[index];
 
   const planned = useMemo(() => plannedTotal(data, draft), [data, draft]);
   const treasury = { ...data.treasury, planned };
@@ -117,10 +95,13 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
   const chosen = useMemo(() => selectedCountries(data, draft), [data, draft]);
   const blockers = blockersFor(stepId, data);
   const stageRows = useMemo(() => launchStageSummaries(data, draft), [data, draft]);
+  const settled = new Set(stageRows.filter((row) => row.done).map((row) => row.id));
 
   /* One pricing preview belongs to the wizard, not each step. The page, strip
      and blueprint consume the same world result for a given edit. */
   const pricingSettings = draft.pricing ?? data.pricing;
+  /* Pricing before an offer is chosen has no number to read and nowhere to go. */
+  const noOffer = stepId === 'pricing' && pricingSettings.commercialOffers?.coreModelSelected === false;
   const pricingCountryKey = chosen.map(country => country.id).join('|');
   const pricingCountryIds = useMemo(() => pricingCountryKey ? pricingCountryKey.split('|') : [], [pricingCountryKey]);
   const forecastHandlerRef = useRef(handlers.onForecastPricing);
@@ -156,8 +137,8 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
     monthly: gestureMonthly ?? pricingForecast.monthlyRevenue, yearly: pricingForecast.yearlyRevenue,
     position: pricingForecast.position } : undefined;
 
-  /* What the strip above the footer says on this step: the step's own number
-     and state, over the same plan-against-money bar on all seven. */
+  /* What the HUD reads on this step: the step's own number and state, over
+     the same plan-against-money fuel line on all seven. */
   const bar = useMemo(() => {
     const next = launchStepBar(data, draft, stepId, earnings);
     return stepId === 'pricing' && (pricingGesture || forecastUpdating)
@@ -194,7 +175,7 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
       ? { settings, active: true } : current ? { ...current, active: false } : null) };
 
   return (
-    <div className="sf lw" style={brand as React.CSSProperties}>
+    <div className="sf lw dl" style={brand as React.CSSProperties}>
       <header className="sf-head">
         <button type="button" className="sf-icon-btn" onClick={() => handlers.onExit?.()} aria-label="Back">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 2L4 8l6 6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -206,38 +187,33 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
         {!operation && <span className="lw-count">{index + 1}<i>/{STEPS.length}</i></span>}
       </header>
 
-      {/* --- the stage rail --------------------------------------------------
-          Seven stops on one track. A finished stop is a tick, an unvisited one
-          its own glyph, and the stop you are on opens into a pill that names
-          itself — which is how seven steps fit on a phone without a second
-          line of text underneath doing the naming. */}
-      {!operation && <nav ref={trackRef} className="lw-track" aria-label="Launch steps">
-        <span className="lw-track-line" aria-hidden="true">
+      {/* --- the launch sequence ---------------------------------------------
+          Seven stages on one rail, all seven on a phone. A stage is lit once it
+          is settled — the same `done` the bill and the blueprint read, so the
+          rail, the bill and the briefing can never disagree — and keeps its
+          own glyph either way; the stage you are on is drawn big and names
+          itself underneath. A stage carrying something blocking wears a red
+          dot wherever you are. */}
+      {!operation && <nav className="lw-seq" aria-label="Launch steps">
+        <span className="lw-seq-rail" aria-hidden="true">
           <i style={{ width: `${(index / (STEPS.length - 1)) * 100}%` }} />
         </span>
         {STEPS.map((s, i) => {
-          /* A tick means finished, not merely walked past. Moving on from a
-             stage that still owes something — a storefront previewed but never
-             saved because it is research-locked, say — leaves it open behind
-             you rather than ticking it. `blockersFor` is the same source the
-             stage itself uses to say what is outstanding, so the rail and the
-             stage can never disagree. */
-          const outstanding = i < index && blockersFor(s.id, data).length > 0;
-          const state = i < index ? (outstanding ? 'todo' : 'done') : i === index ? 'now' : 'ahead';
+          const lit = settled.has(s.id);
+          const state = i === index ? 'now' : lit ? 'lit' : i < index ? 'open' : 'ahead';
           const flagged = data.blockers.some((b) => b.step === s.id && b.severity === 'block');
           return (
             <button
               key={s.id}
               type="button"
-              className={`lw-stop is-${state}${flagged ? ' is-flagged' : ''}`}
+              className={`lw-seq-stop is-${state}${lit ? ' is-settled' : ''}${flagged ? ' is-flagged' : ''}`}
               onClick={() => selectStep(s.id)}
-              aria-label={s.verb}
+              aria-label={`${s.verb}${lit ? ' — settled' : ''}`}
               aria-current={i === index ? 'step' : undefined}
             >
-              <span className="lw-stop-glyph" aria-hidden="true">
-                {state === 'done' ? <TickIcon /> : <StepIcon step={s.id} />}
-              </span>
-              <span className="lw-stop-name">{s.label}</span>
+              <span className="lw-seq-glyph" aria-hidden="true"><StepIcon step={s.id} /></span>
+              {lit && <span className="lw-seq-tick" aria-hidden="true"><TickIcon /></span>}
+              {i === index && <span className="lw-seq-name">{s.label}</span>}
             </button>
           );
         })}
@@ -262,55 +238,33 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
         </div>
       </div>
 
-      {!operation && blockers.length > 0 && (
-        <ul className="lw-blockers">
-          {blockers.map((b) => (
-            <li key={b.id} className={b.severity === 'block' ? 'is-block' : 'is-warn'}>{b.text}</li>
-          ))}
-        </ul>
-      )}
-
-      {/* --- the plan, wherever you are ------------------------------------
-          This was a rail at the top of every step: studio money, what the plan
-          would cost, a gauge between them. It said the same thing on all seven
-          screens and nothing about the step you were on, and it sat furthest
-          from the thumb doing the work. Same money, same gauge, same two ways
-          in — and now it also says what this step amounts to. */}
-      {!operation && !(stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false) && <PlanStrip
+      {!operation && <LaunchHud
         view={bar}
         page={stepId}
-        tone={bar.verdict ? bar.verdict.tone : 'flat'}
-        over={gap > 0}
-        money={gap > 0
-          ? { label: 'Short', value: money(gap), bad: true, spent: planned, of: free }
-          : { label: 'Money', value: money(free), spent: planned, of: free }}
+        planned={planned}
+        free={free}
+        readout={!noOffer}
+        blockers={blockers}
         ways={[
           { label: 'The bill', onClick: () => setOpenSheet('plan') },
           gap > 0
             ? { label: 'Add money', primary: true, onClick: () => setOpenSheet('money') }
             : { label: 'Money', onClick: () => setOpenSheet('money') },
         ]}
+        onBack={index > 0 ? () => go(index - 1) : undefined}
+        next={noOffer
+          ? { label: 'Choose an offer', disabled: true, onClick: () => undefined }
+          : index === STEPS.length - 1
+            ? { eyebrow: 'Next', label: 'Build the Platform', glyph: <BuildGlyph />, onClick: () => handlers.onOpenBuildPlatform?.() }
+            : { eyebrow: 'Next', label: STEPS[index + 1].label, glyph: <StepIcon step={STEPS[index + 1].id} />, onClick: () => go(index + 1) }}
       />}
 
-      {operation ? <footer className="lw-foot op-editor-footer">
+      {operation && <footer className="lw-foot op-editor-footer">
         {saveFeedback && <p role="status">{saveFeedback}</p>}
         <button type="button" className="sf-btn sf-btn--ghost" onClick={handlers.onExit}>Close</button>
         {operation.onSave && <button type="button" className="sf-btn sf-btn--primary" onClick={() => {
           const result = operation.onSave!(draft); setSaveFeedback(result.message);
         }}>Save changes</button>}
-      </footer> : <footer className="lw-foot">
-        <button type="button" className="sf-btn sf-btn--ghost" disabled={index === 0} onClick={() => go(index - 1)}>
-          Back
-        </button>
-        <button
-          type="button"
-          className="sf-btn sf-btn--primary"
-          disabled={stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false}
-          onClick={() => (index === STEPS.length - 1 ? handlers.onOpenBuildPlatform?.() : go(index + 1))}
-        >
-          {stepId === 'pricing' && (draft.pricing ?? data.pricing).commercialOffers?.coreModelSelected === false
-            ? 'Choose an offer' : index === STEPS.length - 1 ? 'Open Build the Platform' : `Next · ${STEPS[index + 1].label}`}
-        </button>
       </footer>}
 
       {/* --- where money comes from, attached to the shortfall --------------- */}
@@ -388,29 +342,13 @@ export function LaunchWizard({ data, operation, initialCountryId, initialStep = 
   );
 }
 
-/* --- one glyph per stage ---------------------------------------------------- */
-
-function StepIcon({ step }: { step: LaunchStepId }) {
-  const paths: Record<LaunchStepId, React.ReactElement> = {
-    markets: <><circle cx="12" cy="12" r="8" /><path d="M4 12h16M12 4c4 4.5 4 11 0 16-4-5-4-11.5 0-16z" /></>,
-    clearance: <><path d="M6 3.5h8l4 4V20a.5.5 0 01-.5.5h-11A.5.5 0 016 20V4a.5.5 0 010-.5z" /><path d="M13.5 3.5V8H18M9 13.5l2 2 4-4" /></>,
-    ident: <><path d="M5 12a7 7 0 0114 0" /><path d="M9 12v5M15 12v5M12 9v11" /></>,
-    storefront: <><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M3.5 10h17M9 10v9.5" /></>,
-    pricing: <><path d="M4 11.5V5a1 1 0 011-1h6.5L20 12.5 12.5 20 4 11.5z" /><circle cx="8" cy="8" r="1.2" /></>,
-    catalogue: <><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="M8 5.5v13M16 5.5v13M3.5 12h17" /></>,
-    blueprint: <><rect x="4.5" y="3.5" width="15" height="17" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
-  };
+/* The last stage's way on: Build the Platform, drawn as the launch it leads to. */
+function BuildGlyph() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      {paths[step]}
-    </svg>
-  );
-}
-
-function TickIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12.5l4.5 4.5L19 7.5" />
+      <path d="M12 3c3 2.2 4.5 5.6 4.5 9.5V16h-9v-3.5C7.5 8.6 9 5.2 12 3z" />
+      <path d="M7.5 13.5L5 16v3l2.5-1.5M16.5 13.5L19 16v3l-2.5-1.5M10.5 19.5h3" />
+      <circle cx="12" cy="10" r="1.4" />
     </svg>
   );
 }

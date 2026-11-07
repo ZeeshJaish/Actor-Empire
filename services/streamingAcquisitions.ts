@@ -29,6 +29,7 @@ import { handoffAcquiredPlatformProductions } from './platformAi/platformAiProdu
 import { settlePendingPlatformAiExternalCommitmentsForAcquisition } from './platformAi/platformAiExternalCommitments';
 import { cancelPendingPlatformAiCatalogueDistressDealsForAcquisition } from './platformAi/platformAiDistress';
 import { isStreamingLicenseActiveAt } from './streamingRightsCore';
+import { grantStreamingTechTreeFromLevels, resolveStreamingTechTree } from './streamingTechTreeCatalogue';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum))
@@ -1122,6 +1123,8 @@ export const completeDueStreamingAcquisitionIntegrations = (
         platform: compactOwnedStreamingPlatformForPersistence({
             ...platform,
             technologyLevels: nextTechnology,
+            // the acquired engineering arrives as tech too: whatever the new Playback, Delivery and Reliability levels stand for
+            techTree: grantStreamingTechTreeFromLevels(resolveStreamingTechTree(platform), nextTechnology, absoluteWeek),
             metrics: {
                 ...platform.metrics,
                 technologyHealth: Math.round(clamp(platform.metrics.technologyHealth + technologyDelta, 0, 100)),

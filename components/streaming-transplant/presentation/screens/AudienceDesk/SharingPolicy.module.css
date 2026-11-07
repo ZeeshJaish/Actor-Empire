@@ -16,7 +16,8 @@
 .segments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:3px;border-radius:12px;background:#080a0f;border:1px solid rgba(255,255,255,.06)}
 .segments button{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:8px 3px 7px;border-radius:9px;text-align:center;transition:background .16s ease,box-shadow .16s ease}
 .segments button b{font:800 10.5px/1.1 'Inter',system-ui,sans-serif;color:#aab2c0;white-space:nowrap}
-.segments button small{max-width:100%;overflow:hidden;font-size:8px;line-height:1.2;color:#5f6875;white-space:nowrap;text-overflow:ellipsis}
+/* a hint wraps onto a second line on the narrowest phones rather than being cut (#56) */
+.segments button small{max-width:100%;font-size:8px;line-height:1.2;color:#5f6875;text-wrap:balance}
 .segments button.on{background:color-mix(in srgb,var(--policy-accent) 18%,#0c0f15);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--policy-accent) 60%,transparent)}
 .segments button.on b{color:#fff}
 .segments button.on small{color:color-mix(in srgb,var(--policy-accent) 55%,#c9cfda)}
@@ -45,3 +46,39 @@
 .actions{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:12px}
 .actions .apply{padding:12px;border-radius:12px;background:var(--policy-accent);font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--epx-brand-ink,#fff)}
 .actions .reset{padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);font:800 9.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#c9cfda}
+
+/* ── #108 (plan §18.4) the posture as a dial, enforcement as levels, each figure a gauge ── */
+.dial{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:14px 0 2px}
+.track{position:absolute;top:21px;left:16.67%;right:16.67%;height:4px;border-radius:99px;background:#1b1f28;overflow:hidden}
+.track em{position:absolute;inset:0 auto 0 0;width:var(--at);border-radius:inherit;background:var(--policy-accent);transition:width .25s cubic-bezier(.3,1.3,.5,1)}
+.card .dial .stop{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:0 2px;background:none;border:0;text-align:center}
+.stop > i{position:relative;z-index:1;width:18px;height:18px;border-radius:50%;background:#12151d;border:2px solid #2d323e;transition:transform .2s cubic-bezier(.3,1.5,.5,1),background .2s,border-color .2s}
+.stop.on > i{background:#fff;border-color:var(--policy-accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--policy-accent) 25%,transparent);transform:scale(1.15)}
+.stop.current:not(.on) > i{border-color:#7d8698}
+.stop b{margin-top:3px;font:800 10.5px/1.15 'Inter',system-ui,sans-serif;color:#aab2c0}
+.stop small{max-width:100%;font-size:8px;line-height:1.2;color:#5f6875;text-wrap:balance}
+.stop.on b{color:#fff}
+.stop.on small{color:color-mix(in srgb,var(--policy-accent) 55%,#c9cfda)}
+.levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.card .levels button{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:9px 3px 8px;border-radius:11px;
+  background:#080a0f;border:1px solid rgba(255,255,255,.06);text-align:center;transition:transform .12s cubic-bezier(.3,1.5,.5,1),background .16s}
+.levels button b{font:800 10.5px/1.1 'Inter',system-ui,sans-serif;color:#aab2c0}
+.levels button small{max-width:100%;font-size:8px;line-height:1.2;color:#5f6875;text-wrap:balance}
+.card .levels button.on{background:color-mix(in srgb,var(--policy-accent) 16%,#0c0f15);border-color:color-mix(in srgb,var(--policy-accent) 60%,transparent)}
+.levels button.on b{color:#fff}
+.card .levels button:active{transform:scale(.95)}
+.levels button.current:after{content:'';position:absolute;top:6px;right:7px;width:5px;height:5px;border-radius:50%;background:#7d8698}
+.levels button.current.on:after{background:var(--policy-accent)}
+.bars{display:flex;align-items:flex-end;gap:2px;height:14px}
+.bars i{width:5px;border-radius:2px;background:#262a34}
+.bars i:nth-child(1){height:6px}
+.bars i:nth-child(2){height:10px}
+.bars i:nth-child(3){height:14px}
+.bars i.lit{background:var(--policy-accent)}
+.levels button:not(.on) .bars i.lit{background:#5f6875}
+.gauge{grid-column:1/-1;position:relative;display:block;height:6px;margin-top:5px;border-radius:99px;background:#1b1f28;overflow:visible}
+.gauge em{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:var(--g);box-shadow:0 0 8px -2px var(--g);transition:width .3s ease}
+.gauge u{position:absolute;top:-3px;width:2px;height:12px;margin-left:-1px;border-radius:1px;background:#eef0f5}
+@media (prefers-reduced-motion:reduce){
+  .track em,.stop > i,.card .levels button,.gauge em{transition:none}
+}

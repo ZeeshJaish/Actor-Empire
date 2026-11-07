@@ -7,6 +7,7 @@ import type {
   StreamingDefineLaunchStepId,
   StreamingIdentPackageId,
   StreamingSoundIdentKey,
+  StreamingTechId,
 } from '../types';
 import { getAbsoluteWeek } from '../services/legacyLogic';
 import {
@@ -19,6 +20,9 @@ import {
   isAuthoredStreamingMarket,
 } from '../services/streamingDayOneMarkets';
 import { hasDetailedStreamingMarketCard } from '../services/streamingMarketFilingQuote';
+import { resolveStreamingTechTree } from '../services/streamingTechTreeCatalogue';
+import { STREAMING_LAUNCH_UNLOCKS, streamingLaunchUnlockLock } from '../services/streamingLaunchUnlocks';
+import { getStreamingPlanBuilderView } from '../services/streamingPlanBuilder';
 import { getStreamingMarketSubRegion } from '../services/streamingMarketSubRegions';
 import {
   beginStreamingMarketClearance,
@@ -47,10 +51,8 @@ import { createStreamingCatalogueReadContext, getStreamingCatalogueReadContext, 
 import { reuseStreamingPresentationSource, streamingLaunchDraftPricingChanged } from '../services/streamingPresentationInputs';
 import { rankStreamingLaunchAnchors } from '../services/streamingCatalogueAnchors';
 import { getEligibleOwnedStreamingTitles, getStreamingLicenseOpportunities } from '../services/streamingCatalog';
-import {
-  STREAMING_STOREFRONT_LAYOUTS,
-  getStreamingStorefrontLockReason,
-} from '../services/streamingStorefront';
+import { STREAMING_STOREFRONT_LAYOUTS } from '../services/streamingStorefront';
+import { formatGenreLabel } from '../services/genreCatalog';
 import { LaunchWizard } from './studio-finance/components/launch/LaunchWizard';
 import type {
   Approach,
@@ -84,7 +86,8 @@ interface Props {
   onOpenBuild: () => void;
   onOpenBuildBudget?: () => void;
   onOpenPricing: () => void;
-  onOpenTechnology: () => void;
+  /** Tech in the Platform room; a locked plan step opens on the tech it needs */
+  onOpenTechnology: (techId?: StreamingTechId) => void;
   mode?: 'OPENING' | 'EXPANSION';
   operationCountryId?: string;
   operation?: 'MARKETS' | 'CLEARANCE' | 'IDENTITY' | 'STOREFRONT' | 'PRICING';
@@ -277,34 +280,19 @@ const buildCatalogue = (player: Player, context: StreamingCatalogueReadContext):
   };
 };
 
-const buildCapabilityLocks = (player: Player): Record<string, string> => {
-  const platform = player.ownedStreamingPlatform;
-  const tech = platform.technologyLevels;
-  const active = new Set(platform.productLines.filter(line => line.status === 'ACTIVE').map(line => line.lineId));
-  const locks: Record<string, string> = {};
-  const lock = (key: string, blocked: boolean, reason: string) => { if (blocked) locks[key] = reason; };
-  lock('ident:adaptive', tech.PRODUCT_EXPERIENCE < 35, 'Product Experience level 35');
-  lock('ident:genre', tech.PRODUCT_EXPERIENCE < 20, 'Product Experience level 20');
-  lock('ident:living', tech.PRODUCT_EXPERIENCE < 60 || tech.DATA_RECOMMENDATIONS < 40, 'Product Experience 60 and Recommendations 40');
-  STREAMING_STOREFRONT_LAYOUTS.forEach(layout => {
-    const reason = getStreamingStorefrontLockReason(platform, layout.id);
-    if (reason) locks[`storefront:${layout.id}`] = reason;
+/* #109 (plan §18.5): a locked front page or ident kit names the Tech step that unlocks it (they read Product Experience
+   and Recommendations levels the Tech tab never showed). The stream: and feature: locks nobody read are gone. */
+const buildCapabilityLocks = (player: Player): Pick<LaunchData, 'capabilityLocks' | 'capabilityLockTech'> => {
+  const tree = resolveStreamingTechTree(player.ownedStreamingPlatform);
+  const capabilityLocks: Record<string, string> = {};
+  const capabilityLockTech: NonNullable<LaunchData['capabilityLockTech']> = {};
+  Object.keys(STREAMING_LAUNCH_UNLOCKS).forEach(key => {
+    const lock = streamingLaunchUnlockLock(tree, key);
+    if (!lock) return;
+    capabilityLocks[key] = lock.needs;
+    capabilityLockTech[key] = { techId: lock.techId, tech: lock.tech };
   });
-  lock('stream:sponsor', tech.ADVERTISING_COMMERCE < 20 && !active.has('FREE'), 'Commerce level 20 or EMPIRE+ Free');
-  lock('stream:premium', !active.has('STORE'), 'EMPIRE+ Store');
-  lock('stream:daypass', !active.has('LIVE'), 'EMPIRE+ Live');
-  lock('stream:metered', tech.ADVERTISING_COMMERCE < 60 || tech.PRODUCT_EXPERIENCE < 50, 'Commerce 60 and Product Experience 50');
-  lock('stream:patron', !active.has('FAN') || tech.ADVERTISING_COMMERCE < 40, 'EMPIRE+ Fan and Commerce 40');
-  lock('feature:hd', tech.PLAYBACK_QUALITY < 20, 'Playback Quality level 20');
-  lock('feature:uhd', tech.PLAYBACK_QUALITY < 55, 'Playback Quality level 55');
-  lock('feature:spatial', tech.PLAYBACK_QUALITY < 45, 'Playback Quality level 45');
-  lock('feature:streams2', tech.RELIABILITY < 10, 'Reliability level 10');
-  lock('feature:streams4', tech.RELIABILITY < 35, 'Reliability level 35');
-  lock('feature:downloads', tech.PRODUCT_EXPERIENCE < 25, 'Product Experience level 25');
-  lock('feature:early', tech.CONTENT_OPERATIONS < 20, 'Content Operations level 20');
-  lock('feature:live', !active.has('LIVE'), 'EMPIRE+ Live');
-  lock('feature:extraseat', tech.ADVERTISING_COMMERCE < 30, 'Commerce level 30');
-  return locks;
+  return { capabilityLocks, capabilityLockTech };
 };
 
 export const buildLaunchData = (player: Player, preparedContext?: StreamingCatalogueReadContext, operations = false): LaunchData => {
@@ -399,12 +387,14 @@ export const buildLaunchData = (player: Player, preparedContext?: StreamingCatal
       title: title.title,
       projectType: title.projectType,
       source: 'OWNED' as const,
+      genre: title.genre,
     })),
     ...getStreamingLicenseOpportunities(player).map(title => ({
       id: title.id,
       title: title.title,
       projectType: title.projectType,
       source: 'WORLD' as const,
+      genre: title.genre,
     })),
   ];
   const storefrontTitleMap = new Map(previewTitlePool.map(title => [title.id, title]));
@@ -415,6 +405,8 @@ export const buildLaunchData = (player: Player, preparedContext?: StreamingCatal
     posterSeed: title.id,
     poster: posterById.get(title.id),
     linked: linkedTitleIds.has(title.id),
+    /* #122: the app's key art in the front page previews follows the genre */
+    genre: 'genre' in title && title.genre ? formatGenreLabel(title.genre) : undefined,
     note: title.source === 'OPENING'
       ? 'Opening catalogue'
       : title.source === 'OWNED'
@@ -536,7 +528,8 @@ export const buildLaunchData = (player: Player, preparedContext?: StreamingCatal
     },
     blockers,
     blueprintSaved: Boolean(launchView.tracks[0].milestones.find(milestone => milestone.id === 'LAUNCH_BLUEPRINT')?.complete),
-    capabilityLocks: buildCapabilityLocks(player),
+    ...buildCapabilityLocks(player),
+    planBuilder: getStreamingPlanBuilderView(platform),
   };
 };
 

@@ -28,6 +28,9 @@ const audioContextConstructor = (): typeof AudioContext | null => {
     || null;
 };
 
+/** #115: stops the ident playing (the app's opening ident when it is skipped). */
+export const stopStreamingIdentPreview = (): void => stopActivePreview();
+
 /** Plays only from an explicit player gesture. Presets are synthesized locally,
     so the same path works in Safari, Android WebView and Capacitor without a
     network request or a native audio plugin. */

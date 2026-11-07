@@ -98,6 +98,8 @@ export interface HqEvent {
   meta?: string;
   /** true for the one moment the whole desk is currently about */
   hero?: boolean;
+  /** #76: a slim line (an incident on STATUS): its label small, its line wrapping */
+  compact?: boolean;
 }
 
 export interface HqStat { id: string; label: string; value: string; tone?: 'good' | 'bad' | 'pending' }
@@ -182,6 +184,8 @@ export const PlatformHQ: React.FC<{
   onOpenDivision?: (d: DivisionId, chip?: string) => void;
   onEvent?: (e: HqEvent) => void;
   onOpenViewer?: () => void;
+  /** #116: the logo opens the brand studio */
+  onOpenBrandStudio?: () => void;
   /** the treasury is a door, not a readout — see the note at its render site */
   onOpenFinance?: () => void;
   onOpenTitle?: (t: ServiceTitle) => void;
@@ -189,8 +193,9 @@ export const PlatformHQ: React.FC<{
   onLaunch?: () => void;
   onOpenLaunchTrack?: (track: StreamingLaunchTrackId) => void;
   onOpenLaunchDestination?: (destination: StreamingLaunchDestination) => void;
-}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack }) => {
+}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenBrandStudio, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack }) => {
   const tf = typeFace(brand);
+  const longName = (brand.name || '').length > 14;
   const [pulse, setPulse] = useState(0);
 
   /* one event wins the slot; ties break on declaration order */
@@ -208,16 +213,38 @@ export const PlatformHQ: React.FC<{
 
         {/* ── header ── */}
         <header className={css.hqhead}>
-          <div className={css.hqtop}>
+          {/* #127 (Zeesh: "after adding the logo in header, the text logo isnt in center and not looking nicw so fix it"):
+              the logo and the name are one lockup, set as the brand's lockup sets them (the mark beside the name, or above
+              it), centred on the page with the level under it; the back button stands apart at the left, and as much room
+              is kept free on the right */}
+          {/* a long name (more than 14 letters) is set a size smaller, and a side lockup stacks its mark above it, so the
+              name keeps the whole width and stays on two lines (#77's stress name ran to four beside the mark) */}
+          <div className={cx(css.hqtop, longName && css.hqlong,
+            brand.lockupId === 'WORDMARK' ? css.hqwords : (brand.lockupId === 'STACK' || longName) && css.hqstack)}>
             {onBack && <button className={css.hqback} onClick={onBack} aria-label="Back">←</button>}
             <div className={css.hqname}>
-              <h1 style={{ fontFamily: tf.stack, fontWeight: tf.weight, letterSpacing: tf.spacing }}>
-                {brand.name || 'UNNAMED'}
-              </h1>
-              <span className={css.tier}>{state.live ? state.tier : 'PRE-LAUNCH'}</span>
+              <div className={css.hqlockup} data-lockup={brand.lockupId}>
+                {/* #116 (plan §18.6): the real logo — the mark (or the upload) as the lockup sets it — and a tap on it opens
+                    the brand studio */}
+                {brand.lockupId !== 'WORDMARK' && (onOpenBrandStudio ? (
+                  <button type="button" className={css.hqlogo} onClick={onOpenBrandStudio} aria-label={`${brand.name || 'The'} logo. Open the brand studio`}>
+                    <Mark brand={brand} /><i aria-hidden="true">✎</i>
+                  </button>
+                ) : <span className={css.hqlogo}><Mark brand={brand} /></span>)}
+                {onOpenBrandStudio && brand.lockupId === 'WORDMARK' ? (
+                  <button type="button" className={css.hqwordmark} onClick={onOpenBrandStudio} aria-label={`${brand.name || 'The'} logo. Open the brand studio`}>
+                    <h1 style={{ fontFamily: tf.stack, fontWeight: tf.weight, letterSpacing: tf.spacing }}>{brand.name || 'UNNAMED'}</h1>
+                  </button>
+                ) : (
+                  <h1 style={{ fontFamily: tf.stack, fontWeight: tf.weight, letterSpacing: tf.spacing }}>
+                    {brand.name || 'UNNAMED'}
+                  </h1>
+                )}
+              </div>
+              <span className={css.tier} data-tier>{state.live ? state.tier : 'PRE-LAUNCH'}</span>
             </div>
           </div>
-          <div className={css.hqwhere}>
+          <div className={css.hqwhere} data-where>
             <i className={css.pin} />
             {state.live
               ? `${state.territories} territor${state.territories === 1 ? 'y' : 'ies'} · Level ${state.reachLevel}`
@@ -280,7 +307,7 @@ export const PlatformHQ: React.FC<{
 
           {/* ── the event slot: at most one, highest priority, or nothing ── */}
           {event && (state.live || !state.launchProgram) && (
-            <button className={cx(css.eventbar, css[event.tone], (event.hero ? css.hero : ''))}
+            <button className={cx(css.eventbar, css[event.tone], (event.hero ? css.hero : ''), (event.compact ? css.compact : ''))}
               onClick={() => onEvent?.(event)}>
               <span className={css.evdot} />
               <div className={css.evtxt}>
@@ -436,7 +463,7 @@ export const PlatformHQ: React.FC<{
               {state.divisions.map(d => (
                 <div key={d.id} className={cx(css.divwrap, css[d.id.toLowerCase()])}>
                 <button className={cx(css.divcard, css[d.id.toLowerCase()], css[d.pressure])}
-                  onClick={() => { setPulse(p => p + 1); onOpenDivision?.(d.id); }}>
+                  onClick={() => { navigator.vibrate?.(12); setPulse(p => p + 1); onOpenDivision?.(d.id); }}>
                   <i className={cx(css.plight, css[d.pressure])} />
                   <span className={css.divicon}>{DIV_ICON[d.id]}</span>
                   <div className={css.divtxt}>
@@ -451,7 +478,7 @@ export const PlatformHQ: React.FC<{
                   <div className={css.chiprail}>
                     {d.chips.map(ch => (
                       <button key={ch.id} className={cx(css.chip, (ch.alert ? css.alert : ''))}
-                        onClick={() => onOpenDivision?.(d.id, ch.id)}>
+                        onClick={() => { navigator.vibrate?.(8); onOpenDivision?.(d.id, ch.id); }}>
                         {ch.label}{ch.alert && <i className={css.chipdot} />}
                       </button>
                     ))}

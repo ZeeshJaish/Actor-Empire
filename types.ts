@@ -342,7 +342,33 @@ export type IndustryEventType =
     | 'FRANCHISE_DECISION'
     | 'AWARD_NOMINATED'
     | 'AWARD_WON'
-    | 'PARTNERSHIP_REPEATED';
+    | 'PARTNERSHIP_REPEATED'
+    /** a streaming service launches a tech: a new picture, HDR, a feature (Phase 5, #66) */
+    | 'PLATFORM_TECH_LAUNCHED'
+    /** a streaming service goes down or breaks where viewers notice, and is fixed (#67) */
+    | 'PLATFORM_OUTAGE'
+    | 'PLATFORM_RESTORED'
+    /** a streaming service raises a price, puts ads on a paid plan, or gets cheaper (#68) */
+    | 'PLATFORM_PRICE_RAISED'
+    | 'PLATFORM_ADS_ADDED'
+    | 'PLATFORM_PRICE_CUT'
+    /** a rival's picture goes past the best the player's plans stream (#70) */
+    | 'PLATFORM_QUALITY_GAP'
+    /** #117 (plan §18.7): a new look or ident, a new front page */
+    | 'PLATFORM_REBRANDED'
+    | 'PLATFORM_APP_REDESIGNED'
+    /** #117: a free tier opened (not "a price cut"), and the offer's other moves: the main offer switched, a free tier
+        closed, subscriptions turned off, the store opened, ads taken off a plan */
+    | 'PLATFORM_FREE_TIER'
+    | 'PLATFORM_OFFER_CHANGED'
+    /** #117: a plan clearly better value than the rivals', or clearly worse */
+    | 'PLATFORM_VALUE_PRAISED'
+    | 'PLATFORM_VALUE_CRITICISED'
+    /** #143: the weekly Top 10's notable weeks: your title the world's #1, a fourth week at #1, your titles entering
+        the world's ten, a rival holding six of them */
+    | 'PLATFORM_CHART_MOMENT'
+    /** #149: a campaign's big moment, famous screen or big result */
+    | 'PLATFORM_CAMPAIGN_MOMENT';
 
 export type IndustryEventEvidenceKind =
     | 'COMPANY'
@@ -381,6 +407,8 @@ export interface IndustryEventFact {
     headline: string;
     detail: string;
     evidence: IndustryEventEvidence[];
+    /** #149: a picture in the media store its news and posts show (a campaign's scene) */
+    imageMediaId?: string;
 }
 
 export interface IndustryEventLedgerState {
@@ -2955,7 +2983,8 @@ export interface StreamingPlatformRun {
  * platform. Catalog entries reference existing project IDs so movie and show
  * data continues to have one source of truth.
  */
-export type OwnedStreamingPlatformLifecycle = 'LOCKED' | 'ELIGIBLE' | 'FOUNDING' | 'ACTIVE' | 'SUSPENDED';
+/** #190: SOLD, the company went to a buyer (a new one can be founded two years later) */
+export type OwnedStreamingPlatformLifecycle = 'LOCKED' | 'ELIGIBLE' | 'FOUNDING' | 'ACTIVE' | 'SUSPENDED' | 'SOLD';
 export type StreamingInfrastructureStrategy = 'UNDECIDED' | 'CLOUD_FIRST' | 'OWNED_INFRASTRUCTURE' | 'HYBRID';
 export type StreamingLogoKey = 'FRAME_PLAY' | 'SIGNAL_RING' | 'SPOTLIGHT' | 'WORDMARK';
 export type StreamingWordmarkStyleId = 'WORDMARK' | 'SIDE' | 'STACK' | 'ICON';
@@ -2985,6 +3014,85 @@ export type StreamingTechnologyBranch =
     | 'CONTENT_OPERATIONS'
     | 'ADVERTISING_COMMERCE'
     | 'PRODUCT_EXPERIENCE';
+
+/* ── Platform tech tree (codex-handoff/plans/platform-tech-plan.md) ──
+   A tech is unlocked once with cash (it arrives at version 1), then raised to
+   versions 2 and 3 with energy; every unlocked tech carries a weekly upkeep.
+   Phase 1 builds the Picture, HDR, Colour and Sound groups. */
+export type StreamingTechGroupId = 'PICTURE' | 'HDR' | 'COLOUR' | 'SOUND' | 'OPTIMISATION' | 'STABILIZATION' | 'PLAYBACK' | 'APPS' | 'TRUST' | 'SMART_AI' | 'FAMILY' | 'ADS';
+export type StreamingTechId =
+    | 'PICTURE_480P' | 'PICTURE_720P' | 'PICTURE_1080P' | 'PICTURE_4K'
+    | 'PICTURE_8K' | 'PICTURE_12K' | 'PICTURE_16K' | 'PICTURE_24K'
+    | 'HDR_HDR' | 'HDR_PRO' | 'HDR_ULTRA'
+    | 'COLOUR_8BIT' | 'COLOUR_10BIT' | 'COLOUR_12BIT' | 'COLOUR_16BIT'
+    | 'SOUND_STEREO' | 'SOUND_51' | 'SOUND_71' | 'SOUND_SPATIAL' | 'SOUND_LOSSLESS' | 'SOUND_PERSONAL'
+    | 'SOUND_CLEAR_DIALOGUE'
+    /* Phase 2: Optimisation (codecs cut the load and the cost of every viewer) */
+    | 'OPT_H264' | 'OPT_HEVC' | 'OPT_AV1' | 'OPT_VVC' | 'OPT_NEURAL'
+    | 'OPT_SMART_ENCODING' | 'OPT_EDGE_CACHE' | 'OPT_APP'
+    /* Phase 2: Stabilization (pays tech debt down and keeps the service up) */
+    | 'STAB_MONITORING' | 'STAB_AUTOSCALING' | 'STAB_REDUNDANCY' | 'STAB_CHAOS' | 'STAB_SELF_HEALING'
+    | 'STAB_LOAD_TESTING'
+    /* Phase 3: Playback (how fast titles start and how smoothly they play) */
+    | 'PLAY_FAST_START' | 'PLAY_ADAPTIVE' | 'PLAY_LOW_LATENCY'
+    | 'PLAY_DOWNLOADS' | 'PLAY_SKIP_INTRO' | 'PLAY_CONTINUE' | 'PLAY_ACCESSIBILITY'
+    /* Phase 3: Apps and devices (every screen the service can be watched on) */
+    | 'APPS_PHONE' | 'APPS_TV' | 'APPS_CONSOLE' | 'APPS_CAR' | 'APPS_HOLO'
+    /* Phase 3 #54: Trust and safety (Content protection, then Account security, Safe payments, Privacy) */
+    | 'TRUST_DRM' | 'TRUST_STUDIO_DRM' | 'TRUST_WATERMARK' | 'TRUST_TAKEDOWN' | 'TRUST_AI_HUNTER'
+    | 'TRUST_ACCOUNT' | 'TRUST_PAYMENTS' | 'TRUST_PRIVACY'
+    /* Phase 3 #56: Sharing control (Household detection → Device check → Paid extra member) */
+    | 'TRUST_HOUSEHOLD' | 'TRUST_DEVICE_CHECK' | 'TRUST_EXTRA_MEMBER'
+    /* Phase 4 #59: Smart AI (recommendations, then Autoplay and previews, AI channels, Voice search) */
+    | 'AI_TRENDING' | 'AI_BECAUSE' | 'AI_ARTWORK' | 'AI_TASTE'
+    | 'AI_AUTOPLAY' | 'AI_CHANNELS' | 'AI_VOICE'
+    /* Phase 4 #60: Profiles and family (Profiles and screens, then Kids profiles, Watch party) */
+    | 'FAM_SCREENS' | 'FAM_KIDS' | 'FAM_WATCH_PARTY'
+    /* Phase 4 #61: Ads tech (Ad targeting, then Smarter ad breaks, New ad formats) */
+    | 'ADS_BASIC' | 'ADS_CONTEXTUAL' | 'ADS_AUDIENCE' | 'ADS_PRECISION' | 'ADS_AI'
+    | 'ADS_BREAKS' | 'ADS_FORMATS';
+export type StreamingTechVersion = 1 | 2 | 3;
+export interface OwnedStreamingTechProgress {
+    /** the version reached: unlocking gives 1 */
+    version: StreamingTechVersion;
+    /** energy put toward the next version, kept until it is reached */
+    progress: number;
+    unlockedAtAbsoluteWeek: number;
+    /** when the current version was reached (drives the level-up moment and "Now in" banners) */
+    versionReachedAtAbsoluteWeek: number;
+    /** given, not bought: converted from an old save's level, or arrived with an acquisition.
+        Its running cost is already in what the save pays, so it carries no upkeep. */
+    granted?: true;
+}
+/**
+ * Streaming delivery (Phase 2, plan §5): load units and the bandwidth bill. Written at the first
+ * weekly close under load units and never changed after.
+ */
+export interface OwnedStreamingDeliveryEconomics {
+    schemaVersion: 1;
+    /** A save that ran weeks before load units keeps its peak load: 1 / (its viewers' load × its
+        Optimisation) at that close. A service whose first week runs under load units has 1. */
+    loadCalibration: number;
+    calibratedAtAbsoluteWeek: number;
+    /** a save from before Phase 2: the bandwidth bill phases in over 8 weeks from this week */
+    costPhaseInFromWeek?: number;
+}
+
+export interface OwnedStreamingTechTreeState {
+    /** 2 since Optimisation and Stabilization, 3 since Playback and Apps and devices (#52), 4 since
+        Trust and safety (#54), 5 since Sharing control (#56), 6 since Smart AI (#59), 7 since Profiles
+        and family (#60), 8 since Ads tech (#61): an older tree is given the groups it lacks once,
+        from its levels */
+    schemaVersion: 8;
+    techs: Partial<Record<StreamingTechId, OwnedStreamingTechProgress>>;
+    /** true when the tree was built from a pre-tree save's technology levels */
+    convertedFromLegacy: boolean;
+    /** tech debt from pushing quality up (0–100): every unlock and version adds some, and
+        Stabilization pays it down each week. Absent means 0. */
+    debt?: number;
+    /** the last week whose paydown was applied (the weekly close runs it once) */
+    debtPaidAtAbsoluteWeek?: number;
+}
 
 export type StreamingProductLineId =
     | 'CORE'
@@ -3050,6 +3158,10 @@ export interface OwnedStreamingPlatformIdentity {
     /** Legacy founding choice. New companies choose servers in Build. */
     launchServerCityId?: string | null;
     foundedAtAbsoluteWeek: number;
+    /** #116: the week the brand studio last unveiled a new look (logo, colours, typeface, lockup); the next waits 4 weeks */
+    lookChangedAtAbsoluteWeek?: number;
+    /** #116: the week a new ident was last commissioned after launch; the next waits 4 weeks */
+    identChangedAtAbsoluteWeek?: number;
 }
 
 export interface OwnedStreamingFoundingDraft {
@@ -3189,6 +3301,8 @@ export interface OwnedStreamingOpeningProgrammeCommission {
     infrastructureDueNow: number;
     marketFilingDueNow: number;
     marketingReservation: number;
+    /** #112: the ident package paid at launch (missing on commissions from before #112) */
+    identDueNow?: number;
     totalCashRequired: number;
     revision: number;
 }
@@ -3328,6 +3442,33 @@ export type StreamingRevenueStreamId =
 export type StreamingPricingPlanColorId =
     | 'emerald' | 'ocean' | 'teal' | 'rose' | 'magenta' | 'graphite';
 
+/** How many ads a plan carries (plan §6.2, Phase 2). `ads` is true for any level but NONE. */
+export type StreamingPlanAdLevel = 'NONE' | 'LIGHT' | 'STANDARD' | 'HEAVY';
+
+/**
+ * What a plan offers, from unlocked tech (plan §6.2, Phase 2). Every row is a tech step the
+ * service owns: the picture the plan streams, its HDR (or none), colour depth, sound and Clear
+ * dialogue, plus screens and downloads. Later phases add rows (AI channels, kids…). A plan
+ * without an offer (saved before Phase 2) is read from its features (streamingPlanOffer.ts).
+ */
+export interface OwnedStreamingPlanOffer {
+    picture: StreamingTechId;
+    hdr: StreamingTechId | null;
+    colour: StreamingTechId;
+    sound: StreamingTechId;
+    dialogue: boolean;
+    /** screens at once; 6 since Profiles and screens (#60) */
+    screens: 1 | 2 | 4 | 6;
+    downloads: boolean;
+    /** #62: Kids profiles, AI channels and Autoplay on this plan; absent means on whenever the tech
+        is owned (the plan takes the feature when it arrives), false keeps it off this plan */
+    kids?: boolean;
+    aiChannels?: boolean;
+    autoplay?: boolean;
+    /** #106: 'MOBILE' sells the plan on phones and tablets only (Netflix's Mobile plan); absent, every device */
+    devices?: 'MOBILE';
+}
+
 export interface OwnedStreamingPricingPlan {
     id: string;
     name: string;
@@ -3335,6 +3476,10 @@ export interface OwnedStreamingPricingPlan {
     featureIds: string[];
     ads: boolean;
     colorId?: StreamingPricingPlanColorId;
+    /** Phase 2: the plan's ad load; absent reads as STANDARD with ads and NONE without */
+    adLevel?: StreamingPlanAdLevel;
+    /** Phase 2: what the plan offers; its features (hd, uhd, spatial, screens, downloads) follow it */
+    offer?: OwnedStreamingPlanOffer;
 }
 
 export type StreamingCommercialCoreModel = 'SUBSCRIPTION' | 'ADVERTISING' | 'STORE' | 'LEGACY';
@@ -3349,8 +3494,9 @@ export interface StreamingCommercialOfferIntent {
     schemaVersion: 1;
     /** False only for a new, untouched setup. Missing in older saves means chosen. */
     coreModelSelected?: boolean;
-    /** Dormant ad-tier terms only; active plans remain the price authority. */
-    inactiveAdPlans?: Record<string, { monthly: number }>;
+    /** Dormant ad-tier terms only; active plans remain the price authority. #103: the ad plans that wait while
+        subscriptions are off, with their ad level, and come back with them. */
+    inactiveAdPlans?: Record<string, { monthly: number; adLevel?: StreamingPlanAdLevel }>;
     coreModel: StreamingCommercialCoreModel;
     freeAdAccess: boolean;
     /** Buyer permission for new store transactions; title rights are checked separately. */
@@ -3379,6 +3525,17 @@ export interface OwnedStreamingPricingConfiguration {
     metered: { perHour: number };
     patron: { monthly: number };
     commercialOffers?: StreamingCommercialOfferIntent;
+    /** Free with ads: what the free tier streams (Phase 2 #46, plan §6.5), one tech step per row
+        like a plan's offer. Absent until the player sets it: free viewers then watch what the plans'
+        viewers watch, as before. */
+    freeAdOffer?: OwnedStreamingPlanOffer;
+    /** Rent or buy: the best quality the store sells (Phase 2 #47, plan §6.5; picture, HDR, colour,
+        sound, dialogue). Absent until the player sets it: store buyers then watch what the plans'
+        viewers watch, and buy as before. */
+    storeQuality?: OwnedStreamingPlanOffer;
+    /** Rent or buy's top edition (a picture above 1080p) at its own prices; absent, it sells at the
+        HD prices (rentals.rent / rentals.buy). */
+    storeTopEdition?: { rent: number; buy: number };
 }
 
 export interface OwnedStreamingServiceConfiguration {
@@ -3468,12 +3625,55 @@ export interface OwnedStreamingLegacyLocalizationGrant {
     readyAtAbsoluteWeek: number;
 }
 
+/** Content Desk · Localization: a language region's subtitle or dubbing track. */
+export type StreamingLocalizationTrack = 'SUBTITLES' | 'DUBBING';
+
+/**
+ * A level a region finished, with the region's figures from the last week
+ * processed before it applied. The desk reads "since" deltas against these.
+ */
+export interface OwnedStreamingLocalizationMilestone {
+    track: StreamingLocalizationTrack;
+    level: 1 | 2 | 3;
+    completedAtAbsoluteWeek: number;
+    /** last processed week when the level finished; null before the first week */
+    baselineAbsoluteWeek: number | null;
+    /** paid accounts in the region's live markets that week */
+    baselineSubscribers: number;
+    /** that week's viewers who watched in their own language through the region */
+    baselineLocalizedViewers: number;
+    /** that week's viewers the region's levels added */
+    baselineAddedViewers: number;
+    /** #170: the executive who reached it, when the team did */
+    by?: string;
+}
+
+/**
+ * Levels for one language region (one `STREAMING_LANGUAGE_PACKAGES` id).
+ * Setting a region up is the package capability (cash). Each track then rises
+ * a level at a time with energy: level 1 reaches the library, 2 adds new
+ * releases, 3 adds premieres on their first day. Every title inherits it in
+ * every country that speaks one of the region's languages.
+ */
+export interface OwnedStreamingLocalizationRegion {
+    packageId: string;
+    subtitleLevel: 0 | 1 | 2 | 3;
+    dubbingLevel: 0 | 1 | 2 | 3;
+    /** energy already put toward the next subtitle level; kept until it is reached */
+    subtitleProgress: number;
+    /** energy already put toward the next dubbing level */
+    dubbingProgress: number;
+    milestones: OwnedStreamingLocalizationMilestone[];
+}
+
 export interface OwnedStreamingLocalizationOperationsState {
     providers: OwnedStreamingLocalizationProvider[];
     facilities: OwnedStreamingLocalizationFacility[];
     jobs: OwnedStreamingLocalizationJob[];
     titleLanguageAssets: OwnedStreamingTitleLanguageAsset[];
     legacyPackageGrants: OwnedStreamingLegacyLocalizationGrant[];
+    /** Region levels and progress from the Content Desk; absent on older saves (none). */
+    regions?: OwnedStreamingLocalizationRegion[];
 }
 
 export type StreamingCostCommitmentCategory =
@@ -3547,13 +3747,20 @@ export interface OwnedStreamingExecutiveAppointment {
     performance: number;
     level: StreamingExecutiveLevel;
     experience: number;
+    /** #180: the options granted on hiring (a % of the company, vesting a sixteenth a quarter over 4 years); when they
+     *  leave, the part not vested goes back (settled once) */
+    options?: { percent: number; grantedAtAbsoluteWeek: number; settledAtAbsoluteWeek?: number };
+    /** #180: the signing bonus paid on hiring */
+    signingBonus?: number;
 }
 
 export type StreamingExecutiveDevelopmentTrack =
     | 'ROLE_MASTERY'
     | 'FOUNDER_ALIGNMENT'
     | 'ETHICS_TRUST'
-    | 'PERFORMANCE_COACHING';
+    | 'PERFORMANCE_COACHING'
+    /** #164: the team's Train: one level up */
+    | 'LEVEL_UP';
 
 export interface OwnedStreamingExecutiveDevelopment {
     id: string;
@@ -3588,6 +3795,116 @@ export interface OwnedStreamingLeadershipState {
     appointments: OwnedStreamingExecutiveAppointment[];
     developmentPrograms: OwnedStreamingExecutiveDevelopment[];
     delegation: OwnedStreamingDelegationMandate;
+    /** #164 (plan §21.17): the six-seat team that runs jobs for the player. Absent in older saves. */
+    team?: OwnedStreamingTeamState;
+}
+
+/* ---- #164: "Your team", executives who run things (plan §21.13, §21.17) ---------------------------------------- */
+
+export type StreamingTeamSeatId = 'MARKETING' | 'CONTENT' | 'TECHNOLOGY' | 'INTERNATIONAL' | 'MONEY' | 'TRUST';
+/** Do it (inside the limits), Ask me (a card in the tray), Off (the player's own). */
+export type StreamingTeamJobMode = 'DO' | 'ASK' | 'OFF';
+export type StreamingTeamJobId =
+    | 'PREMIERE_PUSH' | 'BRAND_CAMPAIGN' | 'CAMPAIGN_RESULTS'
+    | 'RENEWALS' | 'MARKET_BUYS' | 'ORIGINAL_PITCH'
+    | 'CAPACITY' | 'INCIDENTS'
+    | 'FILINGS' | 'LANGUAGES'
+    | 'OFFERS' | 'PRICE_IDEAS' | 'GUIDANCE'
+    | 'LEAKS' | 'TRUST_INCIDENTS';
+
+export interface OwnedStreamingTeamSeat {
+    seatId: StreamingTeamSeatId;
+    jobs: Partial<Record<StreamingTeamJobId, StreamingTeamJobMode>>;
+    /** money a week the seat may spend by itself */
+    weeklyMoney: number;
+    /** the most for one action */
+    actionMoney: number;
+    /** energy a week (⚡) the seat may spend from the player's energy */
+    weeklyEnergy: number;
+    /** what was used, in `usageWeek` */
+    usageWeek: number;
+    moneyUsed: number;
+    energyUsed: number;
+    actionsUsed: number;
+}
+
+/** What a card or a job does when it runs: the same services as the player's own buttons. */
+export type StreamingTeamAction =
+    | { kind: 'POACH_ANSWER'; moveId: string }
+    | { kind: 'CAMPAIGN_START'; draft: Record<string, unknown> }
+    | { kind: 'CAMPAIGN_STOP'; campaignId: string }
+    | { kind: 'CAMPAIGN_EXTEND'; campaignId: string; weeks: number }
+    | { kind: 'RENEWAL'; caseId: string; decision: 'ACCEPT_RENEWAL' | 'LET_EXPIRE' | 'RETURN_TO_MARKET' }
+    | { kind: 'CATALOGUE_SIGN'; packageId: string }
+    /** #168: one title from the Content Market, never above this price */
+    | { kind: 'TITLE_LICENSE'; listingId: string; price: number }
+    | { kind: 'NETWORK_ORDER'; input: Record<string, unknown> }
+    | { kind: 'INCIDENT_REPAIR'; source: 'CRISIS' | 'INFRASTRUCTURE'; incidentId: string; option: 'ENERGY' | 'FIX' }
+    | { kind: 'MARKET_FOLLOW_UP'; operationId: string; step: 'REQUIREMENT' | 'REAPPLY' }
+    | { kind: 'LOCALIZATION_LEVEL'; regionId: string; track: string; level: number; energy?: number }
+    | { kind: 'GUIDANCE'; posture: string }
+    /** #171: the CFO's price idea, approved: the plan's new monthly price through the Offer tab's own save */
+    | { kind: 'PRICE_CHANGE'; planId: string; monthly: number }
+    | { kind: 'OPEN_ROOM'; room: string; focusId?: string }
+    /** #168: taking an Original pitch fills the commissioning desk with this draft */
+    | { kind: 'ORIGINAL_PITCH'; draft: Record<string, unknown> }
+    /** #181: an ambitious executive asks for a raise */
+    | { kind: 'RAISE'; appointmentId: string; percent: number; weekly: number };
+
+export interface OwnedStreamingTeamCard {
+    id: string;
+    /** one card per target (a campaign, a licence, a region…) */
+    dedupeKey: string;
+    seatId: StreamingTeamSeatId;
+    jobId: StreamingTeamJobId | 'RIVAL_CALL' | 'RAISE';
+    appointmentId: string;
+    createdAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+    title: string;
+    detail: string;
+    reason: string;
+    cost: number;
+    energy: number;
+    action: StreamingTeamAction;
+    status: 'WAITING' | 'APPROVED' | 'DECLINED' | 'EXPIRED' | 'FAILED';
+    resolvedAtAbsoluteWeek: number | null;
+}
+
+export interface OwnedStreamingTeamReportEntry {
+    id: string;
+    absoluteWeek: number;
+    seatId: StreamingTeamSeatId | null;
+    appointmentId: string | null;
+    jobId: StreamingTeamJobId | 'RIVAL_CALL' | 'RAISE' | 'TEAM';
+    /** DONE by the executive · ASKED (a card) · HELD (the cash floor) · APPROVED/DECLINED by the player · NOTE */
+    kind: 'DONE' | 'ASKED' | 'HELD' | 'APPROVED' | 'DECLINED' | 'NOTE';
+    title: string;
+    detail: string;
+    cost: number;
+    energy: number;
+    /** #181: how a job the executive carried out turned out: a great move, on plan, or a slip */
+    outcome?: 'GREAT' | 'PLAN' | 'SLIP';
+}
+
+export interface OwnedStreamingTeamState {
+    schemaVersion: 1;
+    seats: OwnedStreamingTeamSeat[];
+    tray: OwnedStreamingTeamCard[];
+    report: OwnedStreamingTeamReportEntry[];
+    lastRunAbsoluteWeek: number | null;
+    /** the week the old roles without a seat (COO beside an International head, Product, Advertising) moved on */
+    reorganizedAtAbsoluteWeek: number | null;
+    /** #180: the candidates on offer, a fresh set every 3 weeks */
+    market?: OwnedStreamingTeamMarket;
+}
+
+/** #180: who each empty chair is shown this set, who it was shown lately (never again for 4 sets), and who turned a
+ *  lower offer down (gone for that set) */
+export interface OwnedStreamingTeamMarket {
+    set: number;
+    shown: Partial<Record<StreamingTeamSeatId, string[]>>;
+    seen: Partial<Record<StreamingTeamSeatId, string[]>>;
+    refused: Record<string, number>;
 }
 
 export type StreamingBoardSeatType = 'INDEPENDENT' | 'INVESTOR_NOMINEE';
@@ -3638,7 +3955,10 @@ export interface OwnedStreamingCelebrityInvestor {
     id: string;
     candidateId: string;
     name: string;
-    status: 'ACCEPTED' | 'DECLINED';
+    /** #187: BOUGHT_OUT: the company bought their stake back; their seat and their share of profit ended */
+    status: 'ACCEPTED' | 'DECLINED' | 'BOUGHT_OUT';
+    boughtOutAtAbsoluteWeek?: number;
+    buyoutPrice?: number;
     investedCapital: number;
     ownershipPercent: number;
     boardSeatGranted: boolean;
@@ -3647,11 +3967,94 @@ export interface OwnedStreamingCelebrityInvestor {
     decisionAtAbsoluteWeek: number;
 }
 
+/** #172: an investor who called as the service grew, with the term sheet the founder signs or declines */
+export interface OwnedStreamingInvestorOffer {
+    id: string;
+    name: string;
+    initials: string;
+    publicIdentity: string;
+    kind: 'CELEBRITY' | 'FUND' | 'FAMILY' | 'SOVEREIGN' | 'FOUNDER';
+    investedCapital: number;
+    ownershipPercent: number;
+    boardSeat: boolean;
+    profitParticipationPercent: number;
+    preferredStrategy: StreamingExecutiveStrategy;
+    influenceDemand: string;
+    attentionEffect: string;
+    caution: string;
+    /** the subscribers step that brought the call (5M, 10M …); #186: the members when the round's offers came */
+    milestoneSubscribers: number;
+    createdAtAbsoluteWeek: number;
+    /** the term sheet stands until this week */
+    expiresAtAbsoluteWeek: number;
+    /** #186: the round it came in */
+    roundId?: string;
+}
+
+/** #186: a round the founder calls: Small up to 5%, Growth up to 10%, Big up to 20% */
+export type StreamingInvestorRoundSize = 'SMALL' | 'GROWTH' | 'BIG';
+
+export interface OwnedStreamingInvestorRound {
+    id: string;
+    size: StreamingInvestorRoundSize;
+    /** the most of the company the round may sell, in % */
+    upToPercent: number;
+    calledAtAbsoluteWeek: number;
+    /** the bankers bring the offers in this week's close */
+    offersAtAbsoluteWeek: number;
+    /** the offers stand until this week (set when they come) */
+    closesAtAbsoluteWeek: number | null;
+    offerCount: number;
+    /** how much of the company the round has sold so far, in % */
+    soldPercent: number;
+}
+
 export interface OwnedStreamingGovernanceState {
     boardConfidence: number;
     directors: OwnedStreamingBoardDirector[];
     motions: OwnedStreamingBoardMotion[];
     celebrityInvestors: OwnedStreamingCelebrityInvestor[];
+    /** #172: investors who called as the service grew; absent in older saves */
+    investorOffers?: OwnedStreamingInvestorOffer[];
+    /** #172: the last subscribers step that brought a call */
+    investorOfferMilestone?: number;
+    /** #186: the latest round the founder called; absent until the first */
+    investorRound?: OwnedStreamingInvestorRound | null;
+    /** #190: the latest sale of the company: the bankers, the bids, the closing; absent until the first */
+    sale?: OwnedStreamingCompanySale | null;
+}
+
+/** #190 (plan §22.4): a bid for the whole company */
+export interface OwnedStreamingSaleBid {
+    id: string;
+    buyerName: string;
+    buyerKind: 'RIVAL' | 'MEDIA' | 'TECH' | 'PRIVATE_EQUITY';
+    /** the whole company's price */
+    price: number;
+    /** over our value when the bid came in (1.10–1.45) */
+    premium: number;
+    payment: 'CASH' | 'SHARES' | 'MIXED';
+    brand: 'KEEP' | 'MERGE';
+    team: 'KEEP' | 'REPLACE';
+    status: 'OPEN' | 'ACCEPTED' | 'VOTED_DOWN' | 'LAPSED';
+}
+
+/** #190: selling the company */
+export interface OwnedStreamingCompanySale {
+    id: string;
+    status: 'BANKERS' | 'BIDS' | 'CLOSING' | 'SOLD' | 'REJECTED';
+    startedAtAbsoluteWeek: number;
+    bidsAtAbsoluteWeek: number;
+    /** the bids stand until this week */
+    bidsCloseAtAbsoluteWeek: number | null;
+    bids: OwnedStreamingSaleBid[];
+    acceptedBidId: string | null;
+    closesAtAbsoluteWeek: number | null;
+    soldAtAbsoluteWeek: number | null;
+    rejectedAtAbsoluteWeek: number | null;
+    /** what the founder was paid for their stake, and the stake */
+    founderCash: number | null;
+    founderPercentAtSale: number | null;
 }
 
 export type StreamingRivalStrategy =
@@ -4166,6 +4569,11 @@ export interface OwnedStreamingEarningsRecord {
     playbackActual: number;
     stockReactionPercent: number;
     headline: string;
+    /** #173: an earnings call the founder held on it (10⚡): the week, and what it moved the price */
+    callHeldAtAbsoluteWeek?: number | null;
+    callEffectPercent?: number;
+    /** #173: the week a call's move reached the share price */
+    callAppliedAtAbsoluteWeek?: number | null;
 }
 
 export type StreamingShareholderVoteType = 'DIRECTOR_MANDATE' | 'EXECUTIVE_PAY' | 'CAPITAL_AUTHORITY' | 'STRATEGIC_REVIEW';
@@ -4183,6 +4591,11 @@ export interface OwnedStreamingShareholderVote {
     founderVote: 'FOR' | 'AGAINST' | null;
     finalSupport: number | null;
     consequence: string | null;
+    /** #173: who decided it: the founder's vote, or the public when it went unanswered by its due week */
+    decidedBy?: 'FOUNDER' | 'PUBLIC';
+    /** #173: what the result moves the share price (percent), and the week it reached it */
+    priceEffectPercent?: number;
+    priceAppliedAtAbsoluteWeek?: number | null;
 }
 
 export type StreamingActivistDemand = 'MARGIN_DISCIPLINE' | 'SLATE_REFRESH' | 'BOARD_SEAT' | 'ASSET_REVIEW';
@@ -4227,6 +4640,21 @@ export interface OwnedStreamingPublicCompanyState {
     shareholderVotes: OwnedStreamingShareholderVote[];
     activistCampaigns: OwnedStreamingActivistCampaign[];
     hostileTakeovers: OwnedStreamingHostileTakeover[];
+    /** #187: the company's buyback programmes, the latest last; absent until the first */
+    buybacks?: OwnedStreamingBuybackProgram[];
+}
+
+/** #187: a listed company buying back its shares over 4 weeks */
+export interface OwnedStreamingBuybackProgram {
+    id: string;
+    startedAtAbsoluteWeek: number;
+    /** % of the shares to buy back */
+    percent: number;
+    weeksLeft: number;
+    boughtPercent: number;
+    spent: number;
+    /** HELD: stopped at the cash floor */
+    status: 'RUNNING' | 'DONE' | 'HELD';
 }
 
 export type StreamingCrisisType =
@@ -4235,12 +4663,33 @@ export type StreamingCrisisType =
     | 'CONTENT_LEAK'
     | 'RECOMMENDATION_BACKLASH'
     | 'RIGHTS_COMPLIANCE'
-    | 'EMPLOYEE_ALLEGATION';
+    | 'EMPLOYEE_ALLEGATION'
+    /* Phase 3 #53: what Playback and Apps and devices can break */
+    | 'APP_CRASH'
+    | 'FEATURE_BROKEN'
+    | 'SLOW_STREAMING';
 
 export type StreamingCrisisSeverity = 'MINOR' | 'SERIOUS' | 'MAJOR' | 'CRITICAL';
 export type StreamingCrisisStage = 'DETECTED' | 'RECOVERING' | 'RESOLVED';
 export type StreamingCrisisCompensation = 'NONE' | 'TARGETED' | 'FULL';
 export type StreamingCrisisCommunication = 'HOLDING_STATEMENT' | 'FACTUAL_UPDATE' | 'FULL_DISCLOSURE';
+
+/**
+ * How STATUS answered an incident (codex-handoff/plans/platform-tech-plan.md §7, Phase 3 #50):
+ * an energy repair (fixed the week it was taken), a cash fix (fixed after 3 or 5 weeks, the price
+ * all in), or waiting it out (6 or 10 weeks of damage from when it opened). Absent: not answered on
+ * STATUS (Incident Command's responses, or nobody yet).
+ */
+export interface StreamingIncidentStatusRepair {
+    path: 'ENERGY' | 'FIX' | 'WAIT';
+    atAbsoluteWeek: number;
+    cash: number;
+    energy: number;
+    /** #75: repaired now for an ad, the week's popup's golden answer: no energy, no cash */
+    paidBy?: 'AD';
+    /** #169: the executive who answered it ("Fixed by Marcus"), when the team did */
+    by?: string;
+}
 
 export interface OwnedStreamingCrisis {
     id: string;
@@ -4262,6 +4711,12 @@ export interface OwnedStreamingCrisis {
     recoveryReadyAtAbsoluteWeek: number | null;
     resolvedAtAbsoluteWeek: number | null;
     outcomeNote: string | null;
+    /** how STATUS answered it (#50) */
+    statusRepair?: StreamingIncidentStatusRepair;
+    /** the app or Playback feature that broke (#53: APP_CRASH, FEATURE_BROKEN) */
+    techId?: StreamingTechId;
+    /** the title on pirate sites (#55: CONTENT_LEAK) */
+    projectId?: string;
 }
 
 export type StreamingShadowOperationType =
@@ -4419,6 +4874,8 @@ export interface OwnedStreamingInfrastructureIncident {
     publicReaction: string;
     subscriberReaction: string;
     outcomeNote: string | null;
+    /** how STATUS answered it (#50) */
+    statusRepair?: StreamingIncidentStatusRepair;
 }
 
 export interface OwnedStreamingInfrastructureOperationsState {
@@ -4457,7 +4914,12 @@ export type StreamingCapitalActionType =
     | 'FOUNDER_CONTRIBUTION'
     | 'LOAN_DRAW'
     | 'LOAN_REPAYMENT'
-    | 'EQUITY_ISSUANCE';
+    | 'EQUITY_ISSUANCE'
+    /* #187: the company buys back shares (listed) or an investor's stake (private), and the founder trades their own */
+    | 'SHARE_BUYBACK'
+    | 'FOUNDER_SHARE_TRADE'
+    /* #190: the company sold to a buyer; every holder paid */
+    | 'COMPANY_SALE';
 
 export interface OwnedStreamingCapitalAction {
     id: string;
@@ -4778,6 +5240,40 @@ export interface OwnedStreamingInfrastructureSetup {
     revision: number;
     committedAtAbsoluteWeek: number;
     loadTest: OwnedStreamingLoadTestSnapshot;
+    /** #89: capacity counted with each maker's power (Scout 0.6, Workhorse 1, Titan 1.8). Absent on an older revision,
+     *  which the weekly close recounts once. */
+    capacityModel?: 'TIERED';
+}
+
+/**
+ * #89: a live company's change to one region's network, ordered on Platform › Network (no Build wizard): racks added
+ * by maker, cloud by company, or hardware sold back. Its money moves when it is ordered (hardware's price, new rooms'
+ * deposit and setup; a sell-back's refund at the region's resale rate); the region changes when it is ready. Each
+ * region has one order at a time, and regions build side by side. Energy brings a build's ready week forward.
+ */
+export interface OwnedStreamingNetworkOrder {
+    id: string;
+    idempotencyKey: string;
+    regionId: string;
+    status: 'BUILDING' | 'DONE';
+    /** The region's rooms and plan once the order is in service; emptied when it is done. */
+    facilities: OwnedStreamingFacility[];
+    regionPlan: OwnedStreamingRegionNetworkPlan;
+    /** Hardware racks added (+) or sold back (−) by maker, and cloud compute added or dropped. */
+    racksDelta: Record<StreamingServerTier, number>;
+    cloudDelta: number;
+    /** Cities the network had never used (a room there takes a week more). */
+    newCityIds: string[];
+    capitalCost: number;
+    refund: number;
+    buildWeeks: number;
+    orderedAtAbsoluteWeek: number;
+    readyAtAbsoluteWeek: number;
+    energySpent: number;
+    weeksCut: number;
+    completedAtAbsoluteWeek: number | null;
+    /** #169: the executive who placed it, when the team did */
+    orderedBy?: { name: string; seatId: string };
 }
 
 export type StreamingTechnologyCampusBranch =
@@ -5435,6 +5931,8 @@ export interface StreamingRightsRenewalCase {
     protectionReasons: string[];
     delegatedReason: string | null;
     delegationTrace?: StreamingRightsDelegationTrace | null;
+    /** #168: the executive who decided it ("Renewed by Nia"), when the team did */
+    decidedBy?: { name: string; seatId: string; absoluteWeek: number } | null;
     outcome: StreamingRightsRenewalOutcome;
     replacementContractId: string | null;
     resolvedAtAbsoluteWeek: number | null;
@@ -6273,6 +6771,20 @@ export interface OwnedStreamingLaunchMarketingDraft {
     allocationMode: StreamingLaunchMarketingAllocationMode;
     countryWeights: Record<string, number>;
     channelAllocations: Partial<Record<StreamingLaunchMarketingChannelId, number>>;
+    /** #151: the campaign formats picked in the launch builder; they set `channelAllocations` */
+    formatIds?: CampaignFormatId[];
+    /** #151: the art uploaded for each picked format (media ids); the rest is made for you */
+    creativeIds?: Partial<Record<CampaignFormatId, string>>;
+    /** #151: the picture of its opening night, for the news */
+    pictureMediaId?: string;
+    /** #158: the weeks before opening it runs (1–15), a week of what is picked in each; absent (before #158): the whole build */
+    weeks?: number;
+    /** #158: how hard it runs: ×1, ×1.5 or ×2 the rate card */
+    strength?: number;
+    /** #158: where each big moment happens (its country): one night at one place */
+    places?: Partial<Record<CampaignFormatId, string>>;
+    /** #158: what the big moments cost, inside `budgetCeiling`, paid on the last week before opening */
+    openingNight?: number;
     updatedAtAbsoluteWeek: number;
     revision: number;
 }
@@ -6290,6 +6802,9 @@ export interface OwnedStreamingLaunchMarketingPlan extends OwnedStreamingLaunchM
     lastProcessedAbsoluteWeek: number | null;
     forecastSnapshot: StreamingLaunchMarketingForecastSnapshot;
     countryAwareness: Record<string, number>;
+    /** #160: paid in full from the treasury at commission (a plan built with its weeks, #158); its weeks then use what
+        was paid, and what is left at opening comes back. Before: reserved, and paid week by week. */
+    prepaid?: boolean;
 }
 
 export type StreamingLaunchCapacityPlan = 'STANDARD' | 'CLOUD_BURST' | 'STAGGERED_PREMIERE';
@@ -6362,6 +6877,87 @@ export interface OwnedStreamingGrowthAttribution {
     summary: string;
 }
 
+/** #145 (plan §20.10 point 3): the campaign engine. A campaign runs formats (online, out of home, big moments) in a
+    set of countries on one of three budgets; each week it spends, reaches people and builds awareness that fades by
+    half about every four weeks. The engine knows no business: the streaming adapter
+    (`services/campaigns/streamingCampaigns.ts`) turns awareness into the world's marketing index per country and a
+    title's pull, and reports the joins and viewers it brought. */
+export type CampaignFormatId =
+    | 'SOCIAL_FEED' | 'SHORT_VIDEO' | 'SEARCH' | 'CREATORS' | 'CTV' | 'TV_SPOTS'
+    | 'BILLBOARD' | 'METRO_WRAP' | 'POSTER_WALL' | 'FLYERS' | 'AIRPORT_SCREENS' | 'MALL_SCREENS' | 'CITY_SCREEN'
+    | 'BUILDING_REVEAL' | 'LANDMARK_LIGHT_SHOW' | 'DRONE_SHOW' | 'FAN_FESTIVAL' | 'LIVE_SHOW';
+export type CampaignFormatGroup = 'ONLINE' | 'OUT_OF_HOME' | 'BIG_MOMENT';
+export type CampaignSubjectKind = 'SERVICE' | 'TITLE' | 'UNIVERSE' | 'FRANCHISE';
+/** One-time burst (1–6 weeks, a total); a pot spent week after week until it runs out (its own pace, or the one set);
+    always-on (a monthly amount, online and app formats only, charged weekly until stopped).
+    #154 (plan §20.13): weeks — what the picked formats cost a week in the campaign's countries (the rate card) ×
+    how hard (1, 1.5 or 2), for 1–12 weeks (extended up to 52), the big moments once in the first. The builder makes
+    weeks only; the other three are kept for campaigns started before #154 and for the rivals' bursts. */
+export type CampaignBudget =
+    | { kind: 'BURST'; total: number; weeks: number }
+    | { kind: 'POT'; total: number; weekly: number | null }
+    | { kind: 'ALWAYS_ON'; monthly: number }
+    | { kind: 'WEEKS'; weeks: number; strength: number };
+export type CampaignStatus = 'RUNNING' | 'PAUSED' | 'FINISHED' | 'STOPPED';
+export interface CampaignWeek {
+    absoluteWeek: number;
+    spend: number;
+    /** people reached this week */
+    reach: number;
+    /** the campaign's awareness across its countries after the week, 0–1, weighted by homes */
+    awareness: number;
+    /** joins and viewers the week's lift is credited with (modelled from the marketing lift; 0 until settled) */
+    joins: number;
+    viewers: number;
+    /** the always-on campaign skipped the week: the treasury could not pay it */
+    paused?: 'TREASURY';
+}
+export interface Campaign {
+    id: string;
+    name: string;
+    subject: { kind: CampaignSubjectKind; id: string; name: string; projectIds: string[] };
+    where: { kind: 'LIVE' | 'REGION' | 'COUNTRIES'; regionId?: string };
+    countryIds: string[];
+    formats: CampaignFormatId[];
+    budget: CampaignBudget;
+    /** #154: where each big moment happens, one night in one country (default: the biggest ad market where the
+        format exists). Without it (campaigns before #154), a big moment is one show in each country where it exists. */
+    places?: Partial<Record<CampaignFormatId, string>>;
+    /** energy paid at launch. #154: 5 to commission, plus each big moment's own once, at most 20; before #154, the big
+        moments' only, one per show */
+    energy: number;
+    status: CampaignStatus;
+    startedAtAbsoluteWeek: number;
+    endedAtAbsoluteWeek: number | null;
+    endReason?: 'SPENT' | 'DONE' | 'STOPPED';
+    spent: number;
+    /** money added to a pot after it started */
+    toppedUp: number;
+    /** the last 26 weeks */
+    weeks: CampaignWeek[];
+    /** #148: an uploaded creative per format, by media id */
+    creativeIds?: Partial<Record<CampaignFormatId, string>>;
+    /** #149: what it has been credited with in each of its countries, over all its weeks */
+    byCountry?: Record<string, { joins: number; viewers: number }>;
+    /** #149: its picture in the media store (its scene with its creative), drawn after launch for the news */
+    pictureMediaId?: string;
+    /** #160: paid in full from the treasury when commissioned, and each extension when it is made; its weeks are not
+        charged again and never wait for money. Campaigns from before #160 have none and pay each week as it runs. */
+    paid?: number;
+    /** #160: what came back to the treasury: the weeks not run when stopped early, or what was left at its end */
+    refunded?: number;
+    /** #167: started by the player's team (the executive's name and seat), shown as "Run by Jonah" */
+    runBy?: { name: string; seatId: string };
+}
+export interface CampaignBook {
+    schemaVersion: 1;
+    campaigns: Campaign[];
+    /** what the campaigns built, by country, 0–1: the service's awareness, and each title's */
+    serviceAwareness: Record<string, number>;
+    titleAwareness: Record<string, Record<string, number>>;
+    lastRunAbsoluteWeek: number | null;
+}
+
 export interface OwnedStreamingGrowthAction {
     id: string;
     idempotencyKey: string;
@@ -6409,6 +7005,9 @@ export interface OwnedStreamingWeeklyOperations {
     worldCustomerPiracyReach?: number;
     worldCustomerAccessLoadAccounts?: number;
     worldCustomerMonthlySubscriptionRevenue?: number;
+    /** #56: outside homes paying to stay as extra members, and what they paid this week (in subscription revenue) */
+    worldCustomerExtraMemberHouseholds?: number;
+    worldCustomerExtraMemberRevenue?: number;
     worldCustomerPlanAllocations?: WorldStreamingCustomerPlanSummary[];
     audienceEnforcementCost?: number;
     worldViewingAccounts?: number;
@@ -6428,6 +7027,8 @@ export interface OwnedStreamingWeeklyOperations {
     financingCost: number;
     weeklyPlanCost: number;
     growthPlanCost?: number;
+    /** #145: what the campaign engine spent this week */
+    campaignCost?: number;
     rightsComplianceCost?: number;
     marketPolicyCost?: number;
     marketIncomeTax?: number;
@@ -6456,6 +7057,15 @@ export interface OwnedStreamingWeeklyOperations {
     additionalOperatingExpense?: number;
     accountingContribution: number;
     peakConcurrentStreams: number;
+    /** Phase 2 load units: peak viewers × what each streams (1080p = 1), after Optimisation and calibration.
+        Capacity utilization is this against burst capacity. Absent before Phase 2. */
+    peakLoadUnits?: number;
+    /** load units a viewer stood for this week (the plan mix's picture, after Optimisation and calibration) */
+    viewerLoad?: number;
+    /** bandwidth for the week's viewing hours, by picture quality, after Optimisation and tech debt (Phase 2) */
+    streamingDeliveryCost?: number;
+    /** share of the delivery cost billed this week: a save from before Phase 2 phases it in over 8 weeks */
+    streamingDeliveryPhaseIn?: number;
     capacityUtilizationPercent: number;
     playbackSuccessRate: number;
     appliedDecisionId: string | null;
@@ -6661,6 +7271,8 @@ export interface OwnedStreamingLegacyState {
 }
 
 export type OwnedStreamingLedgerEventType =
+    /** #181: what a team job came back under or over budget, and an executive's padded expenses */
+    | 'TEAM_RESULT'
     | 'FOUNDATION_CREATED'
     | 'FOUNDER_CAPITAL_CONTRIBUTED'
     | 'LOAN_DRAWN'
@@ -6757,6 +7369,8 @@ export type OwnedStreamingLedgerEventType =
     | 'SEASON_REVIEW_COMMITTED'
     | 'CINEMATIC_QUEUED'
     | 'MILESTONE_REACHED'
+    /** a live service's prices or plans changed in a way the news reports (Phase 5, #68) */
+    | 'PRICING_CHANGED'
     | 'SYSTEM_REPAIR';
 
 export interface OwnedStreamingLedgerEntry {
@@ -6889,8 +7503,16 @@ export interface OwnedStreamingPlatformState {
     founderOwnershipPercent: number;
     /** Canonical network-wide fibre position. Optional for pre-ladder saves. */
     fibre?: { generation: number; level: number };
+    /** The platform tech tree. Optional: a save without it is converted from its technology levels on load. */
+    techTree?: OwnedStreamingTechTreeState;
+    /** #89: per-region network orders (Platform › Network); absent on older saves */
+    networkOrders?: OwnedStreamingNetworkOrder[];
+    /** load units and the bandwidth bill (Phase 2); absent until the first weekly close under them */
+    deliveryEconomics?: OwnedStreamingDeliveryEconomics;
     /** Week from which the rising service standard is measured. */
     serviceStandardFromWeek?: number;
+    /** Week from which rivals' tech moves on at their own pace (#69): stamped the first week a live service runs under it. */
+    rivalTechFromWeek?: number;
     treasuryCash: number;
     debtPrincipal: number;
     infrastructureStrategy: StreamingInfrastructureStrategy;
@@ -6907,6 +7529,8 @@ export interface OwnedStreamingPlatformState {
     processedWeekKeys: string[];
     weeklyDecisions: OwnedStreamingWeeklyDecision[];
     growthActions: OwnedStreamingGrowthAction[];
+    /** #145: campaigns run by the campaign engine; absent until the first one */
+    campaignBook?: CampaignBook;
     lastAcknowledgedWeeklyReportAbsoluteWeek: number | null;
     weeklyHistory: OwnedStreamingWeeklySnapshot[];
     cycleReviews: OwnedStreamingCycleReview[];
@@ -7050,11 +7674,14 @@ export const createInitialOwnedStreamingPlatformState = (playerId = ''): OwnedSt
                 benefits: { plans: {}, freeAds: { premiumAccess: false, earlyAccessWeeks: 0 },
                     store: { premiumAccess: false, earlyAccessWeeks: 0 } },
             },
-            streams: ['subs'],
+            /* Starter plans that differ (Phase 2, §6.2): a new service owns only 480p and stereo, so
+               the honest difference is ads. Three plans with the same offer at three prices left two
+               with no households at all; these two split new households about 60/40. More plans
+               come from the builder as tech is unlocked. */
+            streams: ['subs', 'ads'],
             plans: [
-                { id: 'BASIC', name: 'Essential', monthly: 7.99, featureIds: [], ads: false },
-                { id: 'PREMIUM', name: 'Standard', monthly: 12.99, featureIds: [], ads: false },
-                { id: 'FAMILY', name: 'Premiere', monthly: 17.99, featureIds: [], ads: false },
+                { id: 'BASIC', name: 'Basic with ads', monthly: 7.99, featureIds: [], ads: true },
+                { id: 'PREMIUM', name: 'Standard', monthly: 9.99, featureIds: [], ads: false },
             ],
             annualDiscount: 15,
             introOffer: 0,
@@ -7596,7 +8223,9 @@ export interface RedCarpetInterview {
     }[];
 }
 
-export type ScheduledEventType = 'AWARD_CEREMONY' | 'PREMIERE' | 'PARTY' | 'PRODUCTION_CRISIS' | 'DIRECTOR_DECISION' | 'LIFE_EVENT' | 'LEGAL_HEARING' | 'SCANDAL' | 'UNDERWORLD_OFFER' | 'STOCK_CONTROL';
+export type ScheduledEventType = 'AWARD_CEREMONY' | 'PREMIERE' | 'PARTY' | 'PRODUCTION_CRISIS' | 'DIRECTOR_DECISION' | 'LIFE_EVENT' | 'LEGAL_HEARING' | 'SCANDAL' | 'UNDERWORLD_OFFER' | 'STOCK_CONTROL'
+    /* #75: a new incident on STATUS, answered in the week's popup */
+    | 'STREAMING_INCIDENT';
 
 export type LocalizedTextVars = Record<string, string | number>;
 
@@ -7907,6 +8536,8 @@ export interface NewsItem {
     /** Saved player-facing journalist or commentator byline. */
     byline?: string;
     companyId?: string;
+    /** #149: a picture in the media store (a campaign's scene) */
+    imageMediaId?: string;
 }
 
 export interface Message {
@@ -8082,6 +8713,8 @@ export interface XPost {
     promotedProjectId?: string;
     /** C7 exact-once promotion attribution record. */
     promotionAttributionId?: string;
+    /** #149: a picture in the media store (a campaign's scene) */
+    contentMediaId?: string;
 }
 
 export interface TalentNegotiationState {
@@ -8214,6 +8847,9 @@ export interface Stock {
     outstandingShares?: number;
     publicFloatPercent?: number;
     lastShareIssueWeek?: number;
+    /** #185: where its value was measured from: the week, the price, (for a studio's ticker) its studio's value then, and
+     *  the shares then (new shares dilute what each is worth) */
+    fairAnchor?: { week: number; price: number; value: number; shares?: number };
     volatility: number;
     dividendYield: number;
     relatedBrandName?: string;
@@ -9795,6 +10431,8 @@ export interface PlatformAiRuntimeState {
     royaltySellerPaidThrough?: Record<string,number>;
     decisionHistory: PlatformAiDecisionRecord[];
     launchMarketingHistory: PlatformAiLaunchMarketingCampaign[];
+    /** #152: its campaigns through the campaign engine (titles, universes, the service), and what they built */
+    campaignBook?: CampaignBook;
     distressEpisodes: PlatformAiDistressEpisode[];
     externalRecapitalizations: PlatformAiExternalRecapitalization[];
     administration: PlatformAiAdministrationState | null;
@@ -10318,6 +10956,12 @@ export interface WorldStreamingPlanOffer {
     featureIds: string[];
     ads: boolean;
     appealIndex: number;
+    /** Phase 2: the plan's ad level (absent reads as standard with ads, none without) */
+    adLevel?: StreamingPlanAdLevel;
+    /** Phase 2: the plan's picture on the ladder (480p 0 … 4K 3 … 24K 7), for comparing with rivals */
+    pictureRank?: number;
+    /** #106: watched on phones and tablets only */
+    mobileOnly?: boolean;
 }
 
 export interface WorldStreamingPlatformOffer {
@@ -10340,12 +10984,46 @@ export interface WorldStreamingPlatformOffer {
     /** Prior delivered service and rights-specific content inputs for gross paid churn. */
     customerExperienceByCountry?: Record<string, { quality: number; freshness: number; delivery: number; weeklyChurnRate: number }>;
     localizationStrengthIndex: number;
+    /** Player offer only: the index plus the subtitles and dubbing that reach each market's languages. */
+    localizationStrengthByCountry?: Record<string, number>;
     reputationIndex: number;
     reliabilityIndex: number;
     marketingIndex: number;
+    /** #145: the marketing index where the player's campaigns built awareness (the rest read `marketingIndex`).
+        Recomputed every week, not saved. */
+    marketingIndexByCountry?: Record<string, number>;
     loyaltyIndex: number;
     /** Weeks since this commercial offer began; omitted legacy fixtures are treated as established. */
     maturityWeeks?: number;
+    /** Player offer only, once its free tier's quality is set (#46): that offer's appeal, which moves
+        how many choose the free tier and how long they watch. Recomputed every week, not saved. */
+    freeAdQualityIndex?: number;
+    /** (#53): what Playback adds to a Habit streamer's appeal. Recomputed every week, not saved. A rival's
+        from the steps its style has taken (#69), as are the next five. */
+    habitAppealIndex?: number;
+    /** (#60): what Watch party adds to a family household's appeal (#62: Kids profiles moved to the plans). */
+    familyAppealIndex?: number;
+    /** (#62): what Kids profiles adds to a family household's appeal, on the plans that include them. */
+    kidsAppealIndex?: number;
+    /** (#61, Smarter ad breaks): its plans' ads cost viewers this share of what they did (under 1). */
+    adPenaltyFactor?: number;
+    /** (#53): the extra share of homes that can watch, from the best Apps step (0.03 = 3%). */
+    deviceReach?: number;
+    /** #106: per market, the share of homes that watch on a phone alone (the player's offer, while it sells a phones-only plan) */
+    phoneOnlyShareByCountry?: Record<string, number>;
+    /** (#55): the share of household piracy of its titles Content protection stops, 0–100. */
+    protectionIndex?: number;
+    /** Rival offer only (#69): New ad formats' extra slots at the same ad minutes, Smarter ad breaks' gentler
+        loss of viewers in long breaks, and the audience quality its targeting steps add to its ads. */
+    adSlotFactor?: number;
+    adBreakSlope?: number;
+    adAudienceQualityBonus?: number;
+    /** Player offer only (#56, Device check): outside homes watching on its accounts are multiplied by this (under 1). */
+    sharingCheckFactor?: number;
+    /** Player offer only (#56, Paid extra member): of the sharers its rules turn away, the share who pay to stay on a plan with Extra member. */
+    extraMemberShare?: number;
+    /** Player offer only (#56, Household detection): the share of a sharing crackdown's extra cancellations left (under 1). */
+    crackdownFactor?: number;
     countryMomentum: Record<string, number>;
     preferredGenres: Genre[];
     sourceFingerprint: string;
@@ -10553,6 +11231,10 @@ export interface WorldStreamingCustomerPlanCell {
     sharedActiveViewers: number;
     piracyReach: number;
     accessLoadAccounts: number;
+    /** #56: outside homes paying to stay as extra members (the player's plans with Extra member); absent when none */
+    extraMemberHouseholds?: number;
+    /** #56: what they pay a month, at 40% of the plan's price; not in monthlySubscriptionRevenue */
+    extraMemberMonthlyRevenue?: number;
 }
 
 export interface WorldStreamingCustomerLapsedCell {
@@ -10680,6 +11362,9 @@ export interface WorldStreamingCustomerGlobalSummary {
     playerPiracyReach: number;
     playerAccessLoadAccounts: number;
     playerMonthlySubscriptionRevenue: number;
+    /** #56: the player's paying extra members and what they pay a month; absent when none */
+    playerExtraMemberHouseholds?: number;
+    playerExtraMemberMonthlyRevenue?: number;
     playerPlanAllocations: WorldStreamingCustomerPlanSummary[];
     playerOfferPresent: boolean;
     countryCount: number;
@@ -10694,6 +11379,13 @@ export interface WorldStreamingCustomerSnapshot {
     piracyReach: number;
     playerEndingPaidAccounts: number;
     playerMonthlySubscriptionRevenue: number;
+    /** #128: the households that came to the player's service this week and those that left it, by the
+        movement's reason. A move between the player's own plans is in neither. Absent on a week the player
+        sold nothing, and on weeks settled before #128. */
+    playerFlows?: {
+        in: Partial<Record<WorldStreamingCustomerReasonId, number>>;
+        out: Partial<Record<WorldStreamingCustomerReasonId, number>>;
+    };
 }
 
 export interface WorldStreamingCustomerState {
@@ -10702,6 +11394,9 @@ export interface WorldStreamingCustomerState {
     lastProcessedAbsoluteWeek: number;
     sourceFingerprint: string;
     playerAccessPolicy: WorldStreamingCustomerAccessPolicy;
+    /** Pay yearly (#71): the discount the player's subscribers are billed at; the week it changes they switch
+        billing. Unset (older saves, or before the player sells subscriptions) reads as 15%. */
+    playerAnnualDiscount?: number;
     countries: Record<string, WorldStreamingCustomerCountryState>;
     global: WorldStreamingCustomerGlobalSummary;
     recentMovements: WorldStreamingCustomerMovement[];
@@ -10847,12 +11542,34 @@ export interface WorldStreamingViewingGlobalSummary {
     titleCount: number;
 }
 
+/** The player's week in other languages, by localization region. */
+export interface WorldStreamingViewingLocalizationSummary {
+    /** every account that watched the player's service this week */
+    playerViewingAccounts: number;
+    /** accounts that watched a title from another language with a region's subtitles or dubbing */
+    localizedViewingAccounts: number;
+    /** accounts localization added (regions set up, their subtitles and dubbing): the same week with none has this many fewer */
+    addedViewingAccounts: number;
+    /** accounts that watched a title from another language that no subtitle or dubbing level reached */
+    untappedViewingAccounts?: number;
+    byPackage: Record<string, {
+        localized: number;
+        added: number;
+        /** in markets whose main language is the region's, other-language viewing no level reached */
+        untapped?: number;
+        /** the region's five most-watched titles in its languages: [projectId, viewers] */
+        top?: Array<[string, number]>;
+    }>;
+}
+
 export interface WorldStreamingViewingSnapshot {
     absoluteWeek: number;
     totalViewingAccounts: number;
     totalHoursViewed: number;
     unmetDemandAccounts: number;
     incrementalRevenue: number;
+    /** absent on weeks processed before region localization */
+    localization?: WorldStreamingViewingLocalizationSummary;
 }
 
 /** A finite opening title grant for an ecosystem rival without an authored rights catalogue. */
@@ -11055,12 +11772,35 @@ export interface RecentProjectTitleMemory {
     entries: { title: string; week: number }[];
 }
 
+/** #178 (plan §22): where a person of the industry works now: a rival service, a studio, us, between roles, or their own firm */
+export interface IndustryEmployer {
+    kind: 'RIVAL' | 'STUDIO' | 'OURS' | 'FREE' | 'OWN';
+    id?: string;
+    name: string;
+}
+
+/** #178: what changes about the industry's people (executives and investors); who they are is drawn from the
+ *  career's seed and never saved */
+export interface IndustryPeopleWorldState {
+    version: 1;
+    /** where a person works when it is no longer where they started */
+    employers: Record<string, IndustryEmployer>;
+    /** pay banked since the registry began, which their net worth adds */
+    earned: Record<string, number>;
+    /** the last week the industry's weekly upkeep ran */
+    lastWeek: number;
+    /** recent moves, newest last: who left, who joined whom */
+    moves: Array<{ personId: string; from: IndustryEmployer; to: IndustryEmployer; absoluteWeek: number }>;
+}
+
 export interface WorldState {
     recentProjectTitles?: RecentProjectTitleMemory;
     cinemaMarket?: CinemaSavedState;
     projects: IndustryProject[];
     streamingOpportunityMarket?: StreamingOpportunityMarketState;
     talentCareer?: TalentCareerState;
+    /** #178: the industry's executives and investors: where they work and what they have earned */
+    industryPeople?: IndustryPeopleWorldState;
     historicalCatalogue?: HistoricalCatalogueState;
     trendingGenre: Genre;
     universes: Record<UniverseId, Universe>;
@@ -11099,6 +11839,38 @@ export interface WorldState {
     worldStreamingViewing?: WorldStreamingViewingState;
     worldStreamingPlatformEconomy?: WorldStreamingPlatformEconomyState;
     worldEconomyHealth?: WorldEconomyHealthSummary;
+    /** #129: the weekly Top 10 of every streaming service, films and series, the last 12 settled weeks
+        (`services/streamingWeeklyChart.ts`). Absent before a streaming company is founded, and on saves from
+        before #129 until their next week settles. */
+    streamingWeeklyChart?: StreamingWeeklyChartState;
+}
+
+/** #129: one title in a week's Top 10. Views = hours watched ÷ the title's runtime. */
+export interface StreamingWeeklyChartRow {
+    id: string;
+    title: string;
+    /** The service it was watched on most this week; 'PLAYER' for the player's own. */
+    platformId: string;
+    kind: 'FILM' | 'SERIES';
+    /** The title's genre (#135: its poster). */
+    genre: string;
+    hours: number;
+    views: number;
+}
+
+export interface StreamingWeeklyChartWeek {
+    absoluteWeek: number;
+    films: StreamingWeeklyChartRow[];
+    series: StreamingWeeklyChartRow[];
+    /** #142: the player's own service's Top 10 that week, on its own hours only; absent on weeks stored before schema 3. */
+    own?: { films: StreamingWeeklyChartRow[]; series: StreamingWeeklyChartRow[] };
+}
+
+export interface StreamingWeeklyChartState {
+    /** 3 since #142 (each week also keeps the player's own Top 10); 2 since #135 (rival titles from the services'
+        catalogues, genres). A schema-2 chart is read as 3, its weeks without own lists; a schema-1 chart is dropped. */
+    schemaVersion: 3;
+    weeks: StreamingWeeklyChartWeek[];
 }
 
 export interface LogEntry {
@@ -11574,6 +12346,8 @@ export interface Player {
     stockTakeovers: StockTakeoverCase[];
     world: WorldState;
     ownedStreamingPlatform: OwnedStreamingPlatformState;
+    /** #190: the streaming companies you founded and sold, newest last */
+    soldStreamingCompanies?: Array<{ name: string; soldAtAbsoluteWeek: number; buyerName: string; price: number; founderCash: number }>;
     streamingRightsManagement?: StreamingRightsManagementState;
     flags: Record<string, any>;
     weeklyOpportunities: {

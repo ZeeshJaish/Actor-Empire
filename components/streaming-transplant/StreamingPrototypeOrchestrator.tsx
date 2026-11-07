@@ -26,7 +26,8 @@ import { MachineWakesUp, Activation } from './StreamingCinematicsExperience';
 import { PlatformHQ, HqState, HqStat, SlateItem, ServiceTitle, Division, HqEvent } from './StreamingPlatformCommandDeck';
 import { ContentDesk, ContentDeskState, CatalogueTitle, SlateWeek } from './StreamingContentExperience';
 import { NetworkDesk, NetworkState, NetComponent, ServerCity, TechTrack, PlatformProduct, Incident } from './StreamingNetworkExperience';
-import { AudienceDesk, AudienceState, AudienceMetric, ChartRow, Campaign, RegionRow, Attribution } from './StreamingAudienceExperience';
+import { AudienceDesk, AudienceState } from './StreamingAudienceExperience';
+import { createEmptyAudienceRoom } from './audienceRoomModel';
 import { Boardroom, BoardroomState, Exec as BoardExec, BoardSeat, Holder, IpoCheck, LedgerLine } from './StreamingBoardroomExperience';
 import { ViewerApp, AppState, AppTitle } from './StreamingViewerExperience';
 import { TitleDossier, DossierTitle } from './StreamingDossierExperience';
@@ -710,7 +711,7 @@ const buildHqState = (
         { id: 'ANALYTICS', label: 'GROWTH', alert: !!night && night.lost > 0 },
         { id: 'TOP 10', label: 'RIVALS' },
         { id: 'CAMPAIGNS', label: 'CAMPAIGNS' },
-        { id: 'REGIONS', label: 'REGIONS' },
+        { id: 'MARKETS', label: 'MARKETS' },
       ],
     },
     {
@@ -962,68 +963,8 @@ const buildNetworkState = (
   };
 };
 
-/** Demo audience state. The Top 10 deliberately mixes your titles with the same
- *  rivals the player met on the Wall of Screens. */
-const buildAudienceState = (live: boolean, brandName: string, regions: RegionId[]): AudienceState => {
-  // a plausible 90-week subscriber climb with a dip, so the chart has a shape
-  const trend = Array.from({ length: 90 }, (_, i) => {
-    const base = 240_000 + i * 24_000;
-    const dip = i > 52 && i < 60 ? -90_000 : 0;
-    const wobble = Math.round(Math.sin(i / 3.1) * 22_000);
-    return { label: `Wk ${i + 1}`, value: Math.max(0, base + dip + wobble) };
-  });
-
-  const metrics: AudienceMetric[] = [
-    { id: 'subs', label: 'SUBSCRIBERS', value: '2.41M', delta: 5.6, spark: trend.slice(-14).map(t => t.value) },
-    { id: 'churn', label: 'CHURN', value: '3.1%', delta: -0.4, inverse: true, spark: [4.1, 3.9, 3.8, 3.6, 3.4, 3.3, 3.1] },
-    { id: 'watch', label: 'WATCH HOURS', value: '48.2M', delta: 8.1, spark: [31, 34, 33, 38, 41, 44, 48] },
-    { id: 'arpu', label: 'ARPU', value: '$11.40', delta: 1.2, spark: [10.8, 10.9, 11.0, 11.1, 11.2, 11.3, 11.4] },
-  ];
-
-  const chart: ChartRow[] = [
-    { rank: 1, prevRank: 1, title: 'The Last Harbour', platform: 'Vistaplay', mine: false, hue: 268 },
-    { rank: 2, prevRank: 4, title: 'Atlas Rising', platform: brandName, mine: true, hue: 214 },
-    { rank: 3, prevRank: 2, title: 'Ironmark', platform: 'StreamCo', mine: false, hue: 12 },
-    { rank: 4, prevRank: 3, title: 'Glass Hours', platform: 'Orbit TV', mine: false, hue: 190 },
-    { rank: 5, prevRank: undefined, title: 'Night Ledger', platform: brandName, mine: true, hue: 352 },
-    { rank: 6, prevRank: 5, title: 'Saltwater', platform: 'Vistaplay', mine: false, hue: 158 },
-    { rank: 7, prevRank: 6, title: 'The Quiet Fleet', platform: 'StreamCo', mine: false, hue: 42 },
-    { rank: 8, prevRank: 12, title: 'Crown City', platform: brandName, mine: true, hue: 152 },
-    { rank: 9, prevRank: 7, title: 'Dust & Signal', platform: 'Orbit TV', mine: false, hue: 300 },
-    { rank: 10, prevRank: 9, title: 'Long Division', platform: 'Vistaplay', mine: false, hue: 96 },
-  ];
-
-  const attribution: Attribution[] = [
-    { id: 'org', label: 'Organic', value: 61_200, note: 'Word of mouth and search — nothing was paid for this.' },
-    { id: 'camp', label: 'Campaigns', value: 44_800, note: 'Attributed to the Dead Signal trailer push and the regional billboards.' },
-    { id: 'rec', label: 'Recommendations', value: 22_400, note: 'Surfaced by your own homepage and Top 10 placement.' },
-  ];
-
-  const campaigns: Campaign[] = [
-    { id: 'k1', name: 'Dead Signal — premiere push', channel: 'Trailer · Social · Homepage hero', spend: 8_400_000, reachLow: 4_200_000, reachHigh: 11_000_000, weeksLeft: 3, live: true },
-    { id: 'k2', name: 'Back catalogue revival', channel: 'Genre spotlight', spend: 1_100_000, reachLow: 600_000, reachHigh: 1_800_000, weeksLeft: 6, live: true },
-    { id: 'k3', name: 'Harbour Lights launch', channel: 'Regional · Billboard', spend: 2_600_000, reachLow: 900_000, reachHigh: 3_400_000, weeksLeft: 0, live: false },
-  ];
-
-  const REGION_LABEL: Record<string, string> = {
-    NORTH_AMERICA: 'North America', SOUTH_AMERICA: 'South America', EUROPE: 'Europe',
-    AFRICA: 'Africa', ASIA: 'Asia', OCEANIA: 'Oceania',
-  };
-  const rows: RegionRow[] = (regions.length ? regions : (['EUROPE', 'ASIA'] as RegionId[])).map((r, i) => ({
-    id: r,
-    label: REGION_LABEL[r] ?? r,
-    subs: [1_480_000, 620_000, 210_000, 98_000, 44_000, 21_000][i] ?? 18_000,
-    sharePct: [6.4, 3.8, 2.1, 1.4, 0.9, 0.5][i] ?? 0.4,
-    growthPct: [7.2, 4.1, -1.8, 2.6, 0.4, -0.6][i] ?? 0,
-    latencyMs: [24, 74, 142, 168, 96, 188][i] ?? 150,
-    rivals: [['Vistaplay'], ['StreamCo', 'Vistaplay'], ['Orbit TV'], [], ['StreamCo'], []][i] ?? [],
-  })).sort((a, b) => b.subs - a.subs);
-
-  return {
-    live, metrics, trend, trendLabel: 'Subscribers', chart,
-    attribution, campaigns, objective: 'BALANCED', regions: rows,
-  };
-};
+/** Demo audience state: the founding prototype has no save behind it, so its room is empty (#130). */
+const buildAudienceState = (live: boolean): AudienceState => ({ live, room: createEmptyAudienceRoom(live) });
 
 /** Demo boardroom state. Ownership starts at 100% founder, so the board seats
  *  are drawn empty — that image is the governance rule. */
@@ -1647,10 +1588,10 @@ export const EmpirePlusV2: React.FC<Props> = ({ config, onComplete, onClose, deb
           }}
           onCancelBuild={t => setTech(list => list.map(x => x.id === t.id
             ? { ...x, building: undefined } : x))}
-          onToggleProduct={p => setPaused(x => ({ ...x, [p.id]: !x[p.id] }))} />
+          onPauseProduct={(p, pause) => { setPaused(x => ({ ...x, [p.id]: pause })); return { ok: true, message: '' }; }} />
       )}
       {phase === 'AUDIENCE' && (
-        <AudienceDesk brand={named} state={buildAudienceState(hqLive, named.name, regions)}
+        <AudienceDesk brand={named} state={buildAudienceState(hqLive)}
           initialTab={divTab as any ?? undefined}
           onBack={() => setPhase('DESK')} />
       )}

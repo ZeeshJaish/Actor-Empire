@@ -15,6 +15,11 @@ import { publishIndustryMediaClaimBeats } from './industryMediaClaimPublication'
 import { advanceIndustryMediaNarratives } from './industryMediaNarratives';
 import { advanceIndustryMediaRelationships } from './industryMediaRelationships';
 import { processStreamingUpcomingRightsWeek } from '../streamingUpcomingRights';
+import { collectOwnedStreamingPlatformFacts } from '../streamingPlatformNews';
+import { collectStreamingChartFacts } from '../streamingChartNews';
+import { collectRivalTechFacts } from '../streamingRivalNews';
+import { collectStreamingValueFacts } from '../streamingValueNews';
+import { collectStreamingCampaignNews } from '../campaigns/streamingCampaignNews';
 
 export type IndustryWorldExecutionStage =
     | 'PLATFORM_AI'
@@ -78,7 +83,20 @@ export const processIndustryWorldWeek = (
     diagnostics?.onPhase?.('industry_upcoming_rights_ms', performance.now() - phaseStarted);
     phaseStarted = performance.now();
     executionOrder.push('PRESENTATION');
-    const facts = collectIndustryEventFacts(world, upcomingRights.player.world, absoluteWeek);
+    /* the player's campaigns: their big nights, famous screens and big results (#149), and the fans' buzz */
+    const campaignNews = collectStreamingCampaignNews(player, ledger.lastProcessedAbsoluteWeek, absoluteWeek);
+    const facts = [
+        ...collectIndustryEventFacts(world, upcomingRights.player.world, absoluteWeek),
+        /* the player's own service since the last pass (Phase 5, #66) */
+        ...collectOwnedStreamingPlatformFacts(player, ledger.lastProcessedAbsoluteWeek, absoluteWeek),
+        /* rivals' tech steps and how their picture compares (#70) */
+        ...collectRivalTechFacts(player, upcomingRights.player.world, ledger.lastProcessedAbsoluteWeek, absoluteWeek),
+        /* the player's value against the global rivals: praise or criticism, at most one a week (#117) */
+        ...collectStreamingValueFacts(upcomingRights.player, absoluteWeek),
+        /* the weekly Top 10's notable weeks (#143) */
+        ...collectStreamingChartFacts(player, ledger.lastProcessedAbsoluteWeek, absoluteWeek),
+        ...campaignNews.facts,
+    ];
     const collectedWorld: WorldState = {
         ...upcomingRights.player.world,
         industryEvents: appendIndustryEventFacts(upcomingRights.player.world.industryEvents, facts),
@@ -114,11 +132,30 @@ export const processIndustryWorldWeek = (
     );
     diagnostics?.onPhase?.('industry_media_ms', performance.now() - phaseStarted);
     const resolvedWorld = claimPublication.player.world;
+    /* the fans' posts go straight to the feed, as the fandoms' do; #161: and the street photos to Instagram */
+    const seen = new Set<string>();
+    const posted = campaignNews.buzz.length ? {
+        ...claimPublication.player,
+        x: {
+            ...claimPublication.player.x,
+            feed: [...campaignNews.buzz, ...(claimPublication.player.x?.feed || [])]
+                .filter(post => (seen.has(post.id) ? false : (seen.add(post.id), true))).slice(0, 80),
+        },
+    } : claimPublication.player;
+    const snapped = new Set<string>();
+    const buzzed = campaignNews.insta.length ? {
+        ...posted,
+        instagram: {
+            ...posted.instagram,
+            feed: [...campaignNews.insta, ...(posted.instagram?.feed || [])]
+                .filter(post => (snapped.has(post.id) ? false : (snapped.add(post.id), true))).slice(0, 50),
+        },
+    } : posted;
     return {
-        player: claimPublication.player,
+        player: buzzed,
         world: resolvedWorld,
         news: [...presentation.news, ...responseResolution.news, ...narratives.retrospectiveNews, ...claimPublication.news],
-        socialPosts: [...presentation.xPosts, ...youtube.xPosts, ...fandoms.xPosts, ...narratives.retrospectiveXPosts, ...claimPublication.xPosts],
+        socialPosts: [...presentation.xPosts, ...youtube.xPosts, ...fandoms.xPosts, ...narratives.retrospectiveXPosts, ...claimPublication.xPosts, ...campaignNews.buzz],
         logs: [...streaming.logs, ...studio.logs],
         absoluteWeek,
         processed: true,

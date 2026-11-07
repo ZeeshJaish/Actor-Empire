@@ -17,12 +17,11 @@ import {
     commitStreamingPublicMarketWeek,
     getStreamingPublicMarkets,
     issueStreamingPublicGuidance,
-    listStreamingPlatform,
     resolveStreamingHostileTakeover,
     respondToStreamingActivist,
-    startStreamingIpoRoadshow,
     startStreamingCinematicIpoJourney,
 } from '../services/streamingPublicMarkets';
+import { listStreamingCompanyForQa } from '../services/streamingListingQa';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -320,25 +319,20 @@ assert(!commitStreamingCinematicIpo(cinematicCommit.player, {
 }).changed, 'Replaying or reprocessing listing day must never mint a second share issue.');
 assert(cinematicCommit.player.ownedStreamingPlatform.publicCompany.ipoPlan?.startedAtAbsoluteWeek === journeyStartWeek, 'The public record must retain the real week the multi-session listing began.');
 
-let action = startStreamingIpoRoadshow(player, { ticker: 'NSTR', narrative: 'TECHNOLOGY_NETWORK', offerPercent: 20 });
-assert(action.changed, 'An IPO-ready founder should be able to open a roadshow.');
-player = action.player;
-const plan = player.ownedStreamingPlatform.publicCompany.ipoPlan!;
-assert(plan.institutionalDemandScore > 0 && plan.retailDemandScore > 0, 'Roadshow pricing must be backed by persistent institutional and retail demand.');
-assert(!startStreamingIpoRoadshow(player, { ticker: 'NSTR', narrative: 'AUDIENCE_SCALE', offerPercent: 20 }).changed, 'The same company cannot open duplicate IPO roadshows.');
-
+/* #189: the old roadshow is gone; the company lists through the listing's own commit, as the closing bell does */
 const founderBefore = player.ownedStreamingPlatform.founderOwnershipPercent;
 const treasuryBefore = player.ownedStreamingPlatform.treasuryCash;
-action = listStreamingPlatform(player, (plan.lowPrice + plan.highPrice) / 2);
-assert(action.changed, 'The pricing committee should be able to list inside the disclosed range.');
+let action = listStreamingCompanyForQa(player, { ticker: 'NSTR' });
+assert(action.changed, 'An IPO-ready founder should be able to list.');
 player = action.player;
 const listing = player.ownedStreamingPlatform.publicCompany.listing!;
 assert(player.ownedStreamingPlatform.publicCompany.lifecycle === 'PUBLIC', 'Listing should permanently change the issuer to public.');
-assert(player.ownedStreamingPlatform.founderOwnershipPercent === Math.round(founderBefore * 0.8 * 100) / 100, 'Primary IPO shares should dilute canonical founder ownership.');
+assert(listing.offerPercent >= 19 && listing.offerPercent <= 21, 'The float chosen is the float listed.');
+assert(player.ownedStreamingPlatform.founderOwnershipPercent < founderBefore && player.ownedStreamingPlatform.founderOwnershipPercent === listing.founderOwnershipAfter, 'Primary IPO shares should dilute canonical founder ownership.');
 assert(player.ownedStreamingPlatform.treasuryCash === treasuryBefore + listing.capitalRaised, 'IPO capital must enter company treasury rather than player cash.');
 assert(player.ownedStreamingPlatform.finance.equityHolders.some(holder => holder.holderName === 'Public shareholder float'), 'The public float should enter the canonical equity holder record.');
 assert(player.ownedStreamingPlatform.cinematicQueue.filter(event => event.type === 'IPO_LISTING').length === 1, 'Listing should queue one fact-backed major cinematic.');
-assert(!listStreamingPlatform(player, plan.highPrice).changed, 'Listing cannot be committed twice.');
+assert(!listStreamingCompanyForQa(player, { ticker: 'NSTR' }).changed, 'Listing cannot be committed twice.');
 
 action = issueStreamingPublicGuidance(player, 'AMBITIOUS');
 assert(action.changed, 'A public company should be able to issue next-quarter guidance.');
@@ -362,8 +356,9 @@ player = {
 assert(player.ownedStreamingPlatform.publicCompany.quoteHistory.at(-1)?.absoluteWeek === reportWeek, 'Every processed public week should create one deterministic OHLC quote.');
 assert(player.ownedStreamingPlatform.publicCompany.earnings.at(-1)?.outcome === 'MISS', 'A weak canonical review should miss ambitious public guidance.');
 assert(player.ownedStreamingPlatform.publicCompany.shareholderVotes.some(vote => vote.status === 'OPEN'), 'Public earnings should create a weighted shareholder ballot.');
-assert(player.ownedStreamingPlatform.publicCompany.activistCampaigns.some(campaign => campaign.status === 'ACTIVE'), 'A material miss should be able to create persistent activist pressure.');
-assert(player.ownedStreamingPlatform.publicCompany.hostileTakeovers.some(takeover => takeover.status === 'ACTIVE'), 'Low founder control, activist pressure and an aggressive funded rival should create a hostile tender.');
+/* #173 (plan §21.17, Zeesh's answer): activists and hostile bids stay off and come back with M&A */
+assert(!player.ownedStreamingPlatform.publicCompany.activistCampaigns.some(campaign => campaign.status === 'ACTIVE'), 'A material miss brings no activist until M&A returns.');
+assert(!player.ownedStreamingPlatform.publicCompany.hostileTakeovers.some(takeover => takeover.status === 'ACTIVE'), 'No hostile tender until M&A returns.');
 const quotesBeforeReplay = player.ownedStreamingPlatform.publicCompany.quoteHistory.length;
 assert(commitStreamingPublicMarketWeek(player.ownedStreamingPlatform, player, reportSnapshot).publicCompany.quoteHistory.length === quotesBeforeReplay, 'Public quote processing must be exactly once per game week.');
 
@@ -373,6 +368,27 @@ assert(action.changed, 'The founder should cast actual voting power into a publi
 player = action.player;
 assert(player.ownedStreamingPlatform.publicCompany.shareholderVotes.find(vote => vote.id === openVote.id)?.finalSupport !== null, 'A shareholder result should persist final weighted support.');
 
+/* the responses stay for M&A: a campaign and a tender as the quarter used to open them */
+const reportedAt = getAbsoluteWeek(player.age, player.currentWeek);
+const rival = [...player.ownedStreamingPlatform.competitiveWorld.rivals].sort((a, b) => b.aggression - a.aggression)[0];
+player = {
+    ...player,
+    ownedStreamingPlatform: {
+        ...player.ownedStreamingPlatform,
+        publicCompany: {
+            ...player.ownedStreamingPlatform.publicCompany,
+            activistCampaigns: [...player.ownedStreamingPlatform.publicCompany.activistCampaigns, {
+                id: 'audit-activist', investorName: 'Aperture Partners', ownershipPercent: 6, demand: 'MARGIN_DISCIPLINE', status: 'ACTIVE',
+                pressure: 70, openedAtAbsoluteWeek: reportedAt, resolvedAtAbsoluteWeek: null, response: null, consequence: null,
+            }],
+            hostileTakeovers: [...player.ownedStreamingPlatform.publicCompany.hostileTakeovers, {
+                id: 'audit-takeover', bidderPlatformId: rival.platformId, bidderName: rival.platformName,
+                offerPrice: (player.ownedStreamingPlatform.publicCompany.quoteHistory.at(-1)?.close || 10) * 1.28, premiumPercent: 28,
+                bidderSupportPercent: 60, status: 'ACTIVE', openedAtAbsoluteWeek: reportedAt, resolvedAtAbsoluteWeek: null, defence: null, consequence: null,
+            }],
+        },
+    },
+};
 const activist = player.ownedStreamingPlatform.publicCompany.activistCampaigns.find(campaign => campaign.status === 'ACTIVE')!;
 action = respondToStreamingActivist(player, activist.id, 'ENGAGE');
 assert(action.changed, 'The player should be able to negotiate an activist campaign with a real treasury cost.');
@@ -387,15 +403,18 @@ assert(player.ownedStreamingPlatform.publicCompany.hostileTakeovers.find(item =>
 assert(player.ownedStreamingPlatform.leadership.currentCeo.holderType === 'FOUNDER', 'Losing control must keep the player in a recoverable operator role.');
 assert(player.ownedStreamingPlatform.cinematicQueue.filter(event => event.type === 'HOSTILE_TAKEOVER_DEFENCE').length === 1, 'Tender resolution should queue one fact-backed defence cinematic.');
 
-const component = readFileSync(resolve(process.cwd(), 'components/StreamingPublicMarkets.tsx'), 'utf8');
-const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-public-markets.css'), 'utf8');
+/* #188: MARKETS is the one home for the stock (the Public markets desk is gone) and the listing has its own host.
+   The defence scene has no screen: activism is off (STREAMING_ACTIVISM_ENABLED), so no tender is ever opened. */
+const component = readFileSync(resolve(process.cwd(), 'components/streaming-transplant/BoardroomMarkets.tsx'), 'utf8');
+const host = readFileSync(resolve(process.cwd(), 'components/StreamingListingHost.tsx'), 'utf8');
+const styles = readFileSync(resolve(process.cwd(), 'styles/streaming-listing-host.css'), 'utf8');
 const hq = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const weekly = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
-assert(component.includes('Remaining private forever') && component.includes('No content is locked'), 'The UI must preserve private-company viability and avoid content monetization gates.');
-assert(component.includes('IPO_LISTING') && component.includes('HOSTILE_TAKEOVER_DEFENCE'), 'Both locked Phase 22 cinematics must be presented from committed facts.');
-assert(component.includes('PriceChart') && component.includes('INVESTOR RELATIONS') && component.includes('SHAREHOLDER CHAMBER'), 'The public-market command floor should include price history, earnings and issuer voting.');
-assert(styles.includes('@media (max-width: 760px)') && styles.includes('@media (prefers-reduced-motion: reduce)'), 'Public Markets must include explicit mobile and reduced-motion treatment.');
-assert(hq.includes('StreamingPublicMarkets') && hq.includes('PUBLIC MARKETS'), 'Company HQ should launch the public-market command floor as a first-class room.');
+assert(component.includes('Going public is optional'), 'The UI must preserve private-company viability.');
+assert(host.includes('IPO_LISTING'), 'The listing scene must be presented from committed facts.');
+assert(component.includes('<Line') && component.includes('The next report') && component.includes('SHAREHOLDER VOTE') && component.includes('The register'), 'MARKETS should include price history, the promise and the reports, issuer voting and the register.');
+assert(styles.includes('@media (prefers-reduced-motion: reduce)'), 'The listing must include reduced-motion treatment.');
+assert(hq.includes('StreamingListingHost') && hq.includes("if (chip === 'MARKETS') return openBoardroom('MARKETS')") && !hq.includes('StreamingPublicMarkets'), 'Company HQ should open MARKETS for the stock and the listing host for the bell.');
 assert(weekly.includes('commitStreamingPublicMarketWeek'), 'The canonical weekly loop should commit public quotes and quarter events.');
 assert(!component.includes('server hack') && !component.includes('Buy IPO') && !component.includes('$7 pack'), 'Phase 22 must not leak Phase 23 shadow operations or Phase 25 monetized power.');
 

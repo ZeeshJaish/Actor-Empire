@@ -355,6 +355,11 @@ const normalizeRenewalCase = (value: unknown): StreamingRightsRenewalCase | null
         ...(normalizeStreamingRightsDelegationTrace(source.delegationTrace)
             ? { delegationTrace: normalizeStreamingRightsDelegationTrace(source.delegationTrace) }
             : {}),
+        ...(asRecord(source.decidedBy).name ? { decidedBy: {
+            name: cleanText(asRecord(source.decidedBy).name, 'Your team', 80),
+            seatId: cleanText(asRecord(source.decidedBy).seatId, 'CONTENT', 40),
+            absoluteWeek: Math.max(0, finiteWeek(asRecord(source.decidedBy).absoluteWeek, 0)),
+        } } : {}),
         outcome: CASE_OUTCOMES.has(source.outcome) ? source.outcome : 'PENDING',
         replacementContractId: cleanText(source.replacementContractId) || null,
         resolvedAtAbsoluteWeek: source.resolvedAtAbsoluteWeek === null || source.resolvedAtAbsoluteWeek === undefined

@@ -815,3 +815,110 @@
 .ls .ndbug i{width:6px;height:6px;border-radius:50%;background:#fff;
   animation:epx-lslive 1.2s steps(2,end) infinite}
 @keyframes epx-lslive{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* ── #189: THE ASK — the ticker, the worth and the float, the only place they are chosen ── */
+.ls .akwrap{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 16px 6px;display:flex;flex-direction:column;gap:11px}
+.ls .akhead h2{margin-top:6px;font-size:26px;font-weight:900;letter-spacing:-.025em;line-height:1.05;color:#f0f3f8}
+.ls .akhead p{margin-top:4px;font-size:12px;line-height:1.45;color:#8b97ab}
+.ls .aksec{position:relative;padding:12px 12px 10px;border-radius:14px;background:#0b0f16;border:1px solid #1a2130}
+.ls .aklabel{display:flex;align-items:center;gap:7px;margin-bottom:9px}
+.ls .aklabel b{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:900;color:#1d1607;background:var(--epx-lsamber)}
+.ls .aklabel span{font-size:7.5px;font-weight:900;letter-spacing:.2em;color:#8b97ab}
+.ls .aklabel em{margin-left:auto;font-size:10px;font-weight:800;font-style:normal;color:#8b97ab;white-space:nowrap}
+.ls .aklabel em.ok{color:var(--epx-lsgreen)}
+.ls .aklabel em.warn,.ls .aklabel em.low{color:var(--epx-lsamber)}
+.ls .aklabel em.bad{color:var(--epx-lsalert)}
+.ls .akplate{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 10px 9px;border-radius:10px;
+  background:linear-gradient(#050608,#0b0d12);border:1px solid rgba(245,179,1,.28);box-shadow:inset 0 0 22px rgba(0,0,0,.85)}
+.ls .akplate > span{display:flex;gap:4px}
+.ls .akplate i{display:flex;align-items:center;justify-content:center;width:30px;height:40px;border-radius:4px;font-style:normal;
+  font-size:28px;font-weight:900;color:#ffc44d;background:#120d04;text-shadow:0 0 7px rgba(255,180,40,.9),0 0 16px rgba(255,150,20,.5);
+  background-image:radial-gradient(rgba(255,190,80,.08) 1px,transparent 1px);background-size:3px 3px;animation:ak-flip .35s cubic-bezier(.2,.9,.3,1.2) backwards}
+@keyframes ak-flip{from{transform:rotateX(80deg);opacity:.2}}
+.ls .akplate em{font-size:7px;font-weight:900;font-style:normal;letter-spacing:.22em;color:#8a7650}
+.ls .akchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.ls .akchip{min-width:54px;padding:8px 12px;border-radius:99px;text-align:center;font-size:11px;font-weight:900;letter-spacing:.12em;
+  color:#c9d0db;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.14);transition:transform .12s,background .15s}
+.ls .akchip:active{transform:scale(.95)}
+.ls .akchip.on{color:#1d1607;background:linear-gradient(#ffd27a,#e0a93c);border-color:transparent}
+.ls .akchip.aktype{border-style:dashed;color:#8b97ab}
+.ls .akchipin{width:84px;padding:8px 10px;border-radius:99px;text-align:center;font:900 11px/1 'Inter',system-ui,sans-serif;letter-spacing:.12em;
+  color:#f0f3f8;background:#05070a;border:1px solid var(--epx-lsamber);outline:none;text-transform:uppercase}
+.ls .akfig{position:relative}
+.ls .akfig > span{position:absolute;right:0;top:9px}
+.ls .akfig > b{display:block;font-size:34px;font-weight:900;letter-spacing:-.03em;line-height:1;color:#f0f3f8;cursor:text}
+.ls .akdial{position:relative}
+.ls .akmark{position:absolute;top:6px;width:2px;height:14px;margin-left:-1px;border-radius:1px;background:#e2c06f;box-shadow:0 0 6px rgba(226,192,111,.7);pointer-events:none}
+.ls .akfair{display:block;margin-top:2px;font-size:10px;font-weight:800;color:#e2c06f}
+.ls .akfloat{display:flex;align-items:center;gap:12px}
+.ls .akfloat b{font-size:40px;font-weight:900;letter-spacing:-.03em;line-height:1;color:#f0f3f8}
+.ls .akfloat b.ok{color:var(--epx-lsgreen)}
+.ls .akfloat b.warn{color:var(--epx-lsamber)}
+.ls .akfloat span{font-size:10.5px;line-height:1.35;color:#8b97ab}
+.ls .akout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.ls .akout div{min-width:0;padding:10px 8px;border-radius:12px;text-align:center;background:#0b0f16;border:1px solid #1a2130}
+.ls .akout span{display:block;font-size:7px;font-weight:900;letter-spacing:.18em;color:#6d7a8e}
+.ls .akout b{display:block;margin-top:5px;font-size:17px;font-weight:900;letter-spacing:-.02em;color:#f0f3f8;white-space:nowrap}
+.ls .akverdict{padding:10px 12px;border-left:2px solid #2b3446;font-size:12px;line-height:1.5;color:#c9d0db;background:rgba(255,255,255,.02)}
+.ls .akverdict.ok{border-left-color:var(--epx-lsgreen)}
+.ls .akverdict.warn{border-left-color:var(--epx-lsamber);background:rgba(245,179,1,.06)}
+.ls .akverdict.bad{border-left-color:var(--epx-lsalert);background:rgba(255,74,82,.07)}
+
+/* ── #189: THE TABLE — your CFO, your CTO and the board, with their faces ── */
+.ls .tbwrap{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 16px 6px;display:flex;flex-direction:column;gap:11px}
+.ls .tbhead{display:flex;flex-direction:column;gap:2px}
+.ls .tbhead b{margin-top:4px;font-size:34px;font-weight:900;letter-spacing:-.03em;line-height:1;color:#f0f3f8}
+.ls .tbhead em{font-size:10.5px;font-weight:800;font-style:normal;color:var(--epx-lsgreen)}
+.ls .tbhead em.warn{color:var(--epx-lsamber)}
+.ls .tbexecs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ls .tbexec{display:flex;flex-direction:column;gap:7px;min-width:0;padding:11px 10px;border-radius:14px;background:#0b0f16;border:1px solid #1a2130;transition:border-color .3s,background .3s}
+.ls .tbexec.ok{border-color:rgba(47,208,122,.45)}
+.ls .tbexec.warn{border-color:rgba(245,179,1,.5);background:rgba(245,179,1,.04)}
+.ls .tbexec.bad{border-color:rgba(255,74,82,.55);background:rgba(255,74,82,.05)}
+.ls .tbexectop{display:flex;align-items:center;gap:8px;min-width:0}
+.ls .tbexectop > div{min-width:0}
+.ls .tbexectop b{display:block;font-size:12px;font-weight:900;line-height:1.2;color:#f0f3f8;overflow-wrap:anywhere}
+.ls .tbexectop span{display:block;margin-top:2px;font-size:6.5px;font-weight:900;letter-spacing:.14em;color:#6d7a8e}
+.ls .tbface{flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:#1a2130;color:#c9d0db;font-size:12px;font-weight:900;box-shadow:0 0 0 2px #1a2130}
+.ls .tbchip{align-self:flex-start;padding:3px 7px;border-radius:5px;font-size:7.5px;font-weight:900;font-style:normal;letter-spacing:.14em;color:#8b97ab;background:rgba(255,255,255,.05)}
+.ls .tbexec.ok .tbchip{color:#062012;background:var(--epx-lsgreen)}
+.ls .tbexec.warn .tbchip{color:#241a05;background:var(--epx-lsamber)}
+.ls .tbexec.bad .tbchip{color:#fff;background:var(--epx-lsalert)}
+.ls .tbexec p{font-size:10.5px;line-height:1.45;font-style:italic;color:#c9d0db;animation:ak-flip .3s ease-out backwards}
+.ls .tbboard{padding:11px 10px 12px;border-radius:14px;background:radial-gradient(ellipse 90% 70% at 50% 0%,#111b2e,#0b0f16);border:1px solid #1a2130}
+.ls .tbtally{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.ls .tbtally > span{font-size:8px;font-weight:900;letter-spacing:.16em;color:#8b97ab;white-space:nowrap}
+.ls .tbtally > span b{font-size:20px;letter-spacing:0;vertical-align:-3px}
+.ls .tbtally > span.for b{color:var(--epx-lsgreen)}
+.ls .tbtally > span.against b{color:var(--epx-lsalert)}
+.ls .tbtally i{min-width:0;font-size:6.5px;font-weight:900;font-style:normal;letter-spacing:.16em;color:#6d7a8e;text-align:center}
+.ls .tbseats{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.ls .tbseat{flex:0 0 calc((100% - 18px) / 4);display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:8px 2px 7px;border-radius:12px;text-align:center;
+  background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);transition:border-color .25s,background .25s,transform .12s}
+.ls .tbseat:not(:disabled):active{transform:scale(.96)}
+.ls .tbseat:disabled{cursor:default}
+.ls .tbseat b{max-width:100%;font-size:10.5px;font-weight:900;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ls .tbseat span{max-width:100%;font-size:6px;font-weight:900;letter-spacing:.1em;color:#6d7a8e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ls .tbseat em{font-size:7.5px;font-weight:900;font-style:normal;letter-spacing:.12em;color:#4a5468}
+.ls .tbseatface{width:34px;height:34px;border-radius:50%;background:#1a2130;color:#c9d0db;font-size:11px;font-weight:900;box-shadow:0 0 0 2px #1a2130;transition:box-shadow .25s}
+.ls .tbseat.for{border-color:rgba(47,208,122,.45);background:rgba(47,208,122,.06)}
+.ls .tbseat.for em{color:var(--epx-lsgreen)}
+.ls .tbseat.for .tbseatface{box-shadow:0 0 0 2px var(--epx-lsgreen)}
+.ls .tbseat.against{border-color:rgba(255,74,82,.5);background:rgba(255,74,82,.06)}
+.ls .tbseat.against em{color:var(--epx-lsalert)}
+.ls .tbseat.against .tbseatface{box-shadow:0 0 0 2px var(--epx-lsalert)}
+.ls .tbseat.targeted{border-color:var(--epx-lsamber);box-shadow:0 0 0 3px rgba(245,179,1,.14)}
+.ls .tbreply{margin-top:10px;font-size:11px;line-height:1.45;font-style:italic;color:#c9d0db}
+.ls .tbresult{margin-top:10px;padding:7px;border-radius:8px;text-align:center;font-size:13px;font-weight:900;letter-spacing:.22em;animation:ak-flip .3s ease-out backwards}
+.ls .tbresult.ok{color:#062012;background:var(--epx-lsgreen)}
+.ls .tbresult.bad{color:#fff;background:var(--epx-lsalert)}
+
+/* ── #189: listing day ends on the closing bell ── */
+.ls .tbbell{display:flex;align-items:center;gap:12px;margin:0 14px;padding:11px 12px;border-radius:14px;
+  background:linear-gradient(160deg,rgba(255,196,77,.14),rgba(255,255,255,.02));border:1px solid rgba(255,196,77,.4)}
+.ls .tbbellicon{flex:0 0 auto;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#ffd27a;background:#2a1d05;
+  animation:tb-ring 1.6s ease-in-out 2;transform-origin:50% 10%}
+@keyframes tb-ring{0%,60%,100%{transform:rotate(0)}68%{transform:rotate(16deg)}76%{transform:rotate(-13deg)}84%{transform:rotate(8deg)}92%{transform:rotate(-4deg)}}
+.ls .tbbell b{display:block;font-size:11px;font-weight:900;letter-spacing:.18em;color:#ffd27a}
+.ls .tbbell span{display:block;margin-top:3px;font-size:11px;line-height:1.4;color:#dfe4ec}
+@media (prefers-reduced-motion:reduce){ .ls .akplate i,.ls .tbexec p,.ls .tbresult,.ls .tbbellicon{animation:none} }

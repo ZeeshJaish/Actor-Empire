@@ -687,7 +687,12 @@ const compactWorldEconomy = (world: any) => {
         ])),
       }
     : economyBase;
+  /* #129: the weekly Top 10 keeps 12 weeks */
+  const chart = world.streamingWeeklyChart && Array.isArray(world.streamingWeeklyChart.weeks)
+    ? { ...world.streamingWeeklyChart, weeks: world.streamingWeeklyChart.weeks.slice(-12) }
+    : undefined;
   return {
+    ...(chart ? { streamingWeeklyChart: chart } : {}),
     worldPopulation: population,
     worldAudienceEconomy: audience,
     worldAudienceParticipation: participation,

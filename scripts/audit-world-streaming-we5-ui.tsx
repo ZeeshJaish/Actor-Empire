@@ -85,16 +85,18 @@ const audienceMarkup = renderToStaticMarkup(<AudienceDesk
     state={createCanonicalAudienceState(processed)}
     initialTab="ANALYTICS"
     /* Entry #2 (live): paid access and the sharing policy are the player's own
-       service, so they moved from the industry overview to Your Platform. */
-    initialAnalyticsScope="PLATFORM"
-    initialMarketView="OVERVIEW"
+       service, so they live on ANALYTICS (#130: ANALYTICS is only your service; the industry is WORLD). */
     onBack={() => undefined}
     accessPolicy={processed.ownedStreamingPlatform.audienceAccessPolicy}
     onOpenPlatformOffer={() => undefined}
 />);
-['PAID ACCOUNTS', 'SHARED ACCESS', 'PIRACY REACH'].forEach(text => (
-    assert.ok(audienceMarkup.includes(text), `Audience Market renders ${text}`)
+/* #131: ANALYTICS shows who pays and who watches as one split bar: paid accounts, shared homes, pirates */
+['Who pays and who watches', 'Paid accounts'].forEach(text => (
+    assert.ok(audienceMarkup.includes(text), `Audience Analytics renders ${text}`)
 ));
+/* a part with nothing in it is left out of the bar */
+if (customer.externalSharedHouseholds > 0) assert.ok(audienceMarkup.includes('Shared homes'), 'Audience Analytics renders shared homes');
+if (customer.piracyReach > 0) assert.ok(audienceMarkup.includes('Pirates'), 'Audience Analytics renders pirates');
 /* Entry #3: the sharing policy is configuration, so it moved to the Platform
    room's Offer page, fed by the same settled WE5 figures. */
 const offerView = getStreamingPlatformOfferView(processed);

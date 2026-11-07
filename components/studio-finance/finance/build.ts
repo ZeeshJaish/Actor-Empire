@@ -622,6 +622,18 @@ export interface BuildData {
       available: boolean;
       reason?: string;
     }>;
+    /** #151: the launch campaign builder works its forecast out as you go, and needs what an opening can push */
+    forecastFor?: (draft: OwnedStreamingLaunchMarketingDraft) => StreamingLaunchMarketingForecastSnapshot;
+    /** #158: what each format and door costs a week in the opening countries, and a big night at its place */
+    rateCardFor?: (places?: Partial<Record<import('../../../types').CampaignFormatId, string>>) => import('../../../services/campaigns/launchCampaignRates').LaunchRateCard;
+    hasFlagshipOriginal?: boolean;
+    hasSellablePlan?: boolean;
+    priceHook?: string | null;
+    flagship?: { id: string; title: string; genre: string; hue: number } | null;
+    catalogue?: Array<{ id: string; title: string; genre?: string; hue?: number }>;
+    serviceName?: string;
+    brandHue?: number;
+    accent?: string;
   };
   /** Everything Define the Launch already committed the company to. */
   spend: SpendLine[];

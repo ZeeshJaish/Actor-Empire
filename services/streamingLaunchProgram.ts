@@ -10,6 +10,7 @@ import type {
     StreamingSoundIdentKey,
 } from '../types';
 import { createDeterministicId } from './deterministicRandom';
+import { describeStreamingPricingChange } from './streamingPricingChange';
 import { getAbsoluteWeek } from './legacyLogic';
 import {
     compactOwnedStreamingPlatformForPersistence,
@@ -23,6 +24,12 @@ import {
 } from './streamingStorefront';
 import { normalizeStreamingPricingConfiguration } from './streamingPricingEconomy';
 import { getStreamingInfrastructureForecast } from './streamingInfrastructure';
+import { resolveStreamingTechTree, streamingTechDownloadsAllowed, streamingTechExtraMemberAllowed, streamingTechFeatureAllowed, streamingTechScreens } from './streamingTechTreeCatalogue';
+import { streamingLaunchUnlockLock } from './streamingLaunchUnlocks';
+import {
+    STREAMING_FREE_TIER_ID, STREAMING_FREE_TIER_NAME, STREAMING_MAX_PLANS, STREAMING_PLAN_EXTRA_LOCK_TECH, getStreamingPlanExtraLocks, streamingPlanOfferLocks, type StreamingPlanOfferLock,
+} from './streamingPlanOffer';
+import { STREAMING_STORE_ID, STREAMING_STORE_NAME } from './streamingStoreEditions';
 
 export type StreamingLaunchTrackId = 'DEFINE_LAUNCH' | 'BUILD_PLATFORM';
 export type StreamingLaunchMilestoneId =
@@ -195,7 +202,7 @@ const roundMoney = (value: number): number => Math.max(0, Math.round(Number(valu
 
 export const STREAMING_FULL_IDENT_COST = 4_500_000;
 
-const STREAMING_IDENT_PACKAGE_COSTS: Record<StreamingIdentPackageId, number> = {
+export const STREAMING_IDENT_PACKAGE_COSTS: Record<StreamingIdentPackageId, number> = {
     STANDARD: 0,
     FULL: STREAMING_FULL_IDENT_COST,
     CINEMATIC: 6_500_000,
@@ -204,7 +211,7 @@ const STREAMING_IDENT_PACKAGE_COSTS: Record<StreamingIdentPackageId, number> = {
     LIVING: 14_000_000,
 };
 const STREAMING_IDENT_PACKAGE_IDS: StreamingIdentPackageId[] = ['STANDARD', 'FULL', 'CINEMATIC', 'GENRE', 'ADAPTIVE', 'LIVING'];
-const STREAMING_IDENT_PACKAGE_DURATIONS: Record<StreamingIdentPackageId, number> = {
+export const STREAMING_IDENT_PACKAGE_DURATIONS: Record<StreamingIdentPackageId, number> = {
     STANDARD: 3,
     FULL: 8,
     CINEMATIC: 12,
@@ -286,8 +293,12 @@ export const getStreamingLaunchDefinitionSignature = (player: Player, context?: 
 export interface StreamingLaunchConfigurationResult {
     player: Player;
     changed: boolean;
-    reason: 'SAVED' | 'INVALID_STATE' | 'INSUFFICIENT_TREASURY' | 'INCOMPLETE';
+    reason: 'SAVED' | 'INVALID_STATE' | 'INSUFFICIENT_TREASURY' | 'INCOMPLETE' | 'LOCKED_OPTION';
     shortfall: number;
+    /** Plans v2: the offer rows refused (LOCKED_OPTION), each with what it needs */
+    locked?: Array<StreamingPlanOfferLock & { planId: string; planName: string }>;
+    /** features a plan without an offer asked for and could not have, dropped and reported (Phase 1 plans) */
+    dropped?: Array<{ planId: string; planName: string; featureId: string }>;
 }
 
 /** Persist free wizard intent without executing a paid domain action. */
@@ -345,11 +356,12 @@ export const saveStreamingServiceIdent = (
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!canEditStreamingConfiguration(platform, scope)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const productLevel = platform.technologyLevels.PRODUCT_EXPERIENCE;
-    const dataLevel = platform.technologyLevels.DATA_RECOMMENDATIONS;
-    if (input.identPackageId === 'GENRE' && productLevel < 20) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
-    if (input.identPackageId === 'ADAPTIVE' && productLevel < 35) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
-    if (input.identPackageId === 'LIVING' && (productLevel < 60 || dataLevel < 40)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    /* #109 (plan §18.5): a kit is unlocked by its Tech step (Smart AI), not a Product Experience level; the kit already
+       chosen stays usable */
+    if (input.identPackageId !== platform.serviceConfiguration.identPackageId
+        && streamingLaunchUnlockLock(resolveStreamingTechTree(platform), `ident:${input.identPackageId.toLowerCase()}`)) {
+        return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    }
     const targetCost = STREAMING_IDENT_PACKAGE_COSTS[input.identPackageId];
     const purchases = getStreamingIdentPurchaseView(player);
     const packagePurchased = purchases.purchasedPackageIds.includes(input.identPackageId);
@@ -358,17 +370,22 @@ export const saveStreamingServiceIdent = (
     const sameConfiguration = platform.serviceConfiguration.soundIdentKey === input.soundIdentKey
         && platform.serviceConfiguration.identPackageId === input.identPackageId
         && sameCustomAudio;
+    /* #112 (plan §18.11; it was charged the moment it was tapped, though its copy said "payable at launch", and a switch
+       refunded nothing): a kit is charged at launch — the Opening Programme commission, with the launch's other money —
+       not when it is chosen. A kit already paid for (a save from before #112) is refunded when another replaces it
+       before launch. Once the programme is commissioned the launch's money has moved, so a new kit is paid as it is
+       chosen. */
+    const commissioned = Boolean(platform.openingProgrammeCommission);
     const hasCommissionEvidence = platform.serviceConfiguration.committedAtAbsoluteWeek !== null
-        && (input.identPackageId === 'STANDARD' || packagePurchased);
+        && (input.identPackageId === 'STANDARD' || packagePurchased || !commissioned);
     if (sameConfiguration && hasCommissionEvidence) {
         return { player, changed: false, reason: 'SAVED', shortfall: 0 };
     }
-    /* A package bought in this opening campaign can be selected again freely.
-       Another package is a separate production job: full price, no refund and
-       no trade-in credit from previous work. */
-    const delta = packagePurchased ? 0 : targetCost;
-    if (platform.treasuryCash < delta) {
-        return { player, changed: false, reason: 'INSUFFICIENT_TREASURY', shortfall: delta - platform.treasuryCash };
+    const refunds = identRefundsOnSwitch(platform, purchases.campaignId, input.identPackageId);
+    const refund = refunds.reduce((sum, commitment) => sum + commitment.paidAmount, 0);
+    const delta = commissioned && !packagePurchased ? targetCost : 0;
+    if (platform.treasuryCash + refund < delta) {
+        return { player, changed: false, reason: 'INSUFFICIENT_TREASURY', shortfall: delta - platform.treasuryCash - refund };
     }
     const sourceReferenceId = `service-ident:${purchases.campaignId}:${input.identPackageId.toLowerCase()}`;
     const key = `${sourceReferenceId}:${targetCost}`;
@@ -396,9 +413,20 @@ export const saveStreamingServiceIdent = (
         source: 'PLAYER_ACTION' as const,
         metadata: { cost: delta, package: input.identPackageId },
     } : null;
+    const refunded = new Set(refunds.map(commitment => commitment.id));
+    const refundKey = `${sourceReferenceId}:refund:${refunds.map(commitment => commitment.id).join(',')}`;
+    const refundLedger = refund > 0 ? {
+        id: createDeterministicId('streaming_event', platform.simulationSeed, refundKey),
+        idempotencyKey: refundKey,
+        absoluteWeek,
+        type: 'SERVICE_CONFIGURATION_COMMITTED' as const,
+        summary: `The ident package it replaced was cancelled before launch; ${Math.round(refund).toLocaleString('en-US')} refunded.`,
+        source: 'PLAYER_ACTION' as const,
+        metadata: { refund, package: input.identPackageId },
+    } : null;
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
-        treasuryCash: platform.treasuryCash - delta,
+        treasuryCash: platform.treasuryCash - delta + refund,
         serviceConfiguration: {
             ...platform.serviceConfiguration,
             source: 'PLAYER_ACTION',
@@ -407,7 +435,7 @@ export const saveStreamingServiceIdent = (
             identDurationSeconds: input.customIdentAudio?.durationSeconds
                 || STREAMING_IDENT_PACKAGE_DURATIONS[input.identPackageId],
             customIdentAudio: input.customIdentAudio || null,
-            committedCost: purchases.totalPaid + delta,
+            committedCost: purchases.totalPaid - refund + delta,
             committedAtAbsoluteWeek: absoluteWeek,
             revision: platform.serviceConfiguration.revision + 1,
         },
@@ -418,10 +446,81 @@ export const saveStreamingServiceIdent = (
             serviceConfigurationCommittedAtAbsoluteWeek: absoluteWeek,
             configurationRevision: platform.launchProgram.configurationRevision + 1,
         },
-        costCommitments: commitment ? [...platform.costCommitments, commitment] : platform.costCommitments,
-        eventLedger: ledger ? [...platform.eventLedger, ledger] : platform.eventLedger,
+        costCommitments: [
+            ...platform.costCommitments.map(item => refunded.has(item.id) ? { ...item, status: 'REFUNDED' as const } : item),
+            ...(commitment ? [commitment] : []),
+        ],
+        eventLedger: [...platform.eventLedger, ...(refundLedger ? [refundLedger] : []), ...(ledger ? [ledger] : [])],
     }, player.id);
     return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
+};
+
+/* #112: the paid ident packages a switch to `nextPackage` cancels before launch — this campaign's receipts for any
+   other package, and a legacy receipt for the package being replaced. Nothing after launch is refunded. */
+const identRefundsOnSwitch = (
+    platform: NormalizedStreamingPlatform,
+    campaignId: string,
+    nextPackage: StreamingIdentPackageId,
+): OwnedStreamingCostCommitment[] => {
+    if (platform.launchCommit) return [];
+    const prefix = `service-ident:${campaignId}:`;
+    const replacing = platform.serviceConfiguration.identPackageId;
+    return platform.costCommitments.filter(commitment => {
+        if (!['PAID', 'MIGRATED'].includes(commitment.status) || commitment.paidAmount <= 0) return false;
+        const source = commitment.sourceReferenceId || '';
+        if (source.startsWith(prefix)) return source.slice(prefix.length).toUpperCase() !== nextPackage;
+        return source === 'service-ident' && Boolean(replacing) && replacing !== nextPackage;
+    });
+};
+
+/** #112: what the chosen ident package still owes at launch (nothing once paid, or for the included one). */
+export const getStreamingIdentDueAtLaunch = (player: Player, context?: StreamingCatalogueReadContext): number => {
+    const platform = context?.player === player ? context.platform : normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const active = platform.serviceConfiguration.identPackageId;
+    if (!active || platform.launchCommit) return 0;
+    return getStreamingIdentPurchaseView(player, context).purchasedPackageIds.includes(active) ? 0 : STREAMING_IDENT_PACKAGE_COSTS[active];
+};
+
+/** #112: the Opening Programme commission pays the chosen ident package (once). It leaves the service configuration as
+    it is, so the launch definition's signature — which the blueprint and the commission compare — does not move. */
+export const chargeStreamingIdentAtLaunch = (player: Player): { player: Player; charged: number } => {
+    const due = getStreamingIdentDueAtLaunch(player);
+    if (due <= 0) return { player, charged: 0 };
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const active = platform.serviceConfiguration.identPackageId!;
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const sourceReferenceId = `service-ident:${getIdentCampaignId(platform)}:${active.toLowerCase()}`;
+    const key = `${sourceReferenceId}:${due}:at-launch`;
+    if (platform.costCommitments.some(item => item.idempotencyKey === key && item.status === 'PAID')) return { player, charged: 0 };
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        treasuryCash: platform.treasuryCash - due,
+        costCommitments: [...platform.costCommitments, {
+            id: createDeterministicId('streaming_launch_cost', platform.simulationSeed, key),
+            idempotencyKey: key,
+            category: 'SERVICE',
+            label: `${active.toLowerCase()} service ident package`,
+            status: 'PAID',
+            plannedAmount: due,
+            committedAmount: due,
+            paidAmount: due,
+            weeklyAmount: 0,
+            createdAtAbsoluteWeek: absoluteWeek,
+            committedAtAbsoluteWeek: absoluteWeek,
+            paidAtAbsoluteWeek: absoluteWeek,
+            sourceReferenceId,
+        }],
+        eventLedger: [...platform.eventLedger, {
+            id: createDeterministicId('streaming_event', platform.simulationSeed, key),
+            idempotencyKey: key,
+            absoluteWeek,
+            type: 'SERVICE_CONFIGURATION_COMMITTED' as const,
+            summary: `The ${active.toLowerCase()} motion and sound ident package was paid at launch.`,
+            source: 'PLAYER_ACTION' as const,
+            metadata: { cost: due, package: active },
+        }],
+    }, player.id);
+    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, charged: due };
 };
 
 /** Permanently removes the locally stored audio blob. Package receipts remain
@@ -493,7 +592,8 @@ export const saveStreamingStorefrontPlan = (
     const storefront = getStreamingStorefrontDefinition(input.storefrontLayoutId);
     if (!storefront) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     const storefrontId = storefront.id;
-    if (getStreamingStorefrontLockReason(platform, storefrontId)) {
+    /* #109: a front page is unlocked by its Tech step; the one already in use stays usable */
+    if (storefrontId !== platform.serviceConfiguration.storefrontLayoutId && getStreamingStorefrontLockReason(platform, storefrontId)) {
         return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     }
     if (platform.serviceConfiguration.storefrontLayoutId === storefrontId
@@ -501,8 +601,20 @@ export const saveStreamingStorefrontPlan = (
         return { player, changed: false, reason: 'SAVED', shortfall: 0 };
     }
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    /* #117: a live service's new front page goes on its ledger, and next week's news reports it ("NAME redesigns its app") */
+    const redesignKey = `streaming-front-page:${platform.serviceConfiguration.revision + 1}`;
+    const redesign = platform.launchCommit && storefrontId !== platform.serviceConfiguration.storefrontLayoutId ? {
+        id: createDeterministicId('streaming_event', platform.simulationSeed, redesignKey),
+        idempotencyKey: redesignKey,
+        absoluteWeek,
+        type: 'SERVICE_CONFIGURATION_COMMITTED' as const,
+        summary: `The app's front page is now ${storefront.name}.`,
+        source: 'PLAYER_ACTION' as const,
+        metadata: { kind: 'FRONT_PAGE_CHANGED', layout: storefront.name },
+    } : null;
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        eventLedger: redesign ? [...platform.eventLedger, redesign] : platform.eventLedger,
         serviceConfiguration: {
             ...platform.serviceConfiguration,
             source: 'PLAYER_ACTION',
@@ -568,46 +680,87 @@ export const saveStreamingPricingPlan = (
         return activeProducts.has('FAN') && commerce >= 40;
     });
     if (!allowedStreams.length) return { player, changed: false, reason: 'INCOMPLETE', shortfall: 0 };
+    /* 1080p, 4K HDR and Spatial audio come from the tech tree (Platform room · Tech). */
+    const techTree = resolveStreamingTechTree(platform);
+    /* Plans v2: a locked offer row is never saved, and the player is told what it needs (§6.4). */
+    const requestedPlans = pricing.plans.slice(0, STREAMING_MAX_PLANS);
+    const extraLocks = getStreamingPlanExtraLocks(techTree, activeProducts);
+    const locked = requestedPlans.flatMap(plan => plan.offer ? [
+        ...streamingPlanOfferLocks(plan.offer, techTree, platform.technologyLevels),
+        // a plan built in the plan builder (#45) is refused its locked extras the same way
+        ...(['live', 'extraseat'] as const).filter(id => plan.featureIds.includes(id) && extraLocks[id])
+            .map((id): StreamingPlanOfferLock => ({ row: id, needs: extraLocks[id]!, techId: STREAMING_PLAN_EXTRA_LOCK_TECH[id] ?? null })),
+    ].map(lock => ({ ...lock, planId: plan.id, planName: plan.name })) : []);
+    // Free with ads' and Rent or buy's quality (#46, #47) are held to the same tech
+    if (pricing.freeAdOffer) {
+        locked.push(...streamingPlanOfferLocks(pricing.freeAdOffer, techTree, platform.technologyLevels)
+            .map(lock => ({ ...lock, planId: STREAMING_FREE_TIER_ID, planName: STREAMING_FREE_TIER_NAME })));
+    }
+    if (pricing.storeQuality) {
+        locked.push(...streamingPlanOfferLocks(pricing.storeQuality, techTree, platform.technologyLevels)
+            .map(lock => ({ ...lock, planId: STREAMING_STORE_ID, planName: STREAMING_STORE_NAME })));
+    }
+    if (locked.length) return { player, changed: false, reason: 'LOCKED_OPTION', shortfall: 0, locked };
     const featureAllowed = (feature: string): boolean => {
-        if (feature === 'hd') return platform.technologyLevels.PLAYBACK_QUALITY >= 20;
-        if (feature === 'uhd') return platform.technologyLevels.PLAYBACK_QUALITY >= 55;
-        if (feature === 'spatial') return platform.technologyLevels.PLAYBACK_QUALITY >= 45;
-        if (feature === 'streams2') return platform.technologyLevels.RELIABILITY >= 10;
-        if (feature === 'streams4') return platform.technologyLevels.RELIABILITY >= 35;
-        if (feature === 'downloads') return platform.technologyLevels.PRODUCT_EXPERIENCE >= 25;
+        if (feature === 'hd' || feature === 'uhd' || feature === 'spatial') return streamingTechFeatureAllowed(techTree, feature);
+        // screens come from Profiles and screens (#60; they read Reliability 10 and 35 before)
+        if (feature === 'streams2') return streamingTechScreens(techTree) >= 2;
+        if (feature === 'streams4') return streamingTechScreens(techTree) >= 4;
+        if (feature === 'streams6') return streamingTechScreens(techTree) >= 6;
+        if (feature === 'downloads') return streamingTechDownloadsAllowed(techTree);
         if (feature === 'early') return true; // C5 offer benefit is rights-limited, not research-gated.
         if (feature === 'live') return activeProducts.has('LIVE');
-        if (feature === 'extraseat') return commerce >= 30;
+        if (feature === 'extraseat') return streamingTechExtraMemberAllowed(techTree); // Paid extra member (#56)
         return feature === 'noads' || feature === 'catalogue';
     };
+    // A plan without an offer (the Phase 1 way) keeps only the features it may have, and says which it lost.
+    const dropped = requestedPlans.flatMap(plan => plan.offer ? [] : plan.featureIds
+        .filter(featureId => !featureAllowed(featureId))
+        .map(featureId => ({ planId: plan.id, planName: plan.name, featureId })));
     const safePricing = normalizeStreamingPricingConfiguration({
         ...pricing,
         streams: allowedStreams,
-        plans: pricing.plans.slice(0, 6).map(plan => ({
+        plans: requestedPlans.map(plan => ({
             ...plan,
-            featureIds: plan.featureIds.filter(featureAllowed),
+            featureIds: plan.offer ? plan.featureIds : plan.featureIds.filter(featureAllowed),
             ads: allowedStreams.includes('ads') && plan.ads,
         })),
     });
     if (JSON.stringify(safePricing) === JSON.stringify(platform.serviceConfiguration.pricing)) {
-        return { player, changed: false, reason: 'SAVED', shortfall: 0 };
+        return { player, changed: false, reason: 'SAVED', shortfall: 0, ...(dropped.length ? { dropped } : {}) };
     }
-    const priceFor = (id: string, index: number, fallback: number) => {
-        const plan = safePricing.plans.find(item => item.id === id) || safePricing.plans[index];
-        return plan ? Math.max(0, Math.min(100, Number(plan.monthly) || 0)) : fallback;
-    };
+    /* The Build wizard's three price tiers (Basic, Premium, Family) mirror the plans before launch.
+       With plans of any number and price, they follow the paid plans from cheapest to dearest,
+       kept inside the tiers' ranges and gaps so a plan line-up never blocks commissioning. */
+    const paidPrices = safePricing.plans.map(plan => Number(plan.monthly) || 0).filter(price => price > 0).sort((a, b) => a - b);
+    const tierBasic = Math.min(14.99, Math.max(3.99, paidPrices[0] ?? platform.subscriptionPrices.BASIC));
+    const tierPremium = Math.min(24.99, Math.max(7.99, tierBasic + 2, paidPrices[Math.floor(paidPrices.length / 2)] ?? platform.subscriptionPrices.PREMIUM));
+    const tierFamily = Math.min(34.99, Math.max(11.99, tierPremium + 3, paidPrices.at(-1) ?? platform.subscriptionPrices.FAMILY));
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    /* a live service's newsworthy change goes on its ledger, and next week's news reports it (#68) */
+    const change = platform.launchCommit ? describeStreamingPricingChange(platform.serviceConfiguration.pricing, safePricing) : null;
+    const changeKey = `streaming-pricing-change:${platform.serviceConfiguration.revision + 1}`;
+    const changeEntry = change ? {
+        id: createDeterministicId('streaming_event', platform.simulationSeed, changeKey),
+        idempotencyKey: changeKey,
+        absoluteWeek,
+        type: 'PRICING_CHANGED' as const,
+        summary: 'Prices or plans changed from next week.',
+        source: 'PLAYER_ACTION' as const,
+        metadata: { kind: 'PRICING_CHANGED', change: change.change, plan: change.plan, from: change.from, to: change.to, percent: change.percent },
+    } : null;
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({
         ...platform,
+        eventLedger: changeEntry ? [...platform.eventLedger, changeEntry] : platform.eventLedger,
         /* Live copy (deviation from main): once launched, the legacy tier
            prices are left alone. The live offer reads serviceConfiguration.pricing
            only, while Build seeds network drafts from subscriptionPrices and
            validates them against the three-tier ladder; mirroring a $0 ad tier
            there would block every later network revision. */
         subscriptionPrices: platform.launchCommit ? platform.subscriptionPrices : {
-            BASIC: priceFor('BASIC', 0, platform.subscriptionPrices.BASIC),
-            PREMIUM: priceFor('PREMIUM', 1, platform.subscriptionPrices.PREMIUM),
-            FAMILY: priceFor('FAMILY', 2, platform.subscriptionPrices.FAMILY),
+            BASIC: Math.round(tierBasic * 100) / 100,
+            PREMIUM: Math.round(tierPremium * 100) / 100,
+            FAMILY: Math.round(tierFamily * 100) / 100,
         },
         serviceConfiguration: {
             ...platform.serviceConfiguration,
@@ -624,7 +777,7 @@ export const saveStreamingPricingPlan = (
             configurationRevision: platform.launchProgram.configurationRevision + 1,
         },
     }, player.id);
-    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0 };
+    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0, ...(dropped.length ? { dropped } : {}) };
 };
 
 export const checkpointStreamingLaunchBlueprint = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingLaunchConfigurationResult => {
@@ -730,11 +883,12 @@ const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatal
     const marketsCleared = marketDecision.reviewComplete;
     const identPurchases = getStreamingIdentPurchaseView(player, context);
     const activeIdentPackage = platform.serviceConfiguration.identPackageId;
+    /* #112: before the Opening Programme is commissioned a chosen kit is enough (it is paid at the commission) */
     const hasIdent = Boolean(
         platform.serviceConfiguration.soundIdentKey
         && activeIdentPackage
         && platform.serviceConfiguration.committedAtAbsoluteWeek !== null
-        && identPurchases.purchasedPackageIds.includes(activeIdentPackage),
+        && (identPurchases.purchasedPackageIds.includes(activeIdentPackage) || !platform.openingProgrammeCommission),
     );
     const hasStorefront = Boolean(platform.serviceConfiguration.storefrontLayoutId);
     const hasPricing = Boolean(

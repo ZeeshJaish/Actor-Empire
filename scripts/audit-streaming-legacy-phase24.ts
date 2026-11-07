@@ -190,7 +190,9 @@ assert(!enactStreamingSuccession(player, 'FOUNDER_EMERITUS').changed, 'The same 
 assert(player.ownedStreamingPlatform.eventLedger.some(item => item.type === 'COMPANY_ERA_CLOSED'), 'The founding era should enter the permanent record.');
 
 const effects = getStreamingEraWeeklyEffects(player.ownedStreamingPlatform);
-assert(effects.mandate === 'TECHNOLOGY_LEADERSHIP' && effects.playbackBoost > 0, 'The new era mandate should affect the canonical weekly model.');
+/* #166 (plan §21.12): the mandate is still recorded, but eras no longer move the weekly model */
+assert(effects.mandate === 'TECHNOLOGY_LEADERSHIP' && effects.playbackBoost === 0 && effects.acquisitionRateDelta === 0
+    && effects.churnRateDelta === 0 && effects.engagementRateDelta === 0, 'An era mandate is recorded without a weekly effect.');
 
 let film = createStreamingLegacyMontage(player);
 assert(film.changed && film.montage?.chapters.length === 3, 'The archive should cut a personalized film from retained company facts.');
@@ -229,5 +231,5 @@ console.log('EMPIRE+ Phase 24 legacy and endless-company audit passed.');
 console.log('✓ Schema v22 safely migrates existing platforms into a founding legacy era');
 console.log('✓ Timeline, identity and montage read real retained company facts');
 console.log('✓ Executive succession separates CEO authority from founder ownership');
-console.log('✓ Era mandates create small persistent weekly effects and endless new chapters');
+console.log('✓ Era mandates are recorded with each chapter, without a weekly effect (#166)');
 console.log('✓ Existing family legacy handoff preserves and rebases the streaming company');

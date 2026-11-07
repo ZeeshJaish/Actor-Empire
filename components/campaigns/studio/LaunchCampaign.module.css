@@ -1,0 +1,53 @@
+/* ============================================================================
+   THE LAUNCH CAMPAIGN (#151) — the Campaign Studio's builder in launch mode,
+   over Build the Platform (a portal at 9500, above the wizards at 9000). It
+   wears the Studio's classes (CampaignStudio.module.css); these are its extras.
+   ========================================================================== */
+
+.launch.launch{z-index:9500}
+.launch .countryRow{grid-template-columns:26px minmax(0,1fr) auto auto}
+.launch .lead{margin-bottom:10px}
+.weight{display:inline-flex;align-items:center;gap:4px}
+.launch .weight button{width:28px;height:28px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);font:700 15px/1 'Inter',sans-serif;color:#fff}
+.weight em{min-width:18px;text-align:center;font:400 15px/1 'Anton','Archivo',sans-serif;font-style:normal;color:#fff}
+/* #158: a door's badge and its glyph in a chip, as a format's */
+.launch .doorBadge{align-items:center;justify-content:center;padding:0;font-size:12px;font-weight:900;line-height:1}
+.doorGlyph{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:13px;height:13px;font-style:normal;font-size:10px;font-weight:900;line-height:1;
+  color:color-mix(in srgb,var(--cs-accent) 70%,#fff)}
+.reviewHead{display:flex;flex-direction:column;gap:5px}
+.reviewHead small{font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.14em;color:color-mix(in srgb,var(--cs-accent) 70%,#fff)}
+.reviewHead b{font:400 22px/1 'Anton','Archivo',sans-serif;letter-spacing:.03em;color:#fff}
+.reviewHead span{font-size:9.5px;line-height:1.4;color:#8b93a5}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:2px 24px 4px 0;margin-top:10px;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(90deg,#000 82%,transparent);mask-image:linear-gradient(90deg,#000 82%,transparent)}
+.strip::-webkit-scrollbar{display:none}
+.strip figure{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;margin:0}
+.strip figure > span{width:auto !important;height:74px;max-width:200px}
+.strip figcaption{font:800 7px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.1em;color:#8b93a5;text-transform:uppercase;white-space:nowrap}
+.strip figcaption b{color:color-mix(in srgb,var(--cs-accent) 70%,#fff)}
+
+/* the catalogue push's best-known titles */
+.launch .posters{display:flex;gap:6px;margin-top:4px}
+.posters i{display:block;width:34px;border-radius:5px;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 16px -10px #000}
+/* #158: the build's weeks, commission to opening night; the campaign lights the last of them */
+.launch .weekStrip{grid-template-columns:repeat(var(--weeks),minmax(0,1fr))}
+.stripEnds{display:flex;justify-content:space-between;margin:6px 2px 0;font:800 7px/1 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#6f7889}
+
+/* the Money stage's card that opens it; #158: it is the launch marketing: its picture, picks, weeks and money */
+.card{display:flex;flex-direction:column;gap:10px}
+.cardPicture{position:relative;border-radius:12px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.cardPicture > small{position:absolute;left:8px;bottom:8px;padding:3px 7px;border-radius:7px;background:rgba(5,6,9,.66);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  font:800 8px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#f5b544;max-width:calc(100% - 16px);overflow-wrap:anywhere}
+.cardFormats{display:flex;flex-wrap:wrap;gap:5px}
+.cardFormats span{display:inline-flex;align-items:center;gap:4px;padding:4px 8px 4px 5px;border-radius:999px;background:rgba(255,255,255,.06);font-size:9.5px;font-weight:800;color:#dfe4ec}
+.cardFormats svg{width:13px;height:13px}
+.cardFormats i{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;font-style:normal;font-size:10px;font-weight:900;line-height:1}
+.cardMoney{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:11px 12px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+.cardMoney span{display:flex;flex-direction:column;gap:5px;min-width:0}
+.cardMoney small{font:800 7px/1.15 'Archivo','Inter',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#7c8597}
+.cardMoney b{font:400 19px/1 'Anton','Archivo',sans-serif;color:#fff;overflow-wrap:anywhere}
+.cardMoney em{font-style:normal;font-size:8.5px;font-weight:700;line-height:1.3;color:#8b93a5}
+.cardNight{font-size:9.5px;font-weight:700;line-height:1.45;color:#f5b544}
+.cardWarn{font-size:9.5px;font-weight:700;line-height:1.45;color:#ff9b7a}
+.cardActions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.cardActions .cardQuiet{padding:0;background:none;font:600 11px/1.3 'Archivo','Inter',sans-serif;color:#7c8597;text-decoration:underline;text-underline-offset:3px}

@@ -157,9 +157,6 @@ assert.equal(
     false,
     'Forbes must communicate company health through results rather than exposing an internal lifecycle label.',
 );
-const platformWarsSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformWars.tsx'), 'utf8');
-for (const field of ['company.cashMillions', 'company.activeCountryIds', 'company.technology', 'company.cataloguePower', 'company.lastProcessedAbsoluteWeek']) {
-    assert.ok(platformWarsSource.includes(field), `Platform Wars challengers must render canonical ${field.replace('company.', '')}.`);
-}
+/* #141: Platform Wars, the room that drew the challengers' dossiers, is removed. */
 
 console.log('Platform AI Phase 7 entered-week integration audit passed.');

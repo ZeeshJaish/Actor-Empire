@@ -24,11 +24,28 @@ import type {
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { normalizeOwnedStreamingPlatformState } from '../ownedStreamingPlatform';
 import { getStreamingInfrastructureOperationsEffects } from '../streamingInfrastructureOperations';
+import { getStreamingIncidentHarm } from '../streamingIncidentHarm';
 import { deriveStreamingNetworkCoverage } from '../streamingNetworkCoverage';
 import { PEAK_CONCURRENCY_SHARE } from '../streamingNetworkReach';
-import { createStreamingCatalogueReadContext, evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
+import { resolveStreamingDeliveryLoad } from '../streamingDeliveryLoad';
+import {
+    STREAMING_AD_LEVEL_EFFECTS, resolveStreamingPlanAdLevel, resolveStreamingPlanOffer, streamingFreeTierEngagementFactor, streamingPlanIncludes,
+    streamingPlanOfferAppeal,
+} from '../streamingPlanOffer';
+import { resolveStreamingTechTree, streamingTechAdEffects, streamingTechSmartAiEffects } from '../streamingTechTreeCatalogue';
+import { resolveStreamingStoreEditions } from '../streamingStoreEditions';
+import { createPlayerStreamingTitleRouteEvaluator, createStreamingCatalogueReadContext, evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
 import type { StreamingTitleAccessRoute } from '../streamingTitleAccess';
-import { normalizeStreamingLanguageId, resolveStreamingGlobalLocalizationCapability } from '../streamingLocalizationCapabilities';
+import { normalizeStreamingLanguageId } from '../streamingLocalizationCapabilities';
+import {
+    STREAMING_LANGUAGE_FIT,
+    STREAMING_LOCALIZED_ENGAGEMENT_LIFT,
+    createStreamingCountryLocalizationResolver,
+    localizationCoverageShare,
+    resolveTitleLanguageFit,
+    streamingLocalizationPackagesForLanguages,
+    type StreamingCountryLocalization,
+} from '../streamingLocalizationRegions';
 import { getOwnedStreamingProgramEntries } from '../streamingOriginals';
 import { resolveHistoricalCatalogueTitle } from '../historicalCatalogue';
 import { streamingTitleQuality, streamingTitleWeeksAvailable } from './worldStreamingContentValue';
@@ -51,6 +68,7 @@ import { clearStreamingAdMarket, getStreamingCountryAdMarket,
 import { createAiTitleAccessResolver,
     seedLegacyAiCatalogue } from './worldStreamingAiCatalogue';
 import {attachStreamingRoyaltyReceipts} from './worldStreamingRoyaltyAttribution';
+import { streamingCampaignTitleFit } from '../campaigns/streamingCampaignEffects';
 
 export const WORLD_STREAMING_VIEWING_SCHEMA_VERSION = 2 as const;
 const MAX_SNAPSHOTS = 52;
@@ -439,7 +457,8 @@ const projectRivalViewing = (
                 isRentalEligible: false,
                 isPurchaseEligible: false,
                 isSponsorEligible: commercialPricing.sponsor.titles > 0,
-                commerceCapabilityIndex: clamp(offer.reliabilityIndex * .55 + offer.marketingIndex * .45, 0, 100),
+                // a rival's targeting steps (#69) add to it; none taken, nothing added
+                commerceCapabilityIndex: clamp(offer.reliabilityIndex * .55 + offer.marketingIndex * .45 + (offer.adAudienceQualityBonus || 0), 0, 100),
                 reputationIndex: offer.reputationIndex,
             });
             const storeSources = choices[country.countryId]?.storeSources[offer.platformId] || [];
@@ -589,8 +608,11 @@ const clearDeliveredStreamingAds = (
             return [{ platformId,
                 eligibleHours: rivals.adEligibleHours[countryId]?.[platformId] || 0,
                 minutesPerHour: offer.commercialConfiguration.ads.minutesPerHour,
-                audienceQualityIndex: clamp(offer.reliabilityIndex * .55 + offer.marketingIndex * .45, 0, 100),
-                brandSafetyIndex: offer.reputationIndex }];
+                audienceQualityIndex: clamp(offer.reliabilityIndex * .55 + offer.marketingIndex * .45 + (offer.adAudienceQualityBonus || 0), 0, 100),
+                brandSafetyIndex: offer.reputationIndex,
+                // a rival's own ad tech (#69): more slots at the same minutes, fewer viewers lost in long breaks
+                ...(offer.adSlotFactor ? { slotFactor: offer.adSlotFactor } : {}),
+                ...(offer.adBreakSlope ? { breakSlope: offer.adBreakSlope } : {}) }];
         });
         const playerSupply = playerSupplies.find(row => row.countryId === countryId);
         const cleared = clearStreamingAdMarket({ countryId, absoluteWeek,
@@ -706,19 +728,28 @@ const getProgramWeek = (player: Player, absoluteWeek: number): number => {
     return Math.max(1, Number(player.ownedStreamingPlatform.weeklyHistory.at(-1)?.operations?.programWeek || 0) + 1);
 };
 
+/**
+ * A title's strength in a country by language. Native: unchanged. Another
+ * language: the region that reaches the country best sets it, by which titles
+ * its levels reach (library, new releases, day-one premieres: see
+ * `streamingLocalizationRegions.ts`); with none, .42 as before. `uncoveredFit`
+ * is the same title without any localization, for the week's counterfactual,
+ * and `coverage` how much of the way to a local title localization took it.
+ */
 const resolveLanguageFit = (
     candidate: ViewingCandidate,
-    countryLanguages: string[],
+    normalizedCountryLanguages: string[],
     cohort: WorldAudienceCohortState,
-    localization: ReturnType<typeof resolveStreamingGlobalLocalizationCapability>,
-): number => {
-    const normalizedCountryLanguages = countryLanguages.map(normalizeStreamingLanguageId);
+    localization: StreamingCountryLocalization,
+): { fit: number; native: boolean; uncoveredFit: number; coverage: number } => {
     if (normalizedCountryLanguages.includes(candidate.originalLanguageId)) {
-        return 1.05 + cohort.localLanguageAffinityIndex / 260;
+        const fit = 1.05 + cohort.localLanguageAffinityIndex / 260;
+        return { fit, native: true, uncoveredFit: fit, coverage: 0 };
     }
-    const coveredLanguage = normalizedCountryLanguages.some(language => localization.activeLanguageIds.includes(language));
-    if (!coveredLanguage) return .42 - cohort.localLanguageAffinityIndex / 500;
-    return clamp(.58 + localization.subtitleLevel * .08 + localization.dubbingLevel * .115, .55, 1.02);
+    const uncoveredFit = STREAMING_LANGUAGE_FIT.uncovered - cohort.localLanguageAffinityIndex / 500;
+    if (!localization.packageId) return { fit: uncoveredFit, native: false, uncoveredFit, coverage: 0 };
+    const fit = resolveTitleLanguageFit(localization, candidate.weeksAvailable);
+    return { fit, native: false, uncoveredFit, coverage: localizationCoverageShare(fit) };
 };
 
 const scoreCandidate = (
@@ -727,11 +758,12 @@ const scoreCandidate = (
     countryId: string,
     cohort: WorldAudienceCohortState,
     absoluteWeek: number,
-): { score: number; languageFit: number } => {
+    countryLanguages: string[],
+    countryLocalization: StreamingCountryLocalization,
+): { score: number; languageFit: number; native: boolean; uncoveredFit: number; coverage: number } => {
     const platform = player.ownedStreamingPlatform;
-    const population = player.world.worldPopulation!.countries[countryId];
-    const localization = resolveStreamingGlobalLocalizationCapability(platform);
-    const languageFit = resolveLanguageFit(candidate, population.languages, cohort, localization);
+    const language = resolveLanguageFit(candidate, countryLanguages, cohort, countryLocalization);
+    const languageFit = language.fit;
     const affinityGenres = PERSONA_GENRE_AFFINITY[cohort.primaryPersonaId] || [];
     const genreFit = affinityGenres.includes(candidate.entry.genre) ? 1.22 : .88;
     const qualityFit = .45 + candidate.quality / 100;
@@ -745,14 +777,19 @@ const scoreCandidate = (
     const growthAction = platform.growthActions.find(action => action.status === 'LOCKED'
         && action.targetAbsoluteWeek === absoluteWeek && action.projectId === candidate.entry.projectId);
     const growthFit = growthAction ? 1.28 : 1;
+    /* #145: a title's campaigns pull more viewers where they built awareness */
+    const campaignFit = streamingCampaignTitleFit(platform, candidate.entry.projectId, countryId);
     const reliability = clamp((platform.infrastructureSetup?.reliabilityTarget || platform.metrics.technologyHealth || 75) / 100, .65, 1);
     const rng = createDeterministicRng(`${platform.simulationSeed}:we6-score:${absoluteWeek}:${countryId}:${cohort.id}:${candidate.entry.projectId}`);
     const variance = .94 + rng() * .12;
     return {
         score: Math.max(.01, qualityFit * genreFit * languageFit * prestigeFit * fandomFit * marketingFit
-            * freshness * weeklyLift * recommendationFit * growthFit * reliability * variance
+            * freshness * weeklyLift * recommendationFit * growthFit * campaignFit * reliability * variance
             * cinemaStreamingInterestWeight(player,candidate.entry.projectId,countryId,absoluteWeek)),
         languageFit,
+        native: language.native,
+        uncoveredFit: language.uncoveredFit,
+        coverage: language.coverage,
     };
 };
 
@@ -881,6 +918,28 @@ const buildViewingState = (
     const candidates = entries.map(entry => resolveStreamingViewingProjectFacts(preparedPlayer, entry, programWeek));
     const pricing = platform.serviceConfiguration.pricing;
     const playerCommercialOffers = projectStreamingCommercialOffers(pricing);
+    // Free with ads' own quality (#46): free viewers watch longer the better it is; unset, ×1 as before
+    const freeTierEngagement = streamingFreeTierEngagementFactor(pricing.freeAdOffer
+        ? streamingPlanOfferAppeal(pricing.freeAdOffer, resolveStreamingTechTree(platform)) : undefined);
+    // Rent or buy's quality and editions (#47): buyers decide on the HD price, a better store
+    // converts more of them, and a sale earns its editions' average; unset, as before
+    const storeEditions = resolveStreamingStoreEditions(pricing, resolveStreamingTechTree(platform));
+    // Smart AI (#59): more of a cohort's accounts find something to watch, and Autoplay and previews
+    // keep them on a title longer and back for more; the starter alone (Trending rows v1) changes nothing.
+    // AI channels and Autoplay reach the viewers of the plans that include them (#62), the free tier's too.
+    const smartAiTree = resolveStreamingTechTree(platform);
+    const smartAiByPlan = new Map<string, ReturnType<typeof streamingTechSmartAiEffects>>();
+    const smartAiFor = (planId: string): ReturnType<typeof streamingTechSmartAiEffects> => {
+        const known = smartAiByPlan.get(planId);
+        if (known) return known;
+        const plan = pricing.plans.find(item => item.id === planId);
+        const offer = planId === 'FREE_AD' ? pricing.freeAdOffer : plan ? resolveStreamingPlanOffer(plan, smartAiTree) : null;
+        const effects = streamingTechSmartAiEffects(smartAiTree, {
+            aiChannels: streamingPlanIncludes(offer, 'aiChannels', smartAiTree), autoplay: streamingPlanIncludes(offer, 'autoplay', smartAiTree),
+        });
+        smartAiByPlan.set(planId, effects);
+        return effects;
+    };
     const ownedTitleIds = new Set(candidates
         .filter(candidate => candidate.ownedLibrary)
         .map(candidate => candidate.entry.projectId));
@@ -921,9 +980,23 @@ const buildViewingState = (
     ), 0);
     const effectiveBurstCapacity = Math.max(0, platform.capacity.burstConcurrentStreams)
         * getStreamingInfrastructureOperationsEffects(platform).capacityMultiplier;
-    const deliveryFraction = platform.infrastructureSetup && reachableDemandAccounts > 0
-        ? clamp(effectiveBurstCapacity / (reachableDemandAccounts * PEAK_CONCURRENCY_SHARE), 0, 1)
-        : 1;
+    // Each viewer needs the load units their plan's picture streams, after Optimisation and the
+    // save's calibration (streamingDeliveryLoad): the same figure the weekly close uses.
+    const freeDemandAccounts = playerCountryIds.reduce((sum, countryId) => (
+        sum + (choices[countryId]?.platforms.PLAYER?.freeAd || 0) * countryReach(countryId)
+    ), 0);
+    const storeDemandAccounts = playerCountryIds.reduce((sum, countryId) => (
+        sum + ((choices[countryId]?.platforms.PLAYER?.store || 0) + (choices[countryId]?.platforms.PLAYER?.secondaryStore || 0)) * countryReach(countryId)
+    ), 0);
+    const viewerLoad = resolveStreamingDeliveryLoad(platform, customers.global.playerPlanAllocations, {
+        free: freeDemandAccounts, store: storeDemandAccounts,
+        others: Math.max(0, reachableDemandAccounts - freeDemandAccounts - storeDemandAccounts),
+    }).viewerLoad;
+    /* an open incident's viewers watch less (#51): its reach × its kind's viewing harm; none open, ×1 */
+    const incidentDelivery = 1 - getStreamingIncidentHarm(platform).viewingLoss;
+    const deliveryFraction = (platform.infrastructureSetup && reachableDemandAccounts > 0
+        ? clamp(effectiveBurstCapacity / (reachableDemandAccounts * PEAK_CONCURRENCY_SHARE * Math.max(.01, viewerLoad)), 0, 1)
+        : 1) * incidentDelivery;
     const adHoursFor = (country: WorldStreamingViewingCountryTitleState): number => {
         const customer = customers.countries[country.countryId]?.platformSummaries.find(row => row.platformId === 'PLAYER');
         const adPaid = customer?.planAllocations.reduce((sum, allocation) => (
@@ -939,6 +1012,17 @@ const buildViewingState = (
     const storeTransactions = new Map<string, { rental: number; purchase: number }>();
     const storeBuyerSegments = new Map<string, { countryId: string; titleId: string;
         kind: 'RENTAL' | 'PURCHASE'; buyerPlanId: string | null; households: number }>();
+    // Localization by region: one reader for the week, and what it did — who
+    // watched in their own language (and which titles), what the levels added,
+    // and who watched other-language titles no level reached ("untapped",
+    // credited to the region that speaks the country's main language).
+    const resolveCountryLocalization = createStreamingCountryLocalizationResolver(platform);
+    const localizationByPackage = new Map<string, { localized: number; added: number; untapped: number; titles: Map<string, number> }>();
+    const localizationRow = (packageId: string) => {
+        const row = localizationByPackage.get(packageId) || { localized: 0, added: 0, untapped: 0, titles: new Map<string, number>() };
+        localizationByPackage.set(packageId, row);
+        return row;
+    };
 
     Object.keys(customers.countries).sort().forEach(countryId => {
         const customerCountry = customers.countries[countryId];
@@ -947,6 +1031,12 @@ const buildViewingState = (
         const audienceCountry = preparedPlayer.world.worldAudienceEconomy?.countries[countryId];
         const populationCountry = preparedPlayer.world.worldPopulation?.countries[countryId];
         if (!audienceCountry || !populationCountry) return;
+        const countryLanguages = populationCountry.languages.map(normalizeStreamingLanguageId);
+        const countryLocalization = resolveCountryLocalization(populationCountry.languages);
+        const homePackageId = countryLocalization.packageId
+            || streamingLocalizationPackagesForLanguages(populationCountry.languages.slice(0, 1))[0]
+            || streamingLocalizationPackagesForLanguages(populationCountry.languages)[0]
+            || null;
         const paidPlayerCohorts = customerCountry.cohorts.flatMap(customerCohort => {
             const planCells = customerCohort.planCells.filter(cell => cell.platformId === 'PLAYER');
             if (!planCells.length) return [];
@@ -988,12 +1078,26 @@ const buildViewingState = (
                 unmetDemandAccounts += cohortAccessible;
                 return;
             }
-            const scored = eligible.map(candidate => scoreCandidate(preparedPlayer, candidate, countryId, audienceCohort, absoluteWeek));
+            const scored = eligible.map(candidate => scoreCandidate(preparedPlayer, candidate, countryId, audienceCohort, absoluteWeek,
+                countryLanguages, countryLocalization));
             const meanScore = scored.reduce((sum, row) => sum + row.score, 0) / Math.max(1, scored.length);
-            const engagementRate = clamp(.24 + audienceCohort.entertainmentAppetiteIndex * .0042
-                + Math.min(.16, eligible.length * .018) + Math.min(.1, meanScore * .055), .22, .88);
-            const ownedViewingTotal = Math.min(ownedAccounts, Math.round(ownedAccounts * engagementRate
-                * (accessKind === 'SUBSCRIPTION' ? paidDeliveryFraction : countryDeliveryFraction)));
+            const tierEngagement = accessKind === 'FREE_AD' ? freeTierEngagement : 1;
+            const baseEngagement = (mean: number): number => Math.min(.92, clamp(.24 + audienceCohort.entertainmentAppetiteIndex * .0042
+                + Math.min(.16, eligible.length * .018) + Math.min(.1, mean * .055), .22, .88) * tierEngagement);
+            // Where a region's subtitles and dubbing reach the titles a cohort would
+            // choose, more of it finds something to watch: up to +25% when its whole
+            // weighted choice is other-language titles both tracks reach. No region: unchanged.
+            const totalWeight = scored.reduce((sum, row) => sum + row.score, 0);
+            const localizedShare = totalWeight > 0
+                ? scored.reduce((sum, row) => sum + (row.native ? 0 : row.score * row.coverage), 0) / totalWeight : 0;
+            const localized = Boolean(countryLocalization.packageId) && localizedShare > 0;
+            const localizedRate = localized
+                ? Math.min(.92, baseEngagement(meanScore) * (1 + STREAMING_LOCALIZED_ENGAGEMENT_LIFT * localizedShare))
+                : baseEngagement(meanScore);
+            const smartAi = smartAiFor(cell.planId);
+            const engagementRate = smartAi.engagementLift > 0 ? Math.min(.92, localizedRate * (1 + smartAi.engagementLift)) : localizedRate;
+            const ownedDelivery = accessKind === 'SUBSCRIPTION' ? paidDeliveryFraction : countryDeliveryFraction;
+            const ownedViewingTotal = Math.min(ownedAccounts, Math.round(ownedAccounts * engagementRate * ownedDelivery));
             const sharedViewingTotal = Math.min(sharedAccounts, Math.round(sharedAccounts * clamp(engagementRate * 1.06, 0, .92) * countryDeliveryFraction));
             const piracyViewingTotal = Math.min(piracyAudience, Math.round(piracyAudience * clamp(.22 + meanScore * .09, .12, .72)));
             unmetDemandAccounts += cohortAccessible - ownedViewingTotal - sharedViewingTotal;
@@ -1001,6 +1105,37 @@ const buildViewingState = (
             const ownedByTitle = distributeInteger(ownedViewingTotal, weights);
             const sharedByTitle = distributeInteger(sharedViewingTotal, weights);
             const piracyByTitle = distributeInteger(piracyViewingTotal, weights);
+            if (localized) {
+                // The same cohort this week with no localization: other-language titles at
+                // their uncovered strength and no lift. The difference is what it added.
+                const meanUncovered = scored.reduce((sum, row) => sum + (row.native
+                    ? row.score : row.score * row.uncoveredFit / Math.max(.01, row.languageFit)), 0) / Math.max(1, scored.length);
+                // Smart AI's lift is in both, so the difference stays what localization added
+                const engagementUncovered = smartAi.engagementLift > 0
+                    ? Math.min(.92, baseEngagement(meanUncovered) * (1 + smartAi.engagementLift)) : baseEngagement(meanUncovered);
+                const ownedUncovered = Math.min(ownedAccounts, Math.round(ownedAccounts * engagementUncovered * ownedDelivery));
+                const sharedUncovered = Math.min(sharedAccounts, Math.round(sharedAccounts
+                    * clamp(engagementUncovered * 1.06, 0, .92) * countryDeliveryFraction));
+                localizationRow(countryLocalization.packageId!).added += Math.max(0,
+                    ownedViewingTotal + sharedViewingTotal - ownedUncovered - sharedUncovered);
+            }
+            // Other-language titles: in their own language where a subtitle or dubbing
+            // level reaches the title, untapped where none does.
+            if (homePackageId) {
+                scored.forEach((row, index) => {
+                    if (row.native) return;
+                    const viewers = (ownedByTitle[index] || 0) + (sharedByTitle[index] || 0);
+                    if (viewers <= 0) return;
+                    if (countryLocalization.packageId && row.languageFit > STREAMING_LANGUAGE_FIT.covered + 1e-9) {
+                        const target = localizationRow(countryLocalization.packageId);
+                        target.localized += viewers;
+                        const projectId = eligible[index].entry.projectId;
+                        target.titles.set(projectId, (target.titles.get(projectId) || 0) + viewers);
+                    } else {
+                        localizationRow(homePackageId).untapped += viewers;
+                    }
+                });
+            }
             eligible.forEach((candidate, index) => {
                 const paidViewingAccounts = accessKind === 'SUBSCRIPTION' ? ownedByTitle[index] || 0 : 0;
                 const freeViewingAccounts = accessKind === 'FREE_AD' ? ownedByTitle[index] || 0 : 0;
@@ -1013,13 +1148,13 @@ const buildViewingState = (
                 const completionRate = roundRate(clamp(
                     .3 + candidate.quality * .005 + score.languageFit * .13
                     + (candidate.entry.projectType === 'MOVIE' ? .04 : 0)
-                    - Math.max(0, candidate.runtimeHours - 3) * .02 + (rng() - .5) * .06,
+                    - Math.max(0, candidate.runtimeHours - 3) * .02 + (rng() - .5) * .06 + smartAi.completionLift,
                     .2,
                     .96,
                 ));
                 const repeatViewingRate = roundRate(clamp(
                     .025 + (candidate.entry.releasePattern === 'WEEKLY' ? .075 : .025)
-                    + (candidate.hasUniverse ? .055 : 0) + candidate.quality * .00065 + (rng() - .5) * .025,
+                    + (candidate.hasUniverse ? .055 : 0) + candidate.quality * .00065 + (rng() - .5) * .025 + smartAi.repeatLift,
                     .01,
                     .32,
                 ));
@@ -1079,14 +1214,16 @@ const buildViewingState = (
             }));
             saleRoutes.forEach(({ kind, eligible }) => {
                 if (!eligible.length) return;
-                const price = kind === 'RENTAL' ? pricing.rentals.rent : pricing.rentals.buy;
+                const price = kind === 'RENTAL' ? storeEditions.hdRent : storeEditions.hdBuy;
+                const paid = kind === 'RENTAL' ? storeEditions.rentPrice : storeEditions.buyPrice;
                 const eligibleSourcesByTitle=eligible.map(candidate=>sources.filter(source=>canBuyTitle(source,candidate,price)));
                 const eligibleHomesByTitle=eligibleSourcesByTitle.map(rows=>rows.reduce((sum,source)=>sum+source.households,0));
                 const buyerPool=sources.filter(source=>eligible.some(candidate=>canBuyTitle(source,candidate,price)))
                     .reduce((sum,source)=>sum+source.households,0);
                 const quality = eligible.reduce((sum,candidate)=>sum+candidate.quality,0)/eligible.length;
                 const weeksAvailable = eligible.reduce((sum,candidate)=>sum+candidate.weeksAvailable,0)/eligible.length;
-                const buyers = Math.round(calculateStreamingStoreConversion({ buyerPool, price, kind, quality, weeksAvailable }) * countryDeliveryFraction);
+                const buyers = Math.round(calculateStreamingStoreConversion({ buyerPool, price, kind, quality, weeksAvailable })
+                    * storeEditions.qualityFactor * countryDeliveryFraction);
                 const byTitle = allocateStreamingStoreUnits(buyers, eligible.map((candidate, index) => (
                     eligibleHomesByTitle[index] * Math.max(1, candidate.quality)
                 )));
@@ -1099,7 +1236,7 @@ const buildViewingState = (
                         Math.max(0, eligibleHomesByTitle[index] - existingOwners - (reservedStoreHomes.get(ownershipKey) || 0)));
                     const buyerSources = eligibleSourcesByTitle[index];
                     const sourceSales = allocateStreamingStoreUnits(wanted,buyerSources.map(source=>source.households))
-                        .map((units,i)=>spendStreamingCommerceSource(buyerSources[i],Math.min(units,buyerSources[i].households),price));
+                        .map((units,i)=>spendStreamingCommerceSource(buyerSources[i],Math.min(units,buyerSources[i].households),paid));
                     const count = sourceSales.reduce((sum,units)=>sum+units,0);
                     if (!count) return;
                     reservedStoreHomes.set(ownershipKey,(reservedStoreHomes.get(ownershipKey) || 0)+count);
@@ -1212,15 +1349,34 @@ const buildViewingState = (
         });
     }
 
+    /* Ad minutes an hour in a country (Phase 2): the service's cadence for free viewers, and per
+       ad plan its level's share of it (light half, standard all, heavy double), by accounts. */
+    const adMinutesFor = (countryId: string): number => {
+        const customer = customers.countries[countryId]?.platformSummaries.find(row => row.platformId === 'PLAYER');
+        const free = choices[countryId]?.platforms.PLAYER?.freeAd || 0;
+        let accounts = free;
+        let weighted = free;
+        customer?.planAllocations.forEach(allocation => {
+            const plan = pricing.plans.find(item => item.id === allocation.planId);
+            if (!plan?.ads || allocation.paidAccounts <= 0) return;
+            accounts += allocation.paidAccounts;
+            weighted += allocation.paidAccounts * STREAMING_AD_LEVEL_EFFECTS[resolveStreamingPlanAdLevel(plan)].minutes;
+        });
+        return pricing.ads.minutesPerHour * (accounts > 0 ? weighted / accounts : 1);
+    };
+    // Ads tech (#61): New ad formats sells more slots an hour, Smarter ad breaks keeps viewers through long breaks
+    const adTech = streamingTechAdEffects(resolveStreamingTechTree(platform));
     const playerAdOutcomes = clearDeliveredStreamingAds(preparedPlayer, absoluteWeek, rivalViewing,
         pricing.streams.includes('ads') ? Object.values(countryStates).map(country => ({
             platformId: 'PLAYER', countryId: country.countryId,
             eligibleHours: country.titlePerformance.reduce((sum, row) => sum + Math.max(0,
                 adHoursFor(row) - (passAllocations.get(`${country.countryId}:${row.projectId}`)?.coveredHours || 0)), 0),
-            minutesPerHour: pricing.ads.minutesPerHour,
+            minutesPerHour: adMinutesFor(country.countryId),
             audienceQualityIndex: resolvePlayerStreamingCommerceCapabilityIndex(
                 platform.technologyLevels.ADVERTISING_COMMERCE || 0),
             brandSafetyIndex: platform.competitiveWorld.globalPrestige,
+            ...(adTech.slots !== 1 ? { slotFactor: adTech.slots } : {}),
+            ...(adTech.breakSlope !== 1 ? { breakSlope: adTech.breakSlope } : {}),
         })) : [], offerRegistry);
     const playerTitleAds = new Map<string, { filledImpressions: number; revenue: number }>();
     Object.values(countryStates).forEach(country => {
@@ -1298,6 +1454,9 @@ const buildViewingState = (
         Object.values(countryStates).reduce((sum, country) => sum + country.unmetDemandAccounts, 0),
         baseTitlePerformance.map(title => Math.max(1, title.viewingAccounts)),
     );
+    // Store-source checks below read one unchanging player: prepare it once (on
+    // first use) instead of normalising the platform per title × country × route.
+    let storeSourceRoutes: ReturnType<typeof createPlayerStreamingTitleRouteEvaluator> | null = null;
     const titlePerformance = baseTitlePerformance.map((title, index) => {
         const candidate = candidates.find(item => item.entry.projectId === title.projectId)!;
         const freshMovie = title.projectType === 'MOVIE' && candidate.weeksAvailable <= 2;
@@ -1331,7 +1490,8 @@ const buildViewingState = (
             const funded=fundStreamingAncillaryRevenue(raw,pricing,(choices[country.countryId]?.storeSources.PLAYER || []).filter(source=>{
                 const routes = source.kind==='SUBSCRIPTION' ? [{kind:'SUBSCRIPTION' as const,planId:source.planId || ''}]
                     : source.kind==='FREE_AD' ? [{kind:'AD_SUPPORTED' as const}] : [{kind:'RENTAL' as const},{kind:'PURCHASE' as const}];
-                return routes.some(route=>evaluatePlayerStreamingTitleRoute(preparedPlayer,title.projectId,country.countryId,absoluteWeek,route).allowed);
+                storeSourceRoutes ??= createPlayerStreamingTitleRouteEvaluator(preparedPlayer, absoluteWeek);
+                return routes.some(route=>storeSourceRoutes!(title.projectId,country.countryId,route).allowed);
             }));
             royaltySourceReceipts.push(...funded.map(row=>({...row,platformId:'PLAYER',countryId:country.countryId,projectId:title.projectId})));
             return raw;
@@ -1341,8 +1501,8 @@ const buildViewingState = (
         });
         const rentalTransactions = countrySales.reduce((sum, row) => sum + row.rental, 0);
         const purchaseTransactions = countrySales.reduce((sum, row) => sum + row.purchase, 0);
-        const rentalRevenue = Math.floor(rentalTransactions * Math.max(0, pricing.rentals.rent));
-        const purchaseRevenue = Math.floor(purchaseTransactions * Math.max(0, pricing.rentals.buy));
+        const rentalRevenue = Math.floor(rentalTransactions * Math.max(0, storeEditions.rentPrice));
+        const purchaseRevenue = Math.floor(purchaseTransactions * Math.max(0, storeEditions.buyPrice));
         const storeOperatingCost = Math.round((rentalRevenue + purchaseRevenue) * .035);
         const countryPasses = title.countryPerformance.map(country => passAllocations.get(`${country.countryId}:${title.projectId}`));
         const oneHourPassTransactions = countryPasses.reduce((sum, row) => sum + (row?.oneHourTransactions || 0), 0);
@@ -1534,12 +1694,31 @@ const buildViewingState = (
         };
     });
     const global = summarizeAllPlatforms(platforms, Object.keys(countryStates).length);
+    const localizationRows = [...localizationByPackage.entries()].sort(([left], [right]) => left.localeCompare(right));
     const nextSnapshot: WorldStreamingViewingSnapshot = {
         absoluteWeek,
         totalViewingAccounts: global.totalViewingAccounts,
         totalHoursViewed: global.totalHoursViewed,
         unmetDemandAccounts: global.unmetDemandAccounts,
         incrementalRevenue: global.revenue.totalIncrementalRevenue,
+        // The Content Desk's localization figures: who watched in their own
+        // language through a region (and its five most-watched titles), how many
+        // the region's levels added, and who watched other-language titles no
+        // level reached.
+        localization: {
+            playerViewingAccounts: Math.max(0, Math.round(platformSummary.totalViewingAccounts || 0)),
+            localizedViewingAccounts: localizationRows.reduce((sum, [, row]) => sum + row.localized, 0),
+            addedViewingAccounts: localizationRows.reduce((sum, [, row]) => sum + row.added, 0),
+            untappedViewingAccounts: localizationRows.reduce((sum, [, row]) => sum + row.untapped, 0),
+            byPackage: Object.fromEntries(localizationRows.map(([packageId, row]) => [packageId, {
+                localized: row.localized,
+                added: row.added,
+                untapped: row.untapped,
+                top: [...row.titles.entries()]
+                    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+                    .slice(0, 5) as Array<[string, number]>,
+            }])),
+        },
     };
     const householdProductRevenue=Object.values(choices).reduce((sum,choice)=>sum+
         fundStreamingConsumerProducts(choice.storeSources.PLAYER || [],streamingConsumerProductRate(platform)),0);
