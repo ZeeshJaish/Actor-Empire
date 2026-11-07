@@ -10,16 +10,17 @@
  *     it you carry. Up to three deals a quarter, one card at a time: a whole collection when one fits the
  *     most-for-one-action limit (10⚡, as yours), otherwise one title of that genre through the Content Market's own
  *     Buy, the one inside the limit first.
- *   - ORIGINAL_PITCH: once a quarter, an Original for the biggest audience gap, with a working title. Ask me only:
- *     taking it fills the commissioning desk; the greenlight stays yours.
+ *   - ORIGINAL_PITCH: once a quarter, the pitch in the room most worth reading. Ask me only:
+ *     taking it marks it on the Originals Desk; the commission stays yours.
  *
  * A renewal the team decided keeps who decided it (`decidedBy`), for the Content room's "Renewed by Nia".
  */
-import type { Genre, OwnedStreamingOriginalCommissionDraft, OwnedStreamingPlatformState, Player, StreamingExecutiveStrategy, StreamingOriginalGapId } from '../../types';
+import { getLiveOriginalPitches, markRecommendedOriginalPitch } from '../originalsPitches';
+import { getScriptGapFit } from '../originalsAudienceReport';
+import type { Genre, OwnedStreamingPlatformState, Player, StreamingExecutiveStrategy, StreamingOriginalGapId } from '../../types';
 import { PHASE_ONE_ENERGY_COSTS } from '../energyCosts';
 import { getAbsoluteWeek } from '../legacyLogic';
 import { resolveStreamingCatalogTitle } from '../streamingCatalog';
-import { createDefaultStreamingOriginalDraft, getStreamingAudienceGaps, saveStreamingOriginalDraft } from '../streamingOriginals';
 import {
     evaluateOwnedStreamingRenewalReturn,
     normalizeStreamingRightsCalendarState,
@@ -292,85 +293,50 @@ export const executeTitleLicense: StreamingTeamExecutor = (player, action) => {
 /* ── the Original pitch ── */
 
 /** the gap an executive's strategy leans to */
-const FAVOURITE_GAP: Partial<Record<StreamingExecutiveStrategy, StreamingOriginalGapId>> = {
-    CREATIVE_FIRST: 'PRESTIGE_ANCHOR',
-    GROWTH_FIRST: 'BROAD_AUDIENCE',
-    TRUST_FIRST: 'BROAD_AUDIENCE',
-    MARGIN_FIRST: 'SERIES_RETENTION',
-    GLOBAL_FIRST: 'GENRE_WHITE_SPACE',
-    TECHNOLOGY_FIRST: 'GENRE_WHITE_SPACE',
-};
-const BUDGET_TILT: Partial<Record<StreamingExecutiveStrategy, number>> = { CREATIVE_FIRST: 1.1, GROWTH_FIRST: 1.1, MARGIN_FIRST: 0.8 };
-
-/** working titles, invented for the game */
-const WORKING_TITLES: Record<Genre, string[]> = {
-    ACTION: ['Iron Coast', 'Redline Protocol', 'The Ninth Courier', 'Breakwater', 'Kill Switch Avenue'],
-    DRAMA: ['The Weight of Rivers', 'Kingsbridge Road', 'All Our Winters', 'The Inheritance Clause', 'Salt in the Wound'],
-    COMEDY: ['Out of Office', 'Plus One, Minus Two', 'The Wedding Committee', 'Second Best Man', 'Neighbours from Hell Street'],
-    ROMANCE: ['Letters to Lisbon', 'The Summer After Next', 'Two Tickets to Nowhere', 'Paper Hearts', 'Almost Us'],
-    THRILLER: ['Dead Signal', 'Glasshouse', 'The Long Fall', 'Zero Hour Club', 'Static Line'],
-    MYSTERY: ['The Lantern Room', 'Harrow Lane', 'Whistler Point', 'Nine Doors Down', 'The Quiet Tide'],
-    HORROR: ['The Hollow Below', 'Do Not Answer', 'Nightfeed', 'The Well House', 'Below Stairs'],
-    SCI_FI: ['Orbital Drift', 'Second Earth', 'The Halcyon Signal', 'Low Gravity', 'Echo Station'],
-    ADVENTURE: ['The Lost Meridian', 'Far Country', 'The Map Room', 'Tidebreaker', 'Skyward Bound'],
-    SUPERHERO: ['Nightwarden', 'The Ninth Paragon', 'Volt Rising', 'Afterburn', 'Ironsight'],
-    MUSICAL: ['Midnight Overture', 'Brass Hearts', 'The Last Encore', 'Neon Choir', 'Street Symphony'],
-    BIOPIC: ['The Composer of Vienna', 'First Light', "The Fighter's Year", 'Queen of the Air', 'The Inventor'],
-    SPORTS: ['Final Whistle', 'The Underdog Season', 'Extra Time', 'Long Shot', 'The Last Lap'],
-    ANIMATION: ['Pip and the Paper Moon', 'Cloudkeepers', 'Little Engines', 'The Fox Who Flew', 'Starling Street'],
-    FANTASY: ['The Ember Crown', 'Thornwood', 'The Seventh Gate', 'Wyrmsong', 'The Ashen Throne'],
-    CRIME: ['Salt and Iron', 'The Night Ledger', 'Coldwater', 'Blue Hour', "The Fixer's Daughter"],
-    DOCUMENTARY: ['The Last Harvest', 'Deep Water', 'Made in the Dark', 'Signal and Noise', 'The Long Road Home'],
-};
-const workingTitle = (genre: Genre, seed: number) => {
-    const list = WORKING_TITLES[genre] || WORKING_TITLES.DRAMA;
-    return list[Math.abs(seed) % list.length];
+const FAVOURITE_GENRE: Partial<Record<StreamingExecutiveStrategy, Genre>> = {
+    CREATIVE_FIRST: 'DRAMA',
+    GROWTH_FIRST: 'COMEDY',
+    TRUST_FIRST: 'ADVENTURE',
+    MARGIN_FIRST: 'CRIME',
+    GLOBAL_FIRST: 'ACTION',
+    TECHNOLOGY_FIRST: 'SCI_FI',
 };
 
+/* #280: the studios pitch now, so the Head of Content brings the one worth reading, by what they like and what the Audience report says */
 export const runOriginalPitch: StreamingTeamJobRunner = (context) => {
     const { player, platform, absoluteWeek, executive } = context;
     if (!platform.launchCommit || absoluteWeek - platform.launchCommit.committedAtAbsoluteWeek < 6) return [];
-    /* one in the works already: the desk is busy */
-    if (platform.originalCommissions.some(commission => !commission.canonicalProjectId)) return [];
     const quarter = quarterOf(platform, absoluteWeek);
     const key = `pitch:${quarter}`;
     if (quarterTaken(platform, 'ORIGINAL_PITCH', key, absoluteWeek)) return [];
-    const favourite = FAVOURITE_GAP[executive.preferredStrategy];
-    const gap = getStreamingAudienceGaps(player)
-        .map(item => ({ item, score: item.demandScore + (item.id === favourite ? 8 : 0) }))
-        .sort((left, right) => right.score - left.score)[0]?.item;
-    if (!gap) return [];
-    const base = createDefaultStreamingOriginalDraft(player);
-    const title = workingTitle(gap.recommendedGenre, quarter + executive.skill);
-    const budget = Math.max(5_000_000, Math.min(platform.treasuryCash * 0.65, Math.round(base.productionBudgetCap * (BUDGET_TILT[executive.preferredStrategy] ?? 1) / 1_000_000) * 1_000_000));
-    const draft: OwnedStreamingOriginalCommissionDraft = {
-        ...base,
-        currentStep: 1,
-        gapId: gap.id,
-        title,
-        projectType: gap.recommendedType,
-        genre: gap.recommendedGenre,
-        episodes: gap.recommendedType === 'SERIES' ? 8 : 1,
-        productionBudgetCap: budget,
-    };
-    const format = gap.recommendedType === 'SERIES' ? 'series, 8 episodes' : 'film';
+    const scored = getLiveOriginalPitches(player).map(pitch => ({
+        pitch,
+        fit: getScriptGapFit(player, pitch.script.genres),
+        score: pitch.script.quality + (getScriptGapFit(player, pitch.script.genres) ? 20 : 0) + (FAVOURITE_GENRE[executive.preferredStrategy] === pitch.script.genres[0] ? 8 : 0),
+    })).sort((left, right) => right.score - left.score);
+    const best = scored[0];
+    if (!best) return [];
+    const { pitch, fit } = best;
+    const format = pitch.script.projectType === 'SERIES' ? `series, ${pitch.script.episodes || 8} episodes` : 'film';
     return [{
         jobId: 'ORIGINAL_PITCH',
         dedupeKey: key,
-        title: `“${title}”`,
-        detail: `${streamingGenreWord(gap.recommendedGenre)} ${format} · a budget near ${money(budget)}`,
-        reason: `${gap.title}: ${gap.signal.charAt(0).toLowerCase()}${gap.signal.slice(1)}. ${gap.rationale}`,
+        title: `“${pitch.script.title}”`,
+        detail: `${streamingGenreWord(pitch.script.genres[0] as Genre)} ${format} · from ${pitch.studioName}`,
+        reason: fit ? `It fits your gap: ${fit.title} in ${fit.countryName}.` : `The strongest script in the room this quarter.`,
         cost: 0,
         energy: 0,
-        action: { kind: 'ORIGINAL_PITCH', draft: draft as unknown as Record<string, unknown> },
+        action: { kind: 'ORIGINAL_PITCH', pitchId: pitch.id },
         askOnly: true,
         priority: 5,
     }];
 };
 
-/** taking the pitch fills the commissioning desk; the greenlight stays the player's */
+/** the commission stays the player's: taking the advice only marks the pitch on the Desk */
 export const executeOriginalPitch: StreamingTeamExecutor = (player, action) => {
     if (action.kind !== 'ORIGINAL_PITCH') return { player, changed: false };
-    const next = saveStreamingOriginalDraft(player, action.draft as unknown as OwnedStreamingOriginalCommissionDraft);
-    return next === player ? { player, changed: false, reason: 'An Original is already in the works.' } : { player: next, changed: true };
+    const pitchId = (action as { pitchId?: string }).pitchId;
+    if (!pitchId || !getLiveOriginalPitches(player).some(pitch => pitch.id === pitchId)) return { player, changed: false, reason: 'That pitch has gone.' };
+    return { player: markRecommendedOriginalPitch(player, pitchId), changed: true };
 };
+

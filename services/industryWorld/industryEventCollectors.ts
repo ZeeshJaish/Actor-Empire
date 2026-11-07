@@ -1,3 +1,4 @@
+import { gameWeekText } from '../gameWeek';
 import type {
     IndustryEventFact,
     IndustryEventImportance,
@@ -194,7 +195,7 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
                 type: 'PROJECT_RELEASE_PLANNED',
                 importance: 'MEDIUM',
                 headline: `${studioName} dates ${production.title}`,
-                detail: `${production.title} is planned for absolute week ${production.studioAiExecution.plannedReleaseAbsoluteWeek}.`,
+                detail: `${production.title} is planned for absolute ${gameWeekText(production.studioAiExecution.plannedReleaseAbsoluteWeek)}.`,
             }));
         }
         if (production.status === 'CANCELLED' && previous?.status !== 'CANCELLED') facts.push(createIndustryEventFact({

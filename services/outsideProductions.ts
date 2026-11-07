@@ -10,6 +10,7 @@ import {
     Player
 } from '../types';
 import { getPlayerLanguage, t } from './i18n';
+import { getCareerProjects } from './outsideOriginals';
 
 // Fraud-Risk Producer Investment Offers: suspicious deals stay in the same outside-producer flow,
 // but carry tempting terms, weak verification, and delayed legal fallout risk.
@@ -147,7 +148,7 @@ const getPlayerRecognitionScore = (player: Player): number => {
     const fame = Number(player.stats?.fame || 0);
     const reputation = Number(player.stats?.reputation || 0);
     const awards = (player.awards || []).filter(award => award.outcome === 'WON').length;
-    const creditedProjects = (player.pastProjects || []).length + (player.activeReleases || []).length;
+    const creditedProjects = getCareerProjects(player).length + (player.activeReleases || []).length;
     const producerWins = (player.outsideProductions || []).filter(item => (item.profit || 0) > 0).length;
     const cashSignal = Math.min(18, Math.log10(Math.max(1, player.money || 0)) * 2.2);
     return clamp(fame * 0.45 + reputation * 0.28 + awards * 3 + creditedProjects * 1.2 + producerWins * 2.5 + cashSignal, 0, 100);

@@ -1,0 +1,22 @@
+/* #244: where a title streams, and the way off the player's own service */
+.panel{--svc:#7c5cff;display:flex;flex-direction:column;gap:8px;padding:15px 16px;border-radius:18px;border:1px solid rgba(255,255,255,.09);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--svc) 16%,#0b0e14),#0b0e14 70%)}
+.eyebrow{font-size:8.5px;font-weight:900;letter-spacing:.2em;color:#8d95a6}
+.line{font-size:15px;font-weight:800;line-height:1.3;color:#fff;overflow-wrap:anywhere}
+.put,.pull{margin-top:4px;padding:15px 12px;border-radius:14px;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;overflow-wrap:anywhere;transition:transform .12s}
+.put{color:#fff;background:var(--svc);box-shadow:0 10px 24px -12px var(--svc)}
+.pull{color:#d5dae4;background:rgba(255,255,255,.07)}
+.put:active,.pull:active,.confirm:active,.later:active{transform:scale(.98)}
+.note{font-size:11px;line-height:1.4;color:#8d95a6}
+
+.scrim{--svc:#7c5cff;position:fixed;inset:0;z-index:2147483000;display:flex;align-items:flex-end;justify-content:center;background:rgba(3,4,8,.72)}
+.sheet{width:100%;max-width:480px;max-height:92vh;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:20px 18px calc(18px + env(safe-area-inset-bottom));
+  border-radius:24px 24px 0 0;border-top:1.5px solid var(--svc);background:#0b0e14;animation:rise .24s cubic-bezier(.2,.9,.3,1) both}
+.sheet h3{font-size:21px;font-weight:800;line-height:1.2;color:#fff;overflow-wrap:anywhere}
+.sheet p{font-size:13px;line-height:1.45;color:#a3aab8}
+.sheet .refused{color:#ff8f8f;font-weight:700}
+.foot{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:4px}
+.later,.confirm{padding:16px 10px;border-radius:14px;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;transition:transform .12s}
+.later{color:#d5dae4;background:rgba(255,255,255,.07)}
+.confirm{color:#fff;background:var(--svc)}
+@keyframes rise{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}

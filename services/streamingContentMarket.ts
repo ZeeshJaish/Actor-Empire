@@ -1,9 +1,11 @@
+import { getStreamingOpeningLock } from './streamingOpeningLock';
+import { getStreamingTitlePlacement } from './streamingTitlePlacement';
 import {collectionPrivateDefaults} from './streamingCollectionPrivateOffers';
 import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
 import type { Player, StreamingStarterCatalogPackageId } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { createStreamingMarketCompatibilityContext, getEligibleOwnedStreamingTitles, getStreamingMarketCandidateCompatibility,
+import { createStreamingMarketCompatibilityContext, getEligibleOwnedStreamingTitles, getReleasedOwnedStreamingTitles, getStreamingMarketCandidateCompatibility,
     resolveStreamingCatalogTitle, STREAMING_STARTER_CATALOG_PACKAGES } from './streamingCatalog';
 import { getHistoricalCatalogueTitles } from './historicalCatalogue';
 import {
@@ -243,6 +245,8 @@ export const getContentMarketPrivateOfferDefaults = (player: Player, sourceId: s
 export const submitContentMarketPrivateOffer = (
     player: Player, sourceId: string, terms: StreamingRightsTermsInput,
 ): StreamingRightsActionResult => {
+    const lock = getStreamingOpeningLock(player);
+    if (lock.catalogueLocked) return { player, changed: false, reason: 'NOT_READY', detail: lock.message };
     const collection = getContentMarketCollections(player).find(item => item.id === sourceId);
     if (collection) return isContentMarketAuctionCollection(player, sourceId)
         ? {player, changed:false, reason:'NOT_READY', detail:'This collection is assigned to a live auction.'}
@@ -315,10 +319,14 @@ export const isContentMarketAuctionCollection = (player: Player, collectionId: s
 export const getContentMarketOwnedTitles = (player: Player) => {
     const p = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const countries = getOwnedPlatformPackageCountryIds(p);
-    return getEligibleOwnedStreamingTitles(player).map(title => {
+    return getReleasedOwnedStreamingTitles(player).map(title => {
         const countryIds = getOwnedTitleCountryAccess(player, title.id, countries);
+        const linked = p.catalogProjectIds.includes(title.id);
+        /* #244: says who holds it and until when */
+        const placement = linked ? null : getStreamingTitlePlacement(player, title.id);
+        const held = placement?.kind === 'EXCLUSIVE_OUTSIDE' || placement?.kind === 'THEIRS' ? placement.whyNotOnYours : null;
         return { ...title, countryIds, excludedCountryIds: countries.filter(id => !countryIds.includes(id)),
-            linked: p.catalogProjectIds.includes(title.id), unavailableReason: countryIds.length ? null : 'Streaming rights are already granted in your selected markets.' };
+            linked, unavailableReason: held || (countryIds.length ? null : 'Streaming rights are already granted in your selected markets.') };
     });
 };
 
@@ -343,6 +351,8 @@ export const saveContentMarketStrategy = (player: Player, strategy: StreamingSta
 };
 
 export const linkContentMarketOwnedTitles = (player: Player, ids: string[]) => {
+    const lock = getStreamingOpeningLock(player);
+    if (lock.catalogueLocked) return { player, changed: false, detail: lock.message };
     const p = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!['FOUNDING', 'ACTIVE'].includes(p.lifecycle)) return { player, changed: false, detail: 'The platform is not accepting content.' };
     const options = getContentMarketOwnedTitles(player);
@@ -350,7 +360,13 @@ export const linkContentMarketOwnedTitles = (player: Player, ids: string[]) => {
     if (!chosen.length || chosen.some(t => !t || t.linked || t.unavailableReason)) return { player, changed: false, detail: 'Review your selection: a title is already linked or its rights are unavailable.' };
     const week = getAbsoluteWeek(player.age, player.currentWeek);
     const key = `content-import:${[...ids].sort().join(':')}`;
-    const updated = { ...player, ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({ ...p,
+    /* #244: a title still in the active list is now the player's own to stream: bids waiting for it end here */
+    const activeReleases = player.activeReleases.map(release => (ids.includes(release.id) ? {
+        ...release,
+        ...(release.distributionPhase === 'STREAMING_BIDDING' ? { distributionPhase: 'STREAMING' as const, status: 'FINISHED' as const, bids: undefined } : {}),
+        projectDetails: { ...release.projectDetails, hiddenStats: { ...release.projectDetails.hiddenStats, ownPlatformRelease: true } },
+    } : release));
+    const updated = { ...player, activeReleases, ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({ ...p,
         catalogProjectIds: [...new Set([...p.catalogProjectIds, ...ids])],
         eventLedger: [...p.eventLedger, { id: createDeterministicId('streaming_event', p.simulationSeed, key), idempotencyKey: key,
             absoluteWeek: week, type: 'CATALOG_IMPORTED', source: 'PLAYER_ACTION',
@@ -360,6 +376,8 @@ export const linkContentMarketOwnedTitles = (player: Player, ids: string[]) => {
 };
 
 export const purchaseContentMarketListing = (player: Player, id: string, signature: string) => {
+    const lock = getStreamingOpeningLock(player);
+    if (lock.catalogueLocked) return { player, changed: false, detail: lock.message };
     player = prepareContentMarketDiscovery(player);
     const listing = getContentMarketListings(player).find(o => o.id === id);
     const fail = (detail: string) => ({ player, changed: false, detail });
@@ -378,6 +396,8 @@ export const purchaseContentMarketListing = (player: Player, id: string, signatu
 };
 
 export const purchaseContentMarketCollection = (player: Player, id: string, signature: string) => {
+    const lock = getStreamingOpeningLock(player);
+    if (lock.catalogueLocked) return { player, changed: false, detail: lock.message };
     player = prepareContentMarketDiscovery(player);
     const listing = getContentMarketCollections(player).find(o => o.id === id);
     const fail = (detail: string) => ({ player, changed: false, detail });

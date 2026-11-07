@@ -21,13 +21,16 @@ import { quoteStreamingNetworkPlan } from '../services/streamingNetworkQuote';
 
 const blockedMarkup = renderToStaticMarkup(<StreamingOpeningProgramme {...{
   brand: { name: 'Empire+', hue: 35, sat: 85 },
-  view: { state: 'READY_TO_OPEN', commissioned: true, remainingWeeks: 0, workstreams: [], cityCount: 3, rackCount: 1, releasedCapital: 4e6, earliestOpeningAbsoluteWeek: 763 },
-  launchReadiness: { canLaunch: false, blockerCount: 1, items: [{ id: 'launch-definition', label: 'Launch blueprint', detail: 'Refresh the blueprint.', tone: 'BLOCKED' }] },
-  onBack() {}, onOpenCommissionedPlan() {}, onResolveClearance() {}, onOpeningNight() {}, focus: 'OVERVIEW',
+  view: { state: 'READY_TO_OPEN', commissioned: true, remainingWeeks: 0, workstreams: [], cityCount: 3, citiesOnline: 3, progress: 1, totalWeeks: 15, rackCount: 1, releasedCapital: 4e6, earliestOpeningAbsoluteWeek: 763 },
+  network: { built: true, sites: [], markets: [], reached: 1, served: 1, revision: 1, pending: null, peakStreams: 0, capacityStreams: 0, weeklyOperatingCost: 0 },
+  plan: null,
+  launchReadiness: { canLaunch: false, blockerCount: 1, items: [{ id: 'rights', label: 'Rights windows', detail: '1 programmed title will not have active rights.', tone: 'BLOCKED' }] },
+  onBack() {}, onResolveClearance() {}, onOpeningNight() {}, onOpenContent() {}, focus: 'OVERVIEW',
 } as any} />);
-assert.doesNotMatch(blockedMarkup, /Opening Night is cleared|All systems ready|READY FOR OPENING NIGHT/);
-assert.match(blockedMarkup, /Refresh the blueprint/);
-assert.match(blockedMarkup, /Review launch requirements/);
+assert.doesNotMatch(blockedMarkup, /BEGIN OPENING NIGHT/, 'not cleared: the door stays shut');
+assert.match(blockedMarkup, /1 programmed title will not have active rights/);
+assert.match(blockedMarkup, /Fix it in Content/, 'and it says where to fix it');
+assert.match(blockedMarkup, /NOT CLEARED YET/);
 
 for (const [phase, label] of [['PRE_PRODUCTION', 'PRE-PRODUCTION'], ['PRODUCTION', 'PRODUCTION'], ['POST_PRODUCTION', 'POST-PRODUCTION']]) {
   assert.equal((presentation as any).getCommitmentDisplayPhase({ projectPhase: phase, projectDetails: { releaseStrategy: {} } }), label);
@@ -48,8 +51,8 @@ for (const field of ['treasuryCash', 'facilities', 'infrastructureSetup', 'launc
   assert.deepEqual(refreshed.player.ownedStreamingPlatform[field], before.ownedStreamingPlatform[field], `Review must preserve ${field}`);
 }
 assert.equal(checkpointStreamingLaunchBlueprint(refreshed.player).changed, false);
-const review = renderToStaticMarkup(<StreamingLaunchBlueprintReview player={player} brand={{ name: 'Empire+', hue: 35, sat: 85 } as any} onBack={() => {}} onRefresh={() => {}} />);
-assert.match(review, /Refresh launch blueprint/);
+const review = renderToStaticMarkup(<StreamingLaunchBlueprintReview player={player} />);
+assert.doesNotMatch(review, /Refresh/, 'the plan is locked: there is nothing to refresh');
 assert.match(review, /The First Signal/);
 assert.doesNotMatch(review, /<input|<select/);
 

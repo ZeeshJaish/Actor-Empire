@@ -31,6 +31,8 @@ function* projectReferences(player: Player): Generator<any> {
     yield* rows(player.commitments);
     yield* rows(player.activeReleases);
     yield* rows(player.pastProjects);
+    /* #311: a pitch waiting for an answer needs its people too */
+    yield* rows((player as any).ownedStreamingPlatform?.originalPitches?.pitches).map(pitch => pitch?.concept);
     for (const business of rows(player.businesses)) {
         yield* rows(business.studioState?.scripts);
         yield* rows(business.studioState?.concepts);
@@ -52,6 +54,7 @@ export const collectReferencedNpcIds = (player: Player): Set<string> => {
         if (!value || typeof value !== 'object') return;
         add(value.directorId, value.actorId, value.npcId, value.sourceNpcId, value.writerId);
         for (const person of [...rows(value.castList), ...rows(value.crewList), ...rows(value.returningTalent)]) add(person?.npcId, person?.actorId, person?.id);
+        if (value.selectedCrew && typeof value.selectedCrew === 'object') add(...Object.values(value.selectedCrew));
     };
     for (const contract of contractsFor(player)) add(contract?.npcId, contract?.actorId, contract?.talentId, contract?.personId, contract?.directorId);
     for (const rel of rows(player.relationships)) add(rel?.id, rel?.npcId, rel?.sourceNpcId);

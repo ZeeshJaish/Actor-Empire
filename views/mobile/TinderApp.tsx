@@ -6,6 +6,7 @@ import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { getPregnancyCarrier, getPregnancyFeedbackCopy } from '../../services/familyLogic';
 import { DatingPreferencesSheet, preferenceLabel } from './DatingPreferencesSheet';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { isUnderAdultAge } from '../../services/ageGate';
 import { ArrowLeft, Flame, X, Heart, MessageCircle, Briefcase, Send, ChevronLeft, Calendar, Moon, Link2, Sparkles, SlidersHorizontal } from 'lucide-react';
 
 interface TinderAppProps {
@@ -286,6 +287,8 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
     const [recentTinderNames, setRecentTinderNames] = useState<string[]>([]);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const replyTimeoutRef = useRef<number | null>(null);
+    const isUnderAge = isUnderAdultAge(player);
+    const showAgeGate = () => setResultModal({ title: tr('ageGate.title'), body: tr('ageGate.body'), tone: 'neutral' });
 
     const currentAbsoluteWeek = useMemo(() => getAbsoluteWeek(player.age, player.currentWeek), [player.age, player.currentWeek]);
     const matches = player.dating.matches.filter(m => !m.isPremium);
@@ -448,10 +451,7 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                 onUpdatePlayer({
                     ...player,
                     dating: { ...player.dating, matches: [matchWithChat, ...player.dating.matches] },
-                    logs: [
-                        { week: player.currentWeek, year: player.age, message: tr('dating.tinder.log.matched', { name: matchWithChat.name }), type: 'positive' },
-                        ...player.logs,
-                    ].slice(0, 80),
+                    logs: [...(player.logs || []), { week: player.currentWeek, year: player.age, message: tr('dating.tinder.log.matched', { name: matchWithChat.name }), type: 'positive' }],
                 });
                 pushFeedback(tr('dating.tinder.feedback.matched', { name: matchWithChat.name.split(' ')[0] }), 'success');
             } else {
@@ -473,6 +473,11 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
 
         const historyBase = liveHistory?.length ? liveHistory : activeChatMatch.chatHistory || [];
         const stage = activeChatMatch.tinderStage || 'MATCHED';
+
+        if ((action === 'CASUAL' || (action === 'FLIRT' && variant === 'HEAT_CHECK')) && isUnderAge) {
+            showAgeGate();
+            return;
+        }
 
         let playerText = '';
         let responseText = '';
@@ -519,7 +524,8 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
         }
 
         if (action === 'DATE') {
-            playerText = pickTranslated(TINDER_CHAT_TEMPLATE_KEYS.DATE);
+            /* #255: the first two lines ask for drinks or "something dangerous" */
+            playerText = pickTranslated(isUnderAge ? TINDER_CHAT_TEMPLATE_KEYS.DATE.slice(2) : TINDER_CHAT_TEMPLATE_KEYS.DATE);
             const score = activeChatMatch.chemistry + (stage === 'TALKING' ? 10 : stage === 'CASUAL' ? 14 : stage === 'FWB' ? 12 : stage === 'GHOSTED' ? -12 : 0);
             const success = score >= 58 || Math.random() * 100 < score;
             responseText = success ? pickTranslated(TINDER_CHAT_TEMPLATE_KEYS.DATE_RESPONSES) : pickTranslated(TINDER_CHAT_TEMPLATE_KEYS.REJECT_RESPONSES);
@@ -613,6 +619,10 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
 
     const handleHookUp = () => {
         if (!activeChatMatch || isAwaitingReply) return;
+        if (isUnderAge) {
+            showAgeGate();
+            return;
+        }
 
         const historyBase = liveHistory?.length ? liveHistory : activeChatMatch.chatHistory || [];
         const stage = activeChatMatch.tinderStage || 'MATCHED';
@@ -821,7 +831,7 @@ export const TinderApp: React.FC<TinderAppProps> = ({ player, onBack, onUpdatePl
                             <button onClick={() => setChatAction('CHAT')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${chatAction === 'CHAT' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'}`}>{tr('dating.tinder.action.chat')}</button>
                             <button onClick={() => setChatAction('FLIRT')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${chatAction === 'FLIRT' ? 'bg-pink-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{tr('dating.tinder.action.flirt')}</button>
                             <button onClick={() => setChatAction('DATE')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${chatAction === 'DATE' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{tr('dating.tinder.action.date')}</button>
-                            <button onClick={() => setChatAction('CASUAL')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${chatAction === 'CASUAL' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{tr('dating.tinder.action.casual')}</button>
+                            <button onClick={() => (isUnderAge ? showAgeGate() : setChatAction('CASUAL'))} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${chatAction === 'CASUAL' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{tr('dating.tinder.action.casual')}</button>
                             <button onClick={() => setChatAction('OFFICIAL')} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${chatAction === 'OFFICIAL' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{tr('dating.tinder.action.official')}</button>
                         </div>
 

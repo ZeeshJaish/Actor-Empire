@@ -318,14 +318,14 @@ export const renameAcquiredStudio = ({
             ...player.x,
             feed: [socialPost, ...(player.x?.feed || [])].slice(0, 80),
         },
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: quote.hasProtectedNamePromise
                 ? `${oldName} became ${newName}. The former owners filed a naming-rights lawsuit, and the first hearing is next week.`
                 : `${oldName} became ${newName}. The studio paid ${quote.cost.toLocaleString()} for the rebrand.`,
             type: quote.hasProtectedNamePromise ? 'negative' as const : 'neutral' as const,
-        }, ...(player.logs || [])].slice(0, 80),
+        }],
         flags: {
             ...player.flags,
             studioAcquisitionCases: acquisitionCases,

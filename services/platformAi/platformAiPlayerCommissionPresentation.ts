@@ -1,7 +1,7 @@
 import type { PlatformAiPlayerCommissionOffer } from '../../types';
 
 const getCommissionSourceLabel = (offer: PlatformAiPlayerCommissionOffer): string => (
-    `${offer.platformName.toUpperCase()} COMMISSION`
+    offer.bigDeal ? `BIG DEAL: ${offer.platformName.toUpperCase()}` : `${offer.platformName.toUpperCase()} COMMISSION`
 );
 
 export const createPlatformCommissionBriefReference = (platformName: string, offerId: string): string => {

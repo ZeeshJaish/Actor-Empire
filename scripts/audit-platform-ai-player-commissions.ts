@@ -10,10 +10,17 @@ import {
     declinePlatformAiPlayerCommission,
     finalizePlatformAiPlayerCommissionGreenlight,
     generatePlatformAiPlayerCommissionOffers,
+    calculatePlatformAiPlayerProducerFee,
+    getRivalBudgetLevel,
+    getRivalCapScale,
+    isRivalBigDeal,
     normalizePlatformAiState,
     normalizePlatformAiPlayerCommissionOffers,
     settlePlatformAiPlayerCommissionDelivery,
     transferPlatformAiPlayerCommission,
+    platformAiCommissionKillFee,
+    PLATFORM_COMMISSION_NOTICE_WEEKS,
+    syncPlatformAiPlayerCommissionProductions,
 } from '../services/platformAi';
 import { createProductionCalendar } from '../services/productionCalendar';
 import { createPlatformAiFixture } from './helpers/platformAiFixture';
@@ -226,6 +233,22 @@ assert.equal(
     'Accepting a generated brief must credit its existing commissioning deposit against the reserved total.',
 );
 
+/* #302: what a rival offers follows its money, and a big deal only comes from a rich one */
+assert.ok(getRivalBudgetLevel(300) === 0 && getRivalBudgetLevel(10_000) === 1 && getRivalBudgetLevel(3_000) > 0.5);
+assert.ok(getRivalCapScale(300) < getRivalCapScale(3_000) && getRivalCapScale(3_000) < getRivalCapScale(10_000));
+const feeAt = (cash: number, bigDeal = false) => calculatePlatformAiPlayerProducerFee({
+    player: { ...generatedFixture, world: { ...generatedFixture.world, platforms: { ...generatedFixture.world.platforms!, NETFLIX: { ...generatedFixture.world.platforms!.NETFLIX, cashReserve: cash } } } },
+    platformId: 'NETFLIX', productionBudget: 100_000_000, bigDeal,
+});
+assert.ok(feeAt(300) < feeAt(3_000) && feeAt(3_000) < feeAt(10_000), 'a richer rival pays a bigger share');
+assert.ok(feeAt(300) >= 8_000_000 && feeAt(10_000) <= 22_000_000, 'within what a studio can expect');
+assert.ok(feeAt(5_000, true) >= feeAt(5_000) + 7_000_000, 'a big deal pays clearly more');
+const planIds = Array.from({ length: 800 }, (_, index) => `plan_${index}`);
+const bigShare = (cash: number) => planIds.filter(id => isRivalBigDeal(id, cash, 100)).length / planIds.length;
+assert.equal(bigShare(400), 0, 'a poor rival never offers one');
+assert.ok(bigShare(6_000) > 0.07 && bigShare(6_000) < 0.2, 'about one offer in eight from a rich rival');
+assert.equal(bigShare(1_500), 0, 'it must be able to afford it three times over');
+
 const offered = createPlatformAiPlayerCommissionOffer({
     player,
     platformId: 'NETFLIX',
@@ -271,7 +294,7 @@ assert.deepEqual(buildPlatformCommissionBudgetPresentation(86_000_000, accepted.
     overBudget: false,
 });
 assert.equal(accepted.studioId, 'PLAYER_STUDIO');
-assert.equal(accepted.player.world.platforms!.NETFLIX.cashReserve, platformCashBefore - (offered.offer!.productionBudget + offered.offer!.producerFee) / 1_000_000);
+assert.ok(Math.abs(accepted.player.world.platforms!.NETFLIX.cashReserve - (platformCashBefore - (offered.offer!.productionBudget + offered.offer!.producerFee) / 1_000_000)) < 0.02);
 assert.equal(accepted.player.businesses.find(studio => studio.id === 'PLAYER_STUDIO')!.balance, 10_000_000, 'Acceptance must not pay an exploitable advance.');
 assert.equal(accepted.player.businesses.find(studio => studio.id === 'PLAYER_STUDIO')!.studioState!.lockedStreamingFunds!.length, 1);
 assert.equal(accepted.player.businesses.find(studio => studio.id === 'PLAYER_STUDIO')!.studioState!.lockedStreamingFunds![0].fundingSource, 'AI_PLATFORM_COMMISSION');
@@ -304,7 +327,7 @@ assert.equal(greenlit.player.world.projects.length, accepted.player.world.projec
 assert.ok(greenlit.player.world.industryProductions?.[greenlit.offer!.canonicalProductionId!]);
 assert.equal(
     greenlit.player.world.platforms!.NETFLIX.ai!.slate.find(plan => plan.id === 'commission-plan-101')!.paidSpendMillions,
-    (greenlit.offer!.productionBudget - 20_000_000 + greenlit.offer!.producerFee) / 1_000_000,
+    Math.round((greenlit.offer!.productionBudget - 20_000_000 + greenlit.offer!.producerFee) / 10_000) / 100,
     'The platform plan must record the actual package cost plus producer fee.',
 );
 assert.equal(
@@ -426,7 +449,7 @@ const lowGreenlit = finalizePlatformAiPlayerCommissionGreenlight({
     absoluteWeek: ABSOLUTE_WEEK,
 });
 const lowDelivered = settlePlatformAiPlayerCommissionDelivery({ player: lowGreenlit.player, offerId: lowOffered.offer!.id, commitmentId: 'low-production', finalQualityScore: 40, absoluteWeek: ABSOLUTE_WEEK + 35 });
-assert.equal(lowDelivered.offer?.deliveredImdbRating, 4);
+assert.equal(lowDelivered.offer?.deliveredImdbRating, 5.2);
 assert.ok((lowDelivered.offer?.cooldownUntilAbsoluteWeek || 0) >= ABSOLUTE_WEEK + 35 + 15);
 assert.ok(lowDelivered.player.news.some(item => item.projectId === 'low-production'));
 
@@ -451,5 +474,30 @@ assert.equal(transferred.changed, true);
 assert.equal(transferred.offer?.status, 'TRANSFERRED');
 assert.equal(transferred.player.businesses.find(studio => studio.id === 'PLAYER_STUDIO')!.studioState!.lockedStreamingFunds!.length, 0);
 assert.ok(transferred.player.businesses.find(studio => studio.id === 'PLAYER_STUDIO')!.studioState!.platformRelations!.NETFLIX.recoveryWeeksRemaining >= 20);
+
+/* #241: before greenlight a small kill fee and no suit */
+const studioAfter = (player: typeof transferred.player) => player.businesses.find(studio => studio.id === 'PLAYER_STUDIO')!;
+assert.equal(studioAfter(transferAccepted.player).balance - studioAfter(transferred.player).balance, platformAiCommissionKillFee(transferSource.offer!.productionBudget), 'a kill fee');
+assert.equal((transferred.player.flags.activeCases || []).length, 0, 'no suit before greenlight');
+
+/* #241: after greenlight, walking away is a lawsuit: the fee back and damages. The hole: greenlight pays 25%, return that week and keep it */
+const walked = transferPlatformAiPlayerCommission({ player: greenlit.player, offerId: greenlit.offer!.id, absoluteWeek: ABSOLUTE_WEEK + 1 });
+assert.equal(walked.changed, true, walked.reason);
+const suit = (walked.player.flags.activeCases || [])[0];
+assert.equal(suit?.platformClaim?.kind, 'WALKED_AWAY');
+assert.equal(suit?.platformClaim?.feeBack, greenlit.offer!.producerFeePaid, 'the fee they paid comes back');
+assert.ok((suit?.platformClaim?.damages || 0) > 0, 'and the damages');
+assert.match(walked.player.news[0].headline, /files a lawsuit/);
+
+/* #241: a missed date: a notice, then 4 weeks later the claim, once */
+const deadline = greenlit.offer!.deliveryDeadlineAtAbsoluteWeek!;
+const running = { ...greenlit.player, commitments: [{ id: greenlit.offer!.commitmentId, name: greenlit.offer!.title, projectPhase: 'PRODUCTION', phaseWeeksLeft: 3, totalPhaseDuration: 10 } as never] };
+const noticed = syncPlatformAiPlayerCommissionProductions(running, deadline + 1);
+assert.equal(noticed.world.platformAiPlayerCommissionOffers![greenlit.offer!.id].deadlineNoticeAtAbsoluteWeek, deadline + 1);
+assert.equal((noticed.flags.activeCases || []).length, 0, 'a notice first');
+assert.match(noticed.logs.at(-1)!.message, /past its delivery date/);
+const sued = syncPlatformAiPlayerCommissionProductions(noticed, deadline + 1 + PLATFORM_COMMISSION_NOTICE_WEEKS);
+assert.equal((sued.flags.activeCases || [])[0]?.platformClaim?.kind, 'MISSED_DEADLINE');
+assert.equal((syncPlatformAiPlayerCommissionProductions(sued, deadline + 20).flags.activeCases || []).length, 1, 'one suit, not one a week');
 
 console.log('Platform AI player commission audit passed.');

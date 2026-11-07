@@ -7,6 +7,7 @@ import { createMarketTrends, getGenreMarketTrend, getScriptMarketDemand } from '
 import { getPlayerLanguage, t } from '../../../../services/i18n';
 import { getStudioMarketScripts, StudioMarketLane } from '../../../../services/studioMarket';
 import { RightsMarket } from './RightsMarket';
+import { getScriptGapFit } from '../../../../services/originalsAudienceReport';
 import { formatCurrency } from '../developmentLabFormatting';
 
 export interface DevelopmentLabMarketProps {
@@ -112,6 +113,7 @@ export const DevelopmentLabMarket: React.FC<DevelopmentLabMarketProps> = ({
                 <SourceMaterialMarket
                     market={getStudioMarketScripts(market || [])}
                     playerMoney={playerMoney}
+                    player={player}
                     onBuy={onBuy}
                     onRefresh={onRefresh}
                     refreshPrice={refreshPrice}
@@ -130,6 +132,7 @@ export const DevelopmentLabMarket: React.FC<DevelopmentLabMarketProps> = ({
 
 interface SourceMaterialMarketProps {
     market: Script[];
+    player: Player;
     playerMoney: number;
     onBuy: (script: Script, cost: number) => void;
     onRefresh: () => void;
@@ -144,6 +147,7 @@ interface SourceMaterialMarketProps {
 }
 
 const SourceMaterialMarket: React.FC<SourceMaterialMarketProps> = ({
+    player,
     market,
     playerMoney,
     onBuy,
@@ -268,6 +272,9 @@ const SourceMaterialMarket: React.FC<SourceMaterialMarketProps> = ({
                                     <h3 className="text-2xl font-black uppercase italic leading-[0.9] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                                         {script.title}
                                     </h3>
+                                    {getScriptGapFit(player, script.genres) && (
+                                        <span data-fits-gap className="mt-1.5 inline-block rounded bg-emerald-400/20 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-emerald-300">Fits your gap</span>
+                                    )}
                                     {script.author && (
                                         <p className="mt-2 text-[10px] font-bold uppercase italic tracking-widest text-white/70">
                                             {tr('developmentLab.market.byAuthor', { author: script.author })}

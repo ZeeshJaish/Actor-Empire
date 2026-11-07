@@ -291,12 +291,12 @@ export const submitIndustryMediaResponse = (
             posts: prependUnique(publishedPost, input.player.x.posts || [], 80),
             feed: prependUnique(publishedPost, input.player.x.feed || [], 80),
         },
-        logs: [{
+        logs: [...(input.player.logs || []), {
             week: input.player.currentWeek,
             year: input.player.age,
             message: `${authorName} responded to ${input.sourcePost.authorName}'s public discussion.`,
             type: 'neutral' as const,
-        }, ...(input.player.logs || [])].slice(0, 50),
+        }],
     };
     return { player: nextPlayer, accepted: true, response, publishedPost };
 };
@@ -543,12 +543,12 @@ export const resolveIndustryMediaResponses = (
         x: { ...player.x, followers: Math.max(0, player.x.followers + followerDelta) },
         news: [...news, ...(player.news || []).filter(item => !news.some(created => created.id === item.id))].slice(0, 50),
         world: { ...player.world, industryMedia: media },
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: `${resolvedResponseIds.length} public response${resolvedResponseIds.length === 1 ? '' : 's'} resolved.`,
             type: (controversyDelta > 0 ? 'negative' : reputationDelta > 0 ? 'positive' : 'neutral') as 'positive' | 'negative' | 'neutral',
-        }, ...(player.logs || [])].slice(0, 50),
+        }],
     };
     return { player: nextPlayer, news, resolvedResponseIds };
 };

@@ -1,3 +1,4 @@
+import { gameWeekLabel, gameWeekText } from '../services/gameWeek';
 import { useMemo, useReducer, useState, type CSSProperties, type Key } from 'react';
 import {
   AlertTriangle,
@@ -565,7 +566,7 @@ export default function StreamingTechnologyCampus({
                 onClick={() => dispatch({ type: 'SELECT_PROJECT', definitionId: node.definition.id })}
               >
                 <span className="tech-upgrade-node-index">{node.status === 'INSTALLED' ? <BadgeCheck size={16} /> : node.status === 'BUILDING' ? <HardHat size={16} /> : index + 1}</span>
-                <div><small>{node.definition.codename} • LEVEL {node.definition.targetLevel}</small><strong>{node.definition.title}</strong><p>{node.status === 'INSTALLED' ? 'Installed in live operations' : node.status === 'BUILDING' ? `Ready week ${node.project?.readyAtAbsoluteWeek}` : node.blockers[0] || node.definition.benefitSummary}</p></div>
+                <div><small>{node.definition.codename} • LEVEL {node.definition.targetLevel}</small><strong>{node.definition.title}</strong><p>{node.status === 'INSTALLED' ? 'Installed in live operations' : node.status === 'BUILDING' ? `Ready ${gameWeekText(node.project?.readyAtAbsoluteWeek, campus.absoluteWeek)}` : node.blockers[0] || node.definition.benefitSummary}</p></div>
                 {node.status === 'LOCKED' ? <LockKeyhole size={16} /> : <ChevronRight size={16} />}
               </button>
             ))}
@@ -640,7 +641,7 @@ export default function StreamingTechnologyCampus({
             </div>
             <dl>
               <div><dt>Weeks remaining</dt><dd>{weeksRemaining}</dd></div>
-              <div><dt>Goes live</dt><dd>Week {activeProject.readyAtAbsoluteWeek}</dd></div>
+              <div><dt>Goes live</dt><dd>{gameWeekLabel(activeProject.readyAtAbsoluteWeek, campus.absoluteWeek)}</dd></div>
               <div><dt>Staff committed</dt><dd>{activeProject.staffRequired}</dd></div>
               <div><dt>Weekly cost after launch</dt><dd>{formatMoney(activeProject.weeklyOperatingCostDelta)}</dd></div>
             </dl>
@@ -661,7 +662,7 @@ export default function StreamingTechnologyCampus({
           <article key={project.id}>
             <div className={`tech-ledger-status is-${project.status.toLowerCase()}`}>{project.status === 'COMPLETED' ? <BadgeCheck size={17} /> : <HardHat size={17} />}</div>
             <div><span>{project.branch.replaceAll('_', ' ')} • {project.buildMode}</span><h3>{project.title}</h3><p>{project.riskNote}</p></div>
-            <dl><div><dt>Capital</dt><dd>{formatMoney(project.capitalCost)}</dd></div><div><dt>Run rate</dt><dd>{formatMoney(project.weeklyOperatingCostDelta)}/wk</dd></div><div><dt>Debt</dt><dd>{project.technicalDebtDelta >= 0 ? '+' : ''}{project.technicalDebtDelta}</dd></div><div><dt>{project.status === 'COMPLETED' ? 'Completed' : 'Ready'}</dt><dd>Week {project.completedAtAbsoluteWeek || project.readyAtAbsoluteWeek}</dd></div></dl>
+            <dl><div><dt>Capital</dt><dd>{formatMoney(project.capitalCost)}</dd></div><div><dt>Run rate</dt><dd>{formatMoney(project.weeklyOperatingCostDelta)}/wk</dd></div><div><dt>Debt</dt><dd>{project.technicalDebtDelta >= 0 ? '+' : ''}{project.technicalDebtDelta}</dd></div><div><dt>{project.status === 'COMPLETED' ? 'Completed' : 'Ready'}</dt><dd>{gameWeekLabel(project.completedAtAbsoluteWeek || project.readyAtAbsoluteWeek, campus.absoluteWeek)}</dd></div></dl>
           </article>
         ))}
         {!player.ownedStreamingPlatform.technologyProjects.length ? <div className="tech-empty-construction"><DatabaseZap size={31} /><h3>No engineering history yet.</h3><p>The first approved campus project will establish this ledger.</p></div> : null}
@@ -673,7 +674,7 @@ export default function StreamingTechnologyCampus({
     <div className="tech-campus-shell" role="dialog" aria-modal="true" aria-label="EMPIRE+ Technology Campus">
       <header className="tech-campus-topbar">
         <button type="button" onClick={onClose} aria-label="Close Technology Campus"><ArrowLeft size={20} /></button>
-        <div><span>EMPIRE+ TECHNOLOGY CAMPUS</span><strong>Engineering Session • Week {campus.absoluteWeek}</strong></div>
+        <div><span>EMPIRE+ TECHNOLOGY CAMPUS</span><strong>Engineering Session • {gameWeekLabel(campus.absoluteWeek, campus.absoluteWeek)}</strong></div>
         <div><small>PLATFORM TREASURY</small><strong>{formatMoney(player.ownedStreamingPlatform.treasuryCash)}</strong></div>
         <button type="button" onClick={onClose} aria-label="Close"><X size={20} /></button>
       </header>

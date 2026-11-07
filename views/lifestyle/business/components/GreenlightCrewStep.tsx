@@ -8,6 +8,8 @@ type CrewMode = 'HIRE' | 'SELF' | 'IN_HOUSE';
 type CrewKey = 'cinematographer' | 'composer' | 'lineProducer' | 'vfx';
 
 interface GreenlightCrewStepProps {
+    /** #284 */
+    outsideStudio?: boolean;
     crewMarket: {
         cinematographers: any[];
         composers: any[];
@@ -49,6 +51,7 @@ const CREW_ROLES: Array<{
 ];
 
 export const GreenlightCrewStep: React.FC<GreenlightCrewStepProps> = ({
+    outsideStudio,
     crewMarket,
     crewMarketRefreshIn,
     crewMarketCycle,
@@ -76,7 +79,7 @@ export const GreenlightCrewStep: React.FC<GreenlightCrewStepProps> = ({
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-400 mb-2">Crew Market</p>
                     <h2 className="text-xl font-black text-white mb-2">Build Your Production Team</h2>
-                    <p className="text-zinc-400 text-sm leading-relaxed">Hire specialists, use your studio departments, and populate the world around your principal cast.</p>
+                    <p className="text-zinc-400 text-sm leading-relaxed">{outsideStudio ? 'Hire specialists and populate the world around your principal cast.' : 'Hire specialists, use your studio departments, and populate the world around your principal cast.'}</p>
                 </div>
                 <div className="shrink-0 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
                     <p className="text-[9px] uppercase tracking-widest font-black text-zinc-500">Availability refresh</p>
@@ -114,6 +117,7 @@ export const GreenlightCrewStep: React.FC<GreenlightCrewStepProps> = ({
                     returningTalent={returningTalent}
                     onNegotiate={onNegotiate}
                     formatMoney={formatMoney}
+                    outsideStudio={outsideStudio}
                 />
             ))}
         </div>

@@ -207,24 +207,11 @@ assert(oversized.cycleReviews.length === OWNED_STREAMING_CYCLE_REVIEW_LIMIT, 'Cy
 
 const serviceSource = readFileSync(resolve(process.cwd(), 'services/streamingQuarterSeason.ts'), 'utf8');
 const weeklySource = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
-const componentSource = readFileSync(resolve(process.cwd(), 'components/StreamingQuarterSeasonCycle.tsx'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
-const styleSource = readFileSync(resolve(process.cwd(), 'styles/streaming-quarter-season.css'), 'utf8');
 
 assert(!serviceSource.includes('Math.random'), 'Cycle and board facts must never use uncontrolled randomness.');
 assert(weeklySource.includes('commitStreamingQuarterSeasonCycle('), 'The existing exactly-once weekly commit should own Phase 11 progression.');
-[
-    'PHASE 11 • QUARTER & SEASON CYCLE',
-    'AUDIENCE PULSE',
-    'Turn weeks into a company story.',
-    'SEASON {review.cycleNumber} • BOARD SESSION',
-    'WHAT THE QUARTER PROVED',
-    'THE NEXT MANDATE',
-    'market signal',
-].forEach(fragment => assert(componentSource.includes(fragment) || serviceSource.includes(fragment), `Phase 11 experience should include ${fragment}.`));
 /* #176: the quarter's review is MONEY's report card; the weekly brief that held this room left the game */
 assert(!hqSource.includes('<StreamingQuarterSeasonCycle'), 'Platform HQ no longer mounts the quarter and season room (#176).');
-assert(styleSource.includes('@media (min-width: 620px)'), 'The season room should deliberately enhance larger displays.');
-assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'Boardroom motion should respect reduced-motion preferences.');
 
 console.log('Streaming quarter and season cycle Phase 11 audit passed.');

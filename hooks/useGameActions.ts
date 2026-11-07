@@ -7,6 +7,7 @@ import { calculateInteraction, getGenderedAvatar } from '../services/npcLogic';
 import { getFlavorTexts, getSocialEvents } from '../services/socialEvents';
 import { createBusiness } from '../services/businessLogic';
 import { getAbsoluteWeek } from '../services/legacyLogic';
+import { isUnderAdultAge } from '../services/ageGate';
 import { hasOwnedPremiumAssetInCollection, spendPlayerEnergy } from '../services/premiumLogic';
 import { applyParenthoodAbandonment, applyPartnerBreakup, applyDivorceOutcome, getPregnancyCarrier, getPregnancyFeedbackCopy, reconnectWithChild } from '../services/familyLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
@@ -117,7 +118,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
         partner: Relationship,
         shouldCreateScandalNews: boolean
     ): { next: Player; scheduled: boolean } => {
-        if (prev.activePregnancy) {
+        if (prev.activePregnancy || isUnderAdultAge(prev)) {
             return { next: prev, scheduled: false };
         }
         const pregnancyCarrier = getPregnancyCarrier(prev.gender, partner.gender);
@@ -452,6 +453,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
     const handleImproveAction = (category: string, activityName: string, option: ImprovementOption) => {
         setPlayer(prev => {
+            if (option.id === 'opt_nightout' && isUnderAdultAge(prev)) {
+                setToastMessage({ title: tr('ageGate.title'), subtext: tr('ageGate.body') });
+                return prev;
+            }
             if (prev.energy.current < option.energyCost || prev.money < option.moneyCost) return prev;
 
             if (category === 'GENRE') {
@@ -554,6 +559,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
           }
           if (['DATE', 'PROPOSE', 'INTIMACY', 'CLUBBING', 'TRIP', 'ESTATE_DATE', 'YACHT_DATE', 'JET_ESCAPE', 'LUXURY_GIFT'].includes(action) && isFamilyRelation(partner.relation)) {
               setToastMessage({ title: tr('actions.relationship.blockedTitle'), subtext: tr('actions.relationship.familyRomanceBlockedSubtext') });
+              return prev;
+          }
+          if (['INTIMACY', 'CLUBBING', 'PROPOSE'].includes(action) && isUnderAdultAge(prev)) {
+              setToastMessage({ title: tr('ageGate.title'), subtext: tr('ageGate.body') });
               return prev;
           }
 
@@ -857,6 +866,10 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             setToastMessage({ title: tr('actions.relationship.blockedTitle'), subtext: tr('actions.relationship.familyRomanceBlockedSubtext') });
             return;
         }
+        if (['INTIMACY', 'CLUBBING', 'PROPOSE'].includes(type) && isUnderAdultAge(player)) {
+            setToastMessage({ title: tr('ageGate.title'), subtext: tr('ageGate.body') });
+            return;
+        }
         if (type === 'ESTATE_DATE' && !hasOwnedPremiumAssetInCollection(player, 'bundle_luxury_homes')) {
             setToastMessage({ title: tr('actions.relationship.lockedTitle'), subtext: tr('actions.relationship.lockedHomeSubtext') });
             return;
@@ -883,7 +896,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             }
         }
         if (['DATE', 'CLUBBING', 'HANGOUT'].includes(type) && Math.random() < 0.4) {
-            const potentialEvents = getSocialEvents(language, type);
+            const potentialEvents = getSocialEvents(language, type, { underAge: isUnderAdultAge(player) });
             if (potentialEvents && potentialEvents.length > 0) {
                 const evt = potentialEvents[Math.floor(Math.random() * potentialEvents.length)];
                 setActiveSocialEvent({
@@ -898,6 +911,7 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
 
     const handleIntimacyChoice = (choice: 'PROTECTED' | 'UNPROTECTED', partnerId: string) => {
       handleGenericUpdate(prev => {
+          if (isUnderAdultAge(prev)) return prev;
           const idx = prev.relationships.findIndex(r => r.id === partnerId);
           if (idx === -1) return prev;
           const partner = prev.relationships[idx];

@@ -900,7 +900,8 @@ const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatal
     const catalogueCoverage = getStreamingOpeningCatalogueView(player, context);
     const hasCatalogue = Boolean(platform.starterCatalog && catalogueCoverage.titles.some(title => title.available));
     const launchDefinitionSignature = getStreamingLaunchDefinitionSignature(player, context);
-    const blueprintSaved = Boolean(
+    /* #253: once commissioned the plan is locked: see getStreamingOpeningLock */
+    const blueprintSaved = Boolean(platform.infrastructureSetup) || Boolean(
         platform.launchProgram.lastBlueprintSignature
         && platform.launchProgram.lastBlueprintSignature === launchDefinitionSignature,
     );

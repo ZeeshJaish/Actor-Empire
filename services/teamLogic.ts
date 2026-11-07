@@ -6,6 +6,7 @@ import { generateAudition } from './roleLogic'; // We will export this helper fr
 import { getNextFamousMovie, createFamousOpportunity } from './famousMovieLogic';
 import { generateRandomUniverseOpportunity } from './universeLogic';
 import { calculateYoutubeCreatorScore, getYoutubePublicImageLabel } from './youtubeLogic';
+import { isUnderAdultAge } from './ageGate';
 import { getPlayerLanguage } from './i18n';
 import { getAbsoluteWeek } from './legacyLogic';
 
@@ -429,7 +430,8 @@ export const generateManagerOffer = (player: Player): SponsorshipOffer | null =>
     if (creatorImage === 'Volatile' || creatorImage === 'Risky Bet') categories.push('BEVERAGE');
 
     const cat = pick(categories);
-    const brand = pick(BRAND_DB[cat]);
+    /* #255: no beer deal under 18 */
+    const brand = pick(isUnderAdultAge(player) ? BRAND_DB[cat].filter(name => name !== 'Heineken') : BRAND_DB[cat]);
 
     // Requirements & Type Logic
     // Higher paying deals have harder requirements

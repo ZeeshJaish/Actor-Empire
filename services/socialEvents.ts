@@ -140,10 +140,13 @@ const isSocialEventCategory = (category: string): category is SocialEventCategor
     return SOCIAL_EVENT_CATEGORIES.includes(category as SocialEventCategory);
 };
 
-export const getSocialEvents = (language: GameLanguage, category: string): SocialEventRecord[] => {
+/** #255: these two date popups (a flirty late-night talk, a weekend away) wait for 18 */
+const ADULT_ONLY_SOCIAL_EVENTS = new Set(['lateNightConfession', 'weekendInvite']);
+
+export const getSocialEvents = (language: GameLanguage, category: string, options: { underAge?: boolean } = {}): SocialEventRecord[] => {
     if (!isSocialEventCategory(category)) return [];
 
-    return SOCIAL_EVENT_TEMPLATES[category].map((event) => ({
+    return SOCIAL_EVENT_TEMPLATES[category].filter(event => !(options.underAge && ADULT_ONLY_SOCIAL_EVENTS.has(event.id))).map((event) => ({
         title: t(language, `services.socialEvents.${category}.${event.id}.title`),
         desc: t(language, `services.socialEvents.${category}.${event.id}.desc`),
         options: event.options.map((option) => ({

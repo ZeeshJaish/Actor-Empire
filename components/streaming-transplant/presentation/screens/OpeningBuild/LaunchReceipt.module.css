@@ -1,0 +1,41 @@
+/* #253: the opening night's record */
+.lr{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;overflow:hidden;background:#050609;color:#eef1f6;font-family:'Inter',system-ui,sans-serif}
+.lr :where(*){box-sizing:border-box;margin:0;padding:0;min-width:0}
+.lr :where(button){font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lr .map{position:absolute;left:0;right:0;top:48px;height:58%;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 16%,#000 62%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 16%,#000 62%,transparent 100%)}
+.back{position:absolute;z-index:2;left:14px;top:calc(14px + env(safe-area-inset-top,0px));width:40px;height:40px;border-radius:12px;font-size:18px;color:#e9edf4;background:rgba(10,13,20,.72);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.back:active{transform:scale(.95)}
+.onAir{position:absolute;z-index:2;right:14px;top:calc(22px + env(safe-area-inset-top,0px));display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:7px;font:900 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.2em;color:#fff;background:#d7263d;box-shadow:0 6px 22px -6px #d7263d}
+.onAir i{width:7px;height:7px;border-radius:50%;background:#fff;animation:lr-air 1.2s ease-in-out infinite}
+@keyframes lr-air{50%{opacity:.25}}
+
+.body{position:relative;z-index:1;flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(84px + env(safe-area-inset-top,0px)) 20px 6px}
+.body::-webkit-scrollbar{display:none}
+.lockup{display:flex;align-items:center;gap:10px;animation:lr-rise .5s .05s cubic-bezier(.2,.9,.3,1) both}
+.mark{flex:0 0 auto;width:38px;height:38px;display:block}
+.lockup h1{font-size:clamp(23px,3.6vh,31px);line-height:1.04;text-transform:uppercase;color:#fff;overflow-wrap:anywhere}
+.eyebrow{margin-top:10px;font:800 9.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.22em;color:var(--epx-brand-lift);animation:lr-rise .5s .12s cubic-bezier(.2,.9,.3,1) both}
+.big{display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px 12px;margin-top:9px;animation:lr-rise .5s .18s cubic-bezier(.2,.9,.3,1) both}
+.big b{flex:0 0 auto;font:400 clamp(56px,10vh,84px)/.9 'Anton','Archivo',sans-serif;color:#fff;font-variant-numeric:tabular-nums}
+.big span{flex:1 1 90px;padding-bottom:5px;font:800 10px/1.35 'Archivo','Inter',sans-serif;letter-spacing:.15em;color:#c9d0dc}
+.verdict{margin-top:14px;padding:11px 13px;border-radius:14px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);animation:lr-rise .5s .26s cubic-bezier(.2,.9,.3,1) both}
+.verdict b{display:block;font:800 10.5px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.15em}
+.verdict p{margin-top:4px;font-size:12.5px;line-height:1.4;color:#a3aab8}
+.good{box-shadow:inset 3px 0 0 #4ade80,inset 0 0 0 1px rgba(255,255,255,.08)}
+.good b{color:#4ade80}
+.warn{box-shadow:inset 3px 0 0 #f5b544,inset 0 0 0 1px rgba(255,255,255,.08)}
+.warn b{color:#f5b544}
+.bad{box-shadow:inset 3px 0 0 #ff6b6b,inset 0 0 0 1px rgba(255,255,255,.08)}
+.bad b{color:#ff6b6b}
+.cells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px;animation:lr-rise .5s .34s cubic-bezier(.2,.9,.3,1) both}
+.cells span{display:flex;flex-direction:column;gap:5px;padding:12px 10px;border-radius:14px;background:#0c0f15;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.cells b{font:400 clamp(17px,5.4vw,21px)/1 'Anton','Archivo',sans-serif;letter-spacing:.01em;color:#fff;white-space:nowrap}
+.cells small{font:800 7.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.17em;color:#7f8798}
+.led{margin-top:10px;font-size:12.5px;line-height:1.4;color:#9aa2b1}
+.led b{font-weight:700;color:#e6e9f0}
+.foot{position:relative;z-index:1;flex:0 0 auto;padding:10px 20px calc(14px + env(safe-area-inset-bottom,0px))}
+.go{display:block;width:100%;min-height:56px;padding:10px 14px;border-radius:16px;font:900 12.5px/1.2 'Archivo','Inter',sans-serif;letter-spacing:.16em;color:var(--epx-brand-ink,#fff);background:var(--epx-brand);box-shadow:0 14px 36px -12px var(--epx-brand)}
+.go:active{transform:scale(.98)}
+@keyframes lr-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (max-height:640px){.mark{width:30px;height:30px}.verdict p{display:none}.led{display:none}}
+@media (prefers-reduced-motion:reduce){.onAir i,.lockup,.eyebrow,.big,.verdict,.cells{animation:none}}

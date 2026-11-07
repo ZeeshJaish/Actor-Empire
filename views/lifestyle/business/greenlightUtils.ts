@@ -15,11 +15,12 @@ export type MarketingBudgetPreset = 'LEAN' | 'STANDARD' | 'HEAVY' | 'EVENT' | 'C
 export type MusicArtistSortOption = 'RECOMMENDED' | 'RATING' | 'COST_LOW' | 'COST_HIGH' | 'FAME' | 'FOLLOWERS' | 'AVAILABILITY';
 
 export const formatMoney = (value: number) => {
-    if (value >= 1_000_000_000_000) return `${(value / 1_000_000_000_000).toFixed(1)}T`;
-    if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
-    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-    if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k`;
-    return `${value}`;
+    if (value < 0) return `-${formatMoney(-value)}`;
+    if (value >= 1_000_000_000_000) return `$${(value / 1_000_000_000_000).toFixed(1)}T`;
+    if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}k`;
+    return `$${value}`;
 };
 
 export const clampStat = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));

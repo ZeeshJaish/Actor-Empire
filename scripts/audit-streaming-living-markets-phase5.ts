@@ -141,12 +141,10 @@ assert((postElection?.policySnapshot?.revision || 0) === 1, 'An election cycle s
 assert(election.player.news.some(item => item.id.startsWith('news_market_')), 'Policy and clearance outcomes should create player-visible news.');
 assert(election.player.ownedStreamingPlatform.eventLedger.some(entry => entry.type === 'MARKET_POLICY_CHANGED'), 'Policy changes should be preserved in the canonical ledger.');
 
-const wizardSource = readFileSync('components/StreamingDefineLaunchWizard.tsx', 'utf8');
 const launchExperienceSource = readFileSync('components/StreamingDefineLaunchExperience.tsx', 'utf8');
 const audienceSource = readFileSync('components/streaming-transplant/StreamingAudienceExperience.tsx', 'utf8');
 const flagSource = readFileSync('components/studio-finance/components/FlagField.tsx', 'utf8');
 const flagAsset = readFileSync('public/assets/streaming/country-flags.svg', 'utf8');
-assert(wizardSource.includes('Government review') && wizardSource.includes('Country terms') && wizardSource.includes('SUBMIT REQUIREMENT'), 'The clearance wizard should show the living government-review experience and recovery action.');
 assert(launchExperienceSource.includes('saveStreamingMarketPlan(currentPlayerRef.current, plannedCountryIds || countryIds') && launchExperienceSource.includes('beginStreamingMarketClearance(filingBase'), 'Filing from the transplanted wizard must save the visible footprint against the latest player state before starting government review.');
 assert(audienceSource.includes('Country portfolio') && audienceSource.includes('one living record per market') && audienceSource.includes('NEXT POLICY CYCLE'), 'Audience Markets should be the permanent country expansion headquarters.');
 assert(flagSource.includes("/assets/streaming/country-flags.svg") && flagSource.includes('FLAG_CELLS'), 'Every supported market should use the supplied country-flag kit through one shared renderer.');

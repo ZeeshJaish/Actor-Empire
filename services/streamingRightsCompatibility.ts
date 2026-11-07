@@ -1,3 +1,4 @@
+import { gameWeekLabel } from './gameWeek';
 import type {
     StreamingBiddingRightsLot,
     StreamingLicenseExclusivity,
@@ -190,6 +191,11 @@ const getContractCountryIds = (contract: StreamingRightsContract): string[] => {
     return bounded.length ? bounded : [...CANONICAL_COUNTRY_IDS];
 };
 
+/** #244: a worldwide deal covers every market, also one opened after day one: BD, NL, PK and PL are not on the day-one list */
+const contractCoversCountry = (contract: StreamingRightsContract, countryId: string): boolean => (
+    contract.territory === 'GLOBAL' || getContractCountryIds(contract).includes(countryId)
+);
+
 const countryName = (countryId: string): string => (
     getStreamingDayOneMarket(countryId)?.country || countryId
 );
@@ -283,6 +289,7 @@ const sourceRestriction = (
 const summarize = (
     result: Omit<StreamingRightsCompatibilityResult, 'summary'>,
     registry: Record<string, StreamingRightsContract>,
+    from: number,
 ): string => {
     if (result.status === 'AVAILABLE') {
         return result.requestedCountryIds.length === CANONICAL_COUNTRY_IDS.length
@@ -297,7 +304,7 @@ const summarize = (
     if (firstCountry && firstContract && firstConflict.code === 'EXCLUSIVE_OVERLAP') {
         const until = firstConflict.earliestCompatibleStartWeek === null
             ? 'permanently'
-            : `until Week ${Math.max(0, firstConflict.earliestCompatibleStartWeek - 1)}`;
+            : `until ${gameWeekLabel(Math.max(0, firstConflict.earliestCompatibleStartWeek - 1), from)}`;
         return `${countryName(firstCountry)} is exclusively licensed to ${contractBuyerName(firstContract)} ${until}.`;
     }
     if (result.status === 'PARTIALLY_AVAILABLE') {
@@ -334,7 +341,7 @@ export const resolveStreamingRightsCompatibility = (
             blockedCountryIds: [], compatibleWindowTypes: [], controllingContractIds: [],
             conflicts: [conflict], earliestCompatibleStartWeek: null,
         };
-        return { ...result, summary: summarize(result, registry) };
+        return { ...result, summary: summarize(result, registry, input.startsAtAbsoluteWeek) };
     }
 
     const legacyHold = input.world.legacyStreamingRightsHolds?.[input.sourceProjectId];
@@ -346,7 +353,7 @@ export const resolveStreamingRightsCompatibility = (
             compatibleWindowTypes: [], controllingContractIds: [],
             conflicts: [conflict], earliestCompatibleStartWeek: null,
         };
-        return { ...result, summary: summarize(result, registry) };
+        return { ...result, summary: summarize(result, registry, input.startsAtAbsoluteWeek) };
     }
 
     const sourceClauseConflict = sourceRestriction(input, registry, requestedCountryIds);
@@ -358,7 +365,7 @@ export const resolveStreamingRightsCompatibility = (
             conflicts: [sourceClauseConflict],
             earliestCompatibleStartWeek: sourceClauseConflict.earliestCompatibleStartWeek,
         };
-        return { ...result, summary: summarize(result, registry) };
+        return { ...result, summary: summarize(result, registry, input.startsAtAbsoluteWeek) };
     }
 
     const compatibilityIndex = getStreamingRightsRegistryCompatibilityIndex(registry);
@@ -381,7 +388,7 @@ export const resolveStreamingRightsCompatibility = (
         ));
     if (relatedContracts.length) {
         const overlappingCountries = requestedCountryIds.filter(countryId => relatedContracts.some(contract => (
-            getContractCountryIds(contract).includes(countryId)
+            contractCoversCountry(contract, countryId)
         )));
         if (overlappingCountries.length) {
             const conflict = makeConflict('RELATED_IP_RESTRICTED', overlappingCountries, relatedContracts);
@@ -392,7 +399,7 @@ export const resolveStreamingRightsCompatibility = (
                 controllingContractIds: conflict.contractIds, conflicts: [conflict],
                 earliestCompatibleStartWeek: conflict.earliestCompatibleStartWeek,
             };
-            return { ...result, summary: summarize(result, registry) };
+            return { ...result, summary: summarize(result, registry, input.startsAtAbsoluteWeek) };
         }
     }
 
@@ -400,7 +407,7 @@ export const resolveStreamingRightsCompatibility = (
     const blocked = new Set<string>();
     for (const countryId of requestedCountryIds) {
         const overlapping = exactContracts.filter(contract => (
-            getContractCountryIds(contract).includes(countryId)
+            contractCoversCountry(contract, countryId)
             && windowsOverlap(
                 input.startsAtAbsoluteWeek,
                 input.expiresAtAbsoluteWeek,
@@ -459,7 +466,7 @@ export const resolveStreamingRightsCompatibility = (
         conflicts,
         earliestCompatibleStartWeek,
     };
-    return { ...result, summary: summarize(result, registry) };
+    return { ...result, summary: summarize(result, registry, input.startsAtAbsoluteWeek) };
 };
 
 export const formatStreamingRightsCompatibilitySummary = (

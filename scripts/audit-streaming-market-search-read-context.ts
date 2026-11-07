@@ -22,8 +22,9 @@ if (process.argv.includes('--snapshots')) {
 
 // Recorded from checkpoint 9d770f3 before the read batching change. These cover
 // complete title metadata, ordering, status/reasons and rotating shelf references.
+// #249: the first changed only where a reason says when: "until Week 1363" is now "until Week 12 in 2 years".
 assert.deepEqual(fingerprints, [
-    '4019951e7de6ac0a540baa6d2b6e5f94970fa34017e00f6b8278b196dc59792e',
+    '9eb4352f95844adbcd36628c4797c7a8747934dee4b27ed7618e5b795aaa001e',
     'c4152c5bc2a3e2957ee7262d3c648cca007f6b220c7711b7365323764b7610ce',
     '4fa00f21637aa4672422265afe262002c61bf7b755fed85d017c1dddd22fc5a6',
 ], 'Search batching must preserve the complete pre-change projections.');

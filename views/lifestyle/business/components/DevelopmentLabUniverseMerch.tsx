@@ -82,15 +82,12 @@ export const UniverseMerchView: React.FC<UniverseMerchViewProps> = ({ universe, 
                 }
             },
             businesses: player.businesses.map(b => b.id === studio.id ? updatedStudio : b),
-            logs: [
-                {
+            logs: [...(player.logs || []), {
                     week: player.currentWeek,
                     year: player.age,
                     message: tr('services.business.universeMerch.log.launched', { productName: getUniverseProductName(blueprint.id), universeName: universe.name }),
                     type: 'positive' as const
-                },
-                ...(player.logs || [])
-            ].slice(0, 50)
+                }]
         };
 
         onUpdatePlayer(updatedPlayer);

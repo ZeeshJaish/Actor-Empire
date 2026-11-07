@@ -304,33 +304,19 @@ assert(oversized.weeklyDecisions.length === OWNED_STREAMING_WEEKLY_DECISION_LIMI
 
 const serviceSource = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
 const gameLoopSource = readFileSync(resolve(process.cwd(), 'services/gameLoop.ts'), 'utf8');
-const componentSource = readFileSync(resolve(process.cwd(), 'components/StreamingWeeklyCeoLoop.tsx'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const entrySource = readFileSync(resolve(process.cwd(), 'components/StreamingLockedScreen.tsx'), 'utf8');
 const lifestyleSource = readFileSync(resolve(process.cwd(), 'views/LifestylePage.tsx'), 'utf8');
 const appSource = readFileSync(resolve(process.cwd(), 'App.tsx'), 'utf8');
-const styleSource = readFileSync(resolve(process.cwd(), 'styles/streaming-weekly-loop.css'), 'utf8');
 
 assert(!serviceSource.includes('Math.random'), 'Owned-platform weekly outcomes must never use uncontrolled randomness.');
 assert(serviceSource.includes('createDeterministicRng'), 'The weekly simulation should use the shared seeded RNG.');
 assert(gameLoopSource.includes('processOwnedStreamingPlatformWeek(nextPlayer)'), 'The real game-week processor should own Phase 10 execution.');
 assert(gameLoopSource.includes("emitLoopStage('owned_streaming_start')"), 'Streaming week processing should appear in crash diagnostics.');
-[
-    'PHASE 10 • WEEKLY CEO LOOP',
-    'The week has a story.',
-    'AUDIENCE MOVEMENT',
-    'PLATFORM CONTRIBUTION',
-    'WHY IT HAPPENED',
-    'NEXT-WEEK HOOK',
-    'ONE-WEEK MANDATE',
-    'Return to game and advance week',
-].forEach(fragment => assert(componentSource.includes(fragment), `Phase 10 UI should include ${fragment}.`));
 /* #176 (Zeesh: "weekly brief hata do game se"): the weekly brief left the game, so nothing mounts the loop any more */
 assert(!hqSource.includes('<StreamingWeeklyCeoLoop'), 'Platform HQ no longer mounts the weekly CEO loop (#176).');
 assert(entrySource.includes('onReturnToGame={onReturnToGame}'), 'The streaming entry should preserve the return-to-game callback.');
 assert(lifestyleSource.includes('onReturnToGame={onReturnHome'), 'Lifestyle should bridge the streaming CTA back to the main game.');
 assert(appSource.includes('onReturnHome={() => setActivePage(Page.HOME)}'), 'The weekly CTA should land on the real Home screen and its Next Week button.');
-assert(styleSource.includes('@media (min-width: 620px)'), 'The weekly loop should deliberately enhance larger layouts.');
-assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'Weekly transitions should respect reduced-motion preferences.');
 
 console.log('Streaming complete weekly CEO loop Phase 10 audit passed.');

@@ -92,16 +92,52 @@ export const calculateStreamingCatalogueReferenceValue = (
     component: Pick<StreamingCataloguePackageComponent, 'quality' | 'audience' | 'budget' | 'theatricalGross' | 'streamingRevenue' | 'franchiseProtected' | 'catalogueTier'>,
 ): number => {
     const quality = clamp(Number(component.quality), 0, 100);
-    const audienceValue = Math.min(180_000_000, Math.max(0, Number(component.audience) || 0) * 0.85);
-    const budgetProof = Math.min(90_000_000, finiteMoney(component.budget) * 0.22);
-    const theatricalProof = Math.min(260_000_000, finiteMoney(component.theatricalGross) * 0.18);
-    const streamingProof = Math.min(180_000_000, finiteMoney(component.streamingRevenue) * 0.45);
-    const qualityValue = quality * quality * 22_000;
-    const franchiseValue = component.franchiseProtected ? 28_000_000 : 0;
+    /* #315: one title, two years, worldwide, one service. Set against what the room pays for one title alone and what a rival can carry:
+       about 530M reachable homes, a top title moves 10 to 15M of them, a home is worth about $8. The room then multiplies this by about 2.4. */
+    const qualityValue = quality * quality * 3_500;
+    const theatricalProof = Math.min(150_000_000, finiteMoney(component.theatricalGross) * 0.06);
+    const budgetProof = Math.min(30_000_000, finiteMoney(component.budget) * 0.1);
+    const streamingProof = Math.min(60_000_000, finiteMoney(component.streamingRevenue) * 0.15);
+    const audienceProof = Math.min(40_000_000, Math.max(0, Number(component.audience) || 0) * 0.1);
     return Math.max(1_000_000, Math.round((
-        1_000_000 + audienceValue + budgetProof + theatricalProof + streamingProof + qualityValue + franchiseValue
-    ) * (component.catalogueTier === 'MARQUEE' ? 2 : 1)));
+        qualityValue + theatricalProof + budgetProof + streamingProof + audienceProof
+    ) * (component.franchiseProtected ? 1.15 : 1) * (component.catalogueTier === 'MARQUEE' ? 2 : 1)));
 };
+
+/** #315: share of the world's rights money in these markets (US, Canada, Mexico, Brazil, Argentina are 32% of it, and 34% of reachable homes) */
+export const getStreamingRightsMarketShare = (countryIds: readonly string[]): number => {
+    const wanted = new Set(countryIds);
+    const total = STREAMING_DAY_ONE_MARKETS.reduce((sum, market) => sum + market.openingRightsEstimate, 0);
+    return total > 0 ? STREAMING_DAY_ONE_MARKETS.reduce((sum, market) => sum + (wanted.has(market.id) ? market.openingRightsEstimate : 0), 0) / total : 1;
+};
+
+/**
+ * #315: what the deal itself is worth against two years, worldwide, one service. Duration and exclusivity are the steps of the direct
+ * licence quote (`getStreamingLicenseQuote`), so the two prices speak the same language. Fewer markets cost less, and a title already on
+ * another service in those markets is worth less to the next one.
+ */
+export const getStreamingRightsDealFactor = (input: {
+    durationWeeks: number;
+    exclusivity: StreamingLicenseExclusivity;
+    marketShare: number;
+    otherLicences?: number;
+}): number => {
+    const duration = input.durationWeeks >= 260 ? 1.65 : input.durationWeeks >= 156 ? 1.32 : input.durationWeeks >= 104 ? 1 : 0.72;
+    const shared = input.exclusivity === 'EXCLUSIVE' ? 1 : 1 / 1.75;
+    const markets = 0.35 + 0.65 * clamp(input.marketShare, 0, 1);
+    return duration * shared * markets / (1 + 0.6 * Math.max(0, Number(input.otherLicences) || 0));
+};
+
+/** #315: one title's worth in this deal */
+export const getStreamingCatalogueDealValue = (
+    component: Pick<StreamingCataloguePackageComponent, 'quality' | 'audience' | 'budget' | 'theatricalGross' | 'streamingRevenue' | 'franchiseProtected' | 'catalogueTier' | 'rightsLot' | 'otherLicences'>,
+    deal: { maximumDurationWeeks: number; exclusivity: StreamingLicenseExclusivity },
+): number => Math.max(1_000_000, Math.round(calculateStreamingCatalogueReferenceValue(component) * getStreamingRightsDealFactor({
+    durationWeeks: Math.min(deal.maximumDurationWeeks, component.rightsLot.maximumDurationWeeks),
+    exclusivity: deal.exclusivity,
+    marketShare: getStreamingRightsMarketShare(component.rightsLot.countryIds),
+    otherLicences: component.otherLicences,
+})));
 
 export interface AllocateStreamingCatalogueGuaranteeInput {
     minimumGuaranteesByProject?: Record<string,number>;
@@ -334,6 +370,8 @@ const normalizePackage = (value: unknown): StreamingCataloguePackage | null => {
             } satisfies StreamingBiddingRightsLot,
             referenceValue: finiteMoney(component.referenceValue),
             referenceWeight: Math.max(0, finiteNumber(component.referenceWeight, 0)),
+            /* only when there are any: a live auction's saved signature is taken over these rows, and a new zero here would cancel the auction when it settles */
+            ...(finiteNumber(component.otherLicences, 0) > 0 ? { otherLicences: Math.round(finiteNumber(component.otherLicences, 0)) } : {}),
         } satisfies StreamingCataloguePackageComponent];
     }).sort((left, right) => left.sourceProjectId.localeCompare(right.sourceProjectId));
     if (components.length < 2) return null;
@@ -629,6 +667,11 @@ export const createStreamingCataloguePackage = (
             streamingRevenue: finiteMoney(project.streamingRevenue || project.projectDetails?.streamingRevenue),
             franchiseProtected: Boolean(project.franchiseId || project.universeId || project.projectDetails?.franchiseId || project.projectDetails?.universeId),
             rightsLot: lotBuild.lot,
+            /* #315: already on another service in these markets */
+            otherLicences: Object.values(player.world.streamingRightsContracts || {}).filter(contract => contract.sourceProjectId === projectId
+                && contract.status === 'ACTIVE'
+                && contract.expiresAtAbsoluteWeek > input.startsAtAbsoluteWeek
+                && (!contract.countryIds?.length || contract.countryIds.some(countryId => lotBuild.lot!.countryIds.includes(countryId)))).length,
             referenceValue: 0,
             referenceWeight: 0,
         });
@@ -636,7 +679,7 @@ export const createStreamingCataloguePackage = (
     components.sort((left, right) => left.sourceProjectId.localeCompare(right.sourceProjectId));
     excluded.sort((left, right) => left.projectId.localeCompare(right.projectId));
     if (components.length < 2) return { player, package: null, reason: 'NOT_ENOUGH_ELIGIBLE_TITLES' };
-    const referenceValues = components.map(component => calculateStreamingCatalogueReferenceValue(component));
+    const referenceValues = components.map(component => getStreamingCatalogueDealValue(component, { maximumDurationWeeks: input.maximumDurationWeeks, exclusivity: input.exclusivity }));
     const referenceTotal = referenceValues.reduce((sum, value) => sum + value, 0);
     const valuedComponents = components.map((component, index) => ({
         ...component,
@@ -782,7 +825,8 @@ export const getStreamingCataloguePackageDesk = (
         .filter(cataloguePackage => cataloguePackage.seller.id === studioId)
         .sort((left, right) => right.createdAtAbsoluteWeek - left.createdAtAbsoluteWeek || left.id.localeCompare(right.id));
     const unresolved = packages.filter(cataloguePackage => ['DRAFT', 'READY', 'LIVE'].includes(cataloguePackage.lifecycle));
-    const reservedIds = new Set(unresolved.flatMap(cataloguePackage => cataloguePackage.components.map(component => component.sourceProjectId)));
+    /* #316: only a room that is open holds a title. The team's idea for a package does not take its best titles off the shelf. */
+    const reservedIds = new Set(unresolved.filter(cataloguePackage => cataloguePackage.lifecycle === 'LIVE').flatMap(cataloguePackage => cataloguePackage.components.map(component => component.sourceProjectId)));
     const eligibleTitles = [...getCompletedStudioProjectMap(player, studioId).values()]
         .filter(project => !reservedIds.has(project.id))
         .map(project => ({

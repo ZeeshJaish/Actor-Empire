@@ -3,6 +3,7 @@ import { BASE_CSS } from './theme';
 import { Icon, Meter, Segmented, Sheet, Style, clamp, compactMoney, cssVar, money, useReveal } from './ui';
 import type { SocialInteractionType, SocialUiGeneration, SocialUiHeir, SocialUiModel, SocialUiMove, SocialUiPerson } from '../../services/socialUiAdapter';
 import type { Relationship } from '../../types';
+import { AgeGatePopup } from '../AgeGatePopup';
 
 interface SocialScreenProps extends SocialUiModel {
   onMove: (person: SocialUiPerson, action: SocialInteractionType) => void;
@@ -71,6 +72,7 @@ export default function SocialScreen(props: SocialScreenProps) {
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [submenu, setSubmenu] = React.useState<SocialUiMove | null>(null);
   const [legacyCandidate, setLegacyCandidate] = React.useState<SocialUiHeir | null>(null);
+  const [showAgeGate, setShowAgeGate] = React.useState(false);
   const sorted = props.people.slice().sort((left, right) => right.lastTouchWeeks - left.lastTouchWeeks || left.bond - right.bond);
   const quiet = sorted.filter(person => person.lastTouchWeeks >= 12 && person.relationship.relation !== 'Deceased Parent');
   const cold = quiet.filter(person => person.lastTouchWeeks >= 52).length;
@@ -83,6 +85,7 @@ export default function SocialScreen(props: SocialScreenProps) {
 
   const openPerson = (person: SocialUiPerson) => { setSubmenu(null); setOpenId(person.id); };
   const selectMove = (person: SocialUiPerson, selectedMove: SocialUiMove) => {
+    if (selectedMove.ageLocked) { setShowAgeGate(true); return; }
     if (selectedMove.choices?.length) { setSubmenu(selectedMove); return; }
     if (!selectedMove.action || selectedMove.disabled) return;
     props.onMove(person, selectedMove.action);
@@ -113,6 +116,8 @@ export default function SocialScreen(props: SocialScreenProps) {
   </div>
 
   <Sheet open={Boolean(open)} onClose={() => { setOpenId(null); setSubmenu(null); }} head={open ? <div className="cx-file"><Ring person={open} /><div className="cx-file-t"><span className="ae-lab" style={{ color: 'var(--gold)' }}>{submenu ? submenu.name : 'Relationship file'}</span><div className="cx-file-n">{open.name}</div><span className="ae-lab" style={{ marginTop: 6 }}>{open.role}{open.age !== undefined ? ` · AGE ${open.age}` : ''}</span></div></div> : undefined}>{open && <>{submenu && <button className="cx-back" onClick={() => setSubmenu(null)}><Icon name="back" size={13} />ALL ACTIONS</button>}{!submenu && <><p className="cx-file-b">{open.blurb}</p><div className="cx-stats"><div className="cx-stat"><span className="ae-lab">Bond</span><b style={{ color: bondHue(open.bond) }}>{Math.round(open.bond)}</b><Meter value={open.bond} color={bondHue(open.bond)} thin /></div><div className="cx-stat"><span className="ae-lab">Status</span><b>{open.status}</b></div><div className="cx-stat"><span className="ae-lab">Last touch</span><b style={{ fontSize: 14, color: heatHue(open.lastTouchWeeks) }}>{open.lastTouchWeeks >= 104 ? `${Math.round(open.lastTouchWeeks / 52)}y ago` : open.lastTouchWeeks <= 0 ? 'This week' : `${open.lastTouchWeeks}w ago`}</b></div></div></>}<div className="ae-sec"><span className="ae-lab">{submenu ? 'Choose route' : 'Social actions'}</span><span className="ae-sec-rule" /><span className="ae-lab">{props.energy}E · {compactMoney(props.money)}</span></div><div className="cx-moves">{(submenu?.choices || open.moves).map(item => <MoveCard key={item.id} move={item} onClick={() => selectMove(open, item)} />)}</div>{open.moves.length === 0 && <div className="cx-next"><Icon name="crown" size={26} /><b>Preserved in memory</b><p>This bond is part of the family legacy and has no weekly actions.</p></div>}</>}</Sheet>
+
+  {showAgeGate && <AgeGatePopup language={props.language} onClose={() => setShowAgeGate(false)} />}
 
   <Sheet open={Boolean(legacyCandidate)} onClose={() => setLegacyCandidate(null)} eyebrow="Legacy transfer" eyebrowIcon="crown" title={legacyCandidate ? `Continue as ${legacyCandidate.name}` : ''}>{legacyCandidate && <><div className="cx-transfer"><p>Retire the current character and continue the same game as this heir. This is a permanent generational handoff.</p><div className="cx-transfer-grid"><div className="cx-transfer-stat"><span className="ae-lab">Cash after tax</span><b>{compactMoney(props.inheritance.inheritedMoney)}</b><span className="cx-gen-d">−{compactMoney(props.inheritance.moneyTaxPaid)}</span></div><div className="cx-transfer-stat"><span className="ae-lab">Shares after tax</span><b>{props.inheritance.inheritedShares.toLocaleString()}</b><span className="cx-gen-d">−{props.inheritance.sharesTaxPaid.toLocaleString()} shares</span></div></div><p className="cx-transfer-note">Assets and businesses transfer without inheritance tax. Government tax rate: {Math.round(props.inheritance.taxRate * 100)}%.</p></div><button className="ae-btn" style={{ marginTop: 14 }} onClick={() => { if (legacyCandidate.continuationRelationship) props.onContinueAsChild(legacyCandidate.continuationRelationship); setLegacyCandidate(null); }}><Icon name="crown" size={15} />Confirm legacy shift</button></>}</Sheet>
   </div>;

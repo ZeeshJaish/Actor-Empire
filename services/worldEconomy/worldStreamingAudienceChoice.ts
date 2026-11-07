@@ -396,6 +396,11 @@ export const normalizeWorldStreamingAudienceChoiceState = (
     return createWorldStreamingAudienceChoiceState(player, absoluteWeek, input);
 };
 
+/** #256: this week's state as it stands: the week rebuilds it, and a screen's update does not have to */
+export const isThisWeeksWorldStreamingAudienceChoiceState = (input: WorldStreamingAudienceChoiceState | undefined, absoluteWeek: number): boolean => (
+    Boolean(input) && validCurrentState(input!, absoluteWeek)
+);
+
 /** Explicit C4 transaction hook: never infer a purchase from opportunity counts alone. */
 type PreparedEntitlementSettlement = {
     routeFor: ReturnType<typeof createPlayerStreamingTitleRouteEvaluator>;

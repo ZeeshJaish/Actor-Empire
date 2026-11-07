@@ -26,6 +26,13 @@ export const getInHouseCrewProjectCost = (level: number): number => {
     return Math.round(120_000 + (safe * 105_000) + (safe * safe * 7_500));
 };
 
+/**
+ * #306: the Writing Room writes your in-house scripts. It was upgradeable and charged overhead, but the script's skill was always 45.
+ * Level 1 is what it always was, level 10 is 90, and a better room costs more per script (level 10: $500K).
+ */
+export const getInHouseWriterSkill = (level: number): number => 45 + (Math.max(1, safeLevel(level)) - 1) * 5;
+export const getInHouseScriptCost = (level: number): number => 5_000 * Math.max(1, safeLevel(level)) ** 2;
+
 export const getInHouseCastProjectCost = (level: number): number => {
     const safe = safeLevel(level);
     if (safe <= 0) return 0;

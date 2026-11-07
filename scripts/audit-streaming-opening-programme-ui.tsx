@@ -18,6 +18,7 @@ const baseView: StreamingOpeningProgrammeView = {
     cityCount: 6,
     rackCount: 118,
     releasedCapital: 465_000_000,
+    progress: 0.07, totalWeeks: 15, citiesOnline: 0,
     workstreams: [
         {
             id: 'INFRASTRUCTURE', label: 'Infrastructure', status: 'IN_PROGRESS',
@@ -44,22 +45,30 @@ const auditBrand: Brand = {
     identLen: 2, ratingId: 'MATURE', lockupId: 'SIDE', serverCity: null,
 };
 
+const network = { built: true, sites: [
+  { id: 'NYC', name: 'New York', countryCode: 'US', lat: 40.7, lng: -74, racks: 40, role: 'CORE ORIGIN' as const, reachKm: 400, tier: 1 as const },
+  { id: 'LON', name: 'London', countryCode: 'GB', lat: 51.5, lng: -0.1, racks: 30, role: 'REGIONAL HUB' as const, reachKm: 300, tier: 1 as const },
+  { id: 'BOM', name: 'Mumbai', countryCode: 'IN', lat: 19, lng: 72.8, racks: 20, role: 'EDGE CACHE' as const, reachKm: 200, tier: 2 as const },
+], markets: [], reached: 1, served: 1, revision: 1, pending: null, peakStreams: 0, capacityStreams: 0, weeklyOperatingCost: 0 };
 const props = {
     brand: auditBrand,
+    network,
+    plan: <p>THE APPROVED PLAN</p>,
     focus: 'OVERVIEW' as const,
     onBack: () => undefined,
-    onOpenCommissionedPlan: () => undefined,
     onResolveClearance: () => undefined,
     onOpeningNight: () => undefined,
 };
 
 const executingMarkup = renderToStaticMarkup(<StreamingOpeningProgramme {...props} view={baseView} />);
-assert.match(executingMarkup, /THE OPENING PROGRAMME/);
-assert.match(executingMarkup, /Earliest opening/);
-assert.match(executingMarkup, /Week 2115/);
-assert.match(executingMarkup, /Controls the date/);
-assert.match(executingMarkup, /Infrastructure/);
-assert.match(executingMarkup, /Opening Night · 14 weeks remaining/);
+assert.match(executingMarkup, /BEING BUILT/);
+assert.match(executingMarkup, /Opens around Week 36/);
+assert.match(executingMarkup, /SETS THE DATE/);
+assert.match(executingMarkup, /The network/);
+assert.match(executingMarkup, /OPENING NIGHT · 14 WEEKS/);
+assert.match(executingMarkup, /WHAT YOU APPROVED/);
+assert.match(executingMarkup, /\$465M/, 'money in words, not $14021 M');
+assert.match(executingMarkup, /Locked until opening night/);
 assert.match(executingMarkup, /disabled=""/);
 assert.doesNotMatch(executingMarkup, /Skip/);
 assert.doesNotMatch(executingMarkup, /[0-9]+\/[0-9]+/);
@@ -78,7 +87,7 @@ const actionMarkup = renderToStaticMarkup(<StreamingOpeningProgramme
         } : item),
     }}
 />);
-assert.match(actionMarkup, /ACTION REQUIRED/);
+assert.match(actionMarkup, /NEEDS YOU/);
 assert.match(actionMarkup, /Resolve government request/);
 
 const readyMarkup = renderToStaticMarkup(<StreamingOpeningProgramme
@@ -87,8 +96,9 @@ const readyMarkup = renderToStaticMarkup(<StreamingOpeningProgramme
     view={{ ...baseView, state: 'READY_TO_OPEN', remainingWeeks: 0, controllingWorkstreamId: null,
         workstreams: baseView.workstreams.map(item => ({ ...item, controlsDate: false, status: item.id === 'REHEARSAL' ? 'PASSED' : 'READY' })) }}
 />);
-assert.match(readyMarkup, /READY FOR OPENING NIGHT/);
-assert.match(readyMarkup, /Begin Opening Night/);
+assert.match(readyMarkup, /OPENING NIGHT/);
+assert.match(readyMarkup, /IS READY/);
+assert.match(readyMarkup, /BEGIN OPENING NIGHT/);
 assert.doesNotMatch(readyMarkup, /disabled=""/);
 
 console.log('Streaming Opening Programme UI audit passed.');

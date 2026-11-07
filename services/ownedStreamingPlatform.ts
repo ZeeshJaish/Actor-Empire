@@ -1,3 +1,4 @@
+import type { OwnedStreamingAudienceReport, OwnedStreamingOriginalPitchState } from '../types';
 import type { StreamingExecutiveExitReason } from '../types';
 import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
 import { normalizeStreamingContentMarketDraft } from './streamingContentMarketDraft';
@@ -548,9 +549,11 @@ const LEDGER_EVENT_TYPES: OwnedStreamingLedgerEventType[] = [
     'PRODUCT_LAUNCHED',
     'PRODUCT_STATUS_CHANGED',
     'CATALOG_IMPORTED',
+    'CATALOG_PULLED',
     'LICENSE_NEGOTIATION_UPDATED',
     'LICENSE_SIGNED',
     'ORIGINAL_COMMISSIONED',
+    'ORIGINAL_ISSUE_PAID',
     'ORIGINAL_GREENLIT',
     'ORIGINAL_LOCALIZATION_COMMITTED',
     'TITLE_LOCALIZATION_COMMITTED',
@@ -3688,6 +3691,23 @@ const normalizeOriginalCommissionDraft = (value: unknown): OwnedStreamingOrigina
     };
 };
 
+/* #279: the wizard reads a pitch's script and concept as they are, so this only checks the outline and keeps at most 5 alive */
+const normalizeOriginalPitchState = (value: unknown): OwnedStreamingOriginalPitchState => {
+    const source = asRecord(value);
+    return {
+        cycle: Math.round(clamp(source.cycle, -1, Number.MAX_SAFE_INTEGER, -1)),
+        scoutCycle: Math.round(clamp(source.scoutCycle, -1, Number.MAX_SAFE_INTEGER, -1)),
+        scoutCount: Math.round(clamp(source.scoutCount, 0, 1_000, 0)),
+        pitches: asArray<any>(source.pitches)
+            .filter(pitch => pitch && typeof pitch.id === 'string' && pitch.script?.id && pitch.concept?.scriptId)
+            .slice(-5),
+        passed: asArray<any>(source.passed)
+            .filter(item => item && typeof item.id === 'string' && typeof item.title === 'string')
+            .slice(-12),
+        ...(typeof source.recommendedPitchId === 'string' ? { recommendedPitchId: source.recommendedPitchId } : {}),
+    };
+};
+
 const normalizeOriginalCommission = (value: unknown): OwnedStreamingOriginalCommission | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const source = asRecord(value);
@@ -3754,6 +3774,15 @@ const normalizeOriginalCommission = (value: unknown): OwnedStreamingOriginalComm
                 authorizedAtAbsoluteWeek: Math.max(0, Math.round(clamp(releaseSource.authorizedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
             }
             : null,
+        ...(source.way === 'PITCH' || source.way === 'OUTSIDE' || source.way === 'OWN_STUDIO' ? { way: source.way } : {}),
+        ...(source.deal === 'BUY' || source.deal === 'LICENCE' ? { deal: source.deal } : {}),
+        ...(Number.isFinite(Number(source.making)) && source.making !== undefined ? { making: Math.round(Number(source.making)) } : {}),
+        ...(Number.isFinite(Number(source.fee)) && source.fee !== undefined ? { fee: Math.round(Number(source.fee)) } : {}),
+        ...(Number.isFinite(Number(source.feePercent)) && source.feePercent !== undefined ? { feePercent: Math.round(Number(source.feePercent)) } : {}),
+        ...(Number.isFinite(Number(source.licenceEndsAtAbsoluteWeek)) && source.licenceEndsAtAbsoluteWeek !== undefined ? { licenceEndsAtAbsoluteWeek: Math.round(Number(source.licenceEndsAtAbsoluteWeek)) } : {}),
+        ...(Array.isArray(source.issues) ? { issues: source.issues as any } : {}),
+        ...(Array.isArray(source.notes) ? { notes: source.notes.map(String).slice(0, 12) } : {}),
+        ...(typeof source.nextSeasonCommissionId === 'string' ? { nextSeasonCommissionId: source.nextSeasonCommissionId } : {}),
         lifecycleDecision: decisionId
             ? {
                 id: decisionId,
@@ -4548,6 +4577,7 @@ export const normalizeOwnedStreamingPlatformState = (
                     : {}) }
             : undefined,
         contentMarketDraft: normalizeStreamingContentMarketDraft(source.contentMarketDraft),
+        ...(asRecord(source.titleEarlyViews) && Object.keys(asRecord(source.titleEarlyViews)).length ? { titleEarlyViews: Object.fromEntries(Object.entries(asRecord(source.titleEarlyViews)).map(([id, views]) => [String(id).slice(0, 120), Math.max(0, Math.round(Number(views) || 0))])) } : {}),
         buyerAuctionSessions: normalizeStreamingBuyerAuctionSessions(source.buyerAuctionSessions),
         upcomingRightsSales: dedupeByKey(
             asArray<unknown>(source.upcomingRightsSales)
@@ -4576,6 +4606,8 @@ export const normalizeOwnedStreamingPlatformState = (
             obligation => obligation.id,
         ).slice(-160),
         originalCommissionDraft: normalizeOriginalCommissionDraft(source.originalCommissionDraft),
+        ...(source.originalPitches && typeof source.originalPitches === 'object' ? { originalPitches: normalizeOriginalPitchState(source.originalPitches) } : {}),
+        ...(source.audienceReport && typeof source.audienceReport === 'object' && Array.isArray((source.audienceReport as any).gaps) ? { audienceReport: source.audienceReport as OwnedStreamingAudienceReport } : {}),
         contentAccounting: normalizeStreamingContentAccounting(source.contentAccounting),
         originalCommissions: dedupeByKey(
             asArray<unknown>(source.originalCommissions)

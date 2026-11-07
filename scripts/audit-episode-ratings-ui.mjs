@@ -31,27 +31,9 @@ const pt = read('services/localization/locales/pt-BR.ts');
 
 assert(dashboard.includes('max-h-[460px] overflow-auto'), 'Production dashboard scorecard should allow long seasons to scroll vertically.');
 
-[
-  'const franchiseId = details.franchiseId || original.franchiseId;',
-  'const titleKey = normalizeSeriesTitleKey(project.name || details.title || original.name || original.title);',
-  'const sourceScriptId = details.sourceScriptId || original.sourceScriptId;',
-  '? `franchise:${franchiseId}`',
-  '? `title:${titleKey}`',
-  '? `script:${sourceScriptId}`',
-].forEach(token => {
-  assert(imdb.includes(token), `IMDb series grouping should prefer stable show identity before script id: ${token}`);
-});
-
-[
-  'const franchiseId = details.franchiseId || project?.franchiseId;',
-  "const titleKey = normalizeScorecardSeriesTitle(project?.name || project?.title || details.title || '');",
-  'const sourceScriptId = details.sourceScriptId || project?.sourceScriptId;',
-  '? `franchise:${franchiseId}`',
-  '? `title:${titleKey}`',
-  '? `script:${sourceScriptId}`',
-].forEach(token => {
-  assert(dashboard.includes(token), `Production dashboard scorecard grouping should prefer stable show identity before script id: ${token}`);
-});
+// #272: the IMDb page and the producer's scorecard share one idea of a show. audit-series-identity.ts tests it.
+assert(imdb.includes('groupSeriesRows('), 'IMDb series grouping should use the shared series identity.');
+assert(dashboard.includes('groupSeriesRows('), 'Production dashboard scorecard grouping should use the shared series identity.');
 
 [
   'imdb.project.episodeRatings',

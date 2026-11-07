@@ -423,7 +423,7 @@ const readUi = (fileName: string): string => fs.readFileSync(
     'utf8',
 );
 /* #141: the Platform Wars room is removed; the wizards still draw rivals with the shared brand. */
-for (const wizardFile of ['StreamingDefineLaunchWizard.tsx', 'StreamingMarketExpansionWizard.tsx']) {
+for (const wizardFile of ['StreamingMarketExpansionWizard.tsx']) {
     const wizardSource = readUi(wizardFile);
     assert.ok(
         wizardSource.includes('StreamingPlatformBrand brand={rival.brand}'),

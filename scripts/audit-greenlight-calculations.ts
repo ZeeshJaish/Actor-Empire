@@ -55,6 +55,7 @@ assert.deepEqual(budget, {
     crew: 10_000_000,
     locationCost: 3_000_000,
     equipmentCost: 783_000,
+    effectsCost: 0,
 });
 
 assert.equal(

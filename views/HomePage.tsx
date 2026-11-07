@@ -1,6 +1,8 @@
 
+import { inActivityOrder, inFeedOrder, isOldWorldLine } from '../services/activityLog';
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Player, ActorSkills, Commitment, ScheduledEvent, Message, AuditionOpportunity, UniverseContract, UniverseId, Page, Genre, Relationship, LifeEvent, Script, OutsideProducerInvestmentOffer, OutsideProductionInvestment, PlayerProductionFocus } from '../types';
+import type { StreamingLaunchOutcomeTier } from '../types';
 import { formatMoney } from '../services/formatUtils';
 import { StatsBar } from '../components/StatsBar';
 import { formatRoleRejectionReview, generateProjectDetails, getRoleRejectionFeedback, ROLE_DEFINITIONS } from '../services/roleLogic';
@@ -126,6 +128,9 @@ const safeExportHomePortrait = (selection: ProfileBuilderSelection, exportScale 
   return exportProfilePortrait(selection, exportScale);
 };
 
+/* #263: the dev menu's replay of the opening night. Loaded when asked for, and nowhere else. */
+const NightReplay = React.lazy(() => import('../components/streaming-transplant/opening-night/NightReplay'));
+
 const cheatWeekFromAbsolute = (absoluteWeek: number): { year: number; week: number } => ({
   year: Math.max(18, Math.floor(Math.max(1, absoluteWeek) / 52)),
   week: Math.max(1, Math.max(1, absoluteWeek) % 52 || 52)
@@ -137,6 +142,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
   // Cheat Menu State
+  const [nightReplay,setNightReplay]=useState<{tier:StreamingLaunchOutcomeTier;run:number}|null>(null);
+  const playNight=(tier:StreamingLaunchOutcomeTier)=>{setActiveCheatMenu('NONE');setNightReplay({tier,run:0});};
   const [streamingQaFeedback,setStreamingQaFeedback]=useState('');
   const [streamingQaBusy,setStreamingQaBusy]=useState(false);
   const streamingQaLock=useRef(false);
@@ -178,8 +185,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
   const lastClickRef = useRef(0);
   const avatarClickTimeoutRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const liveFeedLogs = useMemo(() => (player.logs || []).filter(log => {
+  const liveFeedLogs = useMemo(() => inActivityOrder<typeof player.logs[number]>(player.logs || []).filter(log => {
     const message = String(log.message || '');
+    if (isOldWorldLine(message)) return false;
     if (/appointed .+ as (Investor CEO|Managing Partner|Finance CEO|Media President|Regional Chair)/i.test(message)) return false;
     if (/now leads the music charts|turns ".+" into a culture moment|beats ".+" for #1|became a music-scene rivalry|hit a .+ music scandal/i.test(message)) return false;
     return true;
@@ -3211,6 +3219,12 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           </div>
       )}
 
+      {nightReplay && (
+          <React.Suspense fallback={<div className="fixed inset-0 z-[2000] bg-black" />}>
+              <NightReplay key={nightReplay.run} player={player} tier={nightReplay.tier} onClose={()=>setNightReplay(null)} onAgain={()=>setNightReplay(value=>value&&{...value,run:value.run+1})} />
+          </React.Suspense>
+      )}
+
       {/* CHEAT MENU OVERLAY */}
       {activeCheatMenu !== 'NONE' && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -3937,6 +3951,15 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                               >
                                   Streaming Founder Ready
                               </button>
+                              <section className="rounded-xl border border-blue-400/30 bg-blue-950/20 p-3 space-y-2" aria-label="Opening night replay">
+                                <p className="text-xs font-bold text-blue-200">Play opening night</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <button type="button" onClick={()=>playNight('SMOOTH_OPENING')} className="rounded-lg border border-blue-400/40 bg-blue-500/10 px-1 py-3 text-xs font-black text-blue-100">It held</button>
+                                  <button type="button" onClick={()=>playNight('PRESSURED_OPENING')} className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-1 py-3 text-xs font-black text-amber-100">Held, just</button>
+                                  <button type="button" onClick={()=>playNight('DEGRADED_OPENING')} className="rounded-lg border border-red-400/40 bg-red-500/10 px-1 py-3 text-xs font-black text-red-100">It buckled</button>
+                                </div>
+                                <p className="text-xs text-zinc-400">Plays the whole night, any time, as often as you like. Changes nothing in your save.</p>
+                              </section>
                               {onStreamingLaunchQa && <section className="rounded-xl border border-cyan-400/30 bg-cyan-950/20 p-3 space-y-2" aria-label="Streaming launch test shortcuts">
                                 <p className="text-xs font-bold text-cyan-200">Streaming launch testing</p>
                                 <button type="button" disabled={isProcessing||streamingQaBusy||!fullPlatformQa.allowed} onClick={()=>void runStreamingQa('FULL_PLATFORM')} className="w-full rounded-lg border border-emerald-400/50 bg-emerald-950/30 px-3 py-3 text-left text-sm font-bold text-emerald-100 disabled:opacity-40">
@@ -4573,7 +4596,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           reputation: player.stats.reputation,
           fame: player.stats.fame,
         }}
-        feed={[...liveFeedLogs].sort((a, b) => b.year - a.year || b.week - a.week).map((log, index) => ({
+        feed={inFeedOrder(liveFeedLogs).map((log, index) => ({
           id: `${log.year}:${log.week}:${index}`,
           year: log.year,
           week: log.week,

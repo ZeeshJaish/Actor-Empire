@@ -420,6 +420,7 @@ export const processStreamingFundingContracts = ({
             const currentRecovery = Math.max(0, Math.floor(Number(existingRelation?.recoveryWeeksRemaining) || 0));
 
             nextRelations[funding.platformId] = {
+                ...existingRelation,
                 trustModifier: Math.max(-8, currentPenalty - 4),
                 recoveryWeeksRemaining: Math.min(36, Math.max(24, currentRecovery + 6)),
                 lastBreachWeek: currentWeek,

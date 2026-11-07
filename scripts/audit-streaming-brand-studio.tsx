@@ -143,7 +143,8 @@ assert.ok(!offer.includes('Use this storefront') && !offer.includes('Playback id
 const deck = source('components/streaming-transplant/StreamingPlatformCommandDeck.tsx');
 assert.ok(deck.includes('className={css.hqlogo} onClick={onOpenBrandStudio}') && deck.includes('Open the brand studio'), 'The HQ logo opens the studio');
 const hq = source('components/StreamingPlatformHQ.tsx');
-assert.ok(hq.includes('customMark: readIdentity.customMarkDataUrl || null') && hq.includes('typeId: readIdentity.typefaceId ||') && hq.includes('lockupId: readIdentity.wordmarkStyleId ||'),
+const hqBrand = source('components/streaming-transplant/streamingPlatformBrand.ts');
+assert.ok(hq.includes('streamingPlatformBrand(readPlatform') && hqBrand.includes('customMark: identity.customMarkDataUrl || null') && hqBrand.includes('typeId: identity.typefaceId ||') && hqBrand.includes('lockupId: identity.wordmarkStyleId ||'),
     'The HQ and the app draw the real logo, typeface and lockup');
 const app = (lockupId: string) => renderToStaticMarkup(createElement(ViewerApp, {
     brand: { ...brand, lockupId }, onBack: () => undefined,

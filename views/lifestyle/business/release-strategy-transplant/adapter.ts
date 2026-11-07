@@ -11,6 +11,7 @@ import type {
 const PHASE_LABELS: Record<ReleaseWizardPhase, string> = {
   DISTRIBUTION: 'Distribution',
   WAR: 'War Room',
+  YOURS: 'Your Platform',
   DESK: 'Theatrical Desk',
   CAMPAIGN: 'Campaign',
   FESTIVALS: 'Festivals',
@@ -54,8 +55,9 @@ export const getReleaseWizardPhase = (
 export const getReleaseWizardProgress = (
   step: number,
   releaseType: ReleaseType | null,
+  yourPlatform = false,
 ): ReleaseStepMeta[] => {
-  const routePhase: ReleaseWizardPhase = releaseType === 'THEATRICAL' ? 'DESK' : 'WAR';
+  const routePhase: ReleaseWizardPhase = releaseType === 'THEATRICAL' ? 'DESK' : yourPlatform ? 'YOURS' : 'WAR';
   const phases: ReleaseWizardPhase[] = [
     'DISTRIBUTION',
     routePhase,

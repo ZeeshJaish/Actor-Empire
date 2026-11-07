@@ -50,7 +50,8 @@ if (process.argv.includes('--hash')) {
     process.exit(0);
 }
 test('public forecast math retains the complete checkpoint output across ten canonical draft variants', () => {
-    assert.equal(fullForecastHash(), '68fc85bbf779122e22044a13dd2b3a15bc6f0271504011ecc8a4c97e7b6a3db6');
+    /* re-pinned 2026-11-07: the Network page (#89 to #102) changed the forecast on purpose. Same value on live and on the merged game. */
+    assert.equal(fullForecastHash(), '724b874b733715f3ad1c580884e0790af84afc3bbb96fefe71cea4072653fc50');
 });
 
 for (const [label, draft] of variants) test(`read-only ${label} matches the complete saved canonical forecast`, () => {

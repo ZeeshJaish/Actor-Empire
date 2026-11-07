@@ -48,7 +48,8 @@ assert.ok(market.some(platform => !['NETFLIX', 'APPLE_TV', 'DISNEY_PLUS', 'HULU'
 assert.ok(market.every(platform => platform.cashAvailable > 0 && platform.acquisitionCeiling > 0 && platform.baseBid > 0));
 assert.ok(market.every(platform => platform.acquisitionCeiling <= platform.cashAvailable));
 assert.ok(market.every(platform => (platform.availablePremiereAbsoluteWeeks || []).length > 0));
-assert.ok(market.every(platform => platform.availablePremiereAbsoluteWeek === platform.availablePremiereAbsoluteWeeks?.[0]));
+/* #242: each platform waits by its own calendar, and the room still coordinates on one shared week where it can */
+assert.ok(market.every(platform => (platform.availablePremiereAbsoluteWeeks || []).includes(platform.availablePremiereAbsoluteWeek!)));
 assert.ok(market.every(platform => (platform.backendPreference ?? -1) >= 0.1 && (platform.backendPreference ?? 2) <= 0.8));
 assert.ok(market.every(platform => (platform.sharedRightsPreference ?? -1) >= 0.05 && (platform.sharedRightsPreference ?? 2) <= 0.75));
 assert.ok(new Set(market.map(platform => platform.backendPreference)).size > 1, 'bidder deal-structure preferences must vary by company');

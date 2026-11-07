@@ -1,8 +1,10 @@
+import { PLATFORM_CLAIM_CASE, createPlatformClaimHearing } from './platformClaim';
 import { Player, LifeEvent, LifeEventOption, LegalCase, ScheduledEvent, DatingMatch, NewsItem } from '../types';
 import { spendPlayerEnergy } from './premiumLogic';
 import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
 import { applyDivorceOutcome, applyPartnerBreakup } from './familyLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { isUnderAdultAge } from './ageGate';
 import { createStudioNameRightsHearing } from './studioNameRights';
 
 // --- HELPERS ---
@@ -72,11 +74,13 @@ const getLuxeEventTargets = (player: Player) => {
 };
 
 export const hasEligibleLuxeEventTarget = (player: Player) => {
+    if (isUnderAdultAge(player)) return false;
     const { activePremiumMatches, eliteRelationships } = getLuxeEventTargets(player);
     return activePremiumMatches.length > 0 || eliteRelationships.length > 0;
 };
 
 export const generateLuxeLifeEvent = (player: Player): LifeEvent | null => {
+    if (isUnderAdultAge(player)) return null;
     const { activePremiumMatches, eliteRelationships } = getLuxeEventTargets(player);
     if (activePremiumMatches.length === 0 && eliteRelationships.length === 0) return null;
 
@@ -313,7 +317,9 @@ export const generateLuxeLifeEvent = (player: Player): LifeEvent | null => {
 // --- EVENT GENERATORS ---
 
 export const generateLifeEvent = (player: Player): LifeEvent | null => {
-    const roll = Math.random();
+    /* #255: under 18 the romance drama, the private club and the afterparty don't fire. They all sit below .6, so the roll starts there, which keeps the rest of the mix even instead of piling onto the next event. */
+    const isMinor = isUnderAdultAge(player);
+    const roll = isMinor ? 0.6 + Math.random() * 0.4 : Math.random();
     const fame = player.stats.fame;
     const heat = player.flags.heat || 0;
     const partner = getCurrentPartner(player);
@@ -330,7 +336,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
     const hasBusiness = (player.businesses?.length || 0) > 0;
 
     // 0. ROMANCE CHAOS / JEALOUSY / BREAKUP EDGE CASES
-    if (partner && hottestSideConnection && roll < 0.11) {
+    if (!isMinor && partner && hottestSideConnection && roll < 0.11) {
         return {
             id: `relationship_jealousy_${Date.now()}`,
             type: 'CONFLICT',
@@ -431,7 +437,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
         };
     }
 
-    if (partner && (heat > 20 || multipleHotConnections || (partner.closeness < 46 && fame > 20)) && roll < 0.18) {
+    if (!isMinor && partner && (heat > 20 || multipleHotConnections || (partner.closeness < 46 && fame > 20)) && roll < 0.18) {
         const isMarriage = partner.relation === 'Spouse';
         return {
             id: `relationship_breaking_point_${Date.now()}`,
@@ -511,7 +517,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
         };
     }
 
-    if (partner && exPartner && roll < 0.23) {
+    if (!isMinor && partner && exPartner && roll < 0.23) {
         return {
             id: `relationship_ex_return_${Date.now()}`,
             type: 'CONFLICT',
@@ -590,7 +596,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
         };
     }
 
-    if (activeDatingMatches.length > 0 && fame > 20 && roll < 0.28) {
+    if (!isMinor && activeDatingMatches.length > 0 && fame > 20 && roll < 0.28) {
         const leakedMatch = hottestSideConnection || pick(activeDatingMatches);
         return {
             id: `relationship_screenshot_leak_${Date.now()}`,
@@ -689,7 +695,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
     }
 
     // 1. UNDERWORLD / CRIME (Shady Deals)
-    if (roll < 0.15 && fame > 20) {
+    if (!isMinor && roll < 0.15 && fame > 20) {
         // Dynamic reward: scales with player wealth. At least $250k, or 10% of their money if they are rich.
         const baseReward = 250000;
         const wealthScaling = Math.floor(player.money * 0.1);
@@ -865,7 +871,7 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
     }
 
     // 4. NETWORKING (Party with Directors)
-    if (roll < 0.6 && fame > 30) {
+    if (!isMinor && roll < 0.6 && fame > 30) {
         return {
             id: `network_${Date.now()}`,
             type: 'NETWORKING',
@@ -1466,6 +1472,7 @@ export const generateLegalHearing = (player: Player, caseId: string): LifeEvent 
     if (activeCase.caseType === 'STUDIO_NAME_RIGHTS') {
         return createStudioNameRightsHearing(player, caseId);
     }
+    if (activeCase.caseType === PLATFORM_CLAIM_CASE) return createPlatformClaimHearing(player, caseId);
 
     const advanceCase = (p: Player, c: LegalCase) => {
         const language = getPlayerLanguage(p);

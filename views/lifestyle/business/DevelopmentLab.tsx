@@ -189,6 +189,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-4 pb-nav-safe-lg">
                 {activeTab === 'VAULT' && <DevelopmentLabScriptVault
+                    writingRoomLevel={Number(studioState.departments?.writing) || 1}
                     scripts={studioState.scripts} 
                     writers={studioState.writers}
                     studioBalance={studio.balance}

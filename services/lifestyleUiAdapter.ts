@@ -11,7 +11,7 @@ import {
   PROPERTY_CATALOG,
 } from './lifestyleLogic';
 
-export type LifestyleUiDestinationId = 'studio' | 'business' | 'streaming' | 'cinema' | 'assets' | 'activities';
+export type LifestyleUiDestinationId = 'studio' | 'business' | 'streaming' | 'assets' | 'activities';
 
 export interface LifestyleUiDestination {
   id: LifestyleUiDestinationId;
@@ -86,7 +86,6 @@ export const buildLifestyleUiModel = (player: Player): LifestyleUiModel => {
         active: streamingActive,
         progress: streamingActive ? 100 : Math.round(streamingEligibility.readiness * 100),
       },
-      { id: 'cinema', name: 'Cinema Chain', note: 'Build theaters, sell tickets, and own the box office.', icon: 'ticket', color: 'var(--directing)', kind: 'venture', locked: 'PREVIEW' },
       { id: 'assets', name: 'Assets', note: 'Properties, vehicles and wardrobe.', icon: 'building', color: 'var(--acting)', kind: 'spending' },
       { id: 'activities', name: 'Activities', note: 'Trips, nightlife, wellness, family, and legacy memories.', icon: 'calendar', color: 'var(--writing)', kind: 'spending' },
     ],

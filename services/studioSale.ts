@@ -1019,12 +1019,12 @@ export const createStudioSaleDeck = (
         success: true,
         player: {
             ...nextPlayer,
-            logs: [{
+            logs: [...(nextPlayer.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `${studio.name} listed for sale. Buyer offers will arrive over the next three weeks.`,
                 type: 'neutral' as const,
-            }, ...(nextPlayer.logs || [])].slice(0, 120),
+            }],
         },
         deck,
         message: 'Studio is listed. Offers will arrive across the three-week sale window.',
@@ -1603,12 +1603,12 @@ export const completeStudioSaleTransfer = (
             ...nextPlayer.x,
             feed: [makeSalePost(nextPlayer, studio, offer, transferTerms, catalogRetention.catalogTargetName), ...(nextPlayer.x?.feed || [])].slice(0, 100),
         },
-        logs: [{
+        logs: [...(nextPlayer.logs || []), {
             week: nextPlayer.currentWeek,
             year: nextPlayer.age,
             message: `${studio.name} sold to ${offer.buyerName}. Net cash received: ${formatMoney(offer.cashAtClose)}.${catalogRetention.catalogTargetName ? ` Retained catalog moved to ${catalogRetention.catalogTargetName}.` : ''}`,
             type: logType,
-        }, ...(nextPlayer.logs || [])].slice(0, 120),
+        }],
         flags: {
             ...nextPlayer.flags,
             companyEquityPositions: getCompanyEquityPositions(nextPlayer).flatMap(position => {
@@ -1718,12 +1718,12 @@ export const processStudioSaleRoyalties = (player: Player): Player => {
             history: [makeRoyaltyTransaction(player, totalPayout), ...(player.finance?.history || [])].slice(0, 200),
         },
         logs: shouldLog
-            ? [{
+            ? [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `Studio sale royalty collection posted: ${formatMoney(totalPayout)}.`,
                 type: 'positive' as const,
-            }, ...(player.logs || [])].slice(0, 120)
+            }]
             : player.logs,
         flags: {
             ...player.flags,

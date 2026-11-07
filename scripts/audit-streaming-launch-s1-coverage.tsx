@@ -447,7 +447,8 @@ test('commissioning needs each market geographically served even when routed loa
   const launchScreen = renderToStaticMarkup(<BuildWizard data={data} initialStage="launch" initialDraft={draft} />);
   assert.match(launchScreen, /Opening-market coverage/);
   assert.match(launchScreen, /United States 79%/);
-  assert.doesNotMatch(launchScreen, />Commission ·/,
+  /* #157: the Commission button always shows its price; a failing gate disables it */
+  assert.match(launchScreen, /<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Commission ·/s,
     'A passed rehearsal or draft override must not expose commission for a thin market.');
   const testScreen = renderToStaticMarkup(<BuildWizard data={data} initialStage="test" initialDraft={draft} onOpenRehearsal={() => undefined} />);
   assert.match(testScreen, /routed traffic.*geographic coverage/i,

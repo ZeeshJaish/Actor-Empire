@@ -1,37 +1,59 @@
+/**
+ * #253: what was approved, on the waiting screen's second tab. It was a page of its own, with a Refresh for a plan that had changed. While the opening is
+ * being built the plan cannot change (#253), so there is nothing to refresh, only something to read.
+ */
 import React from 'react';
-import { ArrowLeft, Check, FileLock2 } from 'lucide-react';
-import type { Player } from '../types';
-import type { Brand } from './streaming-transplant/StreamingBrandVisuals';
-import { getStreamingLaunchProgramView } from '../services/streamingLaunchProgram';
+import type { Player, StreamingRevenueStreamId } from '../types';
+import css from './streaming-transplant/presentation/screens/OpeningBuild/OpeningBuild.module.css';
 
-export default function StreamingLaunchBlueprintReview({ player, brand, onBack, onRefresh }: {
-  player: Player; brand: Brand; onBack: () => void; onRefresh: () => void;
-}) {
-  const view = getStreamingLaunchProgramView(player);
+const CHIPS = 14;
+const SLATE_ROWS = 6;
+const STREAM_WORDS: Partial<Record<StreamingRevenueStreamId, string>> = { subs: 'Subscriptions', ads: 'Ads', rentals: 'Rent and buy', premium: 'Premium', daypass: 'Day pass', sponsor: 'Sponsors', metered: 'Metered', patron: 'Patrons' };
+const words = (value: string | null | undefined) => (value || '').replaceAll('_', ' ').toLowerCase().replace(/^\w/, letter => letter.toUpperCase());
+
+export default function StreamingLaunchBlueprintReview({ player }: { player: Player }) {
   const platform = player.ownedStreamingPlatform;
   const service = platform.serviceConfiguration;
-  const current = Boolean(view.milestones.find(item => item.id === 'LAUNCH_BLUEPRINT')?.complete);
-  const checks = view.milestones.filter(item => item.trackId === 'DEFINE_LAUNCH' && item.id !== 'FUND_COMPANY' && item.id !== 'LAUNCH_BLUEPRINT');
-  const canRefresh = checks.filter(item => item.id !== 'MARKET_CLEARANCES').every(item => item.complete);
-  return <main className="sop" style={{ ['--sop-brand' as string]: `hsl(${brand.hue} ${brand.sat}% 58%)` }}>
-    <header className="sop-header">
-      <button type="button" className="sop-back" onClick={onBack} aria-label="Back to Streaming+"><ArrowLeft /></button>
-      <span><small>{brand.name}</small><h1>LAUNCH BLUEPRINT</h1></span>
-      <b className="sop-state">{current ? 'CURRENT' : 'REVIEW REQUIRED'}</b>
-    </header>
-    <section className="sop-controller"><FileLock2 /><div><b>Review the commissioned launch</b><p>Markets, service and infrastructure remain commissioned. Refresh this record after changing the opening slate or catalogue. This does not charge funds or restart construction.</p></div></section>
-    <section className="sop-workstreams" aria-label="Current launch decisions"><ul>
-      <li><span><b>Opening markets</b><small>{platform.marketOperations.filter(operation => operation.entryKind === 'OPENING' && operation.status !== 'EXITED').map(operation => operation.countryId).join(', ') || 'None selected'}</small></span></li>
-      <li><span><b>Service and storefront</b><small>{service.soundIdentKey} · {service.identPackageId} · {service.storefrontLayoutId}</small></span></li>
-      <li><span><b>Pricing</b><small>{service.pricing.plans.map(plan => `${plan.name}: $${plan.monthly.toFixed(2)}/month`).join(' · ')} · Annual discount {service.pricing.annualDiscount}%</small><small>Revenue models: {service.pricing.streams.join(', ')} · Rent ${service.pricing.rentals.rent.toFixed(2)} · Buy ${service.pricing.rentals.buy.toFixed(2)}</small></span></li>
-      <li><span><b>Opening slate</b><small>{platform.launchSlate?.entries.map(entry => `${entry.title} — week ${entry.launchWeek}`).join(' · ') || 'No opening slate programmed'}</small></span></li>
-    </ul></section>
-    <section className="sop-workstreams"><ul>{checks.map(item => <li key={item.id}>
-      <Check aria-hidden="true" /><span><b>{item.label}</b><small>{item.description}</small></span><em>{item.status.replaceAll('_', ' ')}</em>
-    </li>)}</ul></section>
-    <p role="status">{current ? 'The saved blueprint matches the current launch plan.' : 'The opening plan changed. Review these decisions and refresh the launch blueprint before Opening Night.'}</p>
-    <footer className="sop-actions"><button type="button" className="sop-plan" onClick={onBack}>Back to Streaming+</button>
-      <button type="button" className="sop-open" disabled={current || !canRefresh} onClick={onRefresh}>{current ? 'Blueprint current' : 'Refresh launch blueprint'}</button>
-    </footer>
-  </main>;
+  const pricing = service.pricing;
+  const markets = platform.marketOperations
+    .filter(operation => operation.entryKind === 'OPENING' && operation.status !== 'EXITED')
+    .map(operation => operation.countryId!)
+    .filter(Boolean);
+  const launchAt = platform.openingProgrammeCommission?.committedAtAbsoluteWeek;
+  const slate = [...(platform.launchSlate?.entries || [])].sort((left, right) => left.launchWeek - right.launchWeek);
+  const earns = pricing.streams.map(stream => STREAM_WORDS[stream] || words(stream)).join(' · ');
+  return (
+    <>
+      <section className={css.planSection} aria-label="Opening markets">
+        <div className={css.planHead}><span>OPENING MARKETS</span><b>{markets.length}</b></div>
+        <div className={css.planChips}>
+          {markets.slice(0, CHIPS).map(id => <i key={id}>{id}</i>)}
+          {markets.length > CHIPS && <i>+{markets.length - CHIPS}</i>}
+        </div>
+      </section>
+      <section className={css.planSection} aria-label="Service and storefront">
+        <div className={css.planHead}><span>SERVICE</span></div>
+        <div className={css.planRows}>
+          <div><b>Sound ident</b><em>{words(service.soundIdentKey)}</em></div>
+          <div><b>Ident package</b><em>{words(service.identPackageId)}</em></div>
+          <div><b>Front page</b><em>{words(service.storefrontLayoutId)}</em></div>
+        </div>
+      </section>
+      <section className={css.planSection} aria-label="Pricing">
+        <div className={css.planHead}><span>THE OFFER</span>{pricing.annualDiscount > 0 && <b>{pricing.annualDiscount}% off yearly</b>}</div>
+        <div className={css.planRows}>
+          {pricing.plans.map(plan => <div key={plan.id || plan.name}><b>{plan.name}</b><em>${plan.monthly.toFixed(2)} a month</em></div>)}
+        </div>
+        <p className={css.planLine}>{earns}{pricing.streams.includes('rentals') ? ` · rent $${pricing.rentals.rent.toFixed(2)}, buy $${pricing.rentals.buy.toFixed(2)}` : ''}</p>
+      </section>
+      <section className={css.planSection} aria-label="Opening slate">
+        <div className={css.planHead}><span>OPENING SLATE</span><b>{slate.length} {slate.length === 1 ? 'title' : 'titles'}</b></div>
+        <div className={css.planRows}>
+          {slate.slice(0, SLATE_ROWS).map(entry => <div key={entry.id}><b>{entry.title}</b><em>Week {entry.launchWeek}</em></div>)}
+        </div>
+        {slate.length > SLATE_ROWS && <p className={css.planLine}>And {slate.length - SLATE_ROWS} more across the first twelve weeks.</p>}
+      </section>
+      <p className={css.planNote}>{launchAt === undefined ? 'Commissioned.' : 'Approved when you commissioned the build.'} It all stays this way until opening night, and you can change it from the rooms after that.</p>
+    </>
+  );
 }

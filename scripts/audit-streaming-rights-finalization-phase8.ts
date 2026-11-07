@@ -4,11 +4,8 @@ import { join } from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { INITIAL_PLAYER, type Player } from '../types';
-import StreamingRightsCalendar, {
-    STREAMING_RIGHTS_DESK_TABS,
-    getNextStreamingRightsDeskTab,
-    getStreamingRightsCaseDisclosureOpen,
-} from '../components/StreamingRightsCalendar';
+import { getStreamingRightsCaseDisclosureOpen } from '../components/StreamingRightsCalendar';
+import RightsRoom from '../components/rights/RightsRoom';
 import { buildStreamingRightsPhase8QaFixture } from '../services/streamingRightsQa';
 import { getStreamingRightsOffice, processStreamingRightsOfficeWeek } from '../services/streamingRightsOffice';
 import {
@@ -31,32 +28,19 @@ player.businesses = [{
     studioState: { scripts: [], concepts: [], writers: [], ipMarket: [], lastMarketRefreshWeek: 0, lastWriterRefreshWeek: 0 },
 }] as Player['businesses'];
 
-assert.deepEqual(STREAMING_RIGHTS_DESK_TABS, ['PORTFOLIO', 'MANDATE', 'RELATIONSHIPS', 'STATEMENTS', 'PACKAGES']);
-assert.equal(getNextStreamingRightsDeskTab('PORTFOLIO', 'ArrowRight'), 'MANDATE');
-assert.equal(getNextStreamingRightsDeskTab('PORTFOLIO', 'ArrowLeft'), 'PACKAGES');
-assert.equal(getNextStreamingRightsDeskTab('RELATIONSHIPS', 'Home'), 'PORTFOLIO');
-assert.equal(getNextStreamingRightsDeskTab('RELATIONSHIPS', 'End'), 'PACKAGES');
-assert.equal(getNextStreamingRightsDeskTab('STATEMENTS', 'Enter'), 'STATEMENTS');
 assert.equal(getStreamingRightsCaseDisclosureOpen({ status: 'ACTION_REQUIRED', outcome: 'PENDING' }), true);
 assert.equal(getStreamingRightsCaseDisclosureOpen({ status: 'OFFER_AVAILABLE', outcome: 'PENDING' }), true);
 assert.equal(getStreamingRightsCaseDisclosureOpen({ status: 'WATCHING', outcome: 'PENDING' }), false);
 assert.equal(getStreamingRightsCaseDisclosureOpen({ status: 'RENEWAL_SECURED', outcome: 'DELEGATED_ACCEPTED' }), false);
 
-const markup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
-    player,
-    context: 'STUDIO',
-    studioId: 'empire-studios',
-    onUpdatePlayer: () => undefined,
-    initialDeskTab: 'PORTFOLIO',
+/* #316: one room, its doors are real buttons with real names */
+const markup = renderToStaticMarkup(React.createElement(RightsRoom, {
+    player, studioId: 'empire-studios', onUpdatePlayer: () => undefined, onClose: () => undefined, onSellTitle: () => undefined, onOpenFilm: () => undefined,
 }));
-
-assert.match(markup, /role="tablist"/);
-assert.match(markup, /role="tab"/);
-assert.match(markup, /aria-selected="true"/);
-assert.match(markup, /aria-controls="streaming-rights-panel-portfolio"/);
-assert.match(markup, /id="streaming-rights-panel-portfolio"/);
-assert.match(markup, /role="tabpanel"/);
-assert.match(markup, /aria-labelledby="streaming-rights-tab-portfolio"/);
+assert.match(markup, /aria-label="Back"/);
+assert.match(markup, /data-rights-open-team/);
+assert.match(markup, /data-rights-open-partners/);
+assert.match(markup, /data-rights-open-money/);
 
 const qaFixture = buildStreamingRightsPhase8QaFixture(player, 'empire-studios');
 const repeatedQaFixture = buildStreamingRightsPhase8QaFixture(player, 'empire-studios');

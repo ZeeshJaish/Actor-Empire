@@ -1,3 +1,4 @@
+import { gameWeekText } from '../services/gameWeek';
 import React, { useMemo, useState } from 'react';
 import {
   Activity,
@@ -410,7 +411,7 @@ export default function StreamingTitleDossier({ player, onClose, onOpenPromotion
                     <LineChart size={22} />
                     <span>PERFORMANCE SIGNAL</span>
                     <strong>{selected.measuredWeeks ? selected.momentum : 'NOT MEASURED'}</strong>
-                    <small>{selected.measuredWeeks ? `Last observed week ${selected.latestMeasuredAbsoluteWeek}` : 'Advance a live week to begin'}</small>
+                    <small>{selected.measuredWeeks ? `Last observed ${gameWeekText(selected.latestMeasuredAbsoluteWeek)}` : 'Advance a live week to begin'}</small>
                   </div>
                 </section>
 

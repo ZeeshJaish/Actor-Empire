@@ -9,6 +9,7 @@ import { getCanonicalProfileAvatar } from '../services/profileAvatar';
 import { getDynastyMemberAge, normalizeDynastyCareerState } from '../services/dynastyCareer';
 import SocialScreen from '../components/ui-overhaul/SocialScreen';
 import { buildSocialUiModel } from '../services/socialUiAdapter';
+import { getCareerProjects } from '../services/outsideOriginals';
 
 interface SocialPageProps {
   player: Player;
@@ -187,7 +188,7 @@ const LegacySocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCon
   const currentLegacyScore = calculateLegacyScore({
       netWorth: player.money,
       awards: player.awards?.length || 0,
-      moviesMade: player.pastProjects.length,
+      moviesMade: getCareerProjects(player).length,
       peakFame: player.stats.fame,
       businessCount: player.businesses?.length || 0,
   });
@@ -236,7 +237,7 @@ const LegacySocialPage: React.FC<SocialPageProps> = ({ player, onInteract, onCon
                   id: player.id,
                   name: player.name,
                   avatar: player.avatar,
-                  caption: `${formatWealth(player.money)} • ${player.pastProjects.length} ${tr('connections.projects')} • ${player.awards?.length || 0} ${tr('connections.awards')}`,
+                  caption: `${formatWealth(player.money)} • ${getCareerProjects(player).length} ${tr('connections.projects')} • ${player.awards?.length || 0} ${tr('connections.awards')}`,
                   secondary: `${tr('connections.fame')} ${Math.floor(player.stats.fame)} • ${tr('connections.businesses')} ${player.businesses?.length || 0}`,
                   accent: 'emerald',
                   score: currentLegacyScore,

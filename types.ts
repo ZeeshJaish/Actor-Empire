@@ -1337,6 +1337,7 @@ export interface CampaignItem {
 }
 export type OutcomeTier = 'MASSIVE_SUCCESS' | 'SUCCESS' | 'NEUTRAL' | 'FAILURE' | 'MAJOR_FAILURE';
 export type ProjectSubtype = 'STANDALONE' | 'SEQUEL' | 'SPINOFF' | 'REBOOT' | 'UNIVERSE_ENTRY' | 'UNIVERSE_EVENT' | 'UNIVERSE_CROSSOVER';
+export type GreenlightPacingId = 'SLOW' | 'MODERATE' | 'FAST' | 'FRENETIC';
 export type UniversePhase = 'PHASE_1_ORIGINS' | 'PHASE_2_EXPANSION' | 'PHASE_3_WAR' | 'PHASE_4_MULTIVERSE';
 export type SeriesStatus = 'N/A' | 'RUNNING' | 'CANCELLED' | 'ENDED';
 export type PlayerReturnStatus = 'RETURNING' | 'WRITTEN_OFF' | 'KILLED_OFF';
@@ -1509,6 +1510,8 @@ export interface Script {
     universePhaseName?: string;
     installmentNumber?: number;
     customPoster?: CustomPoster;
+    /** #301: what the last season's finale built, for a next season */
+    previousSeasonHype?: number;
     lockedStreamingFunding?: LockedStreamingFunding;
     developmentCost?: number;
     /** Recorded only when this studio actually pays new development/acquisition
@@ -1546,6 +1549,8 @@ export interface Writer {
 export interface ProjectConcept {
     id: string;
     scriptId: string;
+    /** #301: the season's money, while the wizard is still open */
+    episodeBudgetShares?: number[];
     /** Optional saved Greenlight choices; absent on old drafts means no backend promises. */
     talentBackendDraft?: Record<string, number>;
     lastUpdated: number;
@@ -1586,6 +1591,9 @@ export interface ProjectConcept {
     lastStep?: 'SELECT_SCRIPT' | 'DIRECTOR' | 'CAST' | 'CREW' | 'EQUIPMENT' | 'LOCATION' | 'SETUP' | 'TONE' | 'CONFIRM';
     customPoster?: CustomPoster;
     lockedStreamingFunding?: LockedStreamingFunding;
+    /** #273: names chosen while setting the project up */
+    episodeNameSet?: number;
+    customEpisodeNames?: Record<string, string>;
     format?: ProjectFormat;
     subjectName?: string;
     subjectType?: ScriptSubjectType;
@@ -2153,6 +2161,15 @@ export type PlatformAiPlayerCommissionStatus =
 
 /** A streaming platform's persisted offer for the player's studio to physically produce an original. */
 export interface PlatformAiPlayerCommissionOffer {
+    /** #302: the rare one from a rich rival: more money to make it, a bigger fee, a higher bar */
+    bigDeal?: boolean;
+    /** #242: when the player was told the date */
+    premiereAnnouncedAtAbsoluteWeek?: number;
+    /** #246: when the platform decided on another season */
+    renewalDecidedAtAbsoluteWeek?: number;
+    /** #241: when the platform wrote about the missed date, and when it sued */
+    deadlineNoticeAtAbsoluteWeek?: number;
+    lawsuitFiledAtAbsoluteWeek?: number;
     id: string;
     platformId: PlatformId;
     platformName: string;
@@ -2197,6 +2214,8 @@ export interface StudioFinanceEntry {
 }
 
 export interface ProjectHiddenStats {
+    /** #314: how the edit moved this title when it was locked. Set once; its presence means the quality is final. */
+    finalCutRoll?: number;
     prepaidDevelopmentCash?: number;
     /** Idempotent personal premiere recognition; never a financial payout. */
     careerRecognitionApplied?: boolean;
@@ -2261,7 +2280,17 @@ export interface ProjectHiddenStats {
     platformFundedPremiereConfirmed?: boolean;
     ownedStreamingCommissionId?: string;
     ownedStreamingOriginal?: boolean;
+    /** #292: what the last season's finale left this one: its first four weeks */
+    previousSeasonHype?: number;
+    /** #244: it goes on the player's own service: no bids, no fee */
+    ownPlatformRelease?: boolean;
+    /** #244: in cinemas now; it goes on the player's own service the week after they close */
+    ownPlatformAfterCinema?: boolean;
+    /** #253: 0: it goes on the shelf when cinemas close, and Content schedules it. Otherwise it goes live by itself this many weeks after they close. */
+    ownPlatformAfterCinemaWeeks?: number;
     ownedStreamingCommissionedBy?: string;
+    /** #288: an outside studio makes this Original for the player's platform */
+    outsideOriginal?: boolean;
     playerPlatformCommissionOfferId?: string;
     playerPlatformCommissionMinimumImdb?: number;
     playerPlatformCommissionDeadlineAbsoluteWeek?: number;
@@ -2858,6 +2887,14 @@ export interface ProjectDetails {
     reviews?: Review[];
     audienceReception?: AudienceReception;
     episodeRatings?: SeasonEpisodeRatings[];
+    /** #273: names are built from this; only another set and typed names are saved */
+    episodeNameSeed?: string;
+    episodeNameSet?: number;
+    customEpisodeNames?: Record<string, string>;
+    /** #275: pacing is read for viewers on a project made after it began to count */
+    pacingLive?: boolean;
+    /** #274: this season's money, episode by episode, in any units. Set from the bars in Setup. */
+    episodeBudgetShares?: number[];
     episodes?: number;
     tone?: number; // 0 = Practical, 100 = CGI
     visualStyle?: 'REALISTIC' | 'STYLISTIC' | 'GRITTY' | 'VIBRANT';
@@ -2917,6 +2954,10 @@ export interface ReleasePlanningDraft {
     commitmentState?: 'DRAFT' | 'SIGNED';
     /** Platform-selected premiere shared by every accepted non-exclusive licence. */
     lockedPremiereAbsoluteWeek?: number | null;
+    /** #244: the third choice: the player's own service */
+    ownPlatformRoute?: boolean;
+    /** #246: the last season's platform had its first word */
+    firstNegotiationDone?: boolean;
     updatedAt: number;
 }
 
@@ -3858,7 +3899,7 @@ export type StreamingTeamAction =
     | { kind: 'PRICE_CHANGE'; planId: string; monthly: number }
     | { kind: 'OPEN_ROOM'; room: string; focusId?: string }
     /** #168: taking an Original pitch fills the commissioning desk with this draft */
-    | { kind: 'ORIGINAL_PITCH'; draft: Record<string, unknown> }
+    | { kind: 'ORIGINAL_PITCH'; pitchId?: string; draft?: Record<string, unknown> }
     /** #181: an ambitious executive asks for a raise */
     | { kind: 'RAISE'; appointmentId: string; percent: number; weekly: number }
     /** #200: an executive has given notice; `wants` is what would keep them (null: nothing would) */
@@ -5815,6 +5856,8 @@ export interface OwnedStreamingCatalogLicense {
 
 /** Actor-neutral canonical record shared by production and distribution views. */
 export interface StreamingRightsContract extends OwnedStreamingCatalogLicense {
+    /** #243: signed during a cinema run: the window waits for the run to close */
+    holdsForCinemaClose?: boolean;
     /** Durable obligation states across full transfers, independent of pruned ledgers. */
     transferredObligationStates?: OwnedStreamingRightsObligation[];
     lastRoyaltySellerReceiptAbsoluteWeek?:number;
@@ -5928,6 +5971,8 @@ export type StreamingRightsRenewalOutcome =
 export type StreamingRightsRenewalOfferDisposition = 'PENDING' | 'OFFERED' | 'DECLINED';
 
 export interface StreamingRightsRenewalPolicy {
+    /** #305: from the studio's mandate, while a case is being decided */
+    exclusivityPolicy?: StreamingRightsExclusivityPolicy;
     noticeWeeks: number;
     preference: StreamingRightsRenewalPreference;
     autoRenewMinimumScore: number;
@@ -6232,6 +6277,8 @@ export interface StreamingBiddingSession {
     cataloguePackageId?: string | null;
     componentLots?: StreamingBiddingRightsLot[];
     catalogueComponents?: StreamingCataloguePackageComponent[];
+    /** #315: what the seller asked for; every package offer is on these terms */
+    catalogueExclusivity?: StreamingLicenseExclusivity;
 }
 
 export type StreamingBiddingSessionRegistry = Record<string, StreamingBiddingSession>;
@@ -6463,6 +6510,8 @@ export interface StreamingCataloguePackageComponent {
     rightsLot: StreamingBiddingRightsLot;
     referenceValue: number;
     referenceWeight: number;
+    /** #315: licences this title already has running in these markets */
+    otherLicences?: number;
 }
 
 export interface StreamingCataloguePackageOfferRow {
@@ -6737,6 +6786,76 @@ export interface OwnedStreamingOriginalLifecycleDecision {
     exclusiveWindowWeeks: number | null;
 }
 
+/** #279: a studio comes to the platform with something to make: the Script and ProjectConcept the Greenlight wizard reads */
+export interface OwnedStreamingOriginalPitch {
+    id: string;
+    seed: string;
+    studioId: string;
+    studioName: string;
+    /** Picks the story, which is built when the pitch is opened */
+    frameIndex: number;
+    heroName: string;
+    script: Script;
+    concept: ProjectConcept;
+    createdAtAbsoluteWeek: number;
+    answerByAbsoluteWeek: number;
+    /** #294: a rival is after it too */
+    chasedByPlatformName?: string;
+    /** #294: the price has climbed with the interest, in percent */
+    priceClimbPercent?: number;
+}
+
+export interface OwnedStreamingPassedPitch {
+    id: string;
+    title: string;
+    studioId: string;
+    studioName: string;
+    genre: string;
+    passedAtAbsoluteWeek: number;
+    /** #294: a rival made it instead */
+    madeByPlatformName?: string;
+    /** #294: a rival took it while the player thought about it */
+    lostToRival?: boolean;
+    /** #294: asked once whether a rival wants it */
+    rivalChecked?: boolean;
+    /** #294: how it did on the rival's service */
+    rating?: number;
+    projectType?: 'SERIES' | 'MOVIE';
+    quality?: number;
+    leadName?: string;
+    directorName?: string;
+}
+
+/** #280: one thing the platform's viewers want and its catalogue does not have */
+export interface OwnedStreamingAudienceGap {
+    id: string;
+    countryId: string;
+    countryName: string;
+    homes: number;
+    genre?: string;
+    language?: string;
+    title: string;
+    wantPercent: number;
+    havePercent: number;
+}
+
+export interface OwnedStreamingAudienceReport {
+    boughtAtAbsoluteWeek: number;
+    expiresAtAbsoluteWeek: number;
+    gaps: OwnedStreamingAudienceGap[];
+}
+
+export interface OwnedStreamingOriginalPitchState {
+    /** The 3-week cycle of the last new set */
+    cycle: number;
+    scoutCycle: number;
+    scoutCount: number;
+    pitches: OwnedStreamingOriginalPitch[];
+    passed: OwnedStreamingPassedPitch[];
+    /** The Head of Content's choice */
+    recommendedPitchId?: string;
+}
+
 export interface OwnedStreamingOriginalCommissionDraft {
     currentStep: number;
     gapId: StreamingOriginalGapId;
@@ -6782,6 +6901,31 @@ export interface OwnedStreamingOriginalCommission {
     localization?: OwnedStreamingOriginalLocalization | null;
     releasePlan?: OwnedStreamingOriginalReleasePlan | null;
     lifecycleDecision?: OwnedStreamingOriginalLifecycleDecision | null;
+    /** #287: how it was ordered. Older commissions have none of these. */
+    way?: 'PITCH' | 'OUTSIDE' | 'OWN_STUDIO';
+    deal?: 'BUY' | 'LICENCE';
+    making?: number;
+    fee?: number;
+    feePercent?: number;
+    licenceEndsAtAbsoluteWeek?: number;
+    /** #289: what the studio still has to come back with */
+    issues?: OwnedStreamingOriginalIssue[];
+    /** #292: the next season, once it is ordered */
+    nextSeasonCommissionId?: string;
+    /** #291: the week it is booked to premiere */
+    notes?: string[];
+}
+
+/** #289: a studio comes back for money */
+export interface OwnedStreamingOriginalIssue {
+    id: string;
+    kind: 'QUALITY' | 'LOCATION' | 'BUDGET';
+    /** It comes up this far through the making, in weeks from the start */
+    atElapsedWeek: number;
+    amount: number;
+    qualityRisk: number;
+    /** UPCOMING until its week comes, WAITING while the popup is up */
+    status: 'UPCOMING' | 'WAITING' | 'PAID' | 'AD' | 'COMPROMISED';
 }
 
 export interface OwnedStreamingSlateEntry {
@@ -7446,9 +7590,11 @@ export type OwnedStreamingLedgerEventType =
     | 'PRODUCT_LAUNCHED'
     | 'PRODUCT_STATUS_CHANGED'
     | 'CATALOG_IMPORTED'
+    | 'CATALOG_PULLED'
     | 'LICENSE_NEGOTIATION_UPDATED'
     | 'LICENSE_SIGNED'
     | 'ORIGINAL_COMMISSIONED'
+    | 'ORIGINAL_ISSUE_PAID'
     | 'ORIGINAL_GREENLIT'
     | 'ORIGINAL_LOCALIZATION_COMMITTED'
     | 'TITLE_LOCALIZATION_COMMITTED'
@@ -7580,6 +7726,8 @@ export interface OwnedStreamingPlatformState {
     catalogSetupDraft: OwnedStreamingCatalogSetupDraft | null;
     /** New quotes start only at this market cycle; absent on legacy saves until a safe weekly rollover. */
     marketQuotePolicy?: { version: 2 | 3; effectiveCycle: number; previousVersion?: 1 | 2 };
+    /** #245: views each title had before its general release. The weekly report rows start at general release, so this keeps its opening whole. */
+    titleEarlyViews?: Record<string, number>;
     contentMarketDraft?: { tab: 'ALL' | 'MOVIE' | 'SERIES' | 'COLLECTIONS' | 'OWNED' | 'OFFERS' | 'AUCTIONS' | 'UPCOMING'; search: string; selectedId: string | null; ownedIds: string[] } | null;
     buyerAuctionSessions: StreamingBuyerAuctionSession[];
     upcomingRightsSales: StreamingUpcomingRightsSale[];
@@ -7592,6 +7740,10 @@ export interface OwnedStreamingPlatformState {
     rightsObligations: OwnedStreamingRightsObligation[];
     originalCommissionDraft: OwnedStreamingOriginalCommissionDraft | null;
     originalCommissions: OwnedStreamingOriginalCommission[];
+    /** #279 */
+    originalPitches?: OwnedStreamingOriginalPitchState;
+    /** #280 */
+    audienceReport?: OwnedStreamingAudienceReport;
     launchSlateDraft: OwnedStreamingLaunchSlate | null;
     launchSlate: OwnedStreamingLaunchSlate | null;
     launchMarketingDraft: OwnedStreamingLaunchMarketingDraft | null;
@@ -8052,6 +8204,19 @@ export interface PastProject {
     reviews?: Review[];
     audienceReception?: AudienceReception;
     episodeRatings?: SeasonEpisodeRatings[];
+    /** #273: names are built from this; only another set and typed names are saved */
+    episodeNameSeed?: string;
+    episodeNameSet?: number;
+    customEpisodeNames?: Record<string, string>;
+    pacing?: GreenlightPacingId;
+    pacingLive?: boolean;
+    /** #286: how the season's money was split, episode by episode */
+    episodeBudgetShares?: number[];
+    /** #288: made by an outside studio for the player's platform: on its shelves, not in the player's credits */
+    outsideOriginal?: boolean;
+    /** #292: what the last season's finale left this one: its first four weeks */
+    previousSeasonHype?: number;
+    directorName?: string;
     campaignRealitySnapshot?: CampaignRealitySnapshot;
     campaignPositioning?: CampaignPositioning;
     campaignTimeline?: CampaignTimeline;
@@ -8325,7 +8490,9 @@ export type ScheduledEventType = 'AWARD_CEREMONY' | 'PREMIERE' | 'PARTY' | 'PROD
     /* #75: a new incident on STATUS, answered in the week's popup */
     | 'STREAMING_INCIDENT'
     /* #210: a decision that needs you, answered in the week's popup or on its page */
-    | 'STREAMING_DECISION';
+    | 'STREAMING_DECISION'
+    /* #289: a studio making an Original comes back for money */
+    | 'ORIGINAL_ISSUE';
 
 export type LocalizedTextVars = Record<string, string | number>;
 
@@ -8473,6 +8640,8 @@ export interface LegalCase {
     status: 'ACTIVE' | 'WON' | 'LOST' | 'SETTLED';
     history: { hearing: number, choice: string }[];
     caseType?: 'STUDIO_NAME_RIGHTS' | string;
+    /** #241: a platform's claim against your studio */
+    platformClaim?: { kind: 'WALKED_AWAY' | 'MISSED_DEADLINE' | 'FUNDING'; platformId: string; platformName: string; titleName: string; feeBack: number; damages: number };
     studioId?: string;
     claimantName?: string;
     protectedStudioName?: string;

@@ -7,6 +7,7 @@ import type { StreamingOpeningProgrammeView } from '../../services/streamingOpen
 import '../../styles/streaming-hq.css';
 
 const executing: StreamingOpeningProgrammeView = {
+  progress: 0.08, totalWeeks: 15, citiesOnline: 1,
   state: 'EXECUTING', commissioned: true, commission: null, absoluteWeek: 2101,
   earliestOpeningAbsoluteWeek: 2115, dateCertainty: 'ESTIMATE', controllingWorkstreamId: 'INFRASTRUCTURE',
   remainingWeeks: 14, cityCount: 6, rackCount: 118, releasedCapital: 465_000_000,
@@ -58,8 +59,9 @@ function Fixture() {
     brand={auditBrand}
     view={view}
     focus="CLEARANCES"
+    network={{ built: true, sites: [], markets: [], reached: 1, served: 1, revision: 1, pending: null, peakStreams: 0, capacityStreams: 0, weeklyOperatingCost: 0 }}
+    plan={null}
     onBack={() => undefined}
-    onOpenCommissionedPlan={() => undefined}
     onResolveClearance={() => setView(current => ({
       ...current,
       state: 'EXECUTING',

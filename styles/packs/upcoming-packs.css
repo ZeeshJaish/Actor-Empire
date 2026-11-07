@@ -1,0 +1,198 @@
+/* Ported from the Upcoming Packs mockup. On a wide screen the page stays a phone-sized column. */
+@media (min-width:449px){.pk-list-root{contain:layout}}
+.pk-list-root{
+  --bg:#070605;--card:#14110d;--gold:#f8a810;--ink:#f9f6ef;--dim:rgba(249,246,239,.6);--line:rgba(255,255,255,.095);--line-on:rgba(248,168,16,.44);
+  --gut:16px;--gap:8px;--ratio:1.12;--v:min(calc(1*var(--pk-vw)),4px);--nf:min(calc(4.9*var(--pk-vw)),21px);--pk-sth:clamp(160px,calc(45.3*var(--pk-vw)),180px);
+  --ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.3,1.4,.5,1);
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --pk-st:max(0px,calc(env(safe-area-inset-top,0px) - 28px));--pk-sb:max(0px,calc(env(safe-area-inset-bottom,0px) - 18px));
+  --pk-vw:min(1vw,4.48px);position:fixed;top:0;bottom:0;left:calc(50vw - 50*var(--pk-vw));width:calc(100*var(--pk-vw));line-height:normal;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--ink);
+  font-family:Archivo,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+}
+.pk-list-root *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+.pk-list-defs{position:absolute;width:0;height:0;overflow:hidden}
+
+/* top bar and title */
+.pk-list-top{position:relative;flex:none;display:flex;align-items:center;gap:12px;padding:calc(34px + var(--pk-st)) var(--gut) 0;animation:pk-list-in .4s var(--ease) backwards}
+.pk-list-back{flex:none;display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:0 16px 0 14px;border-radius:99px;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink);font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;text-decoration:none;transition:transform .12s ease}
+.pk-list-back:active{transform:scale(.96)}
+.pk-list-back svg{width:14px;height:14px;flex:none;display:block}
+.pk-list-title{min-width:0}
+.pk-list-h1{font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;font-size:27px;font-weight:800;letter-spacing:-.035em;line-height:1.05;white-space:nowrap;color:var(--ink)}
+.pk-list-sub{display:flex;align-items:center;gap:6px;margin-top:4px;font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.16em;line-height:1.3;white-space:nowrap;color:var(--dim)}
+.pk-list-sub b{font-family:Anton,sans-serif;font-weight:400;font-size:12px;letter-spacing:.05em;line-height:1;color:var(--gold)}
+
+/* featured stage */
+.pk-list-stage{position:relative;z-index:1;flex:none;display:block;height:var(--pk-sth);margin:12px var(--gut) 0;border-radius:18px;overflow:hidden;isolation:isolate;background:#050403;color:inherit;text-decoration:none;box-shadow:0 20px 34px -24px #000;transition:transform .14s ease;animation:pk-list-in .5s var(--ease) backwards .05s}
+/* a button shrinks to its content even at display:block, and all of this one's content is absolute; it also centres text */
+.pk-list-stage{width:calc(100% - 2*var(--gut));text-align:left}
+.pk-list-stage:active{transform:scale(.985)}
+.pk-list-frame{position:absolute;inset:0;z-index:8;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.13),inset 0 1px 0 rgba(255,255,255,.1)}
+.pk-list-scene{--u:1.2px;--lx:72%;--hb:calc(.9*min(max(calc(78*var(--pk-vw)) - 67px,calc(120*var(--pk-vw)) - 236px),var(--hbmax,280px)));position:absolute;inset:0;display:block;overflow:hidden}
+.pk-list-is-cur{z-index:2;animation:pk-list-xfade .8s ease backwards}
+.pk-list-is-prev{z-index:1;animation:none}
+.pk-list-bd{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.pk-list-scrim{position:absolute;inset:0;display:block;background:linear-gradient(90deg,var(--sc) 0,var(--sc) 26%,transparent 70%);pointer-events:none}
+.pk-list-hb{position:absolute;top:var(--ht,calc((100% - var(--hb))/2 + var(--hy,0px)));right:calc(var(--hb)*var(--hr,-.14));z-index:2;display:block;width:var(--hb);height:var(--hb);pointer-events:none;animation:pk-list-arrive .72s var(--spring) backwards var(--xd,0s)}
+.pk-list-l{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible;pointer-events:none}
+.pk-list-grp{position:absolute;inset:0;display:block;pointer-events:none}
+.pk-list-bulbs{position:absolute;right:44px;bottom:24px;display:block;width:146px;height:8px;overflow:hidden;pointer-events:none}
+.pk-list-copy{position:absolute;left:14px;bottom:30px;z-index:4;display:block;width:48%;transition:opacity .16s linear}
+.pk-list-is-prev .pk-list-copy{opacity:0}
+.pk-list-is-prev .pk-list-hb,.pk-list-is-prev .pk-list-rain,.pk-list-is-prev.pk-list-cross .pk-list-bd{opacity:0;transition:opacity .14s linear}
+.pk-list-is-cur.pk-list-cross{--xd:.1s}
+.pk-list-lock{display:block;font-family:Anton,sans-serif;font-weight:400;text-transform:uppercase;white-space:nowrap}
+.pk-list-lock b{display:block;width:max-content;font-weight:400;line-height:1.08}
+.pk-list-lock .pk-list-t1{font-size:calc(var(--k1)*var(--v));letter-spacing:var(--ls1,.01em);animation:pk-list-up .56s var(--ease) backwards calc(var(--xd,0s) + .2s)}
+.pk-list-lock .pk-list-t2{font-size:calc(var(--k2)*var(--v));letter-spacing:var(--ls2,.01em);animation:pk-list-up .56s var(--ease) backwards calc(var(--xd,0s) + .26s)}
+.pk-list-fan{display:block;margin-top:5px;font-size:clamp(11px,calc(3.3*var(--pk-vw)),13.5px);font-weight:700;line-height:1.28;color:var(--fan);animation:pk-list-up .56s var(--ease) backwards calc(var(--xd,0s) + .32s)}
+.pk-list-fan i{display:block;font-style:normal;white-space:nowrap}
+.pk-list-t1,.pk-list-t2{-webkit-background-clip:text;background-clip:text;color:transparent}
+.pk-list-t1{background-image:var(--t1)}
+.pk-list-t2{background-image:var(--t2)}
+.pk-list-prog{position:absolute;left:14px;bottom:11px;z-index:7;display:flex;align-items:center;gap:4px;height:12px;pointer-events:none;--tick:rgba(255,255,255,.36);--tickon:#fff}
+.pk-list-tick{position:relative;display:block;flex:none;width:5px;height:5px;border-radius:3px;background:var(--tick);overflow:hidden;transition:background-color .3s linear}
+.pk-list-tick-on{width:24px}
+.pk-list-tick-on::after{content:"";position:absolute;inset:0;border-radius:3px;background:var(--tickon);transform-origin:0 50%;animation:pk-list-fill 3.6s linear both}
+.pk-list-prog-ink{--tick:rgba(18,35,74,.28);--tickon:#12234a}
+.pk-list-go{position:absolute;right:9px;bottom:9px;z-index:7;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:rgba(6,5,4,.62);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);pointer-events:none;transition:background-color .3s linear}
+.pk-list-go-ink{background:#12234a}
+.pk-list-go svg{width:11px;height:11px;display:block}
+
+/* Sue is the one bright world. A straight fade between her and a dark world mixes to flat grey,
+   so those two changes go through the light instead: a soft edge of the next world's darkness
+   or marble crosses the old scene, then the new scene clears out of it. Nothing passes through grey. */
+.pk-list-to-dark{--vc:#0b0c0e;--edge-in:linear-gradient(97deg,rgba(11,12,14,0) 0,rgba(11,12,14,.05) 3%,rgba(11,12,14,.2) 7%,rgba(11,12,14,.5) 12%,rgba(11,12,14,.82) 17%,#0b0c0e 22%)}
+.pk-list-to-light{--vc:#f6f4ef;--edge-in:linear-gradient(97deg,rgba(246,244,239,0) 0,rgba(246,244,239,.05) 3%,rgba(246,244,239,.2) 7%,rgba(246,244,239,.5) 12%,rgba(246,244,239,.82) 17%,#f6f4ef 22%)}
+.pk-list-is-prev.pk-list-to-dark::after,.pk-list-is-prev.pk-list-to-light::after{content:"";position:absolute;top:0;bottom:0;left:0;z-index:6;width:300%;background:var(--edge-in);pointer-events:none;animation:pk-list-sweep .22s cubic-bezier(.45,.05,.55,.95) both}
+.pk-list-is-cur.pk-list-to-dark,.pk-list-is-cur.pk-list-to-light{--xd:.2s;animation:pk-list-xfade .01s linear .2s backwards}
+.pk-list-is-cur.pk-list-to-dark::after,.pk-list-is-cur.pk-list-to-light::after{content:"";position:absolute;inset:0;z-index:6;background:var(--vc);pointer-events:none;animation:pk-list-unveil .44s ease-out .2s both}
+
+/* poster wall */
+.pk-list-wall{position:relative;flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:var(--gap);margin:10px var(--gut) calc(20px + var(--pk-sb))}
+.pk-list-spot{position:absolute;left:0;top:0;z-index:0;display:block;width:calc((100% - var(--gap))/2);height:calc((100% - 2*var(--gap))/3);pointer-events:none;will-change:transform;transform:translate3d(calc(var(--c)*(100% + var(--gap))),calc(var(--r)*(100% + var(--gap))),0);transition:transform .72s cubic-bezier(.45,.05,.2,1)}
+.pk-list-spot::before{content:"";position:absolute;inset:-14% -20%;opacity:.34;background:radial-gradient(closest-side,var(--h) 0,var(--h) 62%,transparent);transition:opacity .44s ease}
+.pk-list-spot-off::before{opacity:0;transition:opacity .16s linear}
+.pk-list-poster{--u:.8px;--lx:50%;--foot:calc(var(--nf)*2.3 + 8px);position:relative;z-index:1;display:block;min-width:0;min-height:0;border-radius:12px;overflow:hidden;isolation:isolate;color:inherit;text-decoration:none;box-shadow:0 10px 16px -10px rgba(0,0,0,.95);transition:transform .12s ease;animation:pk-list-in .44s var(--ease) backwards;animation-delay:calc(var(--i)*48ms + 150ms)}
+.pk-list-poster:active{transform:scale(.97)}
+/* --zoom is how far the art grows past the space above the name, --hf is where its hero ends (a share of the art's height): that point stands just above the name at any poster size. */
+.pk-list-box{--bx:min(calc((100% - var(--foot))*var(--zoom,1)),calc((calc(100*var(--pk-vw)) - 2*var(--gut) - var(--gap))/2));position:absolute;left:50%;top:calc(100% - var(--foot) - var(--bx)*var(--hf,1));z-index:1;display:block;height:var(--bx);aspect-ratio:1/1;transform:translateX(-50%);pointer-events:none}
+.pk-list-name{position:absolute;left:0;right:0;bottom:8px;z-index:4;display:block;font-family:Anton,sans-serif;font-weight:400;text-align:center;text-transform:uppercase;white-space:nowrap}
+.pk-list-name b{display:block;width:max-content;margin:0 auto;font-weight:400;line-height:1.1}
+.pk-list-name .pk-list-t1{font-size:calc(var(--nf)*var(--s1,1));letter-spacing:var(--ls1,.01em)}
+.pk-list-name .pk-list-t2{font-size:calc(var(--nf)*var(--s2,1));letter-spacing:var(--ls2,.01em)}
+.pk-list-veil{position:absolute;inset:0;z-index:3;display:block;border-radius:inherit;background:rgba(4,3,2,var(--veil,.14));box-shadow:inset 0 0 0 1px var(--edge,rgba(255,255,255,.1));pointer-events:none;transition:opacity .5s ease}
+.pk-list-poster::before{content:"";position:absolute;top:-10%;bottom:-10%;left:0;z-index:5;width:60%;pointer-events:none;background:linear-gradient(100deg,transparent,rgba(255,255,255,.06) 25%,rgba(255,255,255,.22) 50%,rgba(255,255,255,.06) 75%,transparent);transform:translateX(-130%) skewX(-12deg)}
+.pk-list-poster::after{content:"";position:absolute;inset:0;z-index:6;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 0 1.5px var(--a);opacity:0;transition:opacity .5s ease}
+.pk-list-is-lit{z-index:2;transform:scale(1.02);transition:transform .5s var(--ease)}
+.pk-list-is-lit:active{transform:scale(.97);transition-duration:.12s}
+.pk-list-is-lit .pk-list-veil{opacity:0}
+.pk-list-is-lit::after{opacity:1}
+.pk-list-is-lit::before{animation:pk-list-shine .7s cubic-bezier(.4,0,.6,1) .12s both}
+
+/* A poster can be taller than its art on a tall narrow phone or a short wide window, so the floor carries on below the marble's last step. It starts where the art's floor already is at any size, so everywhere else the art covers it. */
+.pk-list-poster.pk-list-w-sue{background:linear-gradient(#f7f5f0,#f7f5f0) 0 100%/100% calc(100% - min(200px,70%)) no-repeat,linear-gradient(180deg,#7d8ca8,#aab6ca 62%)}
+/* On a tablet the column's edge is on screen, so the spotlight has to fade out before it reaches that edge. */
+@media (min-width:449px){.pk-list-spot::before{left:calc(-1*var(--gut));right:calc(-1*var(--gut))}}
+
+/* motion: the stage always runs. A poster holds its pose until the spotlight reaches it. */
+.pk-list-a-float{animation:pk-list-float var(--t,3.6s) ease-in-out var(--dl,0s) infinite}
+.pk-list-a-swing{animation:pk-list-swing var(--t,6s) ease-in-out var(--dl,0s) infinite}
+.pk-list-a-spin{animation:pk-list-spin var(--t,28.8s) linear var(--dl,0s) infinite}
+.pk-list-a-spinb{animation:pk-list-spin var(--t,36s) linear var(--dl,0s) infinite reverse}
+.pk-list-a-thump{animation:pk-list-thump var(--t,3.6s) cubic-bezier(.5,0,.3,1) var(--dl,0s) infinite}
+.pk-list-a-jolt{animation:pk-list-jolt var(--t,3.6s) linear var(--dl,0s) infinite}
+.pk-list-a-clap{animation:pk-list-clap var(--t,3.6s) ease-in-out var(--dl,0s) infinite}
+.pk-list-a-bob{animation:pk-list-bob var(--t,2.3s) ease-in-out var(--dl,0s) infinite}
+.pk-list-a-drift{animation:pk-list-drift var(--t,6s) ease-in-out var(--dl,0s) infinite}
+.pk-list-a-blink{animation:pk-list-blink .96s linear var(--dl,0s) infinite}
+.pk-list-a-sway{animation:pk-list-swing var(--t,6s) ease-in-out var(--dl,0s) infinite;will-change:transform}
+.pk-list-a-breath{animation:pk-list-bk-breath 5.3s ease-in-out infinite}
+.pk-list-poster .pk-list-a-sway,.pk-list-poster .pk-list-a-breath,.pk-list-poster .pk-list-a-float,.pk-list-poster .pk-list-a-spin,.pk-list-poster .pk-list-a-spinb,.pk-list-poster .pk-list-a-thump,.pk-list-poster .pk-list-a-clap{animation-play-state:var(--play,paused)}
+.pk-list-is-lit.pk-list-poster{--play:running}
+/* a finger on the stage stops the clock: the progress mark and the lit poster wait with the timer */
+.pk-list-held .pk-list-is-lit.pk-list-poster{--play:paused}
+.pk-list-held .pk-list-tick-on::after{animation-play-state:paused}
+.pk-list-rain{position:absolute;left:0;top:-100%;z-index:3;display:block;width:100%;height:200%;pointer-events:none;animation:pk-list-rain .75s linear infinite}
+.pk-list-led{position:absolute;top:43.060%;height:6.750%;display:block;overflow:hidden}
+.pk-list-led svg{position:absolute;left:0;top:0;display:block;width:100%;height:1000%;animation:pk-list-count var(--t,1.600s) steps(10) infinite}
+
+@keyframes pk-list-in{from{opacity:0;transform:translateY(10px) scale(.975)}}
+@keyframes pk-list-xfade{from{opacity:0}to{opacity:1}}
+@keyframes pk-list-unveil{from{opacity:1}to{opacity:0}}
+@keyframes pk-list-sweep{from{transform:translate3d(33.4%,0,0)}to{transform:translate3d(-26%,0,0)}}
+@keyframes pk-list-arrive{from{opacity:0;transform:translateY(9px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes pk-list-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pk-list-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes pk-list-shine{from{transform:translateX(-130%) skewX(-12deg)}to{transform:translateX(230%) skewX(-12deg)}}
+@keyframes pk-list-float{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(calc(var(--y,2.2%)*-1)) rotate(calc(var(--r,1deg)*-1))}70%{transform:translateY(var(--y,2.2%)) rotate(var(--r,1deg))}}
+@keyframes pk-list-swing{0%,100%{transform:rotate(0)}25%{transform:rotate(calc(var(--r,2deg)*-1))}75%{transform:rotate(var(--r,2deg))}}
+@keyframes pk-list-spin{to{transform:rotate(360deg)}}
+@keyframes pk-list-thump{0%{transform:translateY(0)}38%{transform:translateY(calc(var(--y,10%)*-.8))}66%{transform:translateY(calc(var(--y,10%)*-1))}74%{transform:translateY(calc(var(--y,10%)*.05))}80%,100%{transform:translateY(0)}}
+@keyframes pk-list-jolt{0%,73%{transform:translateY(0)}75%{transform:translateY(.9%)}83%,100%{transform:translateY(0)}}
+@keyframes pk-list-clap{0%,58%{transform:rotate(0)}66%{transform:rotate(calc(var(--r,15deg)*-.18))}74%{transform:rotate(var(--r,15deg))}78%{transform:rotate(calc(var(--r,15deg)*.86))}82%,90%{transform:rotate(var(--r,15deg))}100%{transform:rotate(0)}}
+@keyframes pk-list-bob{0%,18%,100%{transform:rotate(0)}24%{transform:rotate(var(--r,14deg))}32%{transform:rotate(0)}62%{transform:rotate(0)}68%{transform:rotate(var(--r,14deg))}76%{transform:rotate(0)}}
+@keyframes pk-list-drift{0%,100%{transform:translateX(0)}50%{transform:translateX(var(--x,3%))}}
+@keyframes pk-list-blink{0%,33%{opacity:1}33.1%,100%{opacity:0}}
+@keyframes pk-list-rain{to{transform:translateY(50%)}}
+@keyframes pk-list-count{to{transform:translateY(-100%)}}
+@keyframes pk-list-bk-breath{0%,100%{opacity:1}50%{opacity:.76}}
+@keyframes pk-list-bk-scan{from{transform:translate3d(0,-100%,0)}to{transform:translate3d(0,340%,0)}}
+
+/* worlds: one ground for the poster and for the stage */
+.pk-list-w-cinema{--a:#e8b64c;--sc:rgba(7,4,4,.82);--fan:rgba(255,240,214,.94);--t1:linear-gradient(180deg,#fff 34%,#c9c7c9);--t2:linear-gradient(180deg,#ffdf8e,#c58f2a);--k1:10.6;--k2:8;--ls2:.03em;
+  background:var(--grain),radial-gradient(70% 54% at var(--lx) 40%,rgba(255,206,120,.3),transparent 74%),linear-gradient(180deg,rgba(7,4,4,.44),transparent 24%,transparent 52%,#070404 88%),repeating-linear-gradient(90deg,#21050a 0,#571019 calc(var(--u)*7),#8e1622 calc(var(--u)*10),#4a0d16 calc(var(--u)*15),#1d0408 calc(var(--u)*21),#521019 calc(var(--u)*25),#7a1420 calc(var(--u)*27),#3e0a12 calc(var(--u)*33),#21050a calc(var(--u)*38))}
+.pk-list-w-sue{--a:#c8102e;--sc:rgba(246,244,239,.94);--fan:#12234a;--t1:linear-gradient(180deg,#12234a,#12234a);--t2:linear-gradient(180deg,#d41433,#a70c26);--k1:12.8;--k2:8.2;--s1:1.24;--s2:.94;--veil:.05;--edge:rgba(18,35,74,.2);
+  background:linear-gradient(180deg,#7d8ca8,#aab6ca 62%)}
+.pk-list-w-nine{--zoom:1.12;--hf:.93;--a:#c2a566;--sc:rgba(10,11,12,.74);--fan:#e9e3d4;--t1:linear-gradient(180deg,#fff,#b9b4a7);--t2:linear-gradient(180deg,#f2dc9c,#b39a5f);--k1:8.8;--k2:6.9;--ls2:.28em;--s2:.94;
+  background:var(--grain),radial-gradient(50% 44% at var(--lx) 0,rgba(214,224,230,.42),transparent 76%),radial-gradient(72% 54% at var(--lx) 46%,rgba(112,120,126,.34),transparent 76%),linear-gradient(180deg,#26282b,#141517 62%,#08080a 90%)}
+.pk-list-w-folly{--zoom:1.1;--hf:.91;--a:#e08a5b;--sc:rgba(15,21,17,.76);--fan:#f5f0dc;--t1:linear-gradient(180deg,#f5f0dc,#f5f0dc);--t2:linear-gradient(180deg,#fff,#d2b08a);--k1:4;--k2:15;--ls1:.42em;--s1:.7;--s2:1.3;
+  background:var(--grain),radial-gradient(70% 42% at var(--lx) 5%,rgba(245,240,220,.42),transparent 76%),linear-gradient(180deg,#465a4e,#2c3a31 50%,#111a15 80%,#0b110e)}
+.pk-list-w-blackout{--a:#7dff9a;--sc:rgba(6,18,11,.86);--fan:#dcffe8;--t1:linear-gradient(180deg,#f4fff8,#a9d8bb);--t2:linear-gradient(180deg,#c9ffd6,#7dff9a);--k1:7.4;--k2:7.4;--ls2:.06em;--s1:1.02;--s2:.98;--hf:.97;--veil:.1;--edge:rgba(125,255,154,.14);
+  background:var(--grain),radial-gradient(64% 56% at var(--lx) 46%,rgba(125,255,154,.18),transparent 76%),linear-gradient(180deg,#0f2a1a,#0a1d12 56%,#06120b)}
+.pk-list-name .pk-list-t1,.pk-list-name .pk-list-t2{display:block}
+
+/* the stage camera: close on the hero, which runs off the right edge. The ticket and the eye sit on the
+   stage's middle. The stamp and the slate hang from the top, so the knob at its peak and the open clapper stay in frame. */
+.pk-list-stage .pk-list-w-sue{--hbmax:250px;--ht:calc(3px - var(--hb)*.0256)}
+.pk-list-stage .pk-list-w-nine{--hy:12px}
+.pk-list-stage .pk-list-w-folly{--ht:calc(2px - var(--hb)*.044);--hr:-.1}
+.pk-list-stage .pk-list-w-blackout{--hb:calc(var(--pk-sth)*1.04);--hr:-.09;--lx:79%}
+
+/* The Blackout: the approved page's door (rings as on that page), in a 160 box that also holds the collar and hinges */
+.pk-list-bk-door{--fu:.5px;position:absolute;left:8.44%;top:6.56%;width:84.38%;height:84.38%;display:block}
+.pk-list-bk-ring{position:absolute;display:block;border-radius:50%}
+.pk-list-bk-rim{inset:0;background:conic-gradient(from 0deg,#e4ffee 0deg,#86cfa6 14deg,#2c5f48 44deg,#0f2a20 84deg,#183c2c 122deg,#3a7a5b 164deg,#5a9b7c 180deg,#3a7a5b 196deg,#183c2c 238deg,#0f2a20 276deg,#2c5f48 316deg,#86cfa6 346deg,#e4ffee 360deg);box-shadow:inset 0 calc(1.3*var(--fu)) calc(.5*var(--fu)) rgba(232,255,240,.75),inset 0 calc(-1.6*var(--fu)) calc(1.2*var(--fu)) rgba(0,0,0,.72),0 0 0 calc(.6*var(--fu)) #020a06}
+.pk-list-bk-mid{inset:13.6%;background:conic-gradient(from 0deg,#8ad6ae 0deg,#3a7a5c 18deg,#153b2b 54deg,#091f17 92deg,#102e22 130deg,#265a43 168deg,#347055 180deg,#265a43 192deg,#102e22 230deg,#091f17 268deg,#153b2b 306deg,#3a7a5c 342deg,#8ad6ae 360deg);box-shadow:inset 0 calc(2.4*var(--fu)) calc(2.8*var(--fu)) rgba(0,0,0,.8),inset 0 calc(-.7*var(--fu)) calc(.4*var(--fu)) rgba(200,255,220,.38)}
+.pk-list-bk-core{inset:29%;background:conic-gradient(from 0deg,#c4f3d5 0deg,#5c9a7c 22deg,#1f4737 60deg,#0d271e 96deg,#183f30 136deg,#336b52 172deg,#447d62 180deg,#336b52 188deg,#183f30 226deg,#0d271e 266deg,#1f4737 302deg,#5c9a7c 338deg,#c4f3d5 360deg);box-shadow:inset 0 calc(1*var(--fu)) calc(.5*var(--fu)) rgba(232,255,240,.65),inset 0 calc(-1*var(--fu)) calc(.8*var(--fu)) rgba(0,0,0,.6),0 calc(2.6*var(--fu)) calc(3*var(--fu)) rgba(0,0,0,.72)}
+.pk-list-bk-light{inset:0;background:radial-gradient(circle at 50% 6%,rgba(220,255,235,.16),transparent 46%),radial-gradient(circle at 50% 112%,rgba(0,8,4,.56),transparent 62%)}
+/* the security camera over the picture */
+.pk-list-bk-lines{position:absolute;inset:0;z-index:2;display:block;pointer-events:none;background:repeating-linear-gradient(180deg,rgba(125,255,154,.05) 0 1px,rgba(2,10,6,.08) 1px 3px)}
+.pk-list-bk-scan{position:absolute;left:34%;right:0;top:0;z-index:3;display:block;height:30%;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(125,255,154,.12) 86%,rgba(190,255,210,.4) 96%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 34%);mask-image:linear-gradient(90deg,transparent,#000 34%);will-change:transform;animation:pk-list-bk-scan 3.6s linear infinite}
+.pk-list-bk-cam{position:absolute;left:14px;top:12px;z-index:5;display:flex;align-items:center;gap:5px;font-size:8.5px;font-weight:800;letter-spacing:.2em;line-height:1;white-space:nowrap;color:#7dff9a}
+.pk-list-bk-cam i{display:block;width:5px;height:5px;border-radius:50%;background:#ff2b2b;box-shadow:0 0 5px #ff2b2b}
+.pk-list-is-prev .pk-list-bk-scan,.pk-list-is-prev .pk-list-bk-cam{opacity:0;transition:opacity .14s linear}
+
+/* the Nine's three brass rings, cast as one piece and lit from above */
+.pk-list-rings{position:absolute;left:12.5%;top:7.5%;width:75%;height:75%;display:block;border-radius:50%;background:conic-gradient(from -14deg,#e2cd96 0deg,#c0aa71 22deg,#94825a 58deg,#65593a 96deg,#463d28 138deg,#50462d 166deg,#73643f 186deg,#4b412a 214deg,#423925 250deg,#65593a 290deg,#94825a 322deg,#c0aa71 344deg,#e2cd96 360deg);-webkit-mask-image:radial-gradient(closest-side,transparent 57.8%,#000 58%,#000 67%,transparent 67.2%,transparent 69.5%,#000 69.7%,#000 77.8%,transparent 78%,transparent 80.3%,#000 80.5%,#000 89.4%,transparent 89.6%);mask-image:radial-gradient(closest-side,transparent 57.8%,#000 58%,#000 67%,transparent 67.2%,transparent 69.5%,#000 69.7%,#000 77.8%,transparent 78%,transparent 80.3%,#000 80.5%,#000 89.4%,transparent 89.6%)}
+
+/* the sealed poster: as tall as the rest, not tappable. Its name is one line, so its foot is shorter. */
+.pk-list-sealed{--a:var(--line-on);--foot:calc(var(--nf)*1.5 + 8px);--zoom:1.08;--hf:.98;--bandy:calc((100% - var(--foot))*.6);background:var(--grain),radial-gradient(58% 50% at 54% 6%,rgba(232,196,128,.2),transparent 78%),repeating-linear-gradient(114deg,rgba(255,255,255,.028) 0 1px,transparent 1px 3px),linear-gradient(148deg,#2a2722,#100e0b 46%,#1e1b16);box-shadow:0 10px 16px -10px rgba(0,0,0,.95),inset 0 0 0 1px var(--line)}
+.pk-list-strap{position:absolute;left:0;right:0;top:var(--bandy);z-index:2;height:calc(var(--nf)*1.15);transform:translateY(-50%);display:block;background:linear-gradient(180deg,#0c0a08,#060504);box-shadow:0 -1px 0 #4a4234,0 1px 0 #4a4234,0 -3px 5px rgba(0,0,0,.5),0 3px 5px rgba(0,0,0,.5)}
+.pk-list-seal{position:absolute;left:50%;top:var(--bandy);z-index:3;display:block;width:calc(var(--nf)*2.5);height:calc(var(--nf)*2.5);transform:translate(-50%,-50%)}
+.pk-list-sealed .pk-list-name{bottom:10px;padding-left:.2em;font-size:calc(var(--nf)*1.02);letter-spacing:.2em;line-height:1.1;color:rgba(249,246,239,.86)}
+
+/* sizes */
+@media (max-width:359px){.pk-list-root{--gut:12px;--gap:6px}.pk-list-top{gap:10px}.pk-list-back{padding:0 13px 0 11px;gap:7px;letter-spacing:.16em}.pk-list-h1{font-size:25px}.pk-list-scene{--hb:calc(.9*(calc(78*var(--pk-vw)) - 57px))}.pk-list-copy{left:12px;width:50%}.pk-list-prog{left:12px}.pk-list-bulbs{width:118px}}
+@media (min-width:400px){.pk-list-bulbs{bottom:18px}}
+@media (min-width:400px) and (min-height:860px){.pk-list-stage{margin-top:14px}.pk-list-wall{margin-top:12px}}
+@media (max-height:739px){
+  .pk-list-root{--ratio:1.08;--nf:min(calc(4.8*var(--pk-vw)),20px);display:block;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .pk-list-root::-webkit-scrollbar{display:none}
+  .pk-list-wall{grid-template-rows:auto auto auto}
+  .pk-list-poster{aspect-ratio:1/var(--ratio)}
+  .pk-list-spot{height:auto;aspect-ratio:1/var(--ratio)}
+}
+/* The column on a tablet can be far taller than the art was drawn for: the posters stop growing and the page sits in the middle of the screen. 297 px is where the lowest art ends on a tablet's 204 px wide poster: Sue's floor and its shadow are drawn to y=233 of 160, and 233/160*204 = 297. Any taller and the shadow stops in a straight line above the poster's foot. */
+@media (min-width:449px) and (min-height:740px){.pk-list-root{justify-content:center}.pk-list-wall{flex:0 1 auto;grid-template-rows:repeat(3,minmax(0,297px))}}
+@media (prefers-reduced-motion:reduce){.pk-list-root *,.pk-list-root *::before,.pk-list-root *::after{animation-duration:.01s!important;animation-iteration-count:1!important;transition-duration:.01s!important}}

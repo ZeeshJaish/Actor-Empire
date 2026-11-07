@@ -10,6 +10,7 @@ import type {
 import { BASE_CSS } from './theme';
 import { Icon, Meter, Segmented, Sheet, Style, clamp, cssVar, money } from './ui';
 import { InformationGrid } from '../../ui-layout';
+import { AgeGatePopup } from '../AgeGatePopup';
 
 interface ImproveScreenProps extends ImproveUiModel {
   onWellbeingAction: (action: ImproveUiAction) => void;
@@ -95,6 +96,7 @@ export default function ImproveScreen(props: ImproveScreenProps) {
   const [discipline, setDiscipline] = React.useState<ImproveUiDisciplineKey>(weakest);
   const [open, setOpen] = React.useState<OpenItem | null>(null);
   const [statsOpen, setStatsOpen] = React.useState(false);
+  const [showAgeGate, setShowAgeGate] = React.useState(false);
   const [skillGroup, setSkillGroup] = React.useState<ImproveUiDisciplineKey>('acting');
   const activeCourses = props.courses.filter(course => course.activeCommitmentId);
   const slots = 24;
@@ -109,12 +111,14 @@ export default function ImproveScreen(props: ImproveScreenProps) {
   const openTitle = open?.value.name;
   const openEnergy = open?.kind === 'wellbeing' ? open.value.energy : open?.kind === 'course' ? open.value.energy : open?.value.energy || 0;
   const openCost = open?.kind === 'wellbeing' ? open.value.cost : open?.kind === 'course' ? open.value.cost : open?.value.cost || 0;
-  const unaffordable = open ? props.money < openCost : false;
-  const insufficientEnergy = open ? (open.kind === 'course' ? props.capacityFree < openEnergy : props.availableEnergy < openEnergy) : false;
+  const ageLocked = open?.kind === 'wellbeing' && Boolean(open.value.ageLocked);
+  const unaffordable = open && !ageLocked ? props.money < openCost : false;
+  const insufficientEnergy = open && !ageLocked ? (open.kind === 'course' ? props.capacityFree < openEnergy : props.availableEnergy < openEnergy) : false;
   const alreadyActive = open?.kind === 'course' && Boolean(open.value.activeCommitmentId);
   const mastered = open?.kind === 'genre' && open.value.points >= open.value.pointsMax;
 
   const commitOpen = () => {
+    if (ageLocked) { setShowAgeGate(true); return; }
     if (!open || unaffordable || insufficientEnergy || alreadyActive || mastered) return;
     if (open.kind === 'wellbeing') props.onWellbeingAction(open.value);
     if (open.kind === 'course') props.onEnrollCourse(open.value);
@@ -136,6 +140,8 @@ export default function ImproveScreen(props: ImproveScreenProps) {
   </div>
 
   <Sheet open={Boolean(open)} onClose={() => setOpen(null)} eyebrow={open?.kind === 'course' ? 'Workshop' : open?.kind === 'genre' ? open.value.genre.replace('_', ' ') : open?.value.request.activityName} eyebrowIcon={open?.kind === 'course' ? 'book' : open?.kind === 'genre' ? 'star' : 'dumbbell'} title={openTitle}>{open && <>{'description' in open.value && <p className="si-note">{open.value.description}</p>}<div className="si-sheet-cost"><div className="si-sc"><span className="ae-lab">Energy</span><b style={{ color: 'var(--gold-hi)' }}>{openEnergy}E</b></div><div className="si-sc"><span className="ae-lab">Cost</span><b style={{ color: openCost ? 'var(--money)' : 'var(--faint)' }}>{openCost ? money(openCost) : 'Free'}</b></div><div className="si-sc"><span className="ae-lab">{open.kind === 'course' ? 'Length' : open.kind === 'genre' ? 'Progress' : 'Type'}</span><b>{open.kind === 'course' ? `${open.value.weeks} wks` : open.kind === 'genre' ? `${Math.round(open.value.points)}/100` : 'One-off'}</b></div></div>{open.kind !== 'genre' && <><div className="ae-sec"><span className="ae-lab">Effect</span><span className="ae-sec-rule" /></div><Effects effects={open.value.effects} color="var(--gold)" /></>}{open.kind === 'course' && open.value.activeCommitmentId ? <button className="ae-btn is-ghost" style={{ marginTop: 16 }} onClick={() => { props.onCancelCourse(open.value.activeCommitmentId!); setOpen(null); }}>Cancel course</button> : <button className="ae-btn" style={{ marginTop: 16 }} disabled={unaffordable || insufficientEnergy || mastered} onClick={commitOpen}>{unaffordable ? 'Not enough money' : insufficientEnergy ? 'Not enough energy' : mastered ? 'Mastered' : open.kind === 'course' ? 'Enroll' : open.kind === 'genre' ? 'Train genre' : 'Do it'}</button>}</>}</Sheet>
+
+  {showAgeGate && <AgeGatePopup language={props.language} onClose={() => setShowAgeGate(false)} />}
 
   <Sheet open={statsOpen} onClose={() => setStatsOpen(false)} eyebrow="Overall talent" eyebrowIcon="brain" title={`${Math.round(props.talent)} / 100`}>{statsOpen && selectedGroup && <><div className="si-tabs">{props.skillGroups.map(group => <button key={group.key} className={'si-tab' + (group.key === skillGroup ? ' is-on' : '')} style={cssVar('--c', group.color)} onClick={() => setSkillGroup(group.key)}>{group.key.toUpperCase()}</button>)}</div><div className="si-radar" style={cssVar('--c', selectedGroup.color)}><div className="si-radar-hud"><span className="ae-lab">Average</span><b>{selectedAverage}<em> / 100</em></b></div><Radar skills={selectedGroup.skills} color={selectedGroup.color} /></div><div className="si-skill-grid">{selectedGroup.skills.map(skill => <div key={skill.name}><div className="si-skill-h"><span>{skill.name}</span><b>{Math.round(skill.value)}</b></div><Meter value={skill.value} color={selectedGroup.color} thin /></div>)}</div></>}</Sheet>
   </div>;

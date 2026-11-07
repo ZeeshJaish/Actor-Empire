@@ -650,7 +650,6 @@ const runOwnedRenewalDeskAudit = (): void => {
     assert.notEqual(inWindow.negotiation!.minimumGuarantee, 108_000_000);
     const platformCalendarMarkup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
         player: inWindow.player,
-        context: 'PLATFORM',
         onUpdatePlayer: () => undefined,
     }));
     assert.match(platformCalendarMarkup, /EMPIRE\+ \/ RIGHTS EXCHANGE/);
@@ -699,20 +698,10 @@ const runCalendarSurfaceAudit = (): void => {
         awards: 1,
     });
     const opened = processStreamingRightsCalendarWeek(player, 44).player;
-    const markup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
-        player: opened,
-        context: 'STUDIO',
-        onUpdatePlayer: () => undefined,
-        onClose: () => undefined,
-    }));
-    assert.match(markup, /Rights Office/);
-    assert.match(markup, /Custom Control/);
-    assert.match(markup, /Action required/);
-    assert.match(markup, /Monsoon City/);
-    assert.match(markup, /Accept renewal/);
-    assert.match(markup, /Return to market/);
-    assert.match(markup, /Let expire/);
-    assert.doesNotMatch(markup, /best deal/i);
+    /* #316: a studio's renewals are answered in the Rights room (`audit-rights-room`); the calendar still holds the case */
+    const waitingCase = getStreamingRightsCalendar(opened, 44).groups.actionRequired.find(item => item.title === 'Monsoon City');
+    assert.ok(waitingCase, 'the renewal waits for a decision');
+    assert.equal(waitingCase!.offerDisposition, 'OFFERED');
 
     const caseForContract = Object.values(opened.world.streamingRightsCalendar!.renewalCases)[0];
     assert.equal(getStreamingRightsTimingLabel(contract, 44, caseForContract), 'Decision required');
@@ -722,7 +711,7 @@ const runCalendarSurfaceAudit = (): void => {
     );
     assert.equal(
         getStreamingRightsTimingLabel({ ...contract, renewalOption: false }, 44, null),
-        'Leaving catalogue after Week 52',
+        'Leaving catalogue after Week 1 next year',
     );
 
     const projectLine = getStreamingRightsProjectLine(opened, contract.sourceProjectId, 44);

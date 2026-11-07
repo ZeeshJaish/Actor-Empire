@@ -424,12 +424,12 @@ export const requestPrivateEquityExit = ({
         position: updatedPosition,
         player: writePositions({
             ...player,
-            logs: [{
+            logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `Private sale process started for ${percentForSale.toFixed(1)}% of ${position.studioName || studioId}.`,
                 type: 'neutral' as const,
-            }, ...(player.logs || [])].slice(0, 50),
+            }],
         }, nextPositions),
     };
 };
@@ -569,12 +569,12 @@ export const acceptPrivateEquityExit = ({
             privateEquityExitHistory: exitHistory,
             studioAcquisitionCases: nextCases,
         },
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: `Private stake sold: ${soldPercent.toFixed(1)}% of ${studioName} for ${proceeds.toLocaleString()} net.`,
             type: 'positive' as const,
-        }, ...(player.logs || [])].slice(0, 50),
+        }],
     }, nextPositions);
 
     return {

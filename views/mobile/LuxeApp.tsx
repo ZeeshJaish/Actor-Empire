@@ -13,6 +13,7 @@ import { getEstimatedNetWorth } from '../../services/loanLogic';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { DatingPreferencesSheet, preferenceLabel } from './DatingPreferencesSheet';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { isUnderAdultAge } from '../../services/ageGate';
 import {
     ArrowLeft,
     Camera,
@@ -377,15 +378,12 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                 luxeCycleStartAbsoluteWeek: cycleStartAbsoluteWeek,
                 luxeRefreshOffset: refreshOffset + 1,
             },
-            logs: [
-                {
+            logs: [...(player.logs || []), {
                     week: player.currentWeek,
                     year: player.age,
                     message: `💎 Paid ${formatMoneyCompact(LUXE_REFRESH_COST)} for a fresh Luxe curation.`,
                     type: 'neutral' as const,
-                },
-                ...player.logs,
-            ].slice(0, 80),
+                }],
         };
 
         onUpdatePlayer(updatedPlayer);
@@ -425,15 +423,12 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                           },
                           ...player.news,
                       ].slice(0, 80),
-                      logs: [
-                          {
+                      logs: [...(player.logs || []), {
                               week: player.currentWeek,
                               year: player.age,
 	                              message: tr('luxe.signal.log', { name: candidate.name }),
                               type: 'neutral' as const,
-                          },
-                          ...player.logs,
-                      ].slice(0, 80),
+                          }],
                   }
                 : player;
             setCandidates(prev => prev.filter(entry => entry.id !== candidate.id));
@@ -458,10 +453,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                 ...player.dating,
                 matches: [enriched, ...player.dating.matches],
             },
-            logs: [
-                { week: player.currentWeek, year: player.age, message: `💎 Luxe matched you with ${candidate.name}.`, type: 'positive' },
-                ...player.logs,
-            ].slice(0, 80),
+            logs: [...(player.logs || []), { week: player.currentWeek, year: player.age, message: `💎 Luxe matched you with ${candidate.name}.`, type: 'positive' }],
         });
         setCandidates(prev => prev.filter(entry => entry.id !== candidate.id));
         setSelectedCandidateId(null);
@@ -544,6 +536,10 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
 
     const handleInvite = (inviteKind: InviteKind) => {
         if (!activeChatMatch) return;
+        if (inviteKind === 'YACHT_ESCAPE' && isUnderAdultAge(player)) {
+            showAgeGate();
+            return;
+        }
         if (isAwaitingReply) {
             pushFeedback('Let them answer first.', 'neutral');
             return;
@@ -618,10 +614,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             : match
                     ),
                 },
-                logs: [
-                    { week: player.currentWeek, year: player.age, message: `💸 ${option.label} fizzled and still cost you ${formatMoneyCompact(Math.floor(cost * 0.35))}.`, type: 'negative' },
-                    ...player.logs,
-                ].slice(0, 80),
+                logs: [...(player.logs || []), { week: player.currentWeek, year: player.age, message: `💸 ${option.label} fizzled and still cost you ${formatMoneyCompact(Math.floor(cost * 0.35))}.`, type: 'negative' }],
             });
             pushFeedback(outcome.headline, 'neutral');
             showResultModal(
@@ -726,10 +719,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                             : match
                     ),
                 },
-                logs: [
-                    { week: player.currentWeek, year: player.age, message: `💔 ${activeChatMatch.name} wants more time before making things official.`, type: 'neutral' },
-                    ...player.logs,
-                ].slice(0, 80),
+                logs: [...(player.logs || []), { week: player.currentWeek, year: player.age, message: `💔 ${activeChatMatch.name} wants more time before making things official.`, type: 'neutral' }],
             });
             pushFeedback(`${activeChatMatch.name.split(' ')[0]} is not ready to define it yet.`, 'neutral');
             showResultModal(
@@ -761,8 +751,14 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
         );
     };
 
+    const showAgeGate = () => setResultModal({ title: tr('ageGate.title'), body: tr('ageGate.body'), tone: 'neutral' });
+
     const handleIntimacy = () => {
         if (!activeChatMatch) return;
+        if (isUnderAdultAge(player)) {
+            showAgeGate();
+            return;
+        }
         if (isAwaitingReply) {
             pushFeedback('Let the current moment land first.', 'neutral');
             return;
@@ -838,8 +834,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                         : match
                 ),
             },
-            logs: [
-                {
+            logs: [...(player.logs || []), {
                     week: player.currentWeek,
                     year: player.age,
                     message: success
@@ -849,9 +844,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                 },
                 ...(hasExistingRomance && success
                     ? [{ week: player.currentWeek, year: player.age, message: `🗞️ You are now playing with affair-level risk.`, type: 'negative' as const }]
-                    : []),
-                ...player.logs,
-            ].slice(0, 80),
+                    : [])],
             news: [
                 ...((success && (activeChatMatch.privacyStyle !== 'LOW_KEY' || hasExistingRomance) && Math.random() < 0.45)
                     ? [{
@@ -1561,7 +1554,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                     {isReadyToMakeOfficial ? 'Official' : 'Ask Out'}
                                 </button>
                                 <button
-                                    onClick={() => setChatActionMode('INTIMACY')}
+                                    onClick={() => (isUnderAdultAge(player) ? showAgeGate() : setChatActionMode('INTIMACY'))}
                                     className={`shrink-0 rounded-full px-4 py-2 text-sm font-sans font-bold ${chatActionMode === 'INTIMACY' ? 'bg-rose-300 text-black' : 'border border-white/10 bg-white/[0.03] text-zinc-300'}`}
                                 >
                                     Intimacy
@@ -1594,7 +1587,7 @@ export const LuxeApp: React.FC<LuxeAppProps> = ({ player, onBack, onUpdatePlayer
                                     {localizedFlirtOptions.map(option => (
                                         <button
                                             key={option.id}
-                                            onClick={() => sendChatOption(option.label, option.lines, option.chemistryGain, warmResponses)}
+                                            onClick={() => (option.id === 'TURN_UP_HEAT' && isUnderAdultAge(player) ? showAgeGate() : sendChatOption(option.label, option.lines, option.chemistryGain, warmResponses))}
                                             disabled={player.energy.current < LUXE_CHAT_ACTION_ENERGY_COST || isAwaitingReply}
                                             className="shrink-0 min-w-[148px] rounded-[18px] border border-amber-500/15 bg-amber-500/6 px-4 py-3 text-left hover:border-amber-500/35 hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
@@ -1999,8 +1992,7 @@ const buildPostInvitePlayer = (
             ...player.x,
             feed: [...xPosts, ...player.x.feed].slice(0, 100),
         },
-        logs: [
-            {
+        logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `💎 ${match.name} said yes to ${inviteMode === 'PRIVATE' ? 'a private' : 'a public'} ${inviteLabel.toLowerCase()} costing ${formatMoneyCompact(cost)}.`,
@@ -2011,9 +2003,7 @@ const buildPostInvitePlayer = (
                 : []),
             ...(isSameGenderPublic
                 ? [{ week: player.currentWeek, year: player.age, message: `🗞️ Your public relationship is triggering intense identity speculation across fan spaces.`, type: 'neutral' as const }]
-                : []),
-            ...player.logs,
-        ].slice(0, 80),
+                : [])],
     };
 };
 
@@ -2029,15 +2019,12 @@ const buildOfficialLuxeRelationshipPlayer = (
             matches: player.dating.matches.filter(entry => entry.id !== match.id),
         },
         relationships: [...player.relationships.filter(rel => rel.npcId !== match.npcId), newRelationship],
-        logs: [
-            {
+        logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `❤️ ${match.name} is now officially your partner.`,
                 type: 'positive' as const,
-            },
-            ...player.logs,
-        ].slice(0, 80),
+            }],
     };
 };
 

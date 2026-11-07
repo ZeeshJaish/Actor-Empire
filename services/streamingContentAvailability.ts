@@ -1,3 +1,4 @@
+import { STREAMING_EARLY_ACCESS_MAX_WEEKS } from './streamingEarlyAccess';
 import type { OwnedStreamingPlatformState, Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
@@ -27,10 +28,10 @@ export const getOwnedPlatformPackageCountryIds = (platform: OwnedStreamingPlatfo
     return (available.length ? available : operations.length ? [] : planned.length ? planned : ['US', 'CA', 'MX']).slice().sort();
 };
 
-export type ContentAvailability = 'IN_PRODUCTION' | 'AWAITING_AVAILABILITY' | 'READY' | 'SCHEDULED' | 'LIVE' | 'RIGHTS_EXPIRED' | 'RIGHTS_UNAVAILABLE';
+export type ContentAvailability = 'IN_PRODUCTION' | 'AWAITING_AVAILABILITY' | 'READY' | 'SCHEDULED' | 'EARLY_ACCESS' | 'LIVE' | 'RIGHTS_EXPIRED' | 'RIGHTS_UNAVAILABLE';
 export const CONTENT_AVAILABILITY_LABELS: Record<ContentAvailability, string> = {
     IN_PRODUCTION: 'In production', AWAITING_AVAILABILITY: 'Awaiting availability', READY: 'Ready to schedule',
-    SCHEDULED: 'Scheduled', LIVE: 'Live', RIGHTS_EXPIRED: 'Rights expired', RIGHTS_UNAVAILABLE: 'Rights unavailable',
+    SCHEDULED: 'Scheduled', EARLY_ACCESS: 'Early access', LIVE: 'Live', RIGHTS_EXPIRED: 'Rights expired', RIGHTS_UNAVAILABLE: 'Rights unavailable',
 };
 
 export interface StreamingContentAvailabilityView {
@@ -107,11 +108,13 @@ export const getOwnedTitleCountryAccess = (player: Player, projectId: string, co
     const week = absoluteWeek ?? getAbsoluteWeek(player.age, player.currentWeek);
     const registry = player.world.streamingRightsContracts || {};
     const buyerId = player.ownedStreamingPlatform.identity?.slug || `player-platform:${player.id}`;
-    const ownContracts = Object.values(registry).filter(c => c.sourceProjectId === projectId
-        && c.buyer.type === 'PLAYER_PLATFORM' && c.buyer.id === buyerId).map(c => c.id);
+    /* #244: the week a window ends and the week before one starts are the player's: asking for two weeks and counting the end week left one dark week each */
+    const ownContracts = Object.values(registry).filter(c => c.sourceProjectId === projectId && (
+        (c.buyer.type === 'PLAYER_PLATFORM' && c.buyer.id === buyerId)
+        || (!c.permanentPurchase && c.windowType !== 'PERMANENT' && c.expiresAtAbsoluteWeek <= week))).map(c => c.id);
     return countryIds.filter(countryId => (['FIRST_WINDOW', 'SECOND_WINDOW', 'PERMANENT'] as const).every(windowType =>
         resolveStreamingRightsCompatibility({ world: player.world, sourceProjectId: projectId, buyerPlatformId: null,
-            territory: 'DOMESTIC', countryIds: [countryId], startsAtAbsoluteWeek: week, expiresAtAbsoluteWeek: week + 1,
+            territory: 'DOMESTIC', countryIds: [countryId], startsAtAbsoluteWeek: week, expiresAtAbsoluteWeek: week,
             windowType, exclusivity: 'NON_EXCLUSIVE', excludeContractIds: ownContracts,
         }).available));
 };
@@ -336,7 +339,9 @@ export const getStreamingContentAvailability = (
             : l.territory === 'MULTI_REGION' || country === countries[0])));
     const readiness = resolveStreamingProductionReadiness(player, projectId, commission, context.productionIndex);
     const readyProduction = readiness.ready;
-    const available = readyProduction && (owned || active.length > 0) && (!countries.length || coveredCountryIds.length > 0);
+    /* #292: an Original on licence goes back when its three years are up */
+    const licenceOver = Boolean(commission?.licenceEndsAtAbsoluteWeek && commission.licenceEndsAtAbsoluteWeek <= week);
+    const available = readyProduction && !licenceOver && (owned || active.length > 0) && (!countries.length || coveredCountryIds.length > 0);
     const slate = context.titleIndex.slate.get(projectId);
     const programWeek = platform.launchCommit
         ? Math.max(1, week - platform.launchCommit.committedAtAbsoluteWeek + 1)
@@ -344,11 +349,19 @@ export const getStreamingContentAvailability = (
     const released = commission?.releasePlan
         ? platform.lifecycle === 'ACTIVE' && commission.releasePlan.premiereAtAbsoluteWeek <= week
         : Boolean(commission && readiness.status === 'RELEASED') || Boolean(slate && platform.lifecycle === 'ACTIVE' && slate.launchWeek <= programWeek);
+    /* #245: a premium plan is already watching a title the slate has ahead */
+    const generalAt = commission?.releasePlan?.premiereAtAbsoluteWeek ?? (slate && platform.launchCommit ? platform.launchCommit.committedAtAbsoluteWeek + slate.launchWeek - 1 : undefined);
+    const earlyWindow = released || generalAt === undefined || platform.lifecycle !== 'ACTIVE' ? 0 : Math.min(
+        Math.max(0, ...context.offer.subscriptions.map(plan => (plan.benefits?.premiumAccess ? plan.benefits.earlyAccessWeeks : 0))),
+        owned ? STREAMING_EARLY_ACCESS_MAX_WEEKS : Math.max(0, ...active.map(licence => normalizeStreamingRightsAccessGrant(player.world.streamingRightsContracts?.[licence.id]?.accessGrant || licence.accessGrant)?.earlyWindowWeeks || 0)),
+    );
+    const inEarlyAccess = earlyWindow > 0 && week < generalAt! && week >= generalAt! - earlyWindow;
     const status: ContentAvailability = !readyProduction ? 'IN_PRODUCTION'
+        : licenceOver ? 'RIGHTS_EXPIRED'
         : !owned && !active.length ? licenses.some(l => l.status === 'ACTIVE' && l.startsAtAbsoluteWeek > week)
             ? 'AWAITING_AVAILABILITY' : 'RIGHTS_EXPIRED'
         : !available ? 'RIGHTS_UNAVAILABLE'
-        : released ? 'LIVE' : slate || commission?.releasePlan ? 'SCHEDULED' : 'READY';
+        : released ? 'LIVE' : inEarlyAccess ? 'EARLY_ACCESS' : slate || commission?.releasePlan ? 'SCHEDULED' : 'READY';
     const raw = context.titleIndex.pastProjects.get(projectId) as any
         || context.titleIndex.worldProjects.get(projectId) as any;
     const runtime = Number(raw?.runtimeMinutes || raw?.projectDetails?.runtimeMinutes || 0);

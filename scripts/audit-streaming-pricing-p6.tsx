@@ -56,13 +56,17 @@ const commit: OwnedStreamingLaunchCommit = {
   outcomeTier: 'SMOOTH_OPENING', openingTitleCount: 3, openingOriginalTitle: 'Signal House',
 };
 const html = renderToStaticMarkup(React.createElement(StreamingLaunchReceipt, {
+  brand: { name: 'C6 Test+', markId: 'BOLT', customMark: null, hue: 210, sat: 90, typeId: 'GROTESK', lockupId: 'SIDE' } as never,
+  network: { built: true, sites: [], markets: [], reached: 1, served: 1, revision: 1, pending: null, peakStreams: 0, capacityStreams: 0, weeklyOperatingCost: 0 },
   platformName: 'C6 Test+', commit, onOpen: () => undefined, onBack: () => undefined,
 }));
-assert.match(html, /Saved opening night record/);
-assert.match(html, /C6 Test\+ is live/);
+assert.match(html, /aria-label="Opening night"/);
+assert.match(html, /C6 Test\+/);
+assert.match(html, /LIVE/);
 assert.match(html, /34,500/);
 assert.match(html, /99\.99%/);
-assert.match(html, /2,040,000/);
+assert.match(html, /2\.04M/);
+assert.match(html, /OPEN YOUR HQ/);
 assert.doesNotMatch(html, /GO \/ NO-GO|GO LIVE|14,000|20,000/,
   'a committed launch must not display a fresh gate or invented actual peak');
 
@@ -77,8 +81,6 @@ assert.match(agreement, /computeRacks\(facility\)/);
 assert.doesNotMatch(agreement, /room move-in|group\.moveIn/,
   'uncanonical listing subtotals cannot appear beside the actual execution charge');
 const premiere = readFileSync('components/streaming-transplant/StreamingPremiereExperience.tsx', 'utf8');
-assert.match(premiere, /committedLaunch \? 'PAID SUBSCRIBERS' : 'ACCOUNTS'/,
-  'a committed opening must identify the saved paid population; demo accounts remain separate');
 assert.match(premiere, /subsGained: commit\.initialSubscribers/,
   'the canonical premiere must display saved launch subscribers instead of recalculating accounts');
 const buildMoney = readFileSync('components/studio-finance/components/build/StageMoney.tsx', 'utf8');

@@ -1,6 +1,8 @@
 import { readCreatorWorld } from '../../services/creatorEconomy';
 
 import React, { useEffect, useState } from 'react';
+import { isUnderAdultAge } from '../../services/ageGate';
+import { AgeGatePopup } from '../../components/AgeGatePopup';
 import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, PregnancyCarrier } from '../../types';
 import { MessageSquare, Search, BarChart3, Camera, Users, Newspaper, TrendingUp, Activity, Heart, Folder, Flame, Gem, Landmark, X, CheckCircle, AlertCircle, BookOpen, Map } from 'lucide-react';
 import { getPhaseDuration } from '../../services/roleLogic';
@@ -104,6 +106,16 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const [initialStockId, setInitialStockId] = useState<string | null>(null);
   const [isImmersiveForbesScene, setIsImmersiveForbesScene] = useState(false);
   const [isImmersiveMessageReview, setIsImmersiveMessageReview] = useState(false);
+  const [showAgeGate, setShowAgeGate] = useState(false);
+
+  /* #255: the dating apps wait for 18. The folder on the home screen and the Guide's shortcuts both come through here. */
+  const openDating = (mode: 'DATING_FOLDER' | 'TINDER' | 'LUXE') => {
+      if (isUnderAdultAge(props.player)) {
+          setShowAgeGate(true);
+          return;
+      }
+      setAppMode(mode);
+  };
 
   useEffect(() => {
       if (!props.initialForbesStudioId) return;
@@ -859,7 +871,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                             />
 
                             {/* DATING FOLDER */}
-                            <button type="button" className="flex min-h-[76px] min-w-0 w-full flex-col items-center gap-1 group cursor-pointer text-center" onClick={() => setAppMode('DATING_FOLDER')} data-tutorial-id="mobile-dating-folder">
+                            <button type="button" className="flex min-h-[76px] min-w-0 w-full flex-col items-center gap-1 group cursor-pointer text-center" onClick={() => openDating('DATING_FOLDER')} data-tutorial-id="mobile-dating-folder">
                                 <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-2 grid grid-cols-2 gap-1 shadow-lg group-active:scale-95 transition-transform overflow-hidden">
                                     <div className="w-full h-full bg-gradient-to-tr from-pink-500 to-orange-500 rounded-[5px] flex items-center justify-center shadow-sm">
                                         <Flame size={12} fill="white" className="text-white" />
@@ -1053,9 +1065,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                     <GuideView
                         player={props.player}
                         onBack={() => setAppMode('HOME')}
-                        onOpenApp={(nextMode) => setAppMode(nextMode)}
+                        onOpenApp={(nextMode) => (nextMode === 'TINDER' || nextMode === 'LUXE' ? openDating(nextMode) : setAppMode(nextMode))}
                     />
                 )}
+
+                {showAgeGate && <AgeGatePopup language={language} onClose={() => setShowAgeGate(false)} />}
 
                 {/* Home Indicator */}
                 <div className="absolute bottom-1 left-0 right-0 flex justify-center pb-2 z-50 pointer-events-none">

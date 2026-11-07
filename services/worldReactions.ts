@@ -531,7 +531,7 @@ export const processWorldReactions = (player: Player): Player => {
                 feed: [xPost, ...(player.x?.feed || []).filter(post => post.id !== xPost.id)].slice(0, 80),
             }
             : player.x,
-        logs: [...(shouldLog ? [{
+        logs: [...(player.logs || []), ...(shouldLog ? [{
             week: player.currentWeek,
             year: player.age,
             message: t(language, 'services.worldReactions.log.weekly', {
@@ -540,6 +540,6 @@ export const processWorldReactions = (player: Player): Player => {
                 employeeRisk: state.employeeDepartureRisk
             }),
             type: state.antiMonopolyPressure >= 60 ? 'negative' as const : 'neutral' as const,
-        }] : []), ...(player.logs || [])].slice(0, 50),
+        }] : [])],
     };
 };

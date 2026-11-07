@@ -107,6 +107,9 @@ export interface BuildGreenlightProjectInput {
     studioFranchises: Array<{ id: string; lastInstallment?: number }>;
     visualStyle: GreenlightVisualStyle;
     pacing: GreenlightPacing;
+    episodeNames?: { set: number; custom: Record<string, string> };
+    /** #286: this season's money by episode, from the Commission page */
+    episodeShares?: number[];
     equipmentChoices: Record<string, string>;
     lockedStreamingFunding?: LockedStreamingFunding | null;
     isPrimaryStudio: boolean;
@@ -160,6 +163,8 @@ export const buildGreenlightProject = ({
     studioFranchises,
     visualStyle,
     pacing,
+    episodeNames,
+    episodeShares,
     equipmentChoices,
     lockedStreamingFunding,
     isPrimaryStudio,
@@ -556,7 +561,9 @@ export const buildGreenlightProject = ({
                     directorQuality: directorData.quality,
                     castingStrength: currentCastingStrength,
                     distributionPower: Math.min(100, 50 + Math.floor(studioPrestigeScore / 8)),
-                    rawHype: currentEstimatedBuzz,
+                    /* #301: last season's finale brings people back: a real number on the next season's hype, and its first weeks */
+                    rawHype: Math.max(1, Math.min(100, currentEstimatedBuzz * (1 + Number(selectedScript.previousSeasonHype || 0)))),
+                    ...(selectedScript.previousSeasonHype ? { previousSeasonHype: selectedScript.previousSeasonHype } : {}),
                     qualityScore: Math.max(1, actualQuality - selfRunQualityStrain),
                     estimatedQualityScore: currentEstimatedQuality,
                     prestigeBonus: (tone < 30 ? 20 : 0) + Math.floor(studioPrestigeScore / 25),
@@ -628,6 +635,13 @@ export const buildGreenlightProject = ({
                 tone: tone,
                 visualStyle: visualStyle as any,
                 pacing: pacing,
+                pacingLive: true,
+                ...(episodeShares?.length ? { episodeBudgetShares: episodeShares } : {}),
+                ...(resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' ? {
+                    episodeNameSeed: selectedScript.id,
+                    episodeNameSet: episodeNames?.set || undefined,
+                    customEpisodeNames: episodeNames && Object.keys(episodeNames.custom).length ? episodeNames.custom : undefined,
+                } : {}),
                 equipmentChoices: equipmentChoices,
                 musicPlan: soundtrackPlan,
                 investorPlan: finalInvestorPlan

@@ -659,12 +659,12 @@ export const beginPrivateControlAcquisition = ({
     };
     const nextPlayer = persistCase({
         ...player,
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: `Control strategy opened for ${profile.name}. Your existing ${existingPercent.toFixed(1)}% stake is credited; negotiations cover the remaining ${remainingPercent.toFixed(1)}%.`,
             type: 'neutral' as const,
-        }, ...(player.logs || [])].slice(0, 50),
+        }],
     }, controlCase);
 
     return {
@@ -1050,12 +1050,12 @@ export const runDueDiligence = ({
         success: true,
         player: {
             ...updatedPlayer,
-            logs: [{
+            logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `Due diligence completed for ${profile.name} at a cost of $${fee.toLocaleString()}.`,
                 type: 'neutral' as const,
-            }, ...(player.logs || [])].slice(0, 50),
+            }],
         },
         report,
     };
@@ -1328,12 +1328,12 @@ export const submitOpeningOffer = ({
         acquisitionCase,
         player: {
             ...updatedPlayer,
-            logs: [{
+            logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `Opening ${offerType.toLowerCase()} offer submitted to ${profile.name}: $${resolvedOfferAmount.toLocaleString()}.`,
                 type: 'neutral' as const,
-            }, ...(player.logs || [])].slice(0, 50),
+            }],
         },
     };
 };
@@ -1588,7 +1588,7 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
                     weekSent: updatedPlayer.currentWeek,
                     expiresIn: ACQUISITION_INBOX_NOTICE_WEEKS,
                 }, ...(updatedPlayer.inbox || [])],
-            logs: [{
+            logs: [...(updatedPlayer.logs || []), {
                 week: updatedPlayer.currentWeek,
                 year: updatedPlayer.age,
                 message: t(language, 'services.studioAcquisition.log.response', {
@@ -1596,7 +1596,7 @@ export const resolveStudioAcquisitionResponses = (player: Player): Player => {
                     decision: getAcquisitionDecisionLabel(language, sellerResponse.decision),
                 }),
                 type: sellerResponse.decision === 'ACCEPTED' ? 'positive' as const : sellerResponse.decision === 'REJECTED' ? 'negative' as const : 'neutral' as const,
-            }, ...(updatedPlayer.logs || [])].slice(0, 50),
+            }],
         };
     });
     return updatedPlayer;
@@ -1906,7 +1906,7 @@ export const completeStudioAcquisition = ({
                 isRead: false,
                 weekSent: player.currentWeek,
             }, ...(withCase.inbox || [])],
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: t(language, 'services.studioAcquisition.log.acquired', {
@@ -1914,7 +1914,7 @@ export const completeStudioAcquisition = ({
                 amount: formatAcquisitionMoney(finalPrice),
             }),
             type: 'positive' as const,
-        }, ...(player.logs || [])].slice(0, 50),
+        }],
     };
 
     return {
@@ -2033,7 +2033,7 @@ export const completeStockControlAcquisition = ({
             isRead: false,
             weekSent: player.currentWeek,
         }, ...(withCase.inbox || []).filter(message => !(message.type === 'STUDIO_ACQUISITION' && message.data?.studioId === profile.id))],
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: t(language, 'services.studioAcquisition.log.stockControlAcquired', {
@@ -2041,7 +2041,7 @@ export const completeStockControlAcquisition = ({
                 ownership: companyPosition.ownershipPercent.toFixed(1),
             }),
             type: 'positive' as const,
-        }, ...(player.logs || [])].slice(0, 50),
+        }],
     };
 
     return {
@@ -2144,12 +2144,12 @@ const completeMinorityStudioInvestment = ({
                 nextPosition,
             ],
         },
-        logs: [{
+        logs: [...(chargedPlayer.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: `Strategic stake secured: ${purchasedPercent.toFixed(1)}% of ${profile.name} for ${formatAcquisitionMoney(finalPrice)}.`,
             type: 'positive' as const,
-        }, ...(chargedPlayer.logs || [])].slice(0, 50),
+        }],
     };
     return {
         success: true,

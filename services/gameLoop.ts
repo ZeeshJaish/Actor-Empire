@@ -1,6 +1,15 @@
+import { inActivityOrder } from './activityLog';
+import { getStreamingSeasonFunding, releaseStreamingSeasonFunding } from './streamingSeasonRights';
+import { recordStreamingEarlyViews } from './streamingEarlyAccess';
+import { announceStreamingRightsBack, landTitleOnShelfAfterCinema, placeTitleOnYourService } from './streamingYourPlatform';
+import { keepStreamingWindowsBehindCinema, openStreamingWindowsAfterCinema } from './streamingCinemaHold';
+import { weekOfYear } from './gameWeek';
+import { announceStreamingPremieres } from './streamingPremiereStatus';
+import { fileStreamingPlatformClaim } from './platformClaim';
 import { quoteYoutubeMemberships, readYoutubeEconomy, readYoutubeAudience, quoteYoutubeCreatorBonus, settleYoutubeActivity } from './youtubeEconomy';
 import { creatorPositiveReward, recordCreatorSpend, readCreatorWorld } from './creatorEconomy';
 import { quoteSponsorshipValue } from './sponsorshipEconomy';
+import { applyFinalCut } from './finalCut';
 import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePreparation, getCareerFinalPerformance, getCareerPublicityGain, getCareerProductionStartPerformance, isPersonalCareerActing, getCareerFameDecay, applyCareerReleaseRecognition, getCareerReportedOutcome } from './actorCareerBalance';
 import { createSeriesStreamingBids, quoteSeriesStreamingRights } from './seriesStreamingValue';
 import { settleStockCash } from './stockSettlement';
@@ -79,6 +88,7 @@ import {
 } from './newsLogic';
 import { generateWeeklyEvent } from './geminiService';
 import { generateLifeEvent, generateLuxeLifeEvent, hasEligibleLuxeEventTarget } from './lifeEventLogic';
+import { isUnderAdultAge } from './ageGate';
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist, getGenderedAvatar } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
@@ -89,6 +99,7 @@ import { processDynastyCareerWeek } from './dynastyCareer';
 import { PLATFORM_AI_PROFILES } from './platformAi/platformAiProfiles';
 import {
     generatePlatformAiPlayerCommissionOffers,
+    decidePlatformAiCommissionRenewals,
     syncPlatformAiPlayerCommissionProductions,
 } from './platformAi';
 import { processIndustryWorldWeek } from './industryWorld';
@@ -103,6 +114,7 @@ import { buildStreamingPlatformRunsForProject, summarizeStreamingPlatformRuns } 
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
 import { getForbesStreamingCompanies } from './streamingPlatformEcosystem';
 import { processStreamingCataloguePackagesWeek } from './streamingCataloguePackages';
+import { getSeasonEffects } from './originalsEpisodeBudget';
 import { processStreamingCataloguePackageStrategyAutomation } from './streamingCataloguePackageAutomation';
 import { processStreamingRightsOfficeWeek } from './streamingRightsOffice';
 import { processWorldTurn } from './worldLogic';
@@ -159,6 +171,7 @@ import { clonePlayerForWeekProcessing } from './gameLoopClone';
 import { processAcquisitionMarketPulse } from './acquisitionMarketPulse';
 import { processStudioSaleRoyalties } from './studioSale';
 import { getStudioGroup } from './studioGroup';
+import { industryRoundupOf, isAboutThePlayer, withIndustryRoundup } from './industryRoundup';
 import {
     advanceProductionCalendarWeek,
     ensureProductionCalendarForCommitment,
@@ -172,6 +185,7 @@ import { getActorCareerArc, getActorCareerArcTransitionFromPrevious } from './ac
 import { applyInvestorPayoutMemory, calculateInvestorPayout, processInvestorLeadershipChanges } from './projectInvestors';
 import { buildOutsideProducerInvestmentMessage, generateOutsideProducerInvestmentOffers, getOutsideProducerOfferCadenceWeeks, processOutsideProductionsWeek } from './outsideProductions';
 import { buildEpisodeRatingsStory, generateEpisodeRatings, getEpisodeRatingsGameplayImpact, inferSeasonNumber } from './episodeRatings';
+import { getSeasonRatings } from './seriesIdentity';
 import { calculateProductionRiskProfile } from './productionRisk';
 import { calculateStudioSlateFatigue } from './studioSlateFatigue';
 import { getContinuationPerformanceGross, shouldResolveContinuationDecision } from './releaseContinuationLogic';
@@ -186,6 +200,8 @@ import { processStreamingEstatePlanWeek } from './streamingEstatePlan';
 import { processIndustryPeopleWeek } from './industry/industryPeople';
 import { queueStreamingIncidentEvents } from './streamingIncidentEvent';
 import { queueStreamingDecisionEvents } from './streamingDecisionEvent';
+import { queueOriginalIssueEvents } from './originalsIssues';
+import { getOutsideReviewName, isOutsideOriginal } from './outsideOriginals';
 import { advanceStreamingMarketClearances } from './streamingMarkets';
 import {
     appendStreamingOpeningProgrammeTransitions,
@@ -550,133 +566,6 @@ const getProductionHealthIncident = (player: Player, commitment: Commitment): 's
     return Math.random() < risk ? 'stunt_fracture' : undefined;
 };
 
-const adjustPlatformFundingRelationship = (
-    player: Player,
-    businessId: string,
-    platformId: string,
-    modifierDelta: number,
-    recoveryDelta: number
-) => {
-    const business = player.businesses.find(item => item.id === businessId);
-    if (!business?.studioState) return;
-
-    const relations = business.studioState.platformRelations || {};
-    const current = relations[platformId];
-    if (!current) return;
-
-    const trustModifier = Math.max(-8, Math.min(0, current.trustModifier + modifierDelta));
-    const recoveryWeeksRemaining = Math.max(0, Math.min(36, current.recoveryWeeksRemaining + recoveryDelta));
-    const hasCommercialHistory = Math.max(0, Number(current.completedDeals || 0)) > 0
-        || Math.max(0, Number(current.profitableDeals || 0)) > 0
-        || Math.max(0, Number(current.loyaltyScore || 0)) > 0
-        || Math.max(0, Number(current.realizedPartnerValue || 0)) > 0;
-    const shouldRetainRelationship = hasCommercialHistory || (trustModifier !== 0 && recoveryWeeksRemaining !== 0);
-    business.studioState.platformRelations = {
-        ...relations,
-        ...(shouldRetainRelationship
-            ? {
-                [platformId]: {
-                    ...current,
-                    trustModifier,
-                    recoveryWeeksRemaining
-                }
-            }
-            : {})
-    };
-
-    if (!shouldRetainRelationship) {
-        delete business.studioState.platformRelations[platformId];
-    }
-};
-
-const createFundingBreachLifeEvent = (
-    businessId: string,
-    businessName: string,
-    platformId: string,
-    platformName: string,
-    sourceTitle: string,
-    fundingAmount: number,
-    studioBalance: number,
-    language: GameLanguage = 'en'
-): LifeEvent => {
-    const settlement = Math.max(
-        100_000,
-        Math.min(5_000_000, fundingAmount * 0.03, Math.max(100_000, studioBalance * 0.08))
-    );
-    const legalFee = Math.max(50_000, Math.floor(settlement * 0.35));
-    const settlementText = formatMoneyShort(settlement);
-    const legalFeeText = formatMoneyShort(legalFee);
-    const textVars = { businessName, platformName, sourceTitle };
-
-    return {
-        id: `funding_breach_${businessId}_${platformId}_${Date.now()}`,
-        type: 'LEGAL',
-        title: t(language, 'life.event.fundingBreach.title', { platformName }),
-        titleKey: 'life.event.fundingBreach.title',
-        description: t(language, 'life.event.fundingBreach.description', textVars),
-        descriptionKey: 'life.event.fundingBreach.description',
-        textVars,
-        options: [
-            {
-                label: t(language, 'life.event.fundingBreach.settle.label', { settlement: settlementText }),
-                labelKey: 'life.event.fundingBreach.settle.label',
-                description: t(language, 'life.event.fundingBreach.settle.description'),
-                descriptionKey: 'life.event.fundingBreach.settle.description',
-                textVars: { settlement: settlementText },
-                impact: (player) => {
-                    const resultLanguage = getPlayerLanguage(player);
-                    const business = player.businesses.find(item => item.id === businessId);
-                    if (business) business.balance -= settlement;
-                    adjustPlatformFundingRelationship(player, businessId, platformId, 1, -6);
-                    const logVars = { businessName, platformName, settlement: settlementText };
-                    return {
-                        updatedPlayer: player,
-                        log: t(resultLanguage, 'life.event.fundingBreach.settle.log', logVars),
-                        logKey: 'life.event.fundingBreach.settle.log',
-                        logVars
-                    };
-                }
-            },
-            {
-                label: t(language, 'life.event.fundingBreach.arbitration.label', { legalFee: legalFeeText }),
-                labelKey: 'life.event.fundingBreach.arbitration.label',
-                description: t(language, 'life.event.fundingBreach.arbitration.description'),
-                descriptionKey: 'life.event.fundingBreach.arbitration.description',
-                textVars: { legalFee: legalFeeText },
-                impact: (player) => {
-                    const resultLanguage = getPlayerLanguage(player);
-                    const business = player.businesses.find(item => item.id === businessId);
-                    if (business) business.balance -= legalFee;
-                    const won = Math.random() < 0.4;
-
-                    if (won) {
-                        adjustPlatformFundingRelationship(player, businessId, platformId, 2, -10);
-                        const logVars = { businessName, platformName };
-                        return {
-                            updatedPlayer: player,
-                            log: t(resultLanguage, 'life.event.fundingBreach.arbitration.winLog', logVars),
-                            logKey: 'life.event.fundingBreach.arbitration.winLog',
-                            logVars
-                        };
-                    }
-
-                    const loss = Math.max(100_000, Math.floor(settlement * 0.75));
-                    if (business) business.balance -= loss;
-                    adjustPlatformFundingRelationship(player, businessId, platformId, -1, 6);
-                    const totalCost = formatMoneyShort(legalFee + loss);
-                    const logVars = { businessName, totalCost };
-                    return {
-                        updatedPlayer: player,
-                        log: t(resultLanguage, 'life.event.fundingBreach.arbitration.lossLog', logVars),
-                        logKey: 'life.event.fundingBreach.arbitration.lossLog',
-                        logVars
-                    };
-                }
-            }
-        ]
-    };
-};
-
 const createReturnStatusNews = (
     projectName: string,
     status: PlayerReturnStatus,
@@ -705,10 +594,8 @@ const createReturnStatusNews = (
     };
 };
 
-const getNextSeasonNumber = (title: string) => {
-    const seasonMatch = title.match(/Season (\d+)/i);
-    return seasonMatch ? parseInt(seasonMatch[1], 10) + 1 : 2;
-};
+/** #272: from the record, so a title the player typed for a season still counts right */
+const getNextSeasonNumber = (release: ActiveRelease) => inferSeasonNumber({ ...release.projectDetails, title: release.name }) + 1;
 
 const createContinuationDecisionMessage = ({
     id,
@@ -1436,6 +1323,7 @@ const createPastProjectArchiveSnapshot = (
             identitySource: playerCastMember.identitySource || 'AUTO' as const,
         }
         : suggestCharacterIdentity(inferStoryCompass(projectDetails), playerRoleType, 0, projectDetails);
+    const outsideOriginal = isOutsideOriginal({ projectDetails });
 
     return {
         id: release.id,
@@ -1443,7 +1331,8 @@ const createPastProjectArchiveSnapshot = (
         originalLanguageId:projectDetails.originalLanguageId,
         type: 'ACTING_GIG',
         roleType: playerRoleType,
-        playerCharacterProfile,
+        /* #288: no role in it, so it stays out of the player's role history */
+        ...(outsideOriginal ? { outsideOriginal: true } : { playerCharacterProfile }),
         playerRolePerformance: Math.round(ensureFiniteNumber(release.productionPerformance, qualityScore)),
         year: archiveTiming.releaseYear,
         earnings: 0,
@@ -1492,6 +1381,14 @@ const createPastProjectArchiveSnapshot = (
         reviews: ensureObjectArray(projectDetails.reviews),
         audienceReception: release.audienceReception || projectDetails.audienceReception,
         episodeRatings,
+        episodeNameSeed: projectDetails.episodeNameSeed,
+        episodeNameSet: projectDetails.episodeNameSet,
+        customEpisodeNames: projectDetails.customEpisodeNames,
+        pacing: projectDetails.pacing,
+        pacingLive: projectDetails.pacingLive,
+        episodeBudgetShares: projectDetails.episodeBudgetShares,
+        directorName: projectDetails.directorName,
+        ...(projectDetails.hiddenStats?.previousSeasonHype ? { previousSeasonHype: projectDetails.hiddenStats.previousSeasonHype } : {}),
         campaignRealitySnapshot: projectDetails.campaignRealitySnapshot,
         campaignPositioning: projectDetails.campaignPositioning,
         campaignTimeline: projectDetails.campaignTimeline,
@@ -2176,6 +2073,8 @@ export const processGameWeek = async (
         });
     }
 
+    /* #254: what the other companies did this week */
+    const worldLines: string[] = [];
     const pendingUniversePayouts: { universeId: string; studioId: string; label: string; amount: number }[] = [];
 
     // --- 1. WORLD & INDUSTRY UPDATE ---
@@ -2188,9 +2087,7 @@ export const processGameWeek = async (
         if (worldResult.socialPosts.length > 0) {
             nextPlayer.x.feed = [...worldResult.socialPosts, ...(nextPlayer.x.feed || [])].slice(0, 80);
         }
-        if (worldResult.logs?.length) {
-            worldResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
-        }
+        if (worldResult.logs?.length) worldLines.push(...worldResult.logs);
         emitLoopStage('world_turn_done', { world_news: worldResult.news?.length || 0 });
 
         emitLoopStage('music_industry_start');
@@ -2290,8 +2187,9 @@ export const processGameWeek = async (
             ...(nextPlayer.news || []).filter(existing => !marketUpdate.news.some(item => item.id === existing.id)),
         ].slice(0, 80);
     }
-    marketUpdate.notifications.forEach(notification => {
-        logsToAdd.push({ msg: `📈 ${notification}`, type: 'neutral' });
+    /* #254: another company's share sale is in the news; in the feed only when it dilutes the player's own shares */
+    marketUpdate.corporateActions.forEach(action => {
+        if (nextPlayer.portfolio?.some(holding => holding.stockId === action.stockId && holding.shares > 0)) logsToAdd.push({ msg: `📈 ${action.notification}`, type: 'neutral' });
     });
 
     // Calculate Dividends
@@ -2459,7 +2357,9 @@ export const processGameWeek = async (
             const inviteKind = nextPlayer.youtube.subscribers >= 250000
                 ? (Math.random() < 0.45 ? 'PLATFORM_SUMMIT' : Math.random() < 0.7 ? 'CREATOR_GALA' : 'PODCAST')
                 : (Math.random() < 0.65 ? 'PODCAST' : 'CREATOR_GALA');
-            nextPlayer.pendingEvents.push(createYoutubeCreatorInviteEvent(nextPlayer, inviteKind as 'PODCAST' | 'CREATOR_GALA' | 'PLATFORM_SUMMIT'));
+            /* #255: the gala is an afterparty, so under 18 the invite is the podcast */
+            const invite = inviteKind === 'CREATOR_GALA' && isUnderAdultAge(nextPlayer) ? 'PODCAST' : inviteKind;
+            nextPlayer.pendingEvents.push(createYoutubeCreatorInviteEvent(nextPlayer, invite as 'PODCAST' | 'CREATOR_GALA' | 'PLATFORM_SUMMIT'));
             nextPlayer.flags.lastYoutubeCreatorInviteAbsWeek = currentCreatorAbs;
             logsToAdd.push({ msg: t(language, 'services.gameLoop.youtubeWeekly.log.creatorInvite'), type: 'positive' });
         }
@@ -3230,7 +3130,7 @@ export const processGameWeek = async (
         const newUnknowns = generateNewUnknowns(5);
         nextPlayer.flags.extraNPCs = [...(nextPlayer.flags.extraNPCs || []), ...newUnknowns];
         nextPlayer.studio.lastTalentRefreshWeek = (nextPlayer.age - 1) * 52 + nextPlayer.currentWeek;
-        logsToAdd.push({ msg: "🌟 New talent has emerged in the industry.", type: 'neutral' });
+        worldLines.push('New talent joined the casting pool.');
     }
 
     // Film obligations and financial obligations have separate lifetimes.
@@ -4185,7 +4085,9 @@ export const processGameWeek = async (
             // Check for Production Crisis (Traits & General)
             // A completed shoot waiting for its final choices must not generate another shoot event.
             const awaitingWrapChoices = updatedC.careerBalanceVersion === 1 && isPersonalCareerActing(updatedC) && (updatedC.phaseWeeksLeft ?? 1) <= 0;
-            const crisis = awaitingWrapChoices ? null : checkForProductionCrisis(nextPlayer, updatedC);
+            /* #288: an outside studio has its own problems, and they reach the platform as issues, never the player's wallet */
+            const outsideOriginalShoot = isOutsideOriginal(updatedC);
+            const crisis = awaitingWrapChoices || outsideOriginalShoot ? null : checkForProductionCrisis(nextPlayer, updatedC);
             if (crisis) {
                 if (!nextPlayer.pendingEvents) nextPlayer.pendingEvents = [];
                 nextPlayer.pendingEvents.push({
@@ -4218,7 +4120,7 @@ export const processGameWeek = async (
             }
 
             // Check for Director Decision
-            const decision = awaitingWrapChoices ? null : checkForDirectorDecision(nextPlayer, updatedC);
+            const decision = awaitingWrapChoices || outsideOriginalShoot ? null : checkForDirectorDecision(nextPlayer, updatedC);
             if (decision) {
                 if (!nextPlayer.pendingEvents) nextPlayer.pendingEvents = [];
                 nextPlayer.pendingEvents.push({
@@ -4298,7 +4200,10 @@ export const processGameWeek = async (
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'POST_PRODUCTION') {
             if (weeksLeft <= 0) {
-                logsToAdd.push({ msg: `🎬 Post-production complete for "${updatedC.name}"! Ready for release strategy.`, type: 'positive' });
+                /* #314: the film is locked here, on every side of the game. Nothing comes out perfect and the edit moves it a little. */
+                const finalCut = applyFinalCut(updatedC);
+                updatedC = finalCut.commitment;
+                logsToAdd.push({ msg: `🎬 Post-production complete for "${updatedC.name}"!${finalCut.note} Ready for release strategy.`, type: 'positive' });
                 nextCommitments.push({ ...updatedC, projectPhase: 'AWAITING_RELEASE', phaseWeeksLeft: 0, totalPhaseDuration: 0 });
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'AWAITING_RELEASE') {
@@ -4384,7 +4289,9 @@ export const processGameWeek = async (
                     updatedC.projectDetails.reviews = generateReviews(
                         quality,
 	                        updatedC.projectDetails.genre,
-	                        nextPlayer.name,
+	                        isOutsideOriginal(updatedC)
+	                            ? getOutsideReviewName(updatedC.projectDetails, (nextPlayer.world.studios as any)?.[String(updatedC.projectDetails.studioId)]?.name || updatedC.name)
+	                            : nextPlayer.name,
 	                        isRecast,
 	                        updatedC.projectDetails.hiddenStats.castDepthScore,
 	                        updatedC.projectDetails.budgetTier,
@@ -4401,6 +4308,12 @@ export const processGameWeek = async (
                     if (isOwnedPlatformOriginal) {
                         const ownedPlatformName = nextPlayer.ownedStreamingPlatform.identity?.name || 'EMPIRE+';
                         logsToAdd.push({ msg: `📺 "${updatedC.name}" premiered as a ${ownedPlatformName} Original! IMDb Page Created.`, type: 'positive' });
+                    } else if (updatedC.projectDetails.hiddenStats.ownPlatformRelease) {
+                        /* #244: on the player's own service: the Slate has its week since the wizard */
+                        const ownedPlatformName = nextPlayer.ownedStreamingPlatform.identity?.name || 'EMPIRE+';
+                        logsToAdd.push(nextPlayer.ownedStreamingPlatform.lifecycle === 'ACTIVE'
+                            ? { msg: `📺 "${updatedC.name}" is on ${ownedPlatformName}. IMDb Page Created.`, type: 'positive' }
+                            : { msg: `"${updatedC.name}" is finished, but ${ownedPlatformName} is not live. Sell it from Filmography.`, type: 'negative' });
                     } else {
                         const isAlreadySold = !!updatedC.projectDetails.hiddenStats.platformId;
                         const platformId = (updatedC.projectDetails.hiddenStats.platformId as PlatformId) || determineStreamingAcquisition(updatedC.projectDetails);
@@ -4535,7 +4448,7 @@ export const processGameWeek = async (
 		                    let newRelease: ActiveRelease = {
 	                        id: updatedC.id, name: updatedC.name, type: updatedC.projectDetails.type, roleType: getPlayerProjectRoleType(updatedC.roleType, updatedC.projectDetails.castList),
 	                        projectDetails: updatedC.projectDetails, weekNum: 1, weeklyGross: [], totalGross: 0, budget: budget,
-                        status: updatedC.projectDetails.hiddenStats.ownedStreamingOriginal ? 'FINISHED' : 'RUNNING', imdbRating: imdb, productionPerformance: updatedC.productionPerformance || 50,
+                        status: updatedC.projectDetails.hiddenStats.ownedStreamingOriginal || updatedC.projectDetails.hiddenStats.ownPlatformRelease ? 'FINISHED' : 'RUNNING', imdbRating: imdb, productionPerformance: updatedC.productionPerformance || 50,
                         distributionPhase: isStreamingOnly ? 'STREAMING' : 'THEATRICAL',
                         streaming: streamingState,
                         streamingRuns: releaseStreamingRuns,
@@ -4567,10 +4480,12 @@ export const processGameWeek = async (
 	                        releaseYear: nextPlayer.age,
 	                        releasedAtAbsoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek)
 		                    };
-		                    if (newRelease.type === 'SERIES' && !newRelease.projectDetails.episodeRatings?.length) {
+		                    if (newRelease.type === 'SERIES') {
+		                        /* #272: a season already in production in an old save may still hold the last season's */
+		                        const seasonRatings = getSeasonRatings(newRelease);
 		                        newRelease.projectDetails = {
 		                            ...newRelease.projectDetails,
-		                            episodeRatings: generateEpisodeRatings(newRelease)
+		                            episodeRatings: seasonRatings.length ? seasonRatings : generateEpisodeRatings(newRelease)
 		                        };
 		                    }
                         const openingAudienceReception = buildAudienceReception(
@@ -4915,7 +4830,7 @@ export const processGameWeek = async (
         // Owned-platform Originals settle viewing through the platform loop,
         // rather than an external streaming state. Keep their real release
         // record when handing off so catalogue and production truth survive.
-        if (initialRelease.projectDetails.hiddenStats.ownedStreamingOriginal
+        if ((initialRelease.projectDetails.hiddenStats.ownedStreamingOriginal || initialRelease.projectDetails.hiddenStats.ownPlatformRelease)
             && initialRelease.distributionPhase === 'STREAMING' && !initialRelease.streaming) {
             if (!nextPlayer.pastProjects.some(project => project.id === initialRelease.id)) {
                 nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot(initialRelease, { player: nextPlayer }));
@@ -5132,7 +5047,7 @@ export const processGameWeek = async (
                             expiresIn: 4
                         });
                     } else if (isPlayerProduction) {
-                        const nextSeasonNum = getNextSeasonNumber(rel.name);
+                        const nextSeasonNum = getNextSeasonNumber(rel);
                         const sourceStudio = isPlayerProduction
                             ? nextPlayer.businesses?.find(business => (
                                 business.id === rel.projectDetails.studioId
@@ -5159,6 +5074,9 @@ export const processGameWeek = async (
                         const continuationScript = continuation?.script || existingContinuation;
 
                         if (continuation?.ok && continuation.script && sourceStudio?.studioState) {
+                            /* #246: a platform paid for this season: the renewal goes to it, and it does not sue over money the season is using */
+                            const seasonFund = getStreamingSeasonFunding(sourceStudio, rel);
+                            if (seasonFund) continuation.script.lockedStreamingFunding = seasonFund;
                             sourceStudio.studioState.scripts = [
                                 continuation.script,
                                 ...(sourceStudio.studioState.scripts || []),
@@ -5177,6 +5095,8 @@ export const processGameWeek = async (
                             }));
                         } else {
                             newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+                            /* #247: the activity log says it too */
+                            logsToAdd.push({ msg: `📺 "${rel.name}" was renewed. Season ${nextSeasonNum} is waiting in your Studio Vault.`, type: 'positive' });
                             newInbox.unshift(createContinuationDecisionMessage({
                                 id: `renewal_decision_${rel.id}`,
                                 sender: rareChaos?.platformName ? `${rareChaos.platformName} Executive` : 'Network Exec',
@@ -5199,7 +5119,7 @@ export const processGameWeek = async (
                             }));
                         }
                     } else {
-	                        const nextSeasonNum = getNextSeasonNumber(rel.name);
+	                        const nextSeasonNum = getNextSeasonNumber(rel);
 	                        newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
 	                        const returnStatusNews = createReturnStatusNews(rel.name, returnDecision.status, nextPlayer.currentWeek, nextPlayer.age, true);
 	                        if (returnStatusNews) newNews.unshift(returnStatusNews);
@@ -5214,9 +5134,12 @@ export const processGameWeek = async (
 	                } else {
 	                    potential.seriesStatus = 'CANCELLED';
 	                    rel.futurePotential = potential;
+	                    /* #246: the network stopped it: what it set aside goes back */
+	                    if (isPlayerProduction && rel.projectDetails.studioId) nextPlayer = releaseStreamingSeasonFunding(nextPlayer, rel.projectDetails.studioId, rel.id);
 	                    const releasedSeasonNum = inferSeasonNumber({ ...rel.projectDetails, title: rel.name });
 	                    const nextSeasonNum = releasedSeasonNum + 1;
 	                    newNews.unshift(generateCancellationNews(rel.name, releasedSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
+	                    if (isPlayerProduction) logsToAdd.push({ msg: `"${rel.name}" will not get a Season ${nextSeasonNum}.`, type: 'negative' });
 	                    newInbox.unshift(createContinuationDecisionMessage({
 	                        id: `renewal_pass_${rel.id}`,
 	                        sender: 'Network Exec',
@@ -5730,6 +5653,7 @@ export const processGameWeek = async (
                 imdbRating: rel.imdbRating,
                 productionPerformance: rel.productionPerformance
             });
+            const seasonBars = getSeasonEffects(rel.projectDetails.episodeBudgetShares);
             const nextStreamingRuns = streamingRuns.map(run => {
                 if (run.isLeaving || settlementAbsoluteWeek < run.startWeekAbsolute) return run;
                 const company = getForbesStreamingCompanies(nextPlayer).find(candidate => candidate.id === run.platformId);
@@ -5743,7 +5667,13 @@ export const processGameWeek = async (
                     rel.type,
                     streamingDemand,
                 );
-                const runViews = Math.max(0, Math.floor(rawRunViews * streamingProductionRisk.streamingViewMultiplier));
+                /* #301: a season's bars work on any service. The opening's pull is carried down the curve from week one, the middle slows the weekly fall. Your own service has its own viewing model (worldStreamingViewing). */
+                const seasonOnThisRun = rel.type !== 'SERIES' || nextPlayer.world.streamingRightsContracts?.[run.contractId]?.buyer?.type === 'PLAYER_PLATFORM'
+                    ? 1
+                    : run.weekOnPlatform === 1
+                        ? 1 + seasonBars.pull + Number(rel.projectDetails.hiddenStats?.previousSeasonHype || 0)
+                        : 1 + seasonBars.keep * 0.1;
+                const runViews = Math.max(0, Math.floor(rawRunViews * streamingProductionRisk.streamingViewMultiplier * seasonOnThisRun));
                 return {
                     ...run,
                     weekOnPlatform: run.weekOnPlatform + 1,
@@ -6202,6 +6132,9 @@ export const processGameWeek = async (
             nextPlayer.world.awardHistory = sanitizeAwardHistoryEntries(nextPlayer.world.awardHistory);
             historyEntry.winners.forEach(winner => {
                 if (!winner.projectId) return;
+                /* #293: the platform's Original won: worth telling, without a popup */
+                const wonOriginal = nextPlayer.ownedStreamingPlatform?.originalCommissions?.find(item => item.canonicalProjectId === winner.projectId);
+                if (wonOriginal) logsToAdd.push({ msg: `🏆 ${wonOriginal.title} won ${winner.category} at the ${awardShow.name || awardShow.type}.`, type: 'positive' });
                 const industryProject = nextPlayer.world.projects.find(project => project.id === winner.projectId);
                 const activeProject = nextPlayer.activeReleases.find(project => project.id === winner.projectId)?.projectDetails;
                 const pastProject = nextPlayer.pastProjects.find(project => project.id === winner.projectId);
@@ -6591,7 +6524,11 @@ export const processGameWeek = async (
     const exitedCinemaIds=new Set(nextPlayer.world.cinemaMarket!.weeks.at(-1)!.titles.filter(t=>t.closed).map(t=>t.titleId));
     const cinemaFinalizedReleases:ActiveRelease[]=[];
     for(const rel of nextPlayer.activeReleases){
-        if(!exitedCinemaIds.has(rel.id) || rel.distributionPhase!=='THEATRICAL'){cinemaFinalizedReleases.push(rel);continue;}
+        if(!exitedCinemaIds.has(rel.id) || rel.distributionPhase!=='THEATRICAL'){
+            /* #243: the run goes on, so a window held for it moves on too */
+            if(rel.distributionPhase==='THEATRICAL')nextPlayer=keepStreamingWindowsBehindCinema(nextPlayer,rel.id,enteredStreamingAbsoluteWeek);
+            cinemaFinalizedReleases.push(rel);continue;
+        }
         const studio=findCinemaBusiness(nextPlayer,rel.projectDetails.studioId);
         // Acting consequences reflect delivered experience and actual exposure, not producer ROI.
         const paid=nextPlayer.world.cinemaMarket!.titles[rel.id];
@@ -6612,7 +6549,30 @@ export const processGameWeek = async (
         const cinemaOutcomeNews=newNews.filter(n=>!cinemaNewsBefore.has(n.id));
         if(cinemaOutcomeNews.length)nextPlayer.news=[...cinemaOutcomeNews,...nextPlayer.news].slice(0,50);
         logsToAdd.push({msg:`🎟️ "${rel.name}" completed its paid cinema run.`,type:'neutral'});
-        if(rel.streaming){cinemaFinalizedReleases.push({...rel,distributionPhase:'STREAMING',status:'FINISHED'});continue;}
+        /* #244: the player chose their own service for after the run */
+        if(rel.projectDetails.hiddenStats.ownPlatformAfterCinema && !rel.streaming && nextPlayer.ownedStreamingPlatform.lifecycle==='ACTIVE'){
+            if(!nextPlayer.pastProjects.some(p=>p.id===rel.id))nextPlayer.pastProjects.push(createPastProjectArchiveSnapshot({...rel,status:'FINISHED'},{player:nextPlayer}));
+            /* #253: the shelf, and Content schedules it; or live by itself the weeks chosen after the run closed */
+            const afterCinemaWeeks=rel.projectDetails.hiddenStats.ownPlatformAfterCinemaWeeks??1;
+            const placed=afterCinemaWeeks===0
+                ?landTitleOnShelfAfterCinema(nextPlayer,rel.id,rel.name)
+                :placeTitleOnYourService(nextPlayer,rel.id,enteredStreamingAbsoluteWeek+afterCinemaWeeks);
+            nextPlayer=placed.player;
+            logsToAdd.push({msg:`"${rel.name}" left cinemas. ${placed.detail}`,type:placed.changed?'positive':'negative'});
+            continue;
+        }
+        if(rel.streaming){
+            /* #243: its window starts the week after the cinemas really closed */
+            const opened=openStreamingWindowsAfterCinema(nextPlayer,rel.id,enteredStreamingAbsoluteWeek);
+            nextPlayer=opened.player;
+            if(opened.startsAt!==null)logsToAdd.push({msg:`"${rel.name}" starts on ${resolveStreamingPlatformBrandById(rel.streaming.platformId).displayName} next week.`,type:'positive'});
+            cinemaFinalizedReleases.push({...rel,distributionPhase:'STREAMING',status:'FINISHED',
+                ...(opened.startsAt!==null?{
+                    streaming:{...rel.streaming,startWeekAbsolute:opened.startsAt,startWeek:weekOfYear(opened.startsAt)},
+                    streamingRuns:(rel.streamingRuns||[]).map(run=>({...run,startWeekAbsolute:opened.startsAt as number})),
+                }:{})});
+            continue;
+        }
         if(!studio){
             const platformId=determineStreamingAcquisition(rel.projectDetails);
             const quote=quoteCinemaRightsForBuyer(nextPlayer,rel.projectDetails,rel.id,platformId,enteredStreamingAbsoluteWeek+1);
@@ -6640,11 +6600,17 @@ export const processGameWeek = async (
     }
     nextPlayer.activeReleases=cinemaFinalizedReleases;
     nextPlayer=collectStreamingStudioRoyaltyReceipts(nextPlayer,enteredStreamingAbsoluteWeek);
-    streamingIndustryResult.logs.forEach(message => logsToAdd.push({ msg: `🏢 ${message}`, type: 'neutral' }));
+    /* #242: a platform names a title's date: a line in the activity log, and news */
+    nextPlayer=announceStreamingPremieres(nextPlayer,enteredStreamingAbsoluteWeek);
+    /* #244: an outside window ended: a line in the activity log */
+    nextPlayer=announceStreamingRightsBack(nextPlayer,enteredStreamingAbsoluteWeek);
+    worldLines.push(...streamingIndustryResult.logs);
     const dynastyCareerResult = processDynastyCareerWeek(nextPlayer, enteredStreamingAbsoluteWeek);
     nextPlayer = dynastyCareerResult.player;
     nextPlayer.news = [...dynastyCareerResult.news, ...nextPlayer.news].slice(0, 50);
     dynastyCareerResult.logs.forEach(message => logsToAdd.push({ msg: `👑 ${message}`, type: 'neutral' }));
+    /* #246: a commission the platform owns: it decides on another season, and can hire the studio again */
+    nextPlayer = decidePlatformAiCommissionRenewals(nextPlayer, enteredStreamingAbsoluteWeek);
     const playerCommissionGeneration = generatePlatformAiPlayerCommissionOffers(
         nextPlayer,
         enteredStreamingAbsoluteWeek,
@@ -6724,6 +6690,8 @@ export const processGameWeek = async (
         },
     );
     nextPlayer=recordCinemaStreamingAudience(nextPlayer);
+    /* #245: what a title's opening counts from before its general release */
+    nextPlayer=recordStreamingEarlyViews(nextPlayer,enteredStreamingAbsoluteWeek);
     nextPlayer = settleWorldStreamingAudienceEntitlements(nextPlayer, enteredStreamingAbsoluteWeek);
     /* #129: the week's Top 10, from the viewing just settled (recorded only; it changes nothing else) */
     const streamingWeeklyChart = advanceStreamingWeeklyChart(nextPlayer, enteredStreamingAbsoluteWeek);
@@ -6796,6 +6764,12 @@ export const processGameWeek = async (
         nextPlayer = processIndustryPeopleWeek(nextPlayer);
     } catch (error) {
         console.error('Industry people week failed', error);
+    }
+    /* #289: a studio making an Original comes back for money */
+    try {
+        nextPlayer = queueOriginalIssueEvents(nextPlayer);
+    } catch (error) {
+        console.error('Original issues failed', error);
     }
     /* #210: what needs you this week comes up as a popup, after the team has done what it can */
     if (ownedStreamingResult.processed) {
@@ -7154,7 +7128,7 @@ export const processGameWeek = async (
 
     if (nextPlayer.currentWeek % 3 === 0) {
         // Updated: usedTitles now includes past projects to prevent repeating famous titles
-        nextPlayer.weeklyOpportunities = { auditions: generateAuditions(nextPlayer, []), jobs: generatePartTimeJobs() };
+        nextPlayer.weeklyOpportunities = { auditions: generateAuditions(nextPlayer, []), jobs: generatePartTimeJobs(nextPlayer) };
         logsToAdd.push({ msg: "🔄 CastLink updated.", type: 'neutral' });
     }
     emitLoopStage('weekly_offers_done', { inbox_messages: nextPlayer.inbox?.length || 0 });
@@ -7238,28 +7212,16 @@ export const processGameWeek = async (
                 return;
             }
 
+            /* #241: the funding goes back, in the reserve's own unit (millions); the claim is the game's own case, so it survives a reload */
             const platform = nextPlayer.world.platforms?.[event.funding.platformId as PlatformId];
             if (platform) {
-                platform.cashReserve += Math.max(0, event.funding.amount);
+                platform.cashReserve += Math.max(0, event.funding.amount) / 1_000_000;
             }
-
-            const lifeEvent = createFundingBreachLifeEvent(
-                business.id,
-                business.name,
-                event.funding.platformId,
-                platformName,
-                sourceTitle,
-                Math.max(0, event.funding.amount),
-                business.balance,
-                language
-            );
-            nextPlayer.pendingEvents.push({
-                id: lifeEvent.id,
-                week: nextPlayer.currentWeek,
-                type: 'SCANDAL',
-                title: lifeEvent.title,
-                description: lifeEvent.description,
-                data: { lifeEvent }
+            nextPlayer = fileStreamingPlatformClaim(nextPlayer, {
+                kind: 'FUNDING', studioId: business.id, platformId: event.funding.platformId, platformName, titleName: sourceTitle,
+                feeBack: 0,
+                damages: Math.max(100_000, Math.min(5_000_000, Math.max(0, event.funding.amount) * 0.03, Math.max(100_000, business.balance * 0.08))),
+                key: `funding_${business.id}_${event.funding.platformId}_${getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek)}`,
             });
             nextPlayer.inbox.unshift({
                 id: `funding_default_${event.funding.id}`,
@@ -7337,9 +7299,17 @@ export const processGameWeek = async (
     if (nextPlayer.instagram?.feed) nextPlayer.instagram.feed = ensureObjectArray<InstaPost>(nextPlayer.instagram.feed).slice(0, 80);
     if (nextPlayer.x?.feed) nextPlayer.x.feed = ensureObjectArray<XPost>(nextPlayer.x.feed).slice(0, 80);
 
+    /* #254: the home feed is about the player; what the other companies did goes to the News app */
+    worldLines.filter(line => isAboutThePlayer(line, nextPlayer)).forEach(line => logsToAdd.push({ msg: line, type: 'neutral' }));
+    nextPlayer.news = withIndustryRoundup(nextPlayer.news, industryRoundupOf(
+        worldLines.filter(line => !isAboutThePlayer(line, nextPlayer)),
+        nextPlayer.news,
+        { week: nextPlayer.currentWeek, year: nextPlayer.age, absoluteWeek: getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek) },
+    )).slice(0, 80);
+
     // Apply Logs - Limit to last 50 entries to prevent storage overflow (CRITICAL FIX)
     const allLogs = [...nextPlayer.logs, ...logsToAdd.map(l => ({ week: nextPlayer.currentWeek, year: nextPlayer.age, message: l.msg, type: l.type }))];
-    nextPlayer.logs = allLogs.slice(-50);
+    nextPlayer.logs = inActivityOrder(allLogs).slice(-50);
     emitLoopStage('final_trim_done', {
         logs_added: logsToAdd.length,
         inbox_messages: nextPlayer.inbox?.length || 0,

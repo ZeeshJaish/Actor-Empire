@@ -341,15 +341,12 @@ export const UniverseDashboard: React.FC<UniverseDashboardProps> = ({ universe, 
         };
         onUpdatePlayer(buildPlayerWithUniverse(updatedUniverse, {
             news: [newsItem, ...player.news].slice(0, 50),
-            logs: [
-                {
+            logs: [...(player.logs || []), {
                     week: player.currentWeek,
                     year: player.age,
                     message: tr('services.business.universeLifecycle.log.archive', { universeName: updatedUniverse.name }),
                     type: 'neutral' as const
-                },
-                ...(player.logs || [])
-            ].slice(0, 50)
+                }]
         }));
         setShowRetirementDialog(false);
     };
@@ -369,15 +366,12 @@ export const UniverseDashboard: React.FC<UniverseDashboardProps> = ({ universe, 
         };
         onUpdatePlayer(buildPlayerWithUniverse(rebootedUniverse, {
             news: [newsItem, ...player.news].slice(0, 50),
-            logs: [
-                {
+            logs: [...(player.logs || []), {
                     week: player.currentWeek,
                     year: player.age,
                     message: tr('services.business.universeLifecycle.log.reboot', { title, universeName: rebootedUniverse.name }),
                     type: 'positive' as const
-                },
-                ...(player.logs || [])
-            ].slice(0, 50)
+                }]
         }, { scripts: updatedScripts }));
         setSagaName(rebootedUniverse.currentSagaName || tr('services.business.universeLifecycle.rebootEra'));
         setPhaseName(rebootedUniverse.currentPhaseName || tr('services.business.universeLifecycle.rebootPhase'));

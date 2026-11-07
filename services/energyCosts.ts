@@ -11,6 +11,11 @@ export const PHASE_ONE_ENERGY_COSTS = {
     STREAMING_DEAL_ACCEPT: 10,
     RELEASE_STRATEGY_LOCK: 15,
     COLLABORATION_SIGNING: 10,
+    /* #278: the head of a platform orders an Original, or another season of one */
+    ORIGINAL_COMMISSION: 15,
+    ORIGINAL_RENEWAL: 15,
+    /* #288: notes to an outside studio while it makes the title */
+    ORIGINAL_NOTES: 8,
 } as const;
 
 export type PhaseOneEnergyCostKey = keyof typeof PHASE_ONE_ENERGY_COSTS;

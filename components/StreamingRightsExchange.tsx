@@ -1,3 +1,4 @@
+import { gameWeekLabel, gameWeekText } from '../services/gameWeek';
 import { validCollectionSnapshot } from '../services/streamingCollectionPrivateOffers';
 import { OfferUsdInput, OfferClauseHelp } from '../content-market-exact/OfferControls';
 import { parseOfferUsd } from '../content-market-exact/model';
@@ -249,7 +250,7 @@ export default function StreamingRightsExchange({
         <button type="button" onClick={onClose} aria-label="Close rights exchange"><ArrowLeft size={20} /></button>
         <div>
           <span>EMPIRE+ RIGHTS EXCHANGE</span>
-          <strong>Market Session • Week {absoluteWeek}</strong>
+          <strong>Market Session • {gameWeekLabel(absoluteWeek, absoluteWeek)}</strong>
         </div>
         <div className="rights-exchange-treasury">
           <small>PLATFORM TREASURY</small>
@@ -403,7 +404,7 @@ export default function StreamingRightsExchange({
                   <Swords size={19} />
                   <span>{selectedNegotiation.rivalPlatformName || selectedNegotiation.buyerName || 'Buyer desk'} signal</span>
                   <strong>{formatMoney(selectedNegotiation.rivalBidAmount)} competing value</strong>
-                  <small>Table expires after week {selectedNegotiation.expiresAtAbsoluteWeek}</small>
+                  <small>Table expires after {gameWeekText(selectedNegotiation.expiresAtAbsoluteWeek, absoluteWeek)}</small>
                 </div>
                 {selectedIsExactTransfer ? <div className="rights-fixed-transfer-terms">
                   <span>INHERITED LICENCE — FIXED</span>
@@ -472,7 +473,6 @@ export default function StreamingRightsExchange({
           <section className="rights-calendar-section">
             <StreamingRightsCalendar
               player={player}
-              context="PLATFORM"
               onUpdatePlayer={onUpdatePlayer}
               embedded
             />
@@ -492,7 +492,7 @@ export default function StreamingRightsExchange({
                   const progress = Math.min(100, obligation.targetAmount ? obligation.observedAmount / obligation.targetAmount * 100 : 100);
                   return (
                     <article key={obligation.id}>
-                      <div><span>{obligation.type === 'MARKETING_SPEND' ? 'MARKETING GUARANTEE' : 'VIEWERSHIP THRESHOLD'}</span><strong>{obligation.title}</strong><small>Due week {obligation.dueAtAbsoluteWeek} • {obligation.status.replace('_', ' ')}</small></div>
+                      <div><span>{obligation.type === 'MARKETING_SPEND' ? 'MARKETING GUARANTEE' : 'VIEWERSHIP THRESHOLD'}</span><strong>{obligation.title}</strong><small>Due {gameWeekText(obligation.dueAtAbsoluteWeek, absoluteWeek)} • {obligation.status.replace('_', ' ')}</small></div>
                       <div className="rights-progress"><i style={{ width: `${progress}%` }} /><span>{Math.round(progress)}%</span></div>
                       <button type="button" onClick={() => obligation.type === 'MARKETING_SPEND' ? onOpenPromotion?.(obligation.sourceProjectId) : onOpenTitleDossier?.(obligation.sourceProjectId)}>
                         {obligation.type === 'MARKETING_SPEND' ? 'Open Campaign Studio' : 'Open title evidence'} <ChevronRight size={15} />
@@ -551,7 +551,7 @@ export default function StreamingRightsExchange({
                     <div><dt>Cash received</dt><dd>{formatMoney(deal.upfrontFee)}</dd></div>
                     <div><dt>Seller split</dt><dd>{deal.sellerRevenueShare}%</dd></div>
                     <div><dt>Territory</dt><dd>{deal.territory.replace('_', ' ')}</dd></div>
-                    <div><dt>Expiry</dt><dd>Week {deal.expiresAtAbsoluteWeek}</dd></div>
+                    <div><dt>Expiry</dt><dd>{gameWeekLabel(deal.expiresAtAbsoluteWeek, absoluteWeek)}</dd></div>
                   </dl>
                   <footer><span className={`is-${deal.status.toLowerCase()}`}>{deal.status}</span><strong>Platform-to-platform trade</strong></footer>
                 </article>

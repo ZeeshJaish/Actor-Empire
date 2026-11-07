@@ -285,7 +285,7 @@ export const NEW_PLAYER_TUTORIAL_STEPS: NewPlayerTutorialStep[] = [
         targetId: 'mobile-dating-folder',
         eyebrow: 'Personal',
         title: 'Dating affects life outside work',
-        body: 'Dating apps help relationships start. Romance, family, public drama, and legacy choices can all grow from here.',
+        body: 'Dating apps open at 18 and help relationships start. Romance, family, public drama, and legacy choices can all grow from here.',
         actionLabel: 'Next',
         nextStepId: 'MOBILE_GUIDE_APP',
         tone: 'rose',

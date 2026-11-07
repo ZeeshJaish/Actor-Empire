@@ -168,7 +168,11 @@ export const seedLegacyAiCatalogue = (
         ]);
         const target = Math.max(8, Math.min(20, 8 + Math.round(offer.catalogueStrengthIndex / 10)));
         if (known.size >= target || !historical.length) continue;
-        const candidates = historical.slice().sort((left, right) => (
+        /* #293: what the player's platform ordered is exclusive to it. A licence that has run out goes back to the market */
+        const heldOriginals = new Set(player.ownedStreamingPlatform.originalCommissions
+            .filter(commission => commission.canonicalProjectId && !(commission.licenceEndsAtAbsoluteWeek && commission.licenceEndsAtAbsoluteWeek <= absoluteWeek))
+            .map(commission => commission.canonicalProjectId as string));
+        const candidates = historical.filter(title => !heldOriginals.has(title.id)).sort((left, right) => (
             hashDeterministicSeed(`${player.id}:ai-library:${offer.platformId}:${right.id}`)
             - hashDeterministicSeed(`${player.id}:ai-library:${offer.platformId}:${left.id}`)
             || left.id.localeCompare(right.id)

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     CheckCircle,
+    ChevronDown,
     Crown,
     Info,
     Plus,
@@ -19,6 +20,7 @@ import { CharacterIdentityControls } from './CharacterIdentityControls';
 import { StoryCompassStrip } from './StoryCompassStrip';
 import type { GreenlightCastRole } from '../greenlightTypes';
 import { isMissingMovieActorProfile } from '../greenlightUtils';
+import { evaluateCharacterProfileFit, getCharacterIdentityOption } from '../../../../services/characterStoryFit';
 
 interface GreenlightCastStepProps {
     player: Player;
@@ -106,32 +108,21 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
     onNext,
 }) => {
     const castIncomplete = castList.some(role => !role.actorId);
+    /* #269: one role's form open at a time; the rest stay short so the whole cast can be read at once */
+    const [openRoleId, setOpenRoleId] = useState<string | null>(null);
+    const [showScriptDna, setShowScriptDna] = useState(false);
 
     return (
         <div className="mx-auto max-w-4xl space-y-6 px-4 pt-6 pb-[calc(13rem+env(safe-area-inset-bottom))] animate-in slide-in-from-right-4 duration-300">
-            <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
-                <h2 className="text-xl font-bold text-white mb-2">Assemble The Cast</h2>
-                <p className="text-zinc-400 text-sm">Star power drives box office, but talent drives reviews. Name the characters too, even for standalone projects.</p>
-            </div>
-            {selectedStoryCompass && <StoryCompassStrip compass={selectedStoryCompass} />}
-            {liveCastStoryRead && (
-                <section
-                    className="border-y border-cyan-400/20 bg-cyan-400/[0.035] px-1 py-4 sm:px-4"
-                    aria-live="polite"
-                >
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.22em] text-cyan-300">
-                                <ShieldAlert size={14} aria-hidden="true" />
-                                Cast Story Read
-                            </div>
-                            <h3 className="mt-2 text-sm sm:text-base font-black text-white leading-tight">
-                                {liveCastStoryRead.headline}
-                            </h3>
-                            <p className="mt-1 text-[11px] sm:text-xs leading-relaxed text-zinc-400">
-                                {liveCastStoryRead.summary}
-                            </p>
-                        </div>
+            <section className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-2xl p-4 shadow-lg">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                        <h2 className="text-lg font-black text-white leading-tight">Assemble The Cast</h2>
+                        <p className="mt-1 text-xs leading-relaxed text-zinc-400" aria-live="polite">
+                            {liveCastStoryRead?.headline || 'Star power drives box office, but talent drives reviews.'}
+                        </p>
+                    </div>
+                    {liveCastStoryRead && (
                         <div className="shrink-0 text-right">
                             <p className={`font-mono text-xl font-black ${
                                 liveCastStoryRead.balanceScore >= 78
@@ -144,18 +135,39 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                             </p>
                             <p className="text-[7px] font-black uppercase tracking-widest text-zinc-600">Balance</p>
                         </div>
-                    </div>
-                    {(liveCastStoryRead.strengths[0] || liveCastStoryRead.warnings[0]) && (
-                        <p className={`mt-3 border-l-2 pl-3 text-[10px] leading-relaxed ${
-                            liveCastStoryRead.warnings[0]
-                                ? 'border-amber-400/60 text-amber-100/75'
-                                : 'border-emerald-400/60 text-emerald-100/75'
-                        }`}>
-                            {liveCastStoryRead.warnings[0] || liveCastStoryRead.strengths[0]}
-                        </p>
                     )}
-                </section>
-            )}
+                </div>
+                {(selectedStoryCompass || liveCastStoryRead) && (
+                    <button
+                        type="button"
+                        onClick={() => setShowScriptDna(open => !open)}
+                        aria-expanded={showScriptDna}
+                        className="mt-3 flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] px-3 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-300"
+                    >
+                        <span className="flex items-center gap-2"><ShieldAlert size={14} aria-hidden="true" />Script DNA</span>
+                        <ChevronDown size={15} aria-hidden="true" className={`transition-transform ${showScriptDna ? 'rotate-180' : ''}`} />
+                    </button>
+                )}
+                {showScriptDna && (
+                    <div className="mt-3 space-y-3">
+                        {selectedStoryCompass && <StoryCompassStrip compass={selectedStoryCompass} />}
+                        {liveCastStoryRead && (
+                            <div className="px-1">
+                                <p className="text-[11px] leading-relaxed text-zinc-400">{liveCastStoryRead.summary}</p>
+                                {(liveCastStoryRead.strengths[0] || liveCastStoryRead.warnings[0]) && (
+                                    <p className={`mt-2 border-l-2 pl-3 text-[10px] leading-relaxed ${
+                                        liveCastStoryRead.warnings[0]
+                                            ? 'border-amber-400/60 text-amber-100/75'
+                                            : 'border-emerald-400/60 text-emerald-100/75'
+                                    }`}>
+                                        {liveCastStoryRead.warnings[0] || liveCastStoryRead.strengths[0]}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </section>
 
             <div className="space-y-3">
                 {castList.map((role, index) => {
@@ -223,19 +235,26 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                     ? 'Walked Away'
                                     : formatFee(role.salary || 0);
 
+                    /* #269: what the row shows without opening the form */
+                    const isOpen = openRoleId === role.id;
+                    const identity = { ...getSuggestedIdentity(role, index), ...role } as CharacterIdentityProfile;
+                    const roleFit = selectedStoryCompass
+                        ? evaluateCharacterProfileFit(selectedStoryCompass, identity, (role.roleType === 'EXTRA' ? 'CAMEO' : role.roleType) as RoleType)
+                        : null;
+
                     return (
-                        <div key={role.id} className="relative overflow-hidden bg-zinc-950/70 border border-zinc-800 rounded-2xl p-4 animate-in slide-in-from-bottom-2 hover:border-zinc-700 transition-all">
+                        <div key={role.id} className="relative overflow-hidden bg-zinc-950/70 border border-zinc-800 rounded-2xl p-3.5 animate-in slide-in-from-bottom-2">
                             <button
                                 type="button"
                                 onClick={() => onRemoveRole(role.id)}
-                                className="absolute top-3 right-3 p-2 text-zinc-600 hover:text-rose-500 transition-colors z-10 bg-black/40 rounded-full"
+                                className="absolute top-1.5 right-1.5 grid h-11 w-11 place-items-center text-zinc-600 hover:text-rose-500 transition-colors z-10"
                                 title="Remove Role"
                                 aria-label="Remove role"
                             >
                                 <X size={16} />
                             </button>
 
-                            <div className="grid grid-cols-[56px_minmax(0,1fr)] items-start gap-4 sm:grid-cols-[64px_minmax(0,1fr)_8rem]">
+                            <div className="grid grid-cols-[56px_minmax(0,1fr)] items-start gap-3 pr-8">
                                 <div className={`shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center border overflow-hidden ${assignedActor || isSelf || isStudio || connection ? 'border-emerald-500/30 bg-emerald-500/5' : 'bg-zinc-900 border-zinc-800 text-zinc-600'}`}>
                                     {isSelf ? (
                                         <div className="w-full h-full bg-amber-500/10 flex items-center justify-center overflow-hidden">
@@ -255,9 +274,8 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                         <Users size={20} />
                                     )}
                                 </div>
-                                <div className="min-w-0 space-y-3 pr-10 sm:pr-0">
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
                                             <select
                                                 value={role.roleType || 'SUPPORTING'}
                                                 onChange={event => onRoleTypeChange(role.id, event.target.value as GreenlightCastRole['roleType'])}
@@ -272,7 +290,7 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                             {returningData && <span className="px-2 py-1 rounded-lg bg-purple-500/10 text-purple-300 text-[9px] font-black uppercase tracking-widest">Returning</span>}
                                             {isKnownRole && <span className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-300 text-[9px] font-black uppercase tracking-widest">Known Character</span>}
                                         </div>
-                                        {role.actorId ? (
+                                    {role.actorId ? (
                                             <div className="text-lg sm:text-2xl font-black text-white tracking-tight truncate">
                                                 {role.actorName || 'Selected Actor'}
                                             </div>
@@ -280,8 +298,69 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                             <div className="text-base sm:text-xl font-black text-zinc-500 italic">Pending Audition</div>
                                         )}
                                         {isMissingMovieActorProfile(role.actorId, player.flags.extraNPCs || []) && <p className="mt-2 text-xs leading-relaxed text-amber-200">Profile unavailable. Restore a verified backup or choose another actor to continue with this role.</p>}
-                                    </div>
+                                    <p className="mt-0.5 truncate text-[11px] italic text-zinc-300">{role.characterName ? `as ${role.characterName}` : 'Character not named yet'}</p>
+                                </div>
+                            </div>
 
+                            <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.08em]">
+                                <span className="rounded-md border border-zinc-800 bg-black/40 px-2 py-1 text-zinc-300">{getCharacterIdentityOption('storyFunction', identity.storyFunction).label}</span>
+                                <span className="rounded-md border border-zinc-800 bg-black/40 px-2 py-1 text-zinc-300">{getCharacterIdentityOption('storyRole', identity.storyRole).label}</span>
+                                {roleFit && (
+                                    <span className={`rounded-md border px-2 py-1 ${roleFit.label === 'NATURAL_FIT' ? 'border-emerald-400/30 text-emerald-300' : roleFit.label === 'BOLD_INTERPRETATION' ? 'border-amber-400/30 text-amber-200' : 'border-rose-400/30 text-rose-300'}`}>Fit {roleFit.score}</span>
+                                )}
+                            </div>
+
+                            <div className="mt-2.5">
+                                {role.actorId && (
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                ['Talent', talentScore, 'text-emerald-300'],
+                                                ['Fame', fameScore, 'text-rose-300'],
+                                                ['Fee', feeDisplay, returningData && requiresReturningTalentNegotiation(returningData) ? 'text-purple-300' : 'text-amber-300'],
+                                            ].map(([label, value, color]) => (
+                                                <div key={String(label)} className="bg-black/30 border border-zinc-800 rounded-xl px-3 py-2 min-w-0">
+                                                    <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{label}</p>
+                                                    <p className={`text-xs font-black font-mono truncate ${color}`}>{value}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                            </div>
+
+                            <div className="mt-2.5 grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenRoleId(isOpen ? null : role.id)}
+                                    aria-expanded={isOpen}
+                                    className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-black/30 text-[10px] font-black uppercase tracking-widest text-zinc-300"
+                                >
+                                    Character <ChevronDown size={13} aria-hidden="true" className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                <div className="flex min-w-0 gap-2">
+                                    {returningData && requiresReturningTalentNegotiation(returningData) && role.actorId && (
+                                        <button
+                                            type="button"
+                                            onClick={event => {
+                                                event.stopPropagation();
+                                                onNegotiate(role.actorId!, returningData, role.id);
+                                            }}
+                                            className="flex-1 sm:flex-none text-[10px] px-4 py-3 rounded-xl uppercase font-black tracking-widest bg-purple-500/15 text-purple-200 border border-purple-500/25 hover:bg-purple-500/25 transition-all"
+                                        >
+                                            Negotiate
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => onSelectActor(role.id)}
+                                        className={`min-h-11 flex-1 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-colors ${assignedActor || isSelf || isStudio || connection ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-emerald-300 bg-emerald-500 text-black shadow-[0_0_18px_rgba(16,185,129,0.35)]'}`}
+                                    >
+                                        {assignedActor || isSelf || isStudio || connection ? 'Change' : 'Select'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {isOpen && (
+                                <div className="mt-3 space-y-3 border-t border-zinc-800/80 pt-3">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         {linkedCharacterOptions.length > 0 && (
                                             <div>
@@ -363,22 +442,6 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                             )}
                                         </div>
                                     </div>
-                                    {role.actorId && (
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {[
-                                                ['Talent', talentScore, 'text-emerald-300'],
-                                                ['Fame', fameScore, 'text-rose-300'],
-                                                ['Fee', feeDisplay, returningData && requiresReturningTalentNegotiation(returningData) ? 'text-purple-300' : 'text-amber-300'],
-                                            ].map(([label, value, color]) => (
-                                                <div key={String(label)} className="bg-black/30 border border-zinc-800 rounded-xl px-3 py-2 min-w-0">
-                                                    <p className="text-[8px] font-black uppercase tracking-widest text-zinc-600">{label}</p>
-                                                    <p className={`text-xs font-black font-mono truncate ${color}`}>{value}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="col-span-2 min-w-0 sm:col-span-1 sm:col-start-2">
                                     {selectedStoryCompass && (
                                         <CharacterIdentityControls
                                             value={role}
@@ -402,28 +465,7 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                         </div>
                                     )}
                                 </div>
-                                <div className="col-span-2 flex w-full gap-2 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:w-32 sm:flex-col">
-                                    {returningData && requiresReturningTalentNegotiation(returningData) && role.actorId && (
-                                        <button
-                                            type="button"
-                                            onClick={event => {
-                                                event.stopPropagation();
-                                                onNegotiate(role.actorId!, returningData, role.id);
-                                            }}
-                                            className="flex-1 sm:flex-none text-[10px] px-4 py-3 rounded-xl uppercase font-black tracking-widest bg-purple-500/15 text-purple-200 border border-purple-500/25 hover:bg-purple-500/25 transition-all"
-                                        >
-                                            Negotiate
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => onSelectActor(role.id)}
-                                        className={`flex-1 sm:flex-none text-[10px] px-4 py-3 rounded-xl border uppercase font-black tracking-widest transition-all ${assignedActor || isSelf || isStudio || connection ? 'bg-emerald-500/5 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10' : 'bg-zinc-800/50 text-zinc-500 border-zinc-800 hover:bg-zinc-800 hover:text-white'}`}
-                                    >
-                                        {assignedActor || isSelf || isStudio || connection ? 'Change' : 'Select'}
-                                    </button>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     );
                 })}

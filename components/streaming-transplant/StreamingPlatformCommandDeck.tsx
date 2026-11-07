@@ -66,7 +66,7 @@ export type Pressure = 'calm' | 'watch' | 'urgent';
 
 /** A card's table of contents. Text only, one line, in the division's own
  *  colour — the card must still read perfectly with these ignored. */
-export interface DivisionChip { id: string; label: string; alert?: boolean }
+export interface DivisionChip { id: string; label: string; alert?: boolean; locked?: boolean }
 
 export interface Division {
   id: DivisionId;
@@ -130,6 +130,8 @@ export interface HqState {
   events?: HqEvent[];
   /** Canonical pre-launch campaign. It guides the desk without replacing it. */
   launchProgram?: StreamingLaunchProgramView;
+  /** #253: both wizards are done: the one card that opens the waiting screen */
+  openingBuild?: { tone: 'BUILDING' | 'ASK' | 'READY'; weeksLeft: number; percent: number; head: string; line: string; citiesOnline: number; cityCount: number };
 }
 
 /* ============================================================
@@ -193,7 +195,8 @@ export const PlatformHQ: React.FC<{
   onLaunch?: () => void;
   onOpenLaunchTrack?: (track: StreamingLaunchTrackId) => void;
   onOpenLaunchDestination?: (destination: StreamingLaunchDestination) => void;
-}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenBrandStudio, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack }) => {
+  onOpenOpeningBuild?: () => void;
+}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenBrandStudio, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack, onOpenOpeningBuild }) => {
   const tf = typeFace(brand);
   const longName = (brand.name || '').length > 14;
   const [pulse, setPulse] = useState(0);
@@ -253,7 +256,7 @@ export const PlatformHQ: React.FC<{
 
           <div className={css.hqheroes}>
             <div className={cx(css.hero, css.big)}>
-              <span className={css.hlabel}>{state.live ? state.audienceLabel ?? 'SUBSCRIBERS' : 'LAUNCH READINESS'}</span>
+              <span className={css.hlabel}>{state.live ? state.audienceLabel ?? 'SUBSCRIBERS' : state.openingBuild ? 'CITIES ONLINE' : 'LAUNCH READINESS'}</span>
               {state.live ? (
                 <>
                   <b className={css.hval}>{count(state.subscribers)}</b>
@@ -264,6 +267,11 @@ export const PlatformHQ: React.FC<{
                       {signed(state.subsDelta)} this week
                     </em>
                   )}
+                </>
+              ) : state.openingBuild ? (
+                <>
+                  <b className={css.hval}>{state.openingBuild.citiesOnline}<i className={css.of}>/{state.openingBuild.cityCount}</i></b>
+                  <em className={css.hdelta}>{state.openingBuild.citiesOnline >= state.openingBuild.cityCount ? 'all online' : 'crews at work'}</em>
                 </>
               ) : (
                 <>
@@ -319,7 +327,19 @@ export const PlatformHQ: React.FC<{
             </button>
           )}
 
-          {!state.live && state.launchProgram && (
+          {!state.live && state.openingBuild && (
+            <button type="button" className={cx(css.buildCard, state.openingBuild.tone === 'ASK' && css.buildAsk, state.openingBuild.tone === 'READY' && css.buildReady)}
+              data-ui="opening-build-card" onClick={onOpenOpeningBuild}>
+              <span className={css.buildTop}>
+                <small><i aria-hidden="true" />{state.openingBuild.tone === 'READY' ? 'READY' : state.openingBuild.tone === 'ASK' ? 'NEEDS YOU' : 'BEING BUILT'}</small>
+                {state.openingBuild.tone !== 'READY' && <strong>{state.openingBuild.weeksLeft} <em>{state.openingBuild.weeksLeft === 1 ? 'WEEK' : 'WEEKS'}</em></strong>}
+              </span>
+              <b>{state.openingBuild.head}</b>
+              <span className={css.buildBar}><i style={{ width: `${state.openingBuild.percent}%` }} /></span>
+              <span className={css.buildLine}>{state.openingBuild.line}<i aria-hidden="true">›</i></span>
+            </button>
+          )}
+          {!state.live && state.launchProgram && !state.openingBuild && (
             <nav className={css.launchCommandRows} aria-label="Pre-launch wizards">
               {state.launchProgram.tracks.map(track => {
                 const displayedMilestones = track.id === 'DEFINE_LAUNCH'
@@ -442,7 +462,7 @@ export const PlatformHQ: React.FC<{
             {needing > 0 && <span className={css.needing}>{needing} NEED YOU</span>}
           </div>
 
-          {!state.live && <p className={css.consoleBrief}>Every room owns one part of the opening. Enter a room when its light calls for you.</p>}
+          {!state.live && <p className={css.consoleBrief}>{state.openingBuild ? 'What you approved is locked until opening night. Originals, technology and money stay open.' : 'Every room owns one part of the opening. Enter a room when its light calls for you.'}</p>}
 
           {/* not a division — the same company seen from the outside */}
           {state.live && <button className={css.viewerstrip} onClick={onOpenViewer}>
@@ -479,6 +499,7 @@ export const PlatformHQ: React.FC<{
                     {d.chips.map(ch => (
                       <button key={ch.id} className={cx(css.chip, (ch.alert ? css.alert : ''))}
                         onClick={() => { navigator.vibrate?.(8); onOpenDivision?.(d.id, ch.id); }}>
+                        {ch.locked && <svg className={css.chipLock} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-label="Locked"><rect x="5" y="11" width="14" height="10" rx="2.2" /><path d="M8 11V7.5a4 4 0 0 1 8 0V11" /></svg>}
                         {ch.label}{ch.alert && <i className={css.chipdot} />}
                       </button>
                     ))}

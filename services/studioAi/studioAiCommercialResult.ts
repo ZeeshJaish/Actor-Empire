@@ -1,3 +1,4 @@
+import { ratingFromQuality } from '../titleRating';
 import { moveCinemaNpcCash } from '../boxOffice/boxOfficeSettlement';
 import type { BudgetTier, IndustryProductionCommitment, IndustryProject, NPCStudioState, PlatformAiProjectStreamingWindow, WorldState } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
@@ -57,7 +58,7 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
     const backendMillions = money(talentSettlement.totalPaid / 1_000_000);
     const netResultMillions = money(studioReceiptsMillions - backendMillions - input.production.budgetMillions - marketingSpendMillions);
     const outcome = weeklyCinema ? 'SOLID' as const : netResultMillions >= input.production.budgetMillions * 0.6 ? 'HIT' as const : netResultMillions < 0 ? 'FLOP' as const : 'SOLID' as const;
-    const rating = Math.round(clamp(4.2 + quality.creativeQuality * 0.058 + (rng() - 0.5) * 0.5, 1, 10) * 10) / 10;
+    const rating = Math.round(clamp(ratingFromQuality(quality.creativeQuality) + (rng() - 0.5) * 0.5, 1, 10) * 10) / 10;
     const { year, week } = yearWeek(input.absoluteWeek);
     const streamingWindows: PlatformAiProjectStreamingWindow[] = streamingContract ? [{
         id: createDeterministicId('studio_ai_streaming_window', input.production.id, streamingContract.id), platformId: streamingContract.buyerPlatformId!,

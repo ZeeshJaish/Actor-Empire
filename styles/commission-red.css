@@ -1,0 +1,85 @@
+/* #282: the Greenlight wizard, opened from the Commission page. The colour says where it was opened: everything green reads red under .commission-red.
+   Every emerald class the wizard and its steps use, written out; a new one in those files needs a line here. */
+.commission-red .bg-emerald-500.text-black, .commission-red .bg-emerald-400.text-black { color: #fff; }
+.commission-red .hover\:bg-emerald-400.text-black:hover { color: #fff; }
+.commission-red button.bg-emerald-300, .commission-red button.bg-emerald-400 { background-color: rgb(244 63 94); color: #fff; }
+.commission-red button.hover\:bg-emerald-300:hover, .commission-red button.hover\:bg-emerald-400:hover { background-color: rgb(225 29 72); color: #fff; }
+.commission-red .accent-emerald-500 { accent-color: rgb(244 63 94 / 1); }
+.commission-red .active\:bg-emerald-400:active { background-color: rgb(251 113 133 / 1); }
+.commission-red .active\:bg-emerald-400\/20:active { background-color: rgb(251 113 133 / 0.2); }
+.commission-red .bg-emerald-300 { background-color: rgb(253 164 175 / 1); }
+.commission-red .bg-emerald-300\/10 { background-color: rgb(253 164 175 / 0.1); }
+.commission-red .bg-emerald-400 { background-color: rgb(251 113 133 / 1); }
+.commission-red .bg-emerald-400\/10 { background-color: rgb(251 113 133 / 0.1); }
+.commission-red .bg-emerald-400\/15 { background-color: rgb(251 113 133 / 0.15); }
+.commission-red .bg-emerald-500 { background-color: rgb(244 63 94 / 1); }
+.commission-red .bg-emerald-500\/10 { background-color: rgb(244 63 94 / 0.1); }
+.commission-red .bg-emerald-500\/15 { background-color: rgb(244 63 94 / 0.15); }
+.commission-red .bg-emerald-500\/20 { background-color: rgb(244 63 94 / 0.2); }
+.commission-red .bg-emerald-500\/5 { background-color: rgb(244 63 94 / 0.05); }
+.commission-red .bg-emerald-600 { background-color: rgb(225 29 72 / 1); }
+.commission-red .bg-emerald-700 { background-color: rgb(190 18 60 / 1); }
+.commission-red .bg-emerald-900 { background-color: rgb(136 19 55 / 1); }
+.commission-red .bg-emerald-900\/10 { background-color: rgb(136 19 55 / 0.1); }
+.commission-red .bg-emerald-950 { background-color: rgb(76 5 25 / 1); }
+.commission-red .bg-emerald-950\/10 { background-color: rgb(76 5 25 / 0.1); }
+.commission-red .bg-emerald-950\/30 { background-color: rgb(76 5 25 / 0.3); }
+.commission-red .bg-emerald-950\/40 { background-color: rgb(76 5 25 / 0.4); }
+.commission-red .border-emerald-300 { border-color: rgb(253 164 175 / 1); }
+.commission-red .border-emerald-300\/35 { border-color: rgb(253 164 175 / 0.35); }
+.commission-red .border-emerald-400 { border-color: rgb(251 113 133 / 1); }
+.commission-red .border-emerald-400\/20 { border-color: rgb(251 113 133 / 0.2); }
+.commission-red .border-emerald-400\/25 { border-color: rgb(251 113 133 / 0.25); }
+.commission-red .border-emerald-400\/30 { border-color: rgb(251 113 133 / 0.3); }
+.commission-red .border-emerald-400\/60 { border-color: rgb(251 113 133 / 0.6); }
+.commission-red .border-emerald-500 { border-color: rgb(244 63 94 / 1); }
+.commission-red .border-emerald-500\/20 { border-color: rgb(244 63 94 / 0.2); }
+.commission-red .border-emerald-500\/25 { border-color: rgb(244 63 94 / 0.25); }
+.commission-red .border-emerald-500\/30 { border-color: rgb(244 63 94 / 0.3); }
+.commission-red .border-emerald-500\/50 { border-color: rgb(244 63 94 / 0.5); }
+.commission-red .border-emerald-600 { border-color: rgb(225 29 72 / 1); }
+.commission-red .decoration-emerald-300\/40 { text-decoration-color: rgb(253 164 175 / 0.4); }
+.commission-red .focus-visible\:ring-emerald-400:focus-visible { --tw-ring-color: rgb(251 113 133 / 1); }
+.commission-red .focus\:bg-emerald-500\/5:focus { background-color: rgb(244 63 94 / 0.05); }
+.commission-red .focus\:border-emerald-500:focus { border-color: rgb(244 63 94 / 1); }
+.commission-red .focus\:border-emerald-500\/50:focus { border-color: rgb(244 63 94 / 0.5); }
+.commission-red .from-emerald-500\/10 { --tw-gradient-from: rgb(244 63 94 / 0.1) var(--tw-gradient-from-position); --tw-gradient-to: rgb(244 63 94 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.commission-red .from-emerald-950\/20 { --tw-gradient-from: rgb(76 5 25 / 0.2) var(--tw-gradient-from-position); --tw-gradient-to: rgb(76 5 25 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.commission-red .group:hover .group-hover\:bg-emerald-500\/20 { background-color: rgb(244 63 94 / 0.2); }
+.commission-red .group:hover .group-hover\:bg-emerald-800 { background-color: rgb(159 18 57 / 1); }
+.commission-red .group:hover .group-hover\:border-emerald-500\/50 { border-color: rgb(244 63 94 / 0.5); }
+.commission-red .group:hover .group-hover\:text-emerald-400 { color: rgb(251 113 133 / 1); }
+.commission-red .hover\:bg-emerald-300\/15:hover { background-color: rgb(253 164 175 / 0.15); }
+.commission-red .hover\:bg-emerald-400:hover { background-color: rgb(251 113 133 / 1); }
+.commission-red .hover\:bg-emerald-500\/20:hover { background-color: rgb(244 63 94 / 0.2); }
+.commission-red .hover\:bg-emerald-500\/5:hover { background-color: rgb(244 63 94 / 0.05); }
+.commission-red .hover\:border-emerald-500\/30:hover { border-color: rgb(244 63 94 / 0.3); }
+.commission-red .hover\:text-emerald-400:hover { color: rgb(251 113 133 / 1); }
+.commission-red .shadow-emerald-500\/20 { --tw-shadow-color: rgb(244 63 94 / 0.2); --tw-shadow: var(--tw-shadow-colored); }
+.commission-red .text-emerald-100\/75 { color: rgb(255 228 230 / 0.75); }
+.commission-red .text-emerald-200 { color: rgb(254 205 211 / 1); }
+.commission-red .text-emerald-300 { color: rgb(253 164 175 / 1); }
+.commission-red .text-emerald-400 { color: rgb(251 113 133 / 1); }
+.commission-red .text-emerald-50 { color: rgb(255 241 242 / 1); }
+.commission-red .text-emerald-500 { color: rgb(244 63 94 / 1); }
+.commission-red .text-emerald-600\/70 { color: rgb(225 29 72 / 0.7); }
+.commission-red .text-emerald-950 { color: rgb(76 5 25 / 1); }
+.commission-red .bg-\[\#020a05\] { background-color: #0d0306; }
+.commission-red .from-\[\#020a05\] { --tw-gradient-from: #0d0306 var(--tw-gradient-from-position); --tw-gradient-to: rgb(13 3 6 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.commission-red .hover\:shadow-\[0_0_60px_rgba\(16\,185\,129\,0\.6\)\]:hover { --tw-shadow: 0 0 60px rgba(244,63,94,0.6); --tw-shadow-colored: 0 0 60px rgba(244,63,94,0.6); }
+.commission-red .shadow-\[0_0_10px_rgba\(16\,185\,129\,0\.5\)\] { --tw-shadow: 0 0 10px rgba(244,63,94,0.5); --tw-shadow-colored: 0 0 10px rgba(244,63,94,0.5); }
+.commission-red .shadow-\[0_0_10px_rgba\(16\,185\,129\,0\.8\)\] { --tw-shadow: 0 0 10px rgba(244,63,94,0.8); --tw-shadow-colored: 0 0 10px rgba(244,63,94,0.8); }
+.commission-red .shadow-\[0_0_15px_rgba\(16\,185\,129\,0\.5\)\] { --tw-shadow: 0 0 15px rgba(244,63,94,0.5); --tw-shadow-colored: 0 0 15px rgba(244,63,94,0.5); }
+.commission-red .shadow-\[0_0_15px_rgba\(16\,185\,129\,0\.6\)\] { --tw-shadow: 0 0 15px rgba(244,63,94,0.6); --tw-shadow-colored: 0 0 15px rgba(244,63,94,0.6); }
+.commission-red .shadow-\[0_0_18px_rgba\(16\,185\,129\,0\.14\)\] { --tw-shadow: 0 0 18px rgba(244,63,94,0.14); --tw-shadow-colored: 0 0 18px rgba(244,63,94,0.14); }
+.commission-red .shadow-\[0_0_18px_rgba\(16\,185\,129\,0\.16\)\] { --tw-shadow: 0 0 18px rgba(244,63,94,0.16); --tw-shadow-colored: 0 0 18px rgba(244,63,94,0.16); }
+.commission-red .shadow-\[0_0_18px_rgba\(16\,185\,129\,0\.35\)\] { --tw-shadow: 0 0 18px rgba(244,63,94,0.35); --tw-shadow-colored: 0 0 18px rgba(244,63,94,0.35); }
+.commission-red .shadow-\[0_0_20px_rgba\(16\,185\,129\,0\.2\)\] { --tw-shadow: 0 0 20px rgba(244,63,94,0.2); --tw-shadow-colored: 0 0 20px rgba(244,63,94,0.2); }
+.commission-red .shadow-\[0_0_20px_rgba\(16\,185\,129\,0\.3\)\] { --tw-shadow: 0 0 20px rgba(244,63,94,0.3); --tw-shadow-colored: 0 0 20px rgba(244,63,94,0.3); }
+.commission-red .shadow-\[0_0_25px_rgba\(16\,185\,129\,0\.25\)\] { --tw-shadow: 0 0 25px rgba(244,63,94,0.25); --tw-shadow-colored: 0 0 25px rgba(244,63,94,0.25); }
+.commission-red .shadow-\[0_0_30px_rgba\(16\,185\,129\,0\.4\)\] { --tw-shadow: 0 0 30px rgba(244,63,94,0.4); --tw-shadow-colored: 0 0 30px rgba(244,63,94,0.4); }
+.commission-red .shadow-\[0_0_32px_rgba\(16\,185\,129\,0\.35\)\] { --tw-shadow: 0 0 32px rgba(244,63,94,0.35); --tw-shadow-colored: 0 0 32px rgba(244,63,94,0.35); }
+.commission-red .shadow-\[0_0_40px_rgba\(16\,185\,129\,0\.2\)\] { --tw-shadow: 0 0 40px rgba(244,63,94,0.2); --tw-shadow-colored: 0 0 40px rgba(244,63,94,0.2); }
+.commission-red .shadow-\[0_0_40px_rgba\(16\,185\,129\,0\.4\)\] { --tw-shadow: 0 0 40px rgba(244,63,94,0.4); --tw-shadow-colored: 0 0 40px rgba(244,63,94,0.4); }
+.commission-red .via-\[\#020a05\]\/90 { --tw-gradient-to: rgb(13 3 6 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), rgb(13 3 6 / 0.9) var(--tw-gradient-via-position), var(--tw-gradient-to); }
+.commission-red .via-\[\#020a05\]\/95 { --tw-gradient-to: rgb(13 3 6 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), rgb(13 3 6 / 0.95) var(--tw-gradient-via-position), var(--tw-gradient-to); }

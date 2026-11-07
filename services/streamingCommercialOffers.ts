@@ -31,7 +31,23 @@ const restoreAdPlans = (pricing: OwnedStreamingPricingConfiguration) => pricing.
 });
 
 /** A read-only offer view; it does not grant title access or settle revenue. */
+/**
+ * #248: asked for every offer of every cohort of every country, on the same pricing object, each time normalizing it again: 150 ms of a plain career's
+ * week. A pricing configuration is replaced, never edited in place, so its projection holds for as long as the object lives.
+ */
+const projections = new WeakMap<object, StreamingCommercialOfferProjection>();
+
 export const projectStreamingCommercialOffers = (
+    pricing: OwnedStreamingPricingConfiguration,
+): StreamingCommercialOfferProjection => {
+    const known = projections.get(pricing);
+    if (known) return known;
+    const projection = buildStreamingCommercialOffers(pricing);
+    projections.set(pricing, projection);
+    return projection;
+};
+
+const buildStreamingCommercialOffers = (
     pricing: OwnedStreamingPricingConfiguration,
 ): StreamingCommercialOfferProjection => {
     const normalized = normalizeStreamingPricingConfiguration(pricing);

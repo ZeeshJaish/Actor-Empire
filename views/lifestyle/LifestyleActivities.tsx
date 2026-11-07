@@ -80,6 +80,7 @@ import {
     getLifestyleActivityCooldownWeeks,
     getTripActivityOptions,
     getTripCityOptions,
+    ADULT_ONLY_CHOICE_IDS,
     LIFESTYLE_ACTIVITY_CATALOG,
     INDUSTRY_ADDON_OPTIONS,
     INDUSTRY_EVENT_OPTIONS,
@@ -103,6 +104,8 @@ import {
 } from '../../services/lifestyleActivities';
 import { getHealthConditionLabel, getHealthConditionSummary, getHealthConditionTreatmentTags } from '../../services/healthConditions';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { isUnderAdultAge } from '../../services/ageGate';
+import { AgeGatePopup } from '../../components/AgeGatePopup';
 import { getGenderedAvatar } from '../../services/npcLogic';
 
 interface LifestyleActivitiesProps {
@@ -1503,6 +1506,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     const [category, setCategory] = useState<CategoryFilter>('ALL');
     const [selectedActivityId, setSelectedActivityId] = useState(LIFESTYLE_ACTIVITY_CATALOG[0].id);
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+    const [showAgeGate, setShowAgeGate] = useState(false);
     const selectedActivity = useMemo(
         () => LIFESTYLE_ACTIVITY_CATALOG.find(activity => activity.id === selectedActivityId) || LIFESTYLE_ACTIVITY_CATALOG[0],
         [selectedActivityId],
@@ -1767,13 +1771,17 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     );
 
     const selectActivity = useCallback((activity: LifestyleActivityDefinition) => {
+        if (activity.id === 'nightlife_takeover' && isUnderAdultAge(player)) {
+            setShowAgeGate(true);
+            return;
+        }
         setSelectedActivityId(activity.id);
         setSelections(createDefaultLifestyleActivitySelections(activity));
         setStatus(null);
         setAdoptionStage('eligibility');
         setPetStage('brief');
         setIsBuilderOpen(true);
-    }, []);
+    }, [player.age]);
 
     const updateSelection = (key: 'scaleId' | 'privacyId' | 'inviteId' | 'durationId', value: string) => {
         setSelections(prev => ({ ...prev, [key]: value }));
@@ -1817,6 +1825,10 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
     };
 
     const toggleTripActivity = (id: string) => {
+        if (ADULT_ONLY_CHOICE_IDS.has(id) && isUnderAdultAge(player)) {
+            setShowAgeGate(true);
+            return;
+        }
         setSelections(prev => {
             const current = prev.tripActivityIds || [];
             return {
@@ -1849,6 +1861,10 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
         key: 'industryEventId' | 'industryVenueId' | 'industryHostingStyleId' | 'industryServiceId',
         value: string,
     ) => {
+        if (ADULT_ONLY_CHOICE_IDS.has(value) && isUnderAdultAge(player)) {
+            setShowAgeGate(true);
+            return;
+        }
         setSelections(prev => ({ ...prev, [key]: value }));
         setStatus(null);
     };
@@ -2010,10 +2026,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
             relationships: alreadyKnown
                 ? playerAfter.relationships
                 : [encounter.relationship, ...(playerAfter.relationships || [])].slice(0, 80),
-            logs: [
-                friendLog,
-                ...(playerAfter.logs || []),
-            ].slice(0, 80),
+            logs: [...(playerAfter.logs || []), friendLog],
         };
         onUpdatePlayer?.(nextPlayer);
         setActivityResult(null);
@@ -2232,6 +2245,8 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                     />
                 ))}
             </div>
+
+            {showAgeGate && <AgeGatePopup language={language} onClose={() => setShowAgeGate(false)} />}
 
             {isBuilderOpen && (
                 <div className="fixed inset-0 z-[120] bg-black">

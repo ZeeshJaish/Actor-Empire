@@ -5725,6 +5725,8 @@ export const ptBRTranslations: Record<TranslationKey, string> = {
         'actions.relationship.reconnectionSubtext': 'Reparar o dano familiar vai levar tempo, mas o primeiro passo foi dado.',
         'actions.relationship.blockedTitle': 'Bloqueado',
         'actions.relationship.familyRomanceBlockedSubtext': 'Familiares não podem ser usados para ações românticas.',
+        'ageGate.title': 'Espere até os 18',
+        'ageGate.body': 'Você ainda não pode fazer isso. Libera quando você fizer 18.',
         'actions.relationship.lockedTitle': 'Bloqueado',
         'actions.relationship.lockedHomeSubtext': 'Tenha uma casa premium primeiro para organizar encontros na mansão.',
         'actions.relationship.lockedSkySeaSubtext': 'Tenha um item Sky & Sea primeiro para desbloquear esse movimento de estilo de vida.',

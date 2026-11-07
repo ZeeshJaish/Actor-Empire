@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { INITIAL_PLAYER, type Player } from '../types';
 import {
     getStreamingRightsStudioMandate,
@@ -23,7 +24,7 @@ import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { migratePlayerSave } from '../services/saveMigration';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import StreamingRightsCalendar from '../components/StreamingRightsCalendar';
+import RightsRoom, { MoneyScreen, PartnersScreen, TeamScreen } from '../components/rights/RightsRoom';
 
 const player = structuredClone(INITIAL_PLAYER) as Player;
 const defaultMandate = getStreamingRightsStudioMandate(player, 'empire-studios');
@@ -73,7 +74,7 @@ const strategy = updateStreamingRightsStudioMandate(player, {
         controlMode: 'STRATEGY',
         financialPriority: 'UPFRONT_SECURITY',
         distributionPriority: 'GLOBAL_PARTNER',
-        exclusivityPolicy: 'REQUIRE_APPROVAL',
+        exclusivityPolicy: 'ALLOW_WITHIN_LIMITS',
         durationPreference: 'SHORT',
         partnerPreference: 'TRUSTED_RELATIONSHIPS',
         maximumAutomaticGuarantee: 80_000_000,
@@ -244,6 +245,20 @@ assert.notEqual(delegatedRenewal.outcome, 'PENDING', 'Strategy must resolve a ro
 assert.equal(delegatedRenewal.delegationTrace?.mandateRevision, 2, 'delegated actions must retain the exact mandate revision');
 assert.equal(delegatedRenewal.delegationTrace?.facts.sourceContractId, delegationContract.id);
 assert.equal(delegatedRenewal.delegationTrace?.facts.performanceScore, delegatedRenewal.performance?.performanceScore);
+/* #305: the rule on exclusives is real: this contract is exclusive */
+const askFirstPlayer = updateStreamingRightsStudioMandate(delegationPlayer, { studioId: 'empire-studios', absoluteWeek: 200, patch: { exclusivityPolicy: 'REQUIRE_APPROVAL' } });
+const askFirst = Object.values(processStreamingRightsCalendarWeek(processStreamingRightsCalendarWeek(askFirstPlayer, 201).player, 202).player.world.streamingRightsCalendar!.renewalCases)
+    .find(candidate => candidate.sourceContractId === delegationContract.id)!;
+assert.equal(askFirst.outcome, 'PENDING', '"Ask me first" keeps it for the player');
+assert.equal(askFirst.status, 'ACTION_REQUIRED');
+assert.ok(askFirst.protectionReasons.includes('EXCLUSIVE_ASKS_YOU'));
+/* #309: the team's "take a fair offer" is for what your studio sold. Your own service as the buyer is your money, and keeps the strict rule. */
+const calendarSource = readFileSync('services/streamingRightsCalendar.ts', 'utf8');
+assert.ok(calendarSource.includes("const sellingToRival = candidate.seller.type === 'PLAYER_STUDIO' && candidate.incumbentBuyer.type !== 'PLAYER_PLATFORM';"));
+const neverPlayer = updateStreamingRightsStudioMandate(delegationPlayer, { studioId: 'empire-studios', absoluteWeek: 200, patch: { exclusivityPolicy: 'RESTRICT' } });
+const never = Object.values(processStreamingRightsCalendarWeek(processStreamingRightsCalendarWeek(neverPlayer, 201).player, 202).player.world.streamingRightsCalendar!.renewalCases)
+    .find(candidate => candidate.sourceContractId === delegationContract.id)!;
+assert.equal(never.outcome, 'RETURN_TO_MARKET', '"Never renew" sends it back to market');
 
 const commercialPlayer = structuredClone(officePlayer) as Player;
 commercialPlayer.world.streamingRoyaltySettlements = {
@@ -372,48 +387,45 @@ assert.equal(normalizedMalformedOffice.digests[0].absoluteWeek, 0);
 assert.equal(normalizedMalformedOffice.digests[0].actionRequired, 0);
 assert.equal(normalizedMalformedOffice.lastProcessedAbsoluteWeek, -1);
 
-const portfolioMarkup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
-    player: commercialPlayer,
-    context: 'STUDIO',
-    studioId: 'empire-studios',
-    onUpdatePlayer: () => undefined,
-    initialDeskTab: 'PORTFOLIO',
+/* #316: what the old desk's tabs said, in the Rights room */
+const roomMarkup = renderToStaticMarkup(React.createElement(RightsRoom, {
+    player: commercialPlayer, studioId: 'empire-studios', onUpdatePlayer: () => undefined, onClose: () => undefined, onSellTitle: () => undefined, onOpenFilm: () => undefined,
 }));
-assert.match(portfolioMarkup, /Rights Office/);
-assert.match(portfolioMarkup, /Portfolio/);
-assert.match(portfolioMarkup, /Mandate/);
-assert.match(portfolioMarkup, /Relationships/);
-assert.match(portfolioMarkup, /Statements/);
-assert.match(portfolioMarkup, /Packages/);
-assert.match(portfolioMarkup, /Action rail/);
-assert.match(portfolioMarkup, /40 titles under management/);
-assert.doesNotMatch(portfolioMarkup, /best deal/i);
+assert.match(roomMarkup, /Rights/);
+assert.match(roomMarkup, /Partners/);
+assert.match(roomMarkup, /Money/);
+assert.doesNotMatch(roomMarkup, /best deal/i);
+assert.doesNotMatch(roomMarkup, /Financial priority|Distribution priority|Partner preference/);
 
-const mandateMarkup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
-    player: commercialPlayer, context: 'STUDIO', studioId: 'empire-studios', onUpdatePlayer: () => undefined,
-    initialDeskTab: 'MANDATE',
+const teamMarkup = renderToStaticMarkup(React.createElement(TeamScreen, {
+    mandate: getStreamingRightsOffice(commercialPlayer, 'empire-studios', 700).mandate, onPatch: () => undefined, onBack: () => undefined,
 }));
-assert.match(mandateMarkup, /Licensing mandate/);
-assert.match(mandateMarkup, /Financial priority/);
-assert.match(mandateMarkup, /Distribution priority/);
-assert.match(mandateMarkup, /Protected decisions always return to you/);
+/* #305: only what does something is on the screen */
+assert.match(teamMarkup, /Team renews/);
+assert.match(teamMarkup, /I decide/);
+assert.match(teamMarkup, /You only see what you protect below/);
+assert.match(teamMarkup, /Exclusive titles/);
+assert.match(teamMarkup, /How long/);
+assert.match(teamMarkup, /Ask me above/);
+assert.match(teamMarkup, /Franchises/);
+assert.match(teamMarkup, /Worldwide exclusives/);
 
-const relationshipsMarkup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
-    player: commercialPlayer, context: 'STUDIO', studioId: 'empire-studios', onUpdatePlayer: () => undefined,
-    initialDeskTab: 'RELATIONSHIPS',
-}));
-assert.match(relationshipsMarkup, /Relationship intelligence/);
-assert.match(relationshipsMarkup, /Netflix/);
-assert.match(relationshipsMarkup, /Trusted partner/i);
-assert.match(relationshipsMarkup, /commissioned delivery/i);
+const partnersMarkup = renderToStaticMarkup(React.createElement(PartnersScreen, { player: commercialPlayer, studioId: 'empire-studios', onBack: () => undefined }));
+assert.match(partnersMarkup, /Netflix/);
+assert.match(partnersMarkup, /Trusted partner/i);
 
-const statementsMarkup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
-    player: commercialPlayer, context: 'STUDIO', studioId: 'empire-studios', onUpdatePlayer: () => undefined,
-    initialDeskTab: 'STATEMENTS',
-}));
-assert.match(statementsMarkup, /Commercial statement/);
-assert.match(statementsMarkup, /Licensing guarantees/);
-assert.match(statementsMarkup, /Restricted production funding/);
-assert.match(statementsMarkup, /Backend paid/);
+const moneyMarkup = renderToStaticMarkup(React.createElement(MoneyScreen, { player: commercialPlayer, studioId: 'empire-studios', yearIncome: 0, onBack: () => undefined }));
+assert.match(moneyMarkup, /Deals signed/);
+assert.match(moneyMarkup, /Their money for making it/);
+assert.match(moneyMarkup, /Your share of what they earned/);
+
+/* #305: the studio's note is its own, the titles are listed, and the mandate moves real terms */
+const lonelyStudio = getStreamingRightsOffice(player, 'a-studio-with-nothing', 700);
+assert.equal(lonelyStudio.totalTitles, 0);
+assert.equal(lonelyStudio.latestDigest, null, 'a studio with no titles has no desk note, whatever the platform did this week');
+assert.match(roomMarkup, /Free to sell|On services/);
+/* #309: the team never sells a package by itself: the package room pays far more than a licence (plan §26.23) */
+const anyMode = updateStreamingRightsStudioMandate(player, { studioId: 'empire-studios', absoluteWeek: 700, patch: { controlMode: 'STRATEGY' } });
+assert.equal(normalizeStreamingRightsManagementState(anyMode.streamingRightsManagement).packagePolicy?.automation, 'SUGGEST_ONLY', 'packages wait for the player, in every mode');
 
 console.log('Streaming Rights Office Phase A7 mandate audit passed.');

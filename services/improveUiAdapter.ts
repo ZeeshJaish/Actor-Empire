@@ -2,12 +2,14 @@ import type {
   ActorSkills,
   Commitment,
   DirectorStats,
+  GameLanguage,
   Genre,
   ImprovementActivity,
   ImprovementOption,
   Player,
   WriterStats,
 } from '../types';
+import { isUnderAdultAge } from './ageGate';
 import {
   GENRE_TRAINING_CATALOG,
   IMPROVEMENT_CATALOG,
@@ -47,6 +49,8 @@ export interface ImproveUiAction {
   effects: ImproveUiEffect[];
   scene: ImproveUiScene;
   request: ImproveUiActionRequest;
+  /** #255: waits for 18; the sheet's button opens the popup whatever the player can afford */
+  ageLocked?: boolean;
 }
 
 export interface ImproveUiVenue {
@@ -104,6 +108,7 @@ export interface ImproveUiSkillGroup {
 export type ImproveUiScene = 'gym' | 'cardio' | 'outdoor' | 'box' | 'stage' | 'desk';
 
 export interface ImproveUiModel {
+  language: GameLanguage;
   title: string;
   talent: number;
   money: number;
@@ -215,10 +220,12 @@ export const buildImproveUiModel = (player: Player): ImproveUiModel => {
       color: category === 'HEALTH' ? 'var(--health)' : category === 'LOOKS' ? 'var(--looks)' : category === 'MOOD' ? 'var(--mood)' : 'var(--physique)',
       actions: activity.options.map(option => {
         const optionName = fallback(option.nameKey || `improve.option.${option.id}.name`, option.label);
+        const ageLocked = option.id === 'opt_nightout' && isUnderAdultAge(player);
         return {
           id: `${category}-${activity.id}-${option.id}`,
           name: optionName,
-          description: fallback(option.descriptionKey || `improve.option.${option.id}.desc`, option.description),
+          ageLocked,
+          description: ageLocked ? t(language, 'ageGate.body') : fallback(option.descriptionKey || `improve.option.${option.id}.desc`, option.description),
           energy: option.energyCost,
           cost: option.moneyCost,
           effects: effectsFor(option.gains as Partial<Record<string, number>>, option.writerGains as Partial<Record<string, number>>, option.directorGains as Partial<Record<string, number>>, option.risk),
@@ -263,6 +270,7 @@ export const buildImproveUiModel = (player: Player): ImproveUiModel => {
   }));
 
   return {
+    language,
     title: tr('improve.title'),
     talent: calculateGlobalTalent(actorSkills, player.writerStats, player.directorStats),
     money: player.money,

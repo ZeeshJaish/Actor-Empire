@@ -148,9 +148,8 @@ const boardroomSource = readFileSync('components/streaming-transplant/StreamingB
 const entrySource = readFileSync('components/StreamingLockedScreen.tsx', 'utf8');
 const hqSource = `${componentSource}\n${serviceSource}`;
 
+/* #304: the retired five-room HQ's words left with its code; these are the ones the live HQ still says */
 [
-    'LEVEL 0 • FOUNDER HQ',
-    'The company exists. The signal does not.',
     'Content Room',
     'Platform Operations',
     'Market Room',

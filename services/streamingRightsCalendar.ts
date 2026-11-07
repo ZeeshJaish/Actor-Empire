@@ -1,3 +1,4 @@
+import { gameWeekLabel } from './gameWeek';
 import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import {
     STREAMING_RIGHTS_CALENDAR_SCHEMA_VERSION,
@@ -599,17 +600,23 @@ export const buildStreamingRightsRenewalOffer = (
     const rawGuarantee = originalGuarantee * valuationMultiplier;
     const minimumGuarantee = roundMoney(Math.min(rawGuarantee, Math.max(originalGuarantee * 0.35, affordabilityCeiling)));
     const licensorShareDelta = clamp((performanceScore - 50) / 8 + (rivalInterestScore - 50) / 18, -7, 10);
-    const preference = normalizeStreamingRightsManagementState(player.streamingRightsManagement).policy.preference;
+    /* #305: the selling studio's own mandate, not whichever studio was changed last */
+    const sellerMandate = contract.seller.type === 'PLAYER_STUDIO' ? getStreamingRightsStudioMandate(player, contract.seller.id) : null;
+    const preference = sellerMandate?.renewalPreference ?? normalizeStreamingRightsManagementState(player.streamingRightsManagement).policy.preference;
     const preferenceBackendDelta = preference === 'BACKEND_UPSIDE' ? 3 : preference === 'UPFRONT_SECURITY' ? -2 : 0;
     const licensorRevenueShare = clamp(contract.licensorRevenueShare + licensorShareDelta + preferenceBackendDelta, 5, 45);
-    const durationWeeks = performanceScore >= 82 && relationshipScore >= 60
+    const offeredWeeks = performanceScore >= 82 && relationshipScore >= 60
         ? 104
         : performanceScore >= 62 ? 78 : 52;
+    /* #305: the mandate's window length is real: shorter pays less now and the title comes back sooner, longer pays more but less per week */
+    const durationWeeks = sellerMandate?.durationPreference === 'SHORT'
+        ? Math.max(26, Math.round(offeredWeeks * 0.5))
+        : sellerMandate?.durationPreference === 'LONG' ? Math.min(156, Math.round(offeredWeeks * 1.5)) : offeredWeeks;
     return {
         offerDisposition: 'OFFERED',
         performance,
         proposedEconomics: {
-            minimumGuarantee,
+            minimumGuarantee: roundMoney(minimumGuarantee * Math.pow(durationWeeks / offeredWeeks, 0.85)),
             platformRevenueShare: Math.round((100 - licensorRevenueShare) * 10) / 10,
             licensorRevenueShare: Math.round(licensorRevenueShare * 10) / 10,
             durationWeeks,
@@ -655,6 +662,8 @@ export const classifyStreamingRightsRenewalControl = (
     if (management.controlMode === 'FULL') reasons.push('FULL_CONTROL');
     if (management.manualContractIds.includes(contract.id)) reasons.push('MANUAL_CONTROL');
     if (management.protectedProjectIds.includes(contract.sourceProjectId)) reasons.push('PROTECTED_TITLE');
+    /* #305: the mandate's exclusivity rule */
+    if (management.policy.exclusivityPolicy === 'REQUIRE_APPROVAL' && contract.exclusivity === 'EXCLUSIVE') reasons.push('EXCLUSIVE_ASKS_YOU');
     if (
         management.policy.protectGlobalExclusives
         && contract.territory === 'GLOBAL'
@@ -704,9 +713,11 @@ const managementForStudioMandate = (
         ...management.policy,
         preference: mandate.renewalPreference,
         maximumAutomaticGuarantee: mandate.maximumAutomaticGuarantee,
-        maximumAutomaticDurationWeeks: mandate.maximumAutomaticDurationWeeks,
+        /* a player who asks for long windows has allowed them */
+        maximumAutomaticDurationWeeks: mandate.durationPreference === 'LONG' ? Math.max(mandate.maximumAutomaticDurationWeeks, 156) : mandate.maximumAutomaticDurationWeeks,
         protectGlobalExclusives: mandate.protectGlobalExclusives,
         protectFranchises: mandate.protectFranchises,
+        exclusivityPolicy: mandate.exclusivityPolicy,
     },
 });
 
@@ -941,8 +952,16 @@ export const processStreamingRightsCalendarWeek = (
         const baseManagement = normalizeStreamingRightsManagementState(nextPlayer.streamingRightsManagement);
         const mandate = getStreamingRightsStudioMandate(nextPlayer, candidate.seller.id);
         const currentManagement = managementForStudioMandate(baseManagement, mandate);
+        /* #305: on what your studio sold to a rival, the team keeps the money coming. Below "Renew winners" it takes a fair offer on anything that is not weak,
+           unless rivals want the title more: letting a licence go earns nothing until someone sells it again, and "return to market" sells nothing by itself.
+           #309: only there. When your own service is the buyer a renewal spends your money, and that keeps the old, stricter rule. */
+        const sellingToRival = candidate.seller.type === 'PLAYER_STUDIO' && candidate.incumbentBuyer.type !== 'PLAYER_PLATFORM';
+        const renewsOnlyWinners = !sellingToRival || currentManagement.policy.preference === 'RENEW_WINNERS';
         let action: StreamingRightsRenewalAction;
-        if (currentManagement.policy.preference === 'RETEST_MARKET') {
+        if (
+            currentManagement.policy.preference === 'RETEST_MARKET'
+            || (currentManagement.policy.exclusivityPolicy === 'RESTRICT' && candidate.exclusivity === 'EXCLUSIVE')
+        ) {
             action = 'RETURN_TO_MARKET';
         } else if (
             candidate.performance.performanceScore
@@ -957,10 +976,12 @@ export const processStreamingRightsCalendarWeek = (
             )
         ) {
             action = 'ACCEPT_RENEWAL';
-        } else if (candidate.performance.rivalInterestScore >= 55) {
+        } else if (renewsOnlyWinners) {
+            action = candidate.performance.rivalInterestScore >= 55 ? 'RETURN_TO_MARKET' : 'LET_EXPIRE';
+        } else if (candidate.performance.rivalInterestScore >= 70) {
             action = 'RETURN_TO_MARKET';
         } else {
-            action = 'LET_EXPIRE';
+            action = 'ACCEPT_RENEWAL';
         }
         const tracedCalendar = normalizeStreamingRightsCalendarState(nextPlayer.world.streamingRightsCalendar);
         const tracedCase = tracedCalendar.renewalCases[caseId];
@@ -986,12 +1007,21 @@ export const processStreamingRightsCalendarWeek = (
                 explanation: candidate.delegatedReason || 'Routine renewal completed inside the saved mandate.',
             }),
         });
-        const delegated = resolveStreamingRightsRenewal(nextPlayer, {
+        let delegated = resolveStreamingRightsRenewal(nextPlayer, {
             caseId,
             action,
             absoluteWeek: week,
             delegated: true,
         });
+        /* #305: the buyer cannot pay any more: that is not a decision for the player, the window goes back on the market */
+        if (!delegated.changed && sellingToRival && action === 'ACCEPT_RENEWAL' && delegated.reason === 'BUYER_CANNOT_PAY') {
+            delegated = resolveStreamingRightsRenewal(nextPlayer, {
+                caseId,
+                action: 'RETURN_TO_MARKET',
+                absoluteWeek: week,
+                delegated: true,
+            });
+        }
         if (delegated.changed) {
             nextPlayer = delegated.player;
             continue;
@@ -1313,8 +1343,8 @@ export const resolveStreamingRightsRenewal = (
             changed: true,
             reason: returning ? 'RETURNING_TO_MARKET' : 'MARKED_TO_EXPIRE',
             detail: returning
-                ? `The exact next window becomes marketable in Week ${renewalCase.renewalStartsAtAbsoluteWeek}.`
-                : `The incumbent remains active through Week ${renewalCase.sourceExpiresAtAbsoluteWeek}.`,
+                ? `The exact next window becomes marketable in ${gameWeekLabel(renewalCase.renewalStartsAtAbsoluteWeek, absoluteWeek)}.`
+                : `The incumbent remains active through ${gameWeekLabel(renewalCase.sourceExpiresAtAbsoluteWeek, absoluteWeek)}.`,
             replacementContractId: null,
         };
     }
@@ -1441,7 +1471,7 @@ export const resolveStreamingRightsRenewal = (
         player: nextPlayer,
         changed: true,
         reason: 'RENEWED',
-        detail: `Renewal secured from Week ${renewalCase.renewalStartsAtAbsoluteWeek}.`,
+        detail: `Renewal secured from ${gameWeekLabel(renewalCase.renewalStartsAtAbsoluteWeek, absoluteWeek)}.`,
         replacementContractId: registration.contract.id,
     };
 };

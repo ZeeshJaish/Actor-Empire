@@ -17,6 +17,7 @@ type BriefOffer = Pick<
     | 'producerFee'
     | 'minimumImdbRating'
     | 'deliveryAllowanceWeeks'
+    | 'bigDeal'
 >;
 
 interface PlatformCommissionBriefCardProps {
@@ -73,7 +74,9 @@ export default function PlatformCommissionBriefCard({
 
             <header className="flex min-h-[2.75rem] items-center justify-between gap-4 border-b border-[#aaa397]/25 px-4 py-2">
                 <StreamingPlatformBrand brand={brand} variant="LOCKUP" size="SM" />
-                <p className="shrink-0 text-[10px] font-semibold text-[#aaa397]">Commission order</p>
+                {offer.bigDeal
+                    ? <p data-big-deal className="shrink-0 rounded-md bg-[var(--commission-accent)] px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--commission-accent-foreground)]">Big deal</p>
+                    : <p className="shrink-0 text-[10px] font-semibold text-[#aaa397]">Commission order</p>}
             </header>
 
             <div className="px-4 pb-3.5 pt-4">
@@ -124,7 +127,9 @@ export default function PlatformCommissionBriefCard({
                 </section>
 
                 <p className="mt-3 border-l-2 border-[var(--commission-accent)] pl-2.5 text-[10px] font-medium italic leading-snug text-[#9f9990]">
-                    The production cap funds the film. It is not studio income.
+                    {offer.bigDeal
+                        ? `${offer.platformName} rarely offers this much, and it wants a better title for it. The production cap funds the film. It is not studio income.`
+                        : 'The production cap funds the film. It is not studio income.'}
                 </p>
             </div>
 

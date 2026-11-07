@@ -56,11 +56,6 @@ later.ownedStreamingPlatform.originalCommissions[0].localization = { packageId: 
 check('Original cannot play before localization delivery', !route(later).allowed);
 const missing = structuredClone(p); missing.commitments = [];
 check('greenlit without canonical completion remains blocked', !route(missing).allowed && !getStreamingContentAvailability(missing, id, ['US']).available);
-const css = readFileSync('styles/streaming-originals-studio.css', 'utf8');
-const overlay = css.match(/\.originals-studio-overlay\s*\{([^}]+)/)?.[1] || '';
-check('Originals modal owns a fixed inset viewport above HQ', /position:\s*fixed/.test(overlay) && /inset:\s*0/.test(overlay) && Number(overlay.match(/z-index:\s*(\d+)/)?.[1]) > 110);
-const main = css.match(/\.originals-studio-main\s*\{([^}]+)/)?.[1] || '';
-check('Originals content can shrink and scroll inside viewport', /min-height:\s*0/.test(main) && /overflow-y:\s*auto/.test(main));
 for (const row of results) console.log(`${row.pass ? 'PASS' : 'FAIL'} ${row.name}`);
 if (results.some(row => !row.pass)) throw new Error(`${results.filter(row => !row.pass).length}/${results.length} Original readiness checks failed`);
 console.log(`${results.length}/${results.length} Original readiness checks passed`);

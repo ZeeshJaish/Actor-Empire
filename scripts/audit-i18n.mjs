@@ -3757,7 +3757,7 @@ const phase5SocialEventRefs = [
   [socialEventsSource, 'getFlavorTexts = (language', 'social flavor localized getter'],
   [socialEventsSource, "t(language, `services.socialEvents.${category}.${event.id}.title`)", 'social event title localization'],
   [socialEventsSource, "t(language, `services.socialEvents.flavor.${category}.${id}`)", 'social event flavor localization'],
-  [gameActionsSource, 'getSocialEvents(language, type)', 'partner action social event localization'],
+  [gameActionsSource, 'getSocialEvents(language, type, {', 'partner action social event localization'],
   [gameActionsSource, 'getFlavorTexts(language, action)', 'partner action social flavor localization'],
   [english, 'services.socialEvents.DATE.movieNight.title', 'social event EN movie night title'],
   [english, 'services.socialEvents.DATE.movieNight.option.romcom.log', 'social event EN option log'],

@@ -10,6 +10,7 @@
  *  - who pays and who watches, the plans they pick, and the way to the Offer.
  * Ad-only and store services see the same page in their own unit, without the subscription parts.
  */
+import { gameWeekText } from '../../services/gameWeek';
 import React, { useMemo, useState } from 'react';
 import r from './presentation/screens/AudienceDesk/AudienceRoom.module.css';
 import { cx } from './presentation/cx';
@@ -200,7 +201,7 @@ export const AudienceAnalyticsTab: React.FC<{
       {/* ── why they came · why they left ── */}
       {subscription && (
         <>
-          <div className={r.sh}><h2>Why they came · why they left</h2><span>{flows?.available ? `week ${flows.absoluteWeek}` : 'the ledger'}</span></div>
+          <div className={r.sh}><h2>Why they came · why they left</h2><span>{flows?.available ? `${gameWeekText(flows.absoluteWeek)}` : 'the ledger'}</span></div>
           <section className={cx(r.card, r.rise)} style={{ ['--i' as string]: 5 }}>
             {butterfly.length ? (
               <>

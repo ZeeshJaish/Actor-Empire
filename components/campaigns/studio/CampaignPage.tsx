@@ -10,6 +10,7 @@
  *  - in the news: its story, its X posts and the fans' buzz, with its picture;
  *  - in the pinned bar: Top up (a pot) and Stop while it runs; Run again and Open title once it is over.
  */
+import { gameWeekLabel, gameWeekText } from '../../../services/gameWeek';
 import React, { useMemo, useState } from 'react';
 import type { Key } from 'react';
 import css from './CampaignPage.module.css';
@@ -164,7 +165,7 @@ export const CampaignPage: React.FC<{
 
                 <div className={css.sh}><h2>Week by week</h2><span>{ran.length ? `${ran.length} ${ran.length === 1 ? 'week' : 'weeks'}` : 'none yet'}</span></div>
                 {shown.length === 0 ? (
-                    <p className={css.note}>{running ? `It runs from week ${campaign.startedAtAbsoluteWeek}. Each week settles here: what it spent, who it reached, the joins it brought.`
+                    <p className={css.note}>{running ? `It runs from ${gameWeekText(campaign.startedAtAbsoluteWeek)}. Each week settles here: what it spent, who it reached, the joins it brought.`
                         : 'It was stopped before its first week ran, so it spent nothing.'}</p>
                 ) : (
                     <div className={css.chart}>
@@ -173,7 +174,7 @@ export const CampaignPage: React.FC<{
                             <div className={css.bars}>
                                 {shown.map((item, index) => (
                                     <button key={item.absoluteWeek} type="button" className={`${css.bar} ${item === at ? css.barOn : ''}`} onClick={() => setPicked(index)}
-                                        aria-label={`Week ${item.absoluteWeek}: ${item.paused ? 'waited' : money(item.spend)}`}>
+                                        aria-label={`${gameWeekLabel(item.absoluteWeek)}: ${item.paused ? 'waited' : money(item.spend)}`}>
                                         <i style={{ height: `${Math.max(item.paused ? 0 : 6, Math.round((item.spend / spendMax) * 100))}%` }} className={item.paused ? css.barPaused : ''} />
                                     </button>
                                 ))}
@@ -184,7 +185,7 @@ export const CampaignPage: React.FC<{
                             <div className={css.bars}>
                                 {shown.map((item, index) => (
                                     <button key={item.absoluteWeek} type="button" className={`${css.bar} ${css.barJoins} ${item === at ? css.barOn : ''}`} onClick={() => setPicked(index)}
-                                        aria-label={`Week ${item.absoluteWeek}: ${count(item.joins)} joins`}>
+                                        aria-label={`${gameWeekLabel(item.absoluteWeek)}: ${count(item.joins)} joins`}>
                                         <i style={{ height: `${item.joins > 0 ? Math.max(6, Math.round((item.joins / joinsMax) * 100)) : 0}%` }} />
                                     </button>
                                 ))}
@@ -192,7 +193,7 @@ export const CampaignPage: React.FC<{
                         </div>
                         {at && (
                             <p className={css.chartNote}>
-                                <b>Week {at.absoluteWeek}</b>{at.paused ? ' · waited: the treasury could not pay'
+                                <b>{gameWeekLabel(at.absoluteWeek)}</b>{at.paused ? ' · waited: the treasury could not pay'
                                     : ` · ${money(at.spend)} · ${count(at.reach)} reached · ${Math.round(at.awareness * 100)}% aware · ${at.joins > 0 ? `+${count(at.joins)} joins` : 'no joins credited'}`}
                             </p>
                         )}

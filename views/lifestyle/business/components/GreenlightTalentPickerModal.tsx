@@ -3,6 +3,8 @@ import { Crown, X } from 'lucide-react';
 import { type Player } from '../../../../types';
 
 interface GreenlightTalentPickerModalProps {
+    /** #284 */
+    outsideStudio?: boolean;
     roleId: string;
     player: Player;
     playerActingTalent: number;
@@ -23,6 +25,7 @@ const getReturningActor = (returningTalent: any[], actorId: string) => (
 );
 
 export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalProps> = ({
+    outsideStudio,
     roleId,
     player,
     playerActingTalent,
@@ -49,7 +52,7 @@ export const GreenlightTalentPickerModal: React.FC<GreenlightTalentPickerModalPr
                     <button type="button" onClick={onClose} aria-label="Close actor selection" className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors"><X size={20} /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-4 custom-scrollbar">
-                    <div className="space-y-2">
+                    <div className={outsideStudio ? 'hidden' : 'space-y-2'}>
                         <div className="text-[10px] font-bold text-zinc-500 uppercase px-2">You</div>
                         <button
                             type="button"

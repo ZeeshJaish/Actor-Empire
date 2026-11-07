@@ -68,9 +68,9 @@
 .dos .jhead b{font-size:9px;font-weight:900;letter-spacing:.2em;color:#c6ccda}
 .dos .jhead span{font-size:9px;font-weight:900;padding:4px 10px;border-radius:99px;
   background:rgba(255,255,255,.08);color:#aeb6c4}
-.dos .jsteps{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.dos .jsteps{display:flex;gap:3px;padding-bottom:2px}
 .dos .jsteps::-webkit-scrollbar{display:none}
-.dos .jstep{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;width:60px}
+.dos .jstep{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:6px}
 .dos .jstep i{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.07);
   border:1px solid rgba(255,255,255,.1)}
 .dos .jstep.done i{background:color-mix(in srgb,var(--epx-dos-c) 30%,transparent);border-color:var(--epx-dos-c)}

@@ -206,7 +206,7 @@ export interface StockTradeResult {
     success: boolean;
     player: Player;
     quote?: StockTradeQuote;
-    reason?: 'STOCK_NOT_FOUND' | 'INVALID_AMOUNT' | 'INSUFFICIENT_CASH' | 'INSUFFICIENT_SHARES' | 'OWNER_NOT_FOUND' | 'LIVE_SALE_LISTING' | 'UNREPRESENTABLE_AMOUNT' | 'INVALID_SHARE_REGISTER';
+    reason?: 'STOCK_NOT_FOUND' | 'INVALID_AMOUNT' | 'INSUFFICIENT_CASH' | 'INSUFFICIENT_SHARES' | 'OWNER_NOT_FOUND' | 'LIVE_SALE_LISTING' | 'CONTROL_LOCKED' | 'UNREPRESENTABLE_AMOUNT' | 'INVALID_SHARE_REGISTER';
 }
 
 export type StockShareIssueReason =
@@ -409,6 +409,12 @@ export const getSharesForCashOrder = (
     return low;
 };
 
+/** #237 (plan §25.4 Q4): once you control a company, your shares are the company. They paid for it: selling them on the market kept the
+ * studio and took the money back (4.97B on WBD). The way out is selling the studio, which settles the shares (services/studioSale.ts). */
+export const isStockLockedByControl = (player: Pick<Player, 'businesses'>, stock: Pick<Stock, 'relatedStudioId'>) => (
+    Boolean(stock.relatedStudioId) && (player.businesses || []).some(business => business.id === stock.relatedStudioId)
+);
+
 export const executeStockTrade = (
     player: Player,
     stockId: string,
@@ -495,6 +501,7 @@ export const executeStockTrade = (
     }
 
     if (!holding || holding.shares < shares) return { success: false, player, quote, reason: 'INSUFFICIENT_SHARES' };
+    if (isStockLockedByControl(player, stock)) return { success: false, player, quote, reason: 'CONTROL_LOCKED' };
     const split = splitStockReceipt(holding, shares, quote.estimatedValue);
     const corporateReceipts = split.receipts.filter(row => row.ownerStudioId && row.soldShares > 0);
     if (corporateReceipts.some(row => !player.businesses.some(business => business.id === row.ownerStudioId && business.type === 'PRODUCTION_HOUSE'))) {

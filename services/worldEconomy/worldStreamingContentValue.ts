@@ -1,3 +1,4 @@
+import { STREAMING_EARLY_ACCESS_MAX_WEEKS } from '../streamingEarlyAccess';
 import type { OwnedStreamingSlateEntry, Player } from '../../types';
 import { resolveHistoricalCatalogueTitle } from '../historicalCatalogue';
 import type { StreamingCatalogueReadContext } from '../streamingContentAvailability';
@@ -31,14 +32,17 @@ export const streamingTitleWeeksAvailable = (player: Player, entry: OwnedStreami
     const platform=player.ownedStreamingPlatform;
     const launch=platform.launchCommit?.committedAtAbsoluteWeek ?? absoluteWeek;
     let age=Math.max(1,absoluteWeek-launch-entry.launchWeek+2);
+    /* #245: freshness starts at general release: the weeks just before it are early access, not its age */
+    const general=launch+entry.launchWeek-1;
+    const earlyRow=(week:number,weeksAvailable:number)=>weeksAvailable<=1 && week<general && week>=general-STREAMING_EARLY_ACCESS_MAX_WEEKS;
     const viewing=player.world.worldStreamingViewing;
     const prior=viewing?.platforms.PLAYER?.titlePerformance.find(row=>row.projectId===entry.projectId);
-    if(prior && viewing!.lastProcessedAbsoluteWeek<=absoluteWeek)
+    if(prior && viewing!.lastProcessedAbsoluteWeek<=absoluteWeek && !earlyRow(viewing!.lastProcessedAbsoluteWeek,prior.weeksAvailable))
         age=Math.max(age,prior.weeksAvailable+absoluteWeek-viewing!.lastProcessedAbsoluteWeek);
     for(const snapshot of platform.weeklyHistory) {
         if(snapshot.absoluteWeek>absoluteWeek) continue;
         const row=snapshot.operations?.titlePerformance?.find(title=>title.projectId===entry.projectId);
-        if(row) age=Math.max(age,row.weeksAvailable+absoluteWeek-snapshot.absoluteWeek);
+        if(row && !earlyRow(snapshot.absoluteWeek,row.weeksAvailable)) age=Math.max(age,row.weeksAvailable+absoluteWeek-snapshot.absoluteWeek);
     }
     return age;
 };

@@ -10,7 +10,6 @@ import { processOwnedStreamingPlatformWeek } from '../services/streamingWeeklyLo
 import { getStreamingTitleAnalytics } from '../services/streamingTitleAnalytics';
 import StreamingAnalyticsCenter from '../components/StreamingAnalyticsCenter';
 import StreamingTitleDossier from '../components/StreamingTitleDossier';
-import StreamingWeeklyCeoLoop from '../components/StreamingWeeklyCeoLoop';
 
 const player = structuredClone(INITIAL_PLAYER) as Player;
 player.id = 'we6-ui-audit';
@@ -103,9 +102,5 @@ const titleMarkup = renderToStaticMarkup(<StreamingTitleDossier player={processe
     assert.ok(titleMarkup.toUpperCase().includes(text), `Title Dossier renders ${text}`)
 ));
 
-const weeklyMarkup = renderToStaticMarkup(<StreamingWeeklyCeoLoop player={processed} onUpdatePlayer={() => undefined} onReturnToGame={() => undefined} />);
-['WATCH HOURS', 'UNMET DEMAND', 'ADVERTISING', 'TRANSACTIONS', 'SPONSORSHIP'].forEach(text => (
-    assert.ok(weeklyMarkup.toUpperCase().includes(text), `weekly CEO report renders ${text}`)
-));
 
-console.log('WE6 title dossier, Analytics Center, and weekly CEO report UI audit passed.');
+console.log('WE6 title dossier and Analytics Center UI audit passed.');

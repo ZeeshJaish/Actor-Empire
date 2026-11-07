@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { INITIAL_PLAYER, type Player } from '../types';
-import StreamingCataloguePackageDesk from '../components/StreamingCataloguePackageDesk';
 import { StreamingBiddingRoom } from '../views/lifestyle/business/components/StreamingBiddingRoom';
 import { normalizeStreamingRightsManagementState } from '../services/streamingRightsCalendar';
 import {
@@ -34,6 +33,7 @@ import { migratePlayerSave } from '../services/saveMigration';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { processStreamingCataloguePackageStrategyAutomation } from '../services/streamingCataloguePackageAutomation';
 import { normalizePlatformAiState } from '../services/platformAi/platformAiState';
+import { getRightsRoom } from '../services/rightsRoom';
 
 assert.deepEqual(
     (INITIAL_PLAYER.world as any).streamingCataloguePackages,
@@ -525,16 +525,12 @@ const remainingGroup = getStreamingCatalogueRenewalGroups(nearExpiry, [renewalGr
 assert.equal(remainingGroup[0].cases.length, 1, 'excluding a title changes only the review projection');
 assert.deepEqual(nearExpiry.world.streamingRightsCalendar, calendarBeforeGrouping, 'renewal grouping must not mutate canonical A4 cases');
 
-const deskMarkup = renderToStaticMarkup(React.createElement(StreamingCataloguePackageDesk, {
-    player: proposalWeek.player,
-    studioId: 'empire-studios',
-    onUpdatePlayer: () => undefined,
-}));
-assert.match(deskMarkup, /Package Desk/);
-assert.match(deskMarkup, /Portfolio proposals/);
-assert.match(deskMarkup, /Empire Studios drama collection/i);
-assert.match(deskMarkup, /3 titles/);
-assert.doesNotMatch(deskMarkup, /output deal/i);
+/* #316: the team's idea is one line in the Rights room, and picks its titles */
+{
+    const idea = packageDesk.ready.find(item => /Empire Studios drama collection/i.test(item.name));
+    assert.ok(idea && idea.components.length === 3, 'the team proposes a package of three');
+    assert.deepEqual(getRightsRoom(proposalWeek.player, 'empire-studios').suggestion?.projectIds, idea!.components.map(component => component.sourceProjectId));
+}
 
 const packageRoomMarkup = renderToStaticMarkup(React.createElement(StreamingBiddingRoom, {
     session: closedPackageRoom,

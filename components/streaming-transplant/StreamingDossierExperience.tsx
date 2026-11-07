@@ -35,6 +35,10 @@ export interface DossierTitle {
   rightsWeeksLeft?: number;
 
   viewers: number;
+  /** #245: views: the early weeks plus the first general week */
+  opening?: { early: number; first: number; total: number };
+  /** #245: tickets, apart from views */
+  boxOffice?: number;
   completion: number;             // %
   subsAcquired: number;
   churnPrevented: number;
@@ -76,11 +80,7 @@ export const TitleDossier: React.FC<{
   /** #150: its campaigns: how many it has had, and whether one can start now (it streams on the service) */
   campaigns?: { count: number; canStart: boolean; reason?: string };
 }> = ({ brand, t, onClose, onAction, campaigns }) => {
-  const c = brandColor(brand), c2 = brandDeep(brand);
   const tf = typeFace(brand);
-  const margin = t.revenue - t.cost;
-  const marginPct = t.cost > 0 ? Math.round((margin / t.cost) * 100) : 0;
-  const settled = t.maturity.have >= t.maturity.need;
 
   return (
     <div className={css.dos} data-epx-root style={brandVars(brand, { ['--epx-dos-h' as string]: `${t.hue}` } as React.CSSProperties)}>
@@ -106,17 +106,59 @@ export const TitleDossier: React.FC<{
           </div>
         </div>
 
-        <div className={css.dosbody}>
+        <DossierBody brand={brand} t={t} onAction={onAction} campaigns={campaigns} />
+      </div>
+    </div>
+  );
+};
+
+/**
+ * #317: a title has one page. An Original's page already shows who it is, its four big numbers and its next steps, so "All the numbers" opens
+ * these same numbers on that page, under what is already there. Zeesh (2026-11-07): "एक टाइटल का एक पेज, हाँ."
+ */
+export const TitleNumbersInPlace: React.FC<{ brand: Brand; t: DossierTitle }> = ({ brand, t }) => (
+  <div
+    className={css.dos}
+    data-epx-root
+    data-title-numbers-in-place
+    style={brandVars(brand, {
+      ['--epx-dos-h' as string]: `${t.hue}`,
+      position: 'relative', inset: 'auto', zIndex: 0, maxWidth: 'none', margin: 0, background: 'transparent', overflow: 'visible', animation: 'none',
+    } as React.CSSProperties)}
+  >
+    <DossierBody brand={brand} t={t} inPlace />
+  </div>
+);
+
+const DossierBody: React.FC<{
+  brand: Brand;
+  t: DossierTitle;
+  onAction?: (id: string) => void;
+  campaigns?: { count: number; canStart: boolean; reason?: string };
+  /** on the title's own page: what that page already shows is left out */
+  inPlace?: boolean;
+}> = ({ brand, t, onAction, campaigns, inPlace }) => {
+  const c = brandColor(brand);
+  const tf = typeFace(brand);
+  const margin = t.revenue - t.cost;
+  const marginPct = t.cost > 0 ? Math.round((margin / t.cost) * 100) : 0;
+  const settled = t.maturity.have >= t.maturity.need;
+
+  return (
+        <div className={css.dosbody} style={inPlace ? { padding: 0 } : undefined}>
           {/* ── summary ── */}
           <div className={css.seclab}><i />EXECUTIVE SUMMARY</div>
           <p className={css.doslog}>{t.logline}</p>
 
           {/* ── the numbers ── */}
           <div className={css.dgrid}>
-            <Cell label="VIEWERS" value={count(t.viewers)} note="accounts that started it" />
-            <Cell label="COMPLETION" value={`${t.completion}%`} tone="good" note="finished it" />
-            <Cell label="SUBS ACQUIRED" value={count(t.subsAcquired)} tone="brand" note="joined for this title" />
-            <Cell label="CHURN PREVENTED" value={count(t.churnPrevented)} tone="brand" note="stayed because of it" />
+            {!inPlace && <Cell label="VIEWERS" value={count(t.viewers)} note="accounts that started it" />}
+            {t.opening && <Cell label="OPENING WEEK" value={count(t.opening.total)} tone="brand"
+              note={t.opening.early > 0 ? `${count(t.opening.early)} early access + ${count(t.opening.first)} first week` : 'views in its first week'} />}
+            {(t.boxOffice || 0) > 0 && <Cell label="BOX OFFICE" value={money(t.boxOffice!)} note="tickets only; views are apart" />}
+            {!inPlace && <Cell label="COMPLETION" value={`${t.completion}%`} tone="good" note="finished it" />}
+            {!inPlace && <Cell label="SUBS ACQUIRED" value={count(t.subsAcquired)} tone="brand" note="joined for this title" />}
+            {!inPlace && <Cell label="CHURN PREVENTED" value={count(t.churnPrevented)} tone="brand" note="stayed because of it" />}
             {t.kind === 'LICENSED' && <Cell label="RIGHTS GUARANTEE PAID" value={money(t.rightsInvestment || 0)}
               note="Paid upfront; accounted over the licence term" />}
             <Cell label="REVENUE / LATEST WEEK" value={t.financialsAvailable === false ? '—' : money(t.revenue)} tone="good" />
@@ -184,7 +226,7 @@ export const TitleDossier: React.FC<{
           )}
 
           {/* ── artwork ── */}
-          <div className={css.artcard}>
+          {!inPlace && <div className={css.artcard}>
             <div className={css.seclab}><i />ARTWORK</div>
             <div className={css.artrow}>
               {t.artwork.map(a => (
@@ -195,10 +237,10 @@ export const TitleDossier: React.FC<{
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* ── actions ── */}
-          <div className={css.dosacts}>
+          {!inPlace && <div className={css.dosacts}>
             {t.kind === 'ORIGINAL' ? (
               <>
                 <button className={cx(css.dact, css.primary)} onClick={() => onAction?.('renew')}>
@@ -223,7 +265,7 @@ export const TitleDossier: React.FC<{
                 {campaigns.count > 0 && <button className={css.dact} onClick={() => onAction?.('campaigns')}>CAMPAIGNS · {campaigns.count}</button>}
               </>
             )}
-          </div>
+          </div>}
 
           {/* ── press ── */}
           <div className={css.seclab}><i />PRESS &amp; CHATTER</div>
@@ -237,8 +279,6 @@ export const TitleDossier: React.FC<{
 
           <div className={css.dosfoot} />
         </div>
-      </div>
-    </div>
   );
 };
 

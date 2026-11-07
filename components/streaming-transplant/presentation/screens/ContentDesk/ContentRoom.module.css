@@ -302,6 +302,10 @@
 .room .slInfo .metaLine{font-size:9px;color:#8b93a5}
 .room .slRemove{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,90,95,.35);background:rgba(255,90,95,.06);
   font:800 11px/1 'Inter',system-ui,sans-serif;color:#ff8b8f}
+/* #291: an Original series: all at once, or an episode a week */
+.slRhythm{display:flex;flex-wrap:wrap;gap:4px}
+.room .slRhythm button{min-height:28px;padding:0 9px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:transparent;font:700 9.5px/1 'Inter',system-ui,sans-serif;color:#8b93a5}
+.room .slRhythm button.on{border-color:transparent;background:var(--cc);color:#fff}
 .room .wkEmpty{font:500 10px/1.45 'Inter',system-ui,sans-serif;color:#7d8698}
 .room .wkRisk{font:700 9px/1.3 'Inter',system-ui,sans-serif;color:#ff8b8f}
 .room .wkNote{font:500 9px/1.4 'Inter',system-ui,sans-serif;color:#7d8698}

@@ -87,13 +87,13 @@ const assertNamedButtons = async (page: BrowserPage, label: string) => {
         await page.goto(`${baseUrl}/scripts/fixtures/streaming-opening-programme.html?state=${state}`, { waitUntil: 'networkidle' });
         const label = `Opening Programme ${state} at ${viewport.width}x${viewport.height}`;
         console.log(`Checking ${label}`);
-        await page.locator('.sop').waitFor({ timeout: 8_000 });
+        await page.locator('[data-ui="opening-build"]').waitFor({ timeout: 8_000 });
         await assertFits(page, label);
         await assertNamedButtons(page, label);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         const overlap = await page.evaluate(() => {
-          const content = document.querySelector('.sop-workstreams');
-          const actions = document.querySelector('.sop-actions');
+          const content = document.querySelector('[data-ui="opening-build"] [class*="page"]');
+          const actions = document.querySelector('[data-ui="opening-build"] footer');
           if (!content || !actions) return false;
           return content.getBoundingClientRect().bottom > actions.getBoundingClientRect().top + 1;
         });

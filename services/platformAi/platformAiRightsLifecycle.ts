@@ -1,3 +1,4 @@
+import { gameWeekText } from '../gameWeek';
 import {streamingBackendPercentForBuyer} from '../streamingBackendPolicy';
 import type {
     OwnedStreamingCatalogLicense,
@@ -108,7 +109,7 @@ const renewalDecision = (
         : 'A paid catalogue-rights renewal became active.',
     reason: type === 'RIGHTS_RENEWAL_QUEUED'
         ? `${record.minimumGuaranteeMillions}M was persisted as a contractual obligation before contract creation.`
-        : `The non-overlapping continuation starts in week ${record.nextStartsAtAbsoluteWeek}.`,
+        : `The non-overlapping continuation starts in ${gameWeekText(record.nextStartsAtAbsoluteWeek)}.`,
     cashImpactMillions: type === 'RIGHTS_RENEWAL_QUEUED' ? -record.minimumGuaranteeMillions : 0,
 });
 

@@ -8,6 +8,7 @@
  * Read from the stored weekly chart (#129, `world.streamingWeeklyChart`): every week settled since the last industry
  * pass, each against the week before it. A quiet week makes no story. Pure: reads the player, returns facts.
  */
+import { gameWeekText } from './gameWeek';
 import type { IndustryEventFact, Player, StreamingWeeklyChartRow, StreamingWeeklyChartWeek } from '../types';
 import { createIndustryEventFact } from './industryWorld/industryEventLedger';
 import { normalizeStreamingWeeklyChartState, streamingChartAllList } from './streamingWeeklyChart';
@@ -54,7 +55,7 @@ export const collectStreamingChartFacts = (player: Player, sinceWeek: number, ab
         /* your title becomes the world's #1 */
         if (top.platformId === 'PLAYER' && was[0]?.id !== top.id) {
             push(`top:${week.absoluteWeek}`, 'PLAYER', 'HIGH', `${top.title} is the most-watched title in the world`,
-                `${top.title} on ${name} took the world's #1 with ${short(top.views)} views in week ${week.absoluteWeek}, ahead of every service.`, top.id);
+                `${top.title} on ${name} took the world's #1 with ${short(top.views)} views in ${gameWeekText(week.absoluteWeek)}, ahead of every service.`, top.id);
         }
         /* a title holds #1 for a fourth week running */
         let streak = 0;

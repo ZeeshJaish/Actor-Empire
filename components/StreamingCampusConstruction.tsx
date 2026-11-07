@@ -1,3 +1,4 @@
+import { gameWeekLabel, gameWeekText } from '../services/gameWeek';
 import { useMemo, useReducer } from 'react';
 import {
   AlertTriangle,
@@ -237,7 +238,7 @@ export default function StreamingCampusConstruction({
               </header>
               <div className="campus-build-metrics">
                 <article><CircleDollarSign size={18} /><span>Capital committed</span><strong>{money(project.capitalCommitted)}</strong></article>
-                <article><Clock3 size={18} /><span>{project.status === 'OPEN' ? 'Opened' : 'Next gate'}</span><strong>{project.status === 'OPEN' ? `Week ${project.openedAtAbsoluteWeek}` : weeksRemaining ? `${weeksRemaining} weeks` : 'Decision due'}</strong></article>
+                <article><Clock3 size={18} /><span>{project.status === 'OPEN' ? 'Opened' : 'Next gate'}</span><strong>{project.status === 'OPEN' ? `${gameWeekLabel(project.openedAtAbsoluteWeek, absoluteWeek)}` : weeksRemaining ? `${weeksRemaining} weeks` : 'Decision due'}</strong></article>
                 <article><Database size={18} /><span>Installed racks</span><strong>{project.installedRacks} / {project.rackCapacity || '—'}</strong></article>
                 <article><ShieldCheck size={18} /><span>Disruptions absorbed</span><strong>{project.events.length}</strong></article>
               </div>
@@ -266,7 +267,7 @@ export default function StreamingCampusConstruction({
               ) : project.status === 'OPEN' ? (
                 <div className="campus-build-open-state">
                   <div><BadgeCheck size={32} /><span>LIVE OWNED INFRASTRUCTURE</span><h3>{project.installedRacks} commissioned racks now carry real platform duties.</h3><p>{money(project.weeklyOperatingCost)}/week · {project.staffRequired} staff · {project.hallCount} data hall{project.hallCount === 1 ? '' : 's'}</p></div>
-                  <button type="button" onClick={expandCampus} disabled={project.installedRacks >= getStreamingCampusRackCeiling(project.scale) || project.expansionReadyAtAbsoluteWeek != null}><Plus size={18} /> {project.expansionReadyAtAbsoluteWeek != null ? `Expansion due week ${project.expansionReadyAtAbsoluteWeek}` : project.installedRacks >= getStreamingCampusRackCeiling(project.scale) ? 'Campus buildout complete' : 'Add another building'}</button>
+                  <button type="button" onClick={expandCampus} disabled={project.installedRacks >= getStreamingCampusRackCeiling(project.scale) || project.expansionReadyAtAbsoluteWeek != null}><Plus size={18} /> {project.expansionReadyAtAbsoluteWeek != null ? `Expansion due ${gameWeekText(project.expansionReadyAtAbsoluteWeek, absoluteWeek)}` : project.installedRacks >= getStreamingCampusRackCeiling(project.scale) ? 'Campus buildout complete' : 'Add another building'}</button>
                 </div>
               ) : (
                 <div className="campus-build-progress-card" role="status">
@@ -279,7 +280,7 @@ export default function StreamingCampusConstruction({
                 <aside className="campus-build-events">
                   <header><AlertTriangle size={17} /><strong>Construction record</strong><span>Deterministic project events</span></header>
                   {project.events.slice().reverse().map(event => (
-                    <article key={event.id}><div><strong>{event.title}</strong><span>{event.stage.replaceAll('_', ' ')} · week {event.occurredAtAbsoluteWeek}</span></div><p>{event.detail}</p><b>+{event.delayWeeks} week{event.delayWeeks === 1 ? '' : 's'} · {money(event.cost)}</b></article>
+                    <article key={event.id}><div><strong>{event.title}</strong><span>{event.stage.replaceAll('_', ' ')} · {gameWeekText(event.occurredAtAbsoluteWeek, absoluteWeek)}</span></div><p>{event.detail}</p><b>+{event.delayWeeks} week{event.delayWeeks === 1 ? '' : 's'} · {money(event.cost)}</b></article>
                   ))}
                 </aside>
               ) : null}

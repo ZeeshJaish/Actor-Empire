@@ -1,3 +1,4 @@
+import { gameWeekText } from './gameWeek';
 import {getStreamingBuyerBackendCapability,validateNewStreamingBackendTerms} from './streamingBackendPolicy';
 import type { IndustryProductionCommitment, OwnedStreamingRightsNegotiation, Player, StreamingBuyerAuctionLot, StreamingUpcomingRightsSale } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
@@ -93,7 +94,7 @@ export const getStreamingUpcomingRightsAuctionLots = (player: Player): Streaming
                     futureGreenlightReserve: Math.round(sale.referenceValue * 0.25 / 100_000) * 100_000,
                 },
                 sellerPriorities: auctionPriorities(sale.id),
-                notice: `Pre-release rights. ${sale.title} cannot be scheduled or played until the canonical production is delivered and its week ${sale.plannedAvailabilityAbsoluteWeek} availability begins.`,
+                notice: `Pre-release rights. ${sale.title} cannot be scheduled or played until the canonical production is delivered and its ${gameWeekText(sale.plannedAvailabilityAbsoluteWeek)} availability begins.`,
                 cataloguePackageId: null,
                 catalogueComponentIds: [],
                 upcomingRightsSaleId: sale.id,
@@ -241,7 +242,7 @@ export const settleStreamingUpcomingRightsForPlayer = (
         productionId: sale.sourceProductionId,
         platformId: signedPlatform.identity?.slug || `player-platform:${player.id}`,
         headline: `${resolvedSale.winnerName} wins the future rights to ${sale.title}`,
-        detail: `The saved contract begins in absolute week ${sale.plannedAvailabilityAbsoluteWeek}, subject to canonical delivery. Private bid terms remain private.`,
+        detail: `The saved contract begins in absolute ${gameWeekText(sale.plannedAvailabilityAbsoluteWeek)}, subject to canonical delivery. Private bid terms remain private.`,
         evidence: [
             { kind: 'RIGHTS_CONTRACT', id: license.id },
             { kind: 'PRODUCTION', id: sale.sourceProductionId },
@@ -299,7 +300,7 @@ export const resolveStreamingUpcomingRightsAuctionOutcome = (
             projectId: sale.sourceProjectId,
             productionId: sale.sourceProductionId,
             headline: `${outcome.winnerName} wins the future rights to ${sale.title}`,
-            detail: `The public result is confirmed. Contract availability is scheduled for absolute week ${sale.plannedAvailabilityAbsoluteWeek}; private bid terms remain private.`,
+            detail: `The public result is confirmed. Contract availability is scheduled for absolute ${gameWeekText(sale.plannedAvailabilityAbsoluteWeek)}; private bid terms remain private.`,
             evidence: [
                 { kind: 'RIGHTS_CONTRACT', id: outcome.winningContractId },
                 { kind: 'PRODUCTION', id: sale.sourceProductionId },
@@ -449,7 +450,7 @@ export const processStreamingUpcomingRightsWeek = (
         projectId: sale.sourceProjectId,
         productionId: sale.sourceProductionId,
         headline: `${sale.sellerName} schedules a rights auction for ${sale.title}`,
-        detail: `The public sale opens in absolute week ${sale.opensAtAbsoluteWeek}; ${sale.title} is currently expected from week ${sale.plannedAvailabilityAbsoluteWeek}. Interest is an estimate, not a promised result.`,
+        detail: `The public sale opens in absolute ${gameWeekText(sale.opensAtAbsoluteWeek)}; ${sale.title} is currently expected from ${gameWeekText(sale.plannedAvailabilityAbsoluteWeek)}. Interest is an estimate, not a promised result.`,
         evidence: [
             { kind: 'PRODUCTION', id: sale.sourceProductionId },
             { kind: 'PROJECT', id: sale.sourceProjectId },
@@ -525,7 +526,7 @@ export const processStreamingUpcomingRightsWeek = (
                 projectId: sale.sourceProjectId,
                 productionId: sale.sourceProductionId,
                 headline: `${sale.title} moves to a later window`,
-                detail: `The canonical production schedule now points to absolute week ${releaseWeek}; contracted streaming availability follows in week ${plannedAvailabilityAbsoluteWeek}.`,
+                detail: `The canonical production schedule now points to absolute week ${releaseWeek}; contracted streaming availability follows in ${gameWeekText(plannedAvailabilityAbsoluteWeek)}.`,
                 evidence: [
                     { kind: 'PRODUCTION', id: sale.sourceProductionId },
                     { kind: 'PROJECT', id: sale.sourceProjectId },
@@ -556,7 +557,7 @@ export const processStreamingUpcomingRightsWeek = (
                 type: 'RIGHTS_NEGOTIATION',
                 sender: 'Content Market',
                 subject: `Bidding is open for ${sale.title}`,
-                text: `${sale.sellerName}'s live rights auction is open now. The saved agreement would become available from week ${sale.plannedAvailabilityAbsoluteWeek}.`,
+                text: `${sale.sellerName}'s live rights auction is open now. The saved agreement would become available from ${gameWeekText(sale.plannedAvailabilityAbsoluteWeek)}.`,
                 weekSent: (absoluteWeek % 52) + 1,
                 isRead: false,
                 data: {

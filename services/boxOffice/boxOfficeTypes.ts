@@ -180,6 +180,8 @@ export interface CinemaTitleMarketFacts {
     payoff: number;
     accessibility: number;
     urgency: number;
+    /** #275: pacing: how long interest lasts, 1 is unchanged */
+    interestHold?: number;
     /** Only a publicly known window can cause window-specific waiting. */
     streamingWindow?: { platformId: string; countryIds: readonly string[]; absoluteWeek: number; publiclyKnown: boolean };
     streamingWindows?:ReadonlyArray<NonNullable<CinemaTitleMarketFacts['streamingWindow']>>;

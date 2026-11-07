@@ -9,7 +9,10 @@ import {
 import {
     commitOwnedStreamingLaunch,
     getStreamingLaunchReadiness,
+    LAUNCH_ORIGINAL_DEMAND,
 } from '../services/streamingLaunch';
+import { getStreamingSlateWarnings, programStreamingLaunchSlate } from '../services/streamingOriginals';
+import { getStreamingHqSnapshot } from '../services/streamingHq';
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 import { getStreamingLaunchDefinitionSignature } from '../services/streamingLaunchProgram';
 
@@ -283,25 +286,60 @@ const underfunded: Player = {
 const underfundedResult = commitOwnedStreamingLaunch(underfunded, 'CLOUD_BURST');
 assert(!underfundedResult.changed && underfundedResult.reason === 'INSUFFICIENT_TREASURY', 'Unaffordable emergency capacity must fail without a partial launch.');
 
-const componentSource = readFileSync(resolve(process.cwd(), 'components/StreamingLaunchCommand.tsx'), 'utf8');
-const premiereSource = readFileSync(resolve(process.cwd(), 'components/streaming-transplant/StreamingPremiereExperience.tsx'), 'utf8');
+const premiereSource = readFileSync(resolve(process.cwd(), 'components/streaming-transplant/opening-night/LaunchControl.tsx'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
-const styleSource = readFileSync(resolve(process.cwd(), 'styles/streaming-launch.css'), 'utf8');
 const premiereStyleSource = readFileSync(resolve(process.cwd(), 'components/streaming-transplant/presentation/screens/PremiereNight/PremiereNight.module.css'), 'utf8');
-[
-    'Final readiness forecast',
-    'Fix in',
-    'Choose how the gates open.',
-    'DEMAND MAP',
-    'Commit platform launch',
-    'Result locks before the premiere cinematic begins.',
-    'COMMITTED RESULT',
-].forEach(fragment => assert(componentSource.includes(fragment), `Phase 8 UI should include ${fragment}.`));
 assert(hqSource.includes('<StreamingPremiereExperience'), 'Platform HQ should expose the transplanted Launch Command and premiere flow.');
 assert(hqSource.includes('onLaunch={commitCinematicLaunch}'), 'The transplanted launch control must commit through the canonical launch transaction.');
 assert(!hqSource.includes('StreamingLaunchCommand'), 'The legacy Launch Command must not re-enter the transplanted HQ flow.');
-assert(premiereSource.includes('disabled={!launchAllowed}'), 'Canonical readiness blockers must disable the transplanted launch control.');
-assert(styleSource.includes('@media (max-width: 620px)'), 'Launch Command should have a deliberate mobile layout.');
+assert(premiereSource.includes('disabled={!allowed || !pollDone || blockers > 0}'), 'Canonical readiness blockers must disable the transplanted launch control.');
 assert(premiereStyleSource.includes('@media (prefers-reduced-motion:reduce)'), 'Premiere animations should respect reduced-motion preferences.');
+
+// #276: a platform can open with no Original. A finished one makes a bigger opening.
+const noOriginalSave = (): Player => {
+    const base = createFixture();
+    const platform = base.ownedStreamingPlatform;
+    const third = { id: 'slate-action', projectId: 'catalog-action', title: 'Red Line', source: 'OWNED_LIBRARY', projectType: 'MOVIE', genre: 'ACTION', launchWeek: 1, releasePattern: 'SINGLE_PREMIERE', marketingPlan: 'EVENT' } as const;
+    const player: Player = {
+        ...base,
+        commitments: [],
+        pastProjects: [...base.pastProjects, { id: 'catalog-action', name: 'Red Line', studioId: 'producer-studio', projectType: 'MOVIE', genre: 'ACTION', imdbRating: 8.2 } as any],
+        ownedStreamingPlatform: {
+            ...platform,
+            originalCommissions: [],
+            milestoneKeys: platform.milestoneKeys.filter(key => key !== 'first-original-greenlit'),
+            catalogProjectIds: [...platform.catalogProjectIds, 'catalog-action'],
+            starterCatalog: { ...platform.starterCatalog!, ownedProjectIds: [...platform.starterCatalog!.ownedProjectIds, 'catalog-action'] },
+            launchSlate: { ...platform.launchSlate!, entries: [...platform.launchSlate!.entries.filter(entry => entry.source !== 'ORIGINAL'), third as any] },
+        },
+    };
+    return {
+        ...player,
+        ownedStreamingPlatform: {
+            ...player.ownedStreamingPlatform,
+            launchProgram: { ...player.ownedStreamingPlatform.launchProgram, lastBlueprintSignature: getStreamingLaunchDefinitionSignature(player) },
+        },
+    };
+};
+const noOriginal = noOriginalSave();
+const noOriginalReadiness = getStreamingLaunchReadiness(noOriginal);
+assert(noOriginalReadiness.items.find(item => item.id === 'original')?.tone === 'READY', 'No Original must not stop a launch.');
+assert(noOriginalReadiness.canLaunch, `Nothing else stops it: ${noOriginalReadiness.items.filter(item => item.tone === 'BLOCKED').map(item => item.id)}`);
+assert(!noOriginalReadiness.openingHasOriginal, 'It knows there is no Original.');
+assert(noOriginalReadiness.openingOriginalTitle === 'Red Line', `The night is led by the biggest title, got ${noOriginalReadiness.openingOriginalTitle}.`);
+assert(!getStreamingSlateWarnings(noOriginal, noOriginal.ownedStreamingPlatform.launchSlate!).some(warning => warning.severity === 'BLOCKER'), 'No Original is not a slate blocker.');
+const beforeCommission: Player = { ...noOriginal, ownedStreamingPlatform: { ...noOriginal.ownedStreamingPlatform, infrastructureSetup: null as any } };
+const noOriginalSlate = programStreamingLaunchSlate(beforeCommission, beforeCommission.ownedStreamingPlatform.launchSlate!);
+assert(noOriginalSlate.changed, `The slate locks with no Original: ${noOriginalSlate.reason}.`);
+assert(getStreamingHqSnapshot(noOriginal).checklist.find(item => item.id === 'ORIGINAL')?.complete, 'The checklist does not hold the launch back.');
+const noOriginalLaunch = commitOwnedStreamingLaunch(noOriginal, 'STANDARD');
+assert(noOriginalLaunch.changed && noOriginalLaunch.launchCommit?.openingOriginalTitle === 'Red Line', 'It launches, led by that title.');
+const originalLaunch = commitOwnedStreamingLaunch(createFixture(), 'STANDARD');
+assert(originalLaunch.changed, 'A finished Original still launches.');
+const sameSlateSize = (originalLaunch.launchCommit!.openingTitleCount - noOriginalLaunch.launchCommit!.openingTitleCount) * 4;
+assert(
+    originalLaunch.launchCommit!.openingDemandIndex - sameSlateSize - noOriginalLaunch.launchCommit!.openingDemandIndex === LAUNCH_ORIGINAL_DEMAND,
+    `A finished Original adds ${LAUNCH_ORIGINAL_DEMAND} to opening demand: ${originalLaunch.launchCommit!.openingDemandIndex} against ${noOriginalLaunch.launchCommit!.openingDemandIndex}.`,
+);
 
 console.log('Streaming launch Phase 8 audit passed.');

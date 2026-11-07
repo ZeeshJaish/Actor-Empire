@@ -10,6 +10,39 @@
   font-display: swap;
 }
 
+/* Display fonts of the Upcoming Packs pages */
+@font-face {
+  font-family: 'Special Elite';
+  src: url('/assets/fonts/actor-empire-special-elite-400.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/assets/fonts/actor-empire-cinzel-600-700.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 600 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Share Tech Mono';
+  src: url('/assets/fonts/actor-empire-share-tech-mono-400.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Covered By Your Grace';
+  src: url('/assets/fonts/actor-empire-covered-by-your-grace-400.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 @font-face {
   font-family: 'Archivo';
   src: url('/assets/fonts/actor-empire-archivo-500.woff2') format('woff2');

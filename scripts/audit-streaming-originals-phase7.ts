@@ -287,18 +287,10 @@ assert(lockedSlate.player.ownedStreamingPlatform.launchSlate?.entries.length ===
 assert(lockedSlate.player.ownedStreamingPlatform.milestoneKeys.includes('launch-slate-programmed'), 'Locking should complete the Phase 7 slate milestone.');
 
 const hqSource = readFileSync('components/StreamingPlatformHQ.tsx', 'utf8');
-const commissioningSource = readFileSync('components/StreamingOriginalCommissioning.tsx', 'utf8');
 const slateSource = readFileSync('components/StreamingSlatePlanner.tsx', 'utf8');
 const productionSource = readFileSync('views/lifestyle/business/ProductionHouseGame.tsx', 'utf8');
 const styleSource = readFileSync('styles/streaming-hq.css', 'utf8');
 const contentStyleSource = readFileSync('styles/streaming-content-workspaces.css', 'utf8');
-[
-    'COMMISSION ORIGINAL',
-    'Choose who physically makes it.',
-    'Commissioner / rights holder',
-    'Physical producer',
-    'Approve & open Greenlight',
-].forEach(fragment => assert(commissioningSource.includes(fragment), `Commissioning UI should include ${fragment}.`));
 [
     'Twelve-week launch slate',
     'CONTENT-GAP MONITOR',
@@ -308,8 +300,6 @@ const contentStyleSource = readFileSync('styles/streaming-content-workspaces.css
 ].forEach(fragment => assert(slateSource.includes(fragment), `Slate UI should include ${fragment}.`));
 assert(hqSource.includes('FIRST_ORIGINAL_ANNOUNCEMENT'), 'HQ should render the canonical first Original cutscene.');
 assert(productionSource.includes('initialStreamingOriginal'), 'Production House should accept the streaming commission handoff.');
-assert(commissioningSource.includes('className="oc streaming-content-workspace"'), 'Original commissioning should use the ZIP control-room presentation.');
-assert(contentStyleSource.includes('.ocstats'), 'Original commissioning should retain the ZIP stat-strip grammar.');
 assert(contentStyleSource.includes('max-width: 520px'), 'Original commissioning should retain the ZIP mobile frame.');
 assert(styleSource.includes('grid-template-columns: repeat(12'), 'The slate should render a real twelve-week timeline.');
 assert(styleSource.includes('100dvh'), 'Phase 7 workspaces should use mobile-safe dynamic viewport height.');

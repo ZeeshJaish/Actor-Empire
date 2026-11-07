@@ -11,6 +11,8 @@ import { applyInvestorPayoutMemory, calculateInvestorPayout } from '../../servic
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS } from '../../services/streamingFundingLogic';
+import { weekOfYear } from '../../services/gameWeek';
+import { holdStreamingWindowForCinema } from '../../services/streamingCinemaHold';
 const ts: typeof import('typescript') = createRequire(process.cwd() + '/package.json')('typescript');
 const source = readFileSync('views/lifestyle/business/ReleaseWizard.tsx', 'utf8');
 const ast = ts.createSourceFile('ReleaseWizard.tsx', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX);
@@ -28,14 +30,14 @@ export function signThroughReleaseHandler(player: Player, project: any, session:
     let result: Player | undefined, message: string | undefined;
     const noop = () => {};
     const deps: Record<string, any> = { ...bidding, ...rights, quoteSeriesStreamingRights, quoteCinemaRightsForBuyer, resolveStreamingPlatformBrandById,
-        applyInvestorPayoutMemory, calculateInvestorPayout, spendPlayerEnergy, getAbsoluteWeek, PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS,
+        applyInvestorPayoutMemory, calculateInvestorPayout, spendPlayerEnergy, getAbsoluteWeek, PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS, weekOfYear, holdStreamingWindowForCinema,
         player, project, studio: player.businesses.find(b => b.id === project.projectDetails?.studioId), session, offer,
         isSeries: project.projectDetails?.type === 'SERIES', hasStreamingDealEnergy: true, streamingDealEnergyCost: PHASE_ONE_ENERGY_COSTS.STREAMING_DEAL_ACCEPT,
         biddingRightsStartWeek: session.rightsLot.startsAtAbsoluteWeek, isPostTheatricalBidding: false,
         selectedPlatform: null, selectedStreamingPlatformIds: [], selectedStreamingContractIds: [],
         setBiddingRightsMessage: (m: string) => { message = m; }, setSelectedPlatform: noop,
         setSelectedStreamingPlatformIds: noop, setSelectedStreamingContractIds: noop, setCommitmentState: noop,
-        setLockedPremiereAbsoluteWeek: noop, setReleaseWeek: noop, setBiddingSession: noop, setStep: noop,
+        setLockedPremiereAbsoluteWeek: noop, setReleaseWeek: noop, setBiddingSession: noop, setStep: noop, setFirstNegotiationDone: noop,
         tr: (key: string) => key, buildReleasePlanningDraft: () => ({ projectId: project.id, version: 1 }),
         lastPersistedDraftRef: { current: '' }, releaseDraftClearedRef: { current: false }, onComplete: noop,
         onUpdatePlayer: (p: Player) => { result = p; }, captured: () => ({ player: result, message }) };

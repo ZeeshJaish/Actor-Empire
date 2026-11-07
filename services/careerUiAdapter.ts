@@ -3,6 +3,7 @@ import { getAbsoluteWeek, getElapsedWeeks } from './legacyLogic';
 import { deriveOwnedProductionCareerItems, getPlayerActingCommitments } from './ownedProductionCareer';
 import { getBuzzLabel } from './roleLogic';
 import { hasCareerRehearsalLearning } from './actorCareerBalance';
+import { getCareerProjects } from './outsideOriginals';
 
 export type CareerUiStage = 'audition' | 'development' | 'prep' | 'shooting' | 'promo' | 'upcoming';
 
@@ -212,7 +213,7 @@ export const buildCareerUiModel = (player: Player): CareerUiModel => ({
   title: 'Career Profile',
   playerName: player.name,
   reputation: Number(player.stats.reputation || 0),
-  credits: (player.pastProjects || []).filter(project => project.type === 'ACTING_GIG').length,
+  credits: getCareerProjects(player).filter(project => project.type === 'ACTING_GIG').length,
   energy: Math.max(0, Number(player.energy.current || 0)),
   projects: getPlayerActingCommitments(player.commitments)
     .map(commitment => mapCommitment(player, commitment))

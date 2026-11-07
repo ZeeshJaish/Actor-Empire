@@ -482,8 +482,7 @@ export const resolveShareholderVote = (
             news: [newsItem, ...(player.news || [])].slice(0, 80),
             inbox: (player.inbox || []).filter(message => message.data?.voteId !== voteId),
             pendingEvents: (player.pendingEvents || []).filter(event => event.data?.voteId !== voteId),
-            logs: [
-                {
+            logs: [...(player.logs || []), {
                     week: player.currentWeek,
                     year: player.age,
                     message: t(language, 'services.shareholder.log.resolved', {
@@ -491,9 +490,7 @@ export const resolveShareholderVote = (
                         vote: t(language, selectedVote === 'FOR' ? 'services.shareholder.value.for' : 'services.shareholder.value.against'),
                     }),
                     type: passed ? 'positive' as const : 'neutral' as const,
-                },
-                ...(player.logs || []),
-            ].slice(0, 50),
+                }],
         },
     };
 };

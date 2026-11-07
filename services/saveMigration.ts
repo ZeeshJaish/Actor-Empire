@@ -68,12 +68,15 @@ import { normalizePlayerProfileAvatars } from './profileAvatar';
 import { normalizeWorldAudienceEconomyState } from './worldEconomy/worldAudienceCohorts';
 import { normalizeWorldAudienceParticipationState } from './worldEconomy/worldAudienceParticipation';
 import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
-import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
-import { normalizeWorldStreamingAudienceChoiceState } from './worldEconomy/worldStreamingAudienceChoice';
+import { normalizeWorldStreamingCompetitionState, isThisWeeksWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
+import { normalizeWorldStreamingAudienceChoiceState, isThisWeeksWorldStreamingAudienceChoiceState } from './worldEconomy/worldStreamingAudienceChoice';
 import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
 import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
 import { normalizeWorldStreamingPlatformEconomyState } from './worldEconomy/worldStreamingPlatformEconomy';
 import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyIntegrity';
+
+import { healCopiedEpisodeRatings } from './seriesIdentity';
+import { advanceOriginalPitches } from './originalsPitches';
 
 export const SAVE_MIGRATION_VERSION = 53;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
@@ -163,6 +166,36 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> => (
     && typeof value === 'object'
     && !Array.isArray(value)
 );
+
+/* #256: an update from a screen starts from a live save that was already migrated, and most of a 35 MB company is the same objects it was a moment ago. Copying and
+   re-reading those was 200-300 ms on every tap in the studio and the wizards. What came out of a migration or the week is marked settled; while a slice is still that
+   same object, a screen's update passes it through. A load and the week read everything, so nothing can stay unrepaired past the week it happened in. */
+const settled = new WeakSet<object>();
+const isSettled = (value: unknown): boolean => Boolean(value) && typeof value === 'object' && settled.has(value as object);
+const markSettled = (value: unknown) => {
+    if (value && typeof value === 'object') settled.add(value as object);
+};
+export const markPlayerSettled = <T extends Pick<Player, 'world' | 'ownedStreamingPlatform'>>(player: T): T => {
+    markSettled(player.ownedStreamingPlatform);
+    Object.values(player.world || {}).forEach(markSettled);
+    return player;
+};
+/* the simulation's biggest slices: 27 MB, written only by the week, not in the defaults: a screen never needs its own copy, settled or not */
+const WORLD_SLICES_A_SCREEN_NEVER_WRITES: readonly string[] = [
+    'worldStreamingViewing', 'worldStreamingCustomers', 'worldAudienceEconomy', 'worldAudienceParticipation',
+    'streamingPlatformEcosystem', 'worldStreamingAudienceChoice', 'worldStreamingPlatformEconomy',
+];
+const setAsideWhatAScreenDidNotTouch = (input: Partial<Player> | Player) => {
+    const world = { ...(input.world || {}) } as Record<string, unknown>;
+    const kept: Record<string, unknown> = {};
+    Object.keys(world).forEach(key => {
+        if (world[key] === undefined || (!isSettled(world[key]) && !WORLD_SLICES_A_SCREEN_NEVER_WRITES.includes(key))) return;
+        kept[key] = world[key];
+        delete world[key];
+    });
+    const platform = isSettled(input.ownedStreamingPlatform) ? input.ownedStreamingPlatform : undefined;
+    return { rest: { ...input, world, ...(platform ? { ownedStreamingPlatform: undefined } : {}) } as unknown as Partial<Player>, kept, platform };
+};
 
 const mergeDefaults = <T,>(defaults: T, incoming: unknown): T => {
     if (incoming === undefined || incoming === null) return clone(defaults);
@@ -1060,7 +1093,11 @@ const withCinemaMigration = (player: Player): Player => {
         ? { ...migrated, commitments, activeReleases } : migrated);
     return migrateBuiltinNames(synchronized);
 };
-export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
+export const migratePlayerSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean } = {}): Player => (
+    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : advanceOriginalPitches(healCopiedEpisodeRatings(migrateSave(input, options))))
+);
+
+const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean }): Player => {
     const stockContainerIssues = inspectStockSaveContainers(input);
     if (stockContainerIssues.length) throw new StockSaveRecoveryError(stockContainerIssues, input);
     const cinemaErrors=inspectCinemaSavedState(input.world?.cinemaMarket);
@@ -1069,7 +1106,13 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     for(const release of input.activeReleases || [])if(badMoney(release.totalGross)||badMoney(release.totalStudioReceipts)||badMoney(release.budget))cinemaErrors.push('CINEMA_LEGACY_FINANCE_CORRUPT');
     for(const project of input.world?.projects || [])if(badMoney(project.boxOffice))cinemaErrors.push('CINEMA_LEGACY_FINANCE_CORRUPT');
     if(cinemaErrors.length)throw new CinemaMigrationError(cinemaErrors);
-    const base: Player = mergeDefaults(INITIAL_PLAYER, input);
+    const screenUpdate = options.fromScreen ? setAsideWhatAScreenDidNotTouch(input) : null;
+    const merged: Player = mergeDefaults(INITIAL_PLAYER, screenUpdate ? screenUpdate.rest : input);
+    const base: Player = screenUpdate
+        ? { ...merged, world: { ...merged.world, ...screenUpdate.kept }, ...(screenUpdate.platform ? { ownedStreamingPlatform: screenUpdate.platform } : {}) }
+        : merged;
+    /* a slice a screen did not touch */
+    const untouched = (value: unknown) => Boolean(options.fromScreen) && isSettled(value);
     const protectedPlatformAiExternalMoveIds = new Set<string>();
     Object.values(base.world?.platforms || {}).forEach(platform => {
         toArray<{ moveId?: unknown }>(platform?.ai?.externalCommitments).forEach(commitment => {
@@ -1091,7 +1134,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         base.world?.industryProductions,
         migratedAbsoluteWeek,
     );
-    const migratedIndustryEvents = normalizeIndustryEventLedger(base.world?.industryEvents);
+    const migratedIndustryEvents = untouched(base.world?.industryEvents) ? base.world!.industryEvents! : normalizeIndustryEventLedger(base.world?.industryEvents);
     const migratedWorldPopulation = normalizeWorldPopulationState(
         base.world?.worldPopulation,
         migratedAbsoluteWeek,
@@ -1126,7 +1169,9 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
                 industryProductions: migratedIndustryProductions,
             }, migratedAbsoluteWeek, 12),
             industryEvents: migratedIndustryEvents,
-            industryMedia: base.world?.industryMedia
+            industryMedia: untouched(base.world?.industryMedia) && untouched(base.world?.industryEvents)
+                ? base.world!.industryMedia!
+                : base.world?.industryMedia
                 ? reconcileIndustryMediaWorldWithEvents(base.world.industryMedia, migratedIndustryEvents)
                 : normalizeIndustryMediaWorld(undefined),
             worldPopulation: migratedWorldPopulation,
@@ -1146,7 +1191,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         portfolio: migrateStockPortfolio(base.portfolio as Partial<PortfolioItem>[] | undefined, stocks),
         shareholderVotes: toArray<any>(base.shareholderVotes).filter(vote => stocks.some(stock => stock.id === vote?.stockId)).slice(0, 24),
         stockTakeovers: migrateTakeovers(base.stockTakeovers as Partial<StockTakeoverCase>[] | undefined, stocks, base),
-        ownedStreamingPlatform: normalizeOwnedStreamingPlatformState(
+        ownedStreamingPlatform: untouched(base.ownedStreamingPlatform) ? base.ownedStreamingPlatform : normalizeOwnedStreamingPlatformState(
             base.ownedStreamingPlatform,
             String(base.id || INITIAL_PLAYER.id),
             protectedPlatformAiExternalMoveIds,
@@ -1171,7 +1216,8 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         relationships: (toObjectSeries<any>(base.relationships).length > 0
             ? toObjectSeries<any>(base.relationships) : clone(INITIAL_PLAYER.relationships))
             .map((relationship, index) => normalizeRelationship(relationship, index, migratedAge, migratedCurrentWeek)),
-        logs: toArray<any>(base.logs).slice(0, 50),
+        /* #256: a new line goes at the end (#244), so the last 50: this was dropping it from any screen's update once the log was full */
+        logs: toArray<any>(base.logs).slice(-50),
         assetStates: toArray<any>(base.assetStates)
             .filter((state) => typeof state?.assetId === 'string')
             .map((state) => ({
@@ -1195,7 +1241,8 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         activeHealthConditions: toArray<any>(base.activeHealthConditions).slice(0, 6),
     };
     const platformAiAbsoluteWeek = getAbsoluteWeek(playerWithStocks.age, playerWithStocks.currentWeek);
-    const normalizedPlatformAiWorld = normalizeWorldPlatformAi(
+    const platformsUntouched = untouched(playerWithStocks.world?.platforms);
+    const normalizedPlatformAiWorld = platformsUntouched ? playerWithStocks.world : normalizeWorldPlatformAi(
         playerWithStocks,
         playerWithStocks.world,
         platformAiAbsoluteWeek,
@@ -1206,7 +1253,7 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
     const acquiredPlatformIds = new Set(
         playerWithStocks.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds || [],
     );
-    const externallyValidatedPlatforms = normalizedPlatformAiWorld.platforms
+    const externallyValidatedPlatforms = !platformsUntouched && normalizedPlatformAiWorld.platforms
         ? Object.fromEntries(Object.entries(normalizedPlatformAiWorld.platforms).map(([platformId, platform]) => {
             if (!platform.ai || acquiredPlatformIds.has(platform.id)) return [platformId, platform];
             const externalCommitments = normalizePlatformAiExternalCommitments(
@@ -1242,10 +1289,12 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
                 playerWithNormalizedPlatformAiWorld,
                 platformAiAbsoluteWeek,
             ),
-            streamingPlatformEcosystem: normalizeStreamingPlatformEcosystem(
-                playerWithNormalizedPlatformAiWorld.streamingPlatformEcosystem,
-                platformAiAbsoluteWeek,
-            ),
+            streamingPlatformEcosystem: options.fromScreen && playerWithNormalizedPlatformAiWorld.streamingPlatformEcosystem
+                ? playerWithNormalizedPlatformAiWorld.streamingPlatformEcosystem
+                : normalizeStreamingPlatformEcosystem(
+                    playerWithNormalizedPlatformAiWorld.streamingPlatformEcosystem,
+                    platformAiAbsoluteWeek,
+                ),
             streamingBiddingSessions: normalizeStreamingBiddingSessionRegistry(
                 playerWithNormalizedPlatformAiWorld.streamingBiddingSessions,
             ),
@@ -1290,23 +1339,27 @@ export const migratePlayerSave = (input: Partial<Player> | Player): Player => {
         ...playerWithStreamingRightsCalendar,
         world: {
             ...playerWithStreamingRightsCalendar.world,
-            worldStreamingCompetition: normalizeWorldStreamingCompetitionState(
-                base.world?.worldStreamingCompetition,
-                playerWithStreamingRightsCalendar,
-                migratedAbsoluteWeek,
-            ),
+            worldStreamingCompetition: options.fromScreen && isThisWeeksWorldStreamingCompetitionState(base.world?.worldStreamingCompetition, migratedAbsoluteWeek)
+                ? base.world!.worldStreamingCompetition!
+                : normalizeWorldStreamingCompetitionState(
+                    base.world?.worldStreamingCompetition,
+                    playerWithStreamingRightsCalendar,
+                    migratedAbsoluteWeek,
+                ),
         },
     };
     const playerWithWorldStreamingCustomers: Player = {
         ...playerWithWorldStreamingCompetition,
         world: {
             ...playerWithWorldStreamingCompetition.world,
-            worldStreamingAudienceChoice: normalizeWorldStreamingAudienceChoiceState(
-                base.world?.worldStreamingAudienceChoice,
-                playerWithWorldStreamingCompetition,
-                migratedAbsoluteWeek,
-            ),
-            worldStreamingCustomers: normalizeWorldStreamingCustomerState(
+            worldStreamingAudienceChoice: options.fromScreen && isThisWeeksWorldStreamingAudienceChoiceState(base.world?.worldStreamingAudienceChoice, migratedAbsoluteWeek)
+                ? base.world!.worldStreamingAudienceChoice!
+                : normalizeWorldStreamingAudienceChoiceState(
+                    base.world?.worldStreamingAudienceChoice,
+                    playerWithWorldStreamingCompetition,
+                    migratedAbsoluteWeek,
+                ),
+            worldStreamingCustomers: untouched(base.world?.worldStreamingCustomers) ? base.world!.worldStreamingCustomers! : normalizeWorldStreamingCustomerState(
                 base.world?.worldStreamingCustomers,
                 playerWithWorldStreamingCompetition,
                 migratedAbsoluteWeek,

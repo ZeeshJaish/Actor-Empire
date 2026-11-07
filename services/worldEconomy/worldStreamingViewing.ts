@@ -1,3 +1,5 @@
+import { getPacingEffect } from '../greenlightSetupEffects';
+import { getSeasonEffects } from '../originalsEpisodeBudget';
 import { createCinemaViewingRouteLookup } from '../boxOffice/boxOfficeViewingRoutes';
 import { resolveStreamingProductionReadiness } from '../streamingProductionReadiness';
 import { allocateCinemaStreamingEvidence, cinemaStreamingInterestWeight, cinemaStreamingLanguageReady, type CinemaStreamingAudienceEvidence } from '../boxOffice/boxOfficeStreamingAudience';
@@ -108,7 +110,15 @@ const hasOnlyFiniteNonNegativeNumbers = (value: unknown): boolean => {
     return true;
 };
 
+/* #256: a state is only ever replaced whole, so one read as valid this week need not be read again: this runs on every update from a screen */
+const readAsValidAtWeek = new WeakMap<object, number>();
 const isValidViewingState = (input: WorldStreamingViewingState | undefined, absoluteWeek: number): boolean => {
+    if (input && readAsValidAtWeek.get(input) === absoluteWeek) return true;
+    const valid = readViewingState(input, absoluteWeek);
+    if (valid && input) readAsValidAtWeek.set(input, absoluteWeek);
+    return valid;
+};
+const readViewingState = (input: WorldStreamingViewingState | undefined, absoluteWeek: number): boolean => {
     if (!input
         || input.schemaVersion !== WORLD_STREAMING_VIEWING_SCHEMA_VERSION
         || input.lastProcessedAbsoluteWeek !== absoluteWeek
@@ -670,6 +680,9 @@ const PERSONA_GENRE_AFFINITY: Record<string, string[]> = {
     HABIT_STREAMERS: ['MYSTERY', 'CRIME', 'COMEDY', 'DRAMA'],
 };
 
+/** #280: what each kind of viewer likes, for the paid Audience report */
+export const getWorldStreamingGenreAffinity = (): Record<string, string[]> => PERSONA_GENRE_AFFINITY;
+
 interface ViewingCandidate {
     entry: OwnedStreamingSlateEntry;
     quality: number;
@@ -680,6 +693,9 @@ interface ViewingCandidate {
     runtimeHours: number;
     weeksAvailable: number;
     ownedLibrary: boolean;
+    /** #275: pacing: the first four weeks' viewers, and how well they stay */
+    pacingPull?: number;
+    pacingHold?: number;
 }
 
 export const resolveStreamingViewingProjectFacts = (player: Player, entry: OwnedStreamingSlateEntry, programWeek: number): ViewingCandidate => {
@@ -709,10 +725,18 @@ export const resolveStreamingViewingProjectFacts = (player: Player, entry: Owned
         100,
     );
     const rating = clamp(Number.isFinite(rawRating) ? rawRating : quality / 10, 0, 10);
+    const made = (player.activeReleases || []).find(release => String(release.id) === entry.projectId) as any || runtimeRaw;
+    const pacing = getPacingEffect(made?.projectDetails || made);
+    /* #286: a season's bars: the opening pulls, the middle keeps. The finale's hype belongs to Season 2 */
+    const season = getSeasonEffects(made?.projectDetails?.episodeBudgetShares || made?.episodeBudgetShares);
+    /* #292: and the last season's finale brought people back for this one's first weeks */
+    const lastSeasonHype = Number(made?.projectDetails?.hiddenStats?.previousSeasonHype ?? made?.previousSeasonHype ?? 0);
     return {
         entry,
         quality,
         rating,
+        pacingPull: pacing.pull + season.pull + lastSeasonHype,
+        pacingHold: pacing.hold + season.keep,
         originalLanguageId: normalizeStreamingLanguageId(raw.originalLanguageId || raw.language || 'english'),
         isFamous: Boolean(raw.isFamous || Number(raw.boxOffice || raw.gross || 0) >= 150_000_000),
         hasUniverse: Boolean(raw.universeId || raw.franchiseId),
@@ -772,6 +796,7 @@ const scoreCandidate = (
     const marketingFit = candidate.entry.marketingPlan === 'EVENT' ? 1.22 : candidate.entry.marketingPlan === 'STANDARD' ? 1.1 : 1;
     const freshness = clamp(1.28 - Math.max(0, candidate.weeksAvailable - 1) * .055, .58, 1.28);
     const weeklyLift = candidate.entry.releasePattern === 'WEEKLY' && candidate.weeksAvailable <= 8 ? 1.14 : 1;
+    const pacingFit = 1 + (candidate.weeksAvailable <= 4 ? candidate.pacingPull || 0 : candidate.pacingHold || 0);
     const recommendationLevel = clamp(platform.technologyLevels.DATA_RECOMMENDATIONS || 0, 0, 10);
     const recommendationFit = 1 + recommendationLevel * .018;
     const growthAction = platform.growthActions.find(action => action.status === 'LOCKED'
@@ -784,7 +809,7 @@ const scoreCandidate = (
     const variance = .94 + rng() * .12;
     return {
         score: Math.max(.01, qualityFit * genreFit * languageFit * prestigeFit * fandomFit * marketingFit
-            * freshness * weeklyLift * recommendationFit * growthFit * campaignFit * reliability * variance
+            * freshness * weeklyLift * pacingFit * recommendationFit * growthFit * campaignFit * reliability * variance
             * cinemaStreamingInterestWeight(player,candidate.entry.projectId,countryId,absoluteWeek)),
         languageFit,
         native: language.native,
@@ -1148,7 +1173,7 @@ const buildViewingState = (
                 const completionRate = roundRate(clamp(
                     .3 + candidate.quality * .005 + score.languageFit * .13
                     + (candidate.entry.projectType === 'MOVIE' ? .04 : 0)
-                    - Math.max(0, candidate.runtimeHours - 3) * .02 + (rng() - .5) * .06 + smartAi.completionLift,
+                    - Math.max(0, candidate.runtimeHours - 3) * .02 + (rng() - .5) * .06 + smartAi.completionLift + (candidate.pacingHold || 0),
                     .2,
                     .96,
                 ));

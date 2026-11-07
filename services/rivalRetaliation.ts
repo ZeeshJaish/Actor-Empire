@@ -475,7 +475,7 @@ export const processRivalRetaliation = (player: Player): Player => {
                 feed: [xPost, ...(withCounterBid.player.x?.feed || []).filter(post => post.id !== xPost.id)].slice(0, 80),
             }
             : withCounterBid.player.x,
-        logs: [...(shouldLog ? [{
+        logs: [...(withCounterBid.player.logs || []), ...(shouldLog ? [{
             week: player.currentWeek,
             year: player.age,
             message: t(language, state.defensiveAllianceCount === 1
@@ -485,6 +485,6 @@ export const processRivalRetaliation = (player: Player): Player => {
                 alliances: state.defensiveAllianceCount,
             }),
             type: state.retaliationScore >= 65 ? 'negative' as const : 'neutral' as const,
-        }] : []), ...(withCounterBid.player.logs || [])].slice(0, 50),
+        }] : [])],
     };
 };

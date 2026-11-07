@@ -8,6 +8,7 @@ import type {
 import { createDeterministicId } from './deterministicRandom';
 import { applyPublicistMediaModifier, normalizeIndustryMediaWorld } from './industryWorld';
 import { appendCinemaExposureEvent } from './boxOffice/boxOfficeAwareness';
+import { isOutsideOriginal } from './outsideOriginals';
 
 const ELIGIBLE_PHASES = new Set<Commitment['projectPhase']>([
     'PLANNING', 'PRE_PRODUCTION', 'PRODUCTION', 'POST_PRODUCTION', 'SCHEDULED', 'AWAITING_RELEASE',
@@ -26,7 +27,7 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 );
 
 export const getEligiblePromotionProjects = (player: Player): Commitment[] => (
-    player.commitments.filter(item => (ELIGIBLE_TYPES.has(item.type) || (item.type === 'JOB' && item.projectDetails?.type === 'MOVIE')) && ELIGIBLE_PHASES.has(item.projectPhase))
+    player.commitments.filter(item => (ELIGIBLE_TYPES.has(item.type) || (item.type === 'JOB' && item.projectDetails?.type === 'MOVIE')) && ELIGIBLE_PHASES.has(item.projectPhase) && !isOutsideOriginal(item))
 );
 
 export interface ApplyProjectPromotionAttributionInput {

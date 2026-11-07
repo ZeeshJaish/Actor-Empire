@@ -1,3 +1,4 @@
+import { getGearLineQuality, getGearQuality } from '../../../../services/greenlightSetupEffects';
 import React from 'react';
 import { type StudioEquipment } from '../../../../types';
 import { getEquipmentStageName } from '../FacilitiesView';
@@ -15,7 +16,7 @@ export const GREENLIGHT_GEAR_TIERS: Record<string, {
     TIER_5: { name: 'Cutting-Edge', desc: 'Experimental tech and massive setups.', cost: 8_500_000, quality: 30 },
 };
 
-const GEAR_CATEGORIES = [
+export const GEAR_CATEGORIES = [
     {
         id: 'cameras',
         name: 'Camera Rigs',
@@ -87,6 +88,13 @@ export const GreenlightEquipmentStep: React.FC<GreenlightEquipmentStepProps> = (
         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-6 shadow-lg">
             <h2 className="text-xl font-bold text-white mb-2">Equipment & Gear</h2>
             <p className="text-zinc-400 text-sm">Rent gear or use your studio&apos;s owned equipment to boost quality.</p>
+            <div data-gear-total className="mt-3 flex items-center justify-between rounded-lg bg-black/30 px-3 py-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">All four lines add</span>
+                <span className="font-mono text-sm font-black text-emerald-300">+{(Math.round(getGearQuality(GEAR_CATEGORIES.reduce((sum, gear) => {
+                    const choice = choices[gear.id];
+                    return sum + (choice === 'OWNED' ? studioEquipment?.[gear.id as keyof StudioEquipment] || 0 : GREENLIGHT_GEAR_TIERS[choice]?.quality || 0);
+                }, 0) / 4) * 10) / 10).toFixed(1)} quality</span>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -117,7 +125,7 @@ export const GreenlightEquipmentStep: React.FC<GreenlightEquipmentStepProps> = (
                                         Level {ownedLevel} ({getEquipmentStageName(gear.id, ownedLevel)})
                                     </div>
                                     <div className="text-[10px] text-emerald-400 font-bold mt-0.5">
-                                        Quality +{ownedLevel * 3}
+                                        Quality +{getGearLineQuality(ownedLevel)}
                                     </div>
                                 </div>
                                 <div className="text-right">
@@ -161,7 +169,7 @@ export const GreenlightEquipmentStep: React.FC<GreenlightEquipmentStepProps> = (
                                             <div className="font-bold text-sm">{specificData.name}</div>
                                             <div className="text-[10px] opacity-80">{specificData.desc}</div>
                                             <div className={`text-[10px] ${colorClass} font-bold mt-0.5`}>
-                                                Quality +{tierData.quality}
+                                                Quality +{getGearLineQuality(tierData.quality)}
                                             </div>
                                         </div>
                                         <div className="text-right">

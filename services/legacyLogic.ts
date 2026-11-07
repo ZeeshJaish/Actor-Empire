@@ -3,6 +3,7 @@ import { rebaseWorldForLegacy } from './legacyWorldClock';
 import { rebaseStudioSaleHistoryForInheritance } from './studioSaleHistory';
 import { ActorSkills, BloodlineMember, NPCActor, Player, PortfolioItem, Relationship, StreamingState, UniverseId, ProjectType } from '../types';
 import { buildDynastySuccessionState } from './dynastyCareer';
+import { getCareerProjects, isOutsideOriginal } from './outsideOriginals';
 
 export const LEGACY_MIN_PLAYABLE_AGE = 18;
 export const LEGACY_INHERITANCE_TAX_RATE = 0.25;
@@ -297,7 +298,7 @@ export const buildLegacyStudioInheritance = (
         .filter((business: any) => business?.type === 'PRODUCTION_HOUSE' && business?.id)
         .map((business: any) => String(business.id));
     const studioIdSet = new Set(studioIds);
-    const legacyCareerPastProjects = (player.pastProjects || [])
+    const legacyCareerPastProjects = getCareerProjects(player)
         .map(project => ({
             ...rewritePlayerSelfReferencesForLegacyParent(project, parentActor),
             isLegacyCareerProject: true,
@@ -327,7 +328,8 @@ export const buildLegacyStudioInheritance = (
                 : release
         ));
     const inheritedStudioCommitments = (player.commitments || [])
-        .filter((commitment: any) => commitment?.projectDetails?.studioId && studioIdSet.has(String(commitment.projectDetails.studioId)))
+        /* #288: the platform is inherited, so what another studio is making for it comes along */
+        .filter((commitment: any) => isOutsideOriginal(commitment) || (commitment?.projectDetails?.studioId && studioIdSet.has(String(commitment.projectDetails.studioId))))
         .map(commitment => {
             const inherited = rewritePlayerSelfReferencesForLegacyParent(commitment, parentActor);
             return typeof options.heirAge === 'number' && inherited.projectDetails
@@ -335,7 +337,7 @@ export const buildLegacyStudioInheritance = (
                 : inherited;
         });
     const legacyPastProjects = (player.pastProjects || [])
-        .filter((project: any) => project?.studioId && studioIdSet.has(String(project.studioId)))
+        .filter((project: any) => isOutsideOriginal(project) || (project?.studioId && studioIdSet.has(String(project.studioId))))
         .map(project => toLegacyStudioProject(project, parentActor, 'PAST'));
     const legacyActiveProjects = (player.activeReleases || [])
         .filter((release: any) => release?.projectDetails?.studioId && studioIdSet.has(String(release.projectDetails.studioId)))
@@ -508,7 +510,7 @@ export const createBloodlineSnapshot = (player: Player): BloodlineMember => {
         name: player.name,
         finalAge: player.age,
         netWorth: player.money,
-        moviesMade: player.pastProjects.length,
+        moviesMade: getCareerProjects(player).length,
         awards: player.awards?.length || 0,
         generation: getGenerationNumber(player),
         avatar: player.avatar,
@@ -528,7 +530,7 @@ export const calculateDynastyScore = (player: Player): number => {
     return bloodlineScore + calculateLegacyScore({
         netWorth: player.money,
         awards: player.awards?.length || 0,
-        moviesMade: player.pastProjects.length,
+        moviesMade: getCareerProjects(player).length,
         peakFame: player.stats.fame,
         businessCount: player.businesses?.length || 0,
     });
@@ -536,7 +538,7 @@ export const calculateDynastyScore = (player: Player): number => {
 
 export const getLegacyArchetype = (player: Player): string => {
     const awards = player.awards?.length || 0;
-    const projects = player.pastProjects.length;
+    const projects = getCareerProjects(player).length;
     const businesses = player.businesses?.length || 0;
     const fame = player.stats.fame || 0;
     const reputation = player.stats.reputation || 0;
@@ -558,7 +560,7 @@ export const getLegacyObituary = (player: Player): string => {
     const archetype = getLegacyArchetype(player).toLowerCase();
     const awards = player.awards?.length || 0;
     const businesses = player.businesses?.length || 0;
-    const projects = player.pastProjects.length;
+    const projects = getCareerProjects(player).length;
     const dynasty = calculateDynastyScore(player);
     const abandonedChildren = player.flags?.abandonedChildIds?.length || 0;
 

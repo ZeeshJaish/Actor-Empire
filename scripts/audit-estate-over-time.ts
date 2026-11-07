@@ -77,10 +77,9 @@ const main = async () => {
     /* ── a wallet too thin: warned, then shares ── */
     const thin: Player = { ...later(heir, 11), money: 1_000_000 };
     const warned = queueStreamingDecisionEvents({ ...thin, pendingEvents: [] }, getAbsoluteWeek(thin.age, thin.currentWeek));
-    const warning = events(warned).find(data => data!.kind === 'ESTATE_SHORT')!;
-    assert.ok(warning, 'two weeks before: a popup');
-    assert.match(getStreamingDecisionView(warned, warning)!.title, /is due in 2 weeks/);
-    assert.equal(getStreamingDecisionView({ ...warned, money: 5_000_000_000 }, warning), null, 'filled in time, it closes');
+    /* #247: nothing to choose in it, so a line in the activity log, not a popup */
+    assert.equal(events(warned).find(data => data!.kind === 'ESTATE_SHORT'), undefined, 'two weeks before: no popup');
+    assert.match(warned.logs.at(-1)!.message, /is due in 2 weeks/, 'a line in the log');
     const shortPlayer = { ...later(heir, 13), money: 1_000_000 };
     const forced = processStreamingEstatePlanWeek(shortPlayer);
     const forcedPlan = platformOf(forced).governance.estatePlan!;
@@ -89,9 +88,9 @@ const main = async () => {
     assert.ok(forcedPlan.lastSold && forcedPlan.lastSold.amount === plan.quarterly - 1_000_000);
     assert.ok(platformOf(forced).governance.boardConfidence < platformOf(heir).governance.boardConfidence, 'the board marks it');
     const told = queueStreamingDecisionEvents({ ...forced, pendingEvents: [] }, getAbsoluteWeek(forced.age, forced.currentWeek));
-    const soldEvent = events(told).find(data => data!.kind === 'ESTATE_SOLD')!;
-    assert.match(getStreamingDecisionView(told, soldEvent)!.title, /% of your shares were sold/);
-    pass(`too thin: a popup 2 weeks before; then ${forcedPlan.lastSold!.percent}% sold for ${millions(forcedPlan.lastSold!.amount)}, the board marks it, a popup says so`);
+    assert.equal(events(told).find(data => data!.kind === 'ESTATE_SOLD'), undefined, 'sold: no popup');
+    assert.match(told.logs.at(-1)!.message, /% of your shares were sold/, 'a line in the log');
+    pass(`too thin: a line in the log 2 weeks before; then ${forcedPlan.lastSold!.percent}% sold for ${millions(forcedPlan.lastSold!.amount)}, the board marks it, a line says so`);
 
     /* ── paying it off ── */
     assert.equal(payOffStreamingEstate({ ...heir, money: 1_000 }).changed, false, 'not with an empty wallet');

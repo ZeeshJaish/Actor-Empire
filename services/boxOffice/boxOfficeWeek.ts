@@ -1,3 +1,4 @@
+import { getPacingEffect } from '../greenlightSetupEffects';
 import type { ActiveRelease, Business, IndustryProject, Player, ProjectDetails } from '../../types';
 import { getDefaultCinemaChainIdsForRegion, getReleaseRegionIdsForProject } from '../distributionRevenue';
 import { normalizeWorldPopulationState } from '../worldEconomy/worldPopulation';
@@ -71,7 +72,7 @@ export const normalizeLiveTitle = (player: Player, id: string, project: ProjectD
         bookingContract:player.world.cinemaMarket?.bookingContracts?.[id] || 'REVENUE_SHARE',
         languages: [project.originalLanguageId || 'english'], countryIds: countries.map(c => c.id), chainIds: [...new Set(Object.values(chains).flat())], chainIdsByCountry: chains, format: 'STANDARD',
         universeId: project.universeId, returningCharacterIds: [...new Set(title.cast.flatMap(c => c.characterIds))],
-        payoff: title.delivery.deliveredQuality || 50, accessibility: title.delivery.scriptQuality, urgency: ['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY'].includes(project.genre) ? 65 : 45,
+        payoff: title.delivery.deliveredQuality || 50, accessibility: title.delivery.scriptQuality, urgency: (['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY'].includes(project.genre) ? 65 : 45) + getPacingEffect(project).pull * 150, ...(getPacingEffect(project).hold ? {interestHold:1 + getPacingEffect(project).hold * 1.5} : {}),
         ...(windows.length ? {streamingWindows:windows} : {}) };
     return title;
 };

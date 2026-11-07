@@ -85,7 +85,8 @@ interface Props {
 
 export default function StreamingListingHost({ player, onUpdatePlayer, onClose, onListed }: Props) {
   const platform = player.ownedStreamingPlatform;
-  const view = useMemo(() => getStreamingPublicMarkets(player), [player]);
+  /* the company does not change while the listing is open, only its checkpoint does: read it once a week, not on every save of the dial */
+  const view = useMemo(() => getStreamingPublicMarkets(player), [player.age, player.currentWeek]); // eslint-disable-line react-hooks/exhaustive-deps
   const [failure, setFailure] = useState<string | null>(null);
 
   const checkpointListing = (checkpoint: StreamingListingCheckpoint) => {
@@ -177,7 +178,7 @@ export default function StreamingListingHost({ player, onUpdatePlayer, onClose, 
         return people;
       })(),
     };
-  }, [platform, player.age, player.currentWeek, player.name, view.readiness, view.valuation]);
+  }, [player.age, player.currentWeek, player.name, view.readiness, view.valuation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const finishListing = (result: StreamingIpoPresentationResult) => {
     const committed = commitStreamingCinematicIpo(player, {

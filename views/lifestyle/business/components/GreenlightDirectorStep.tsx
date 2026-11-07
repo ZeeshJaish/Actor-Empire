@@ -8,6 +8,8 @@ interface GreenlightDirectorStepProps {
     selectedDirectorId: string | null;
     onSelectDirector: (directorId: string) => void;
     directorMode: 'HIRE' | 'SELF' | 'IN_HOUSE';
+    /** #284 */
+    hideSelfDirect?: boolean;
     onDirectorModeChange: (mode: 'HIRE' | 'SELF' | 'IN_HOUSE') => void;
     player: Player;
     hiredIds: string[];
@@ -23,6 +25,7 @@ interface GreenlightDirectorStepProps {
 }
 
 export const GreenlightDirectorStep: React.FC<GreenlightDirectorStepProps> = ({
+    hideSelfDirect,
     availableDirectors,
     selectedDirectorId,
     onSelectDirector,
@@ -70,6 +73,7 @@ export const GreenlightDirectorStep: React.FC<GreenlightDirectorStepProps> = ({
                 returningTalent={returningTalent}
                 onNegotiate={onNegotiate}
                 formatMoney={formatMoney}
+                outsideStudio={hideSelfDirect}
             />
 
             <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">

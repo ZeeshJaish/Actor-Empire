@@ -270,35 +270,19 @@ assert(migratedPhase4.schemaVersion === OWNED_STREAMING_PLATFORM_SCHEMA_VERSION,
 assert(migratedPhase4.infrastructureSetup === null && migratedPhase4.infrastructureSetupDraft === null, 'Older saves should receive safe empty infrastructure records.');
 assert(migratedPhase4.subscriptionPrices.BASIC === 7.99, 'Older saves should receive balanced default pricing without fake subscribers.');
 
-const componentSource = readFileSync('components/StreamingInfrastructureSetup.tsx', 'utf8');
 const buildSource = readFileSync('components/streaming-transplant/StreamingBuildoutExperience.tsx', 'utf8');
 const hqSource = readFileSync('components/StreamingPlatformHQ.tsx', 'utf8');
-const styleSource = readFileSync('styles/streaming-infrastructure.css', 'utf8');
 const serviceSource = readFileSync('services/streamingInfrastructure.ts', 'utf8');
-const phase5Source = `${componentSource}\n${buildSource}\n${hqSource}\n${serviceSource}`;
+const phase5Source = `${buildSource}\n${hqSource}\n${serviceSource}`;
 
 [
-    'NETWORK DESIGN',
-    'DELIVERY PLAN',
-    'LOAD LAB',
-    'PLAN STUDIO',
-    'OPERATING REVIEW',
-    'Nothing is charged until final CEO approval.',
-    'Range, not a promise',
     'Basic',
     'Premium',
     'Family',
-    'Continue with risk',
-    'This approves capacity and prices only.',
 ].forEach(fragment => assert(phase5Source.includes(fragment), `Phase 5 UI should include ${fragment}.`));
 assert(hqSource.includes('setShowCinematicBuild(true)'), 'Technology Campus should route infrastructure work into the canonical Build room.');
 assert(!hqSource.includes('<StreamingInfrastructureSetup'), 'HQ must not expose the retired duplicate infrastructure configurator.');
 assert(buildSource.includes('isBuilt'), 'The Build room should resume and revise already-commissioned infrastructure.');
-assert(styleSource.includes('env(safe-area-inset-bottom)'), 'Phase 5 footer should respect mobile safe areas.');
-assert(styleSource.includes('@media (min-width: 700px)'), 'Phase 5 should adapt beyond phone widths.');
-assert(styleSource.includes('@media (prefers-reduced-motion: reduce)'), 'Phase 5 should respect reduced-motion preferences.');
 assert(!serviceSource.includes('Math.random'), 'Infrastructure forecasts must remain deterministic.');
-assert(!componentSource.includes('real-time'), 'Infrastructure construction must use game weeks, not real-time waiting.');
-assert(!componentSource.includes('Buy stronger server'), 'Phase 5 must not frame gameplay power as a commercial purchase.');
 
 console.log('EMPIRE+ Phase 5 infrastructure and subscription setup audit passed.');

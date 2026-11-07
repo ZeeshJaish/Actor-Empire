@@ -20,6 +20,7 @@
  * Originals are not scheduled here: their premiere is cleared by the release
  * authorization in the Originals studio, after delivery and localization.
  */
+import { getStreamingContentAvailability } from './streamingContentAvailability';
 import type {
     OwnedStreamingLedgerEntry,
     OwnedStreamingSlateEntry,
@@ -32,6 +33,7 @@ import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle } from './streamingCatalog';
 import { getOwnedStreamingProgramEntries, getStreamingSlateCandidates } from './streamingOriginals';
+import { ORIGINAL_LICENCE_WEEKS } from './originalsDeal';
 
 /** How far ahead a premiere can be set: one year of weeks from next week. */
 export const STREAMING_SLATE_HORIZON_WEEKS = 52;
@@ -40,23 +42,29 @@ export type StreamingSlateScheduleRefusal =
     | 'NOT_LIVE'
     | 'UNKNOWN_TITLE'
     | 'ORIGINAL_USES_RELEASE'
+    | 'ORIGINAL_NOT_READY'
     | 'ALREADY_PREMIERED'
     | 'WEEK_OUT_OF_RANGE'
     | 'BEFORE_RIGHTS_START'
-    | 'RIGHTS_END_FIRST';
+    | 'RIGHTS_END_FIRST'
+    | 'EARLY_ACCESS_RUNNING';
 
 export const STREAMING_SLATE_REFUSAL_COPY: Record<StreamingSlateScheduleRefusal, string> = {
     NOT_LIVE: 'The service is not live yet. Plan the opening slate first.',
     UNKNOWN_TITLE: 'That title is not on your shelves.',
-    ORIGINAL_USES_RELEASE: 'An Original premieres when its release is cleared in the Originals studio.',
+    ORIGINAL_USES_RELEASE: 'An Original on the opening slate keeps its opening week.',
+    ORIGINAL_NOT_READY: 'It is still being made. It can go on the Slate once it is delivered.',
     ALREADY_PREMIERED: 'That title has already premiered on the service.',
     WEEK_OUT_OF_RANGE: `Pick a week from next week to ${STREAMING_SLATE_HORIZON_WEEKS} weeks ahead.`,
     BEFORE_RIGHTS_START: 'Its rights have not started by that week. Pick a week from the start of its window.',
     RIGHTS_END_FIRST: 'Its licence ends before that week. Pick an earlier week or renew the rights.',
+    EARLY_ACCESS_RUNNING: 'Premium viewers are already watching it, so its release date is locked.',
 };
 
 const MARKETING_PLANS: StreamingSlateMarketingPlan[] = ['LEAN', 'STANDARD', 'EVENT'];
 const SERIES_PATTERNS: StreamingOriginalReleasePattern[] = ['FULL_SEASON', 'WEEKLY', 'SPLIT_VOLUME'];
+/* #291: the two rhythms the viewing engine really tells apart */
+const SERIES_RHYTHMS: StreamingOriginalReleasePattern[] = ['FULL_SEASON', 'WEEKLY'];
 
 type Result = { player: Player; changed: boolean; reason?: StreamingSlateScheduleRefusal };
 /** where a title taken off the slate goes: back to the shelves, or back to going live when its rights start */
@@ -122,10 +130,97 @@ const withSlate = (player: Player, entries: OwnedStreamingSlateEntry[], now: num
     };
 };
 
+/** An Original delivered and waiting, or with a premiere still ahead */
+export const originalOnTheShelf = (player: Player, projectId: string) => {
+    const commission = player.ownedStreamingPlatform.originalCommissions.find(item => item.canonicalProjectId === projectId);
+    if (!commission) return null;
+    const job = (player.commitments || []).find(item => item.id === projectId);
+    if (job) return job.projectPhase === 'AWAITING_RELEASE' ? { commission, job } : null;
+    /* #294: a bid-room order is made in the world: delivered, and not yet on the service */
+    const made = Object.values(player.world.industryProductions || {}).find(item => item.canonicalProjectId === projectId);
+    return made?.status === 'DELIVERED' && !(player.world.projects || []).some(item => item.id === projectId) ? { commission, job: null } : null;
+};
+
+const scheduleOriginal = (
+    player: Player,
+    platform: Player['ownedStreamingPlatform'],
+    projectId: string,
+    week: number,
+    now: number,
+    releasePattern?: StreamingOriginalReleasePattern,
+): Result => {
+    const found = originalOnTheShelf(player, projectId);
+    if (!found) {
+        const stillMaking = (player.commitments || []).some(item => item.id === projectId)
+            || Object.values(player.world.industryProductions || {}).some(item => item.canonicalProjectId === projectId && item.status !== 'DELIVERED' && item.status !== 'RELEASED');
+        return { player, changed: false, reason: stillMaking ? 'ORIGINAL_NOT_READY' : 'ALREADY_PREMIERED' };
+    }
+    const { commission, job } = found;
+    const pattern: StreamingOriginalReleasePattern = commission.projectType !== 'SERIES' ? 'SINGLE_PREMIERE'
+        : releasePattern && SERIES_RHYTHMS.includes(releasePattern) ? releasePattern
+            : commission.releasePlan && SERIES_RHYTHMS.includes(commission.releasePlan.releasePattern) ? commission.releasePlan.releasePattern : 'FULL_SEASON';
+    const when = yearAndWeek(week);
+    const idempotencyKey = `original-release:${commission.id}:${week}:${pattern}`;
+    const ledger: OwnedStreamingLedgerEntry = {
+        id: createDeterministicId('streaming_event', platform.simulationSeed, idempotencyKey),
+        idempotencyKey,
+        absoluteWeek: now,
+        type: 'ORIGINAL_RELEASE_AUTHORIZED',
+        summary: `${commission.title} premieres in year ${when.year}, week ${when.week}.`,
+        source: 'PLAYER_ACTION',
+        metadata: { commissionId: commission.id, projectId, premiereAtAbsoluteWeek: week, scope: 'GLOBAL', releasePattern: pattern },
+    };
+    return {
+        player: {
+            ...player,
+            commitments: !job ? player.commitments : player.commitments.map(item => (item.id !== job.id ? item : {
+                ...item,
+                phaseWeeksLeft: week - now,
+                totalPhaseDuration: week - now,
+                projectDetails: {
+                    ...item.projectDetails!,
+                    releaseStrategy: 'STREAMING_ONLY',
+                    releaseDate: when.week,
+                    hiddenStats: { ...item.projectDetails!.hiddenStats, ownedStreamingReleaseScope: 'GLOBAL', ownedStreamingReleasePattern: pattern },
+                },
+            })),
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                ...platform,
+                originalCommissions: platform.originalCommissions.map(item => (item.id !== commission.id ? item : {
+                    ...item,
+                    releasePlan: { scope: 'GLOBAL', releasePattern: pattern, marketingPlan: 'STANDARD', premiereAtAbsoluteWeek: week, authorizedAtAbsoluteWeek: now },
+                    /* a licence's three years run from its premiere */
+                    ...(item.deal === 'LICENCE' ? { licenceEndsAtAbsoluteWeek: week + ORIGINAL_LICENCE_WEEKS } : {}),
+                })),
+                eventLedger: [...platform.eventLedger, ledger],
+            }, player.id),
+        },
+        changed: true,
+    };
+};
+
+const unscheduleOriginal = (player: Player, platform: Player['ownedStreamingPlatform'], projectId: string): Result => {
+    const found = originalOnTheShelf(player, projectId);
+    if (!found) return { player, changed: false, reason: 'ALREADY_PREMIERED' };
+    const { commission, job } = found;
+    const { releaseStrategy: _strategy, releaseDate: _date, ...details } = (job?.projectDetails || {}) as any;
+    return {
+        player: {
+            ...player,
+            commitments: !job ? player.commitments : player.commitments.map(item => (item.id !== job.id ? item : { ...item, phaseWeeksLeft: 0, totalPhaseDuration: 0, projectDetails: details })),
+            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                ...platform,
+                originalCommissions: platform.originalCommissions.map(item => (item.id !== commission.id ? item : { ...item, releasePlan: null })),
+            }, player.id),
+        },
+        changed: true,
+    };
+};
+
 /**
  * Put a title on the slate for a week (or move one that has not premiered yet,
- * or change its campaign). The title must be on the shelves, not an Original,
- * not yet premiered, and its licence must still run in that week.
+ * or change its campaign). The title must be on the shelves, not yet premiered,
+ * and its licence must still run in that week.
  */
 export const scheduleStreamingSlateTitle = (
     player: Player,
@@ -152,8 +247,12 @@ export const scheduleStreamingSlateTitle = (
             projectType: upcoming.projectType || 'MOVIE', genre: upcoming.genre || 'Licensed',
         } : undefined);
     if (!candidate) return { player, changed: false, reason: 'UNKNOWN_TITLE' };
-    if (candidate.source === 'ORIGINAL') return { player, changed: false, reason: 'ORIGINAL_USES_RELEASE' };
     if (hasPremiered(player, candidate.projectId, candidate.source, now, launchAt)) return { player, changed: false, reason: 'ALREADY_PREMIERED' };
+    /* #245: moving it on would keep it fresh for ever. #291: its rhythm can still change, in the same week */
+    const sameWeek = candidate.source === 'ORIGINAL' && platform.originalCommissions.find(item => item.canonicalProjectId === candidate.projectId)?.releasePlan?.premiereAtAbsoluteWeek === week;
+    if (!sameWeek && getStreamingContentAvailability(player, candidate.projectId).status === 'EARLY_ACCESS') return { player, changed: false, reason: 'EARLY_ACCESS_RUNNING' };
+    /* #291: an Original takes its week like anything else on the shelves. The Campaign Studio is what gives it weight now */
+    if (candidate.source === 'ORIGINAL') return scheduleOriginal(player, platform, candidate.projectId, week, now, input.releasePattern);
     if (candidate.source === 'LICENSED_WINDOW') {
         /* a licence must cover the premiere week: started by then, not yet ended */
         const licences = player.ownedStreamingPlatform.catalogLicenses.filter(licence => licence.sourceProjectId === candidate.projectId && licence.status === 'ACTIVE');
@@ -184,8 +283,16 @@ export const scheduleStreamingSlateTitle = (
         ? (platform.launchSlate?.entries || []).map(item => item.projectId === candidate.projectId ? entry : item)
         : [...(platform.launchSlate?.entries || []), entry];
     const when = yearAndWeek(week);
+    /* #244: a film planned through the wizard opens on its Slate week, so moving one moves the other */
+    const planned: Player = player.commitments.some(item => item.id === candidate.projectId && item.projectDetails?.hiddenStats?.ownPlatformRelease) ? {
+        ...player,
+        commitments: player.commitments.map(item => (item.id === candidate.projectId ? {
+            ...item, phaseWeeksLeft: week - now, totalPhaseDuration: week - now,
+            projectDetails: item.projectDetails ? { ...item.projectDetails, releaseDate: when.week } : item.projectDetails,
+        } : item)),
+    } : player;
     return {
-        player: withSlate(player, entries, now, `${candidate.projectId}:${week}`,
+        player: withSlate(planned, entries, now, `${candidate.projectId}:${week}`,
             `${candidate.title} ${existing ? 'moved to' : 'programmed for'} year ${when.year}, week ${when.week} with ${marketingPlan === 'EVENT' ? 'an' : 'a'} ${marketingPlan.toLowerCase()} campaign.`,
             { projectId: candidate.projectId, premiereAtAbsoluteWeek: week, marketingPlan }),
         changed: true,
@@ -206,9 +313,17 @@ export const unscheduleStreamingSlateTitle = (player: Player, projectId: string)
     if (launchAt === undefined || platform.lifecycle !== 'ACTIVE') return { player, changed: false, reason: 'NOT_LIVE' };
     const now = getAbsoluteWeek(player.age, player.currentWeek);
     const entry = platform.launchSlate?.entries.find(item => item.projectId === projectId);
+    /* #291: an Original off the Slate waits, delivered, until it is given a week */
+    const original = !entry && platform.originalCommissions.find(item => item.canonicalProjectId === projectId && item.releasePlan);
+    if (original) {
+        if (original.releasePlan!.premiereAtAbsoluteWeek <= now) return { player, changed: false, reason: 'ALREADY_PREMIERED' };
+        if (getStreamingContentAvailability(player, projectId).status === 'EARLY_ACCESS') return { player, changed: false, reason: 'EARLY_ACCESS_RUNNING' };
+        return unscheduleOriginal(player, platform, projectId);
+    }
     if (!entry) return { player, changed: false, reason: 'UNKNOWN_TITLE' };
     if (entry.source === 'ORIGINAL') return { player, changed: false, reason: 'ORIGINAL_USES_RELEASE' };
     if (launchAt + entry.launchWeek - 1 <= now) return { player, changed: false, reason: 'ALREADY_PREMIERED' };
+    if (getStreamingContentAvailability(player, projectId).status === 'EARLY_ACCESS') return { player, changed: false, reason: 'EARLY_ACCESS_RUNNING' };
     return {
         player: withSlate(player, (platform.launchSlate?.entries || []).filter(item => item.projectId !== projectId), now,
             `${projectId}:off`, `${entry.title} taken off the slate before its premiere.`, { projectId }),
@@ -235,19 +350,21 @@ export interface StreamingSlateAutoFillItem {
 
 /** The shelves: titles on the platform but not on the service, that the slate can premiere. */
 const shelfTitles = (player: Player, now: number, launchAt: number) => getStreamingSlateCandidates(player).flatMap(candidate => {
-    if (candidate.source === 'ORIGINAL') return [];
+    /* #291: a delivered Original with no week yet is on the shelves */
+    const original = candidate.source === 'ORIGINAL' ? originalOnTheShelf(player, candidate.projectId) : null;
+    if (candidate.source === 'ORIGINAL' && (!original || original.commission.releasePlan)) return [];
     if (player.ownedStreamingPlatform.launchSlate?.entries.some(entry => entry.projectId === candidate.projectId)) return [];
     if (hasPremiered(player, candidate.projectId, candidate.source, now, launchAt)) return [];
     const licence = candidate.source === 'LICENSED_WINDOW' ? currentLicence(player, candidate.projectId, now) : null;
     if (candidate.source === 'LICENSED_WINDOW' && !licence) return [];
     return [{
         ...candidate,
-        rightsEnd: licence && !perpetual(licence) ? licence.expiresAtAbsoluteWeek : Number.POSITIVE_INFINITY,
+        rightsEnd: original?.commission.licenceEndsAtAbsoluteWeek ?? (licence && !perpetual(licence) ? licence.expiresAtAbsoluteWeek : Number.POSITIVE_INFINITY),
         rating: resolveStreamingCatalogTitle(player, candidate.projectId)?.rating ?? 0,
     }];
 });
 
-/** The premieres the player set on the slate that are still ahead (not Originals). */
+/** The premieres the player set on the slate that are still ahead (Originals keep their own record). */
 const plannedEntries = (player: Player) => {
     const platform = player.ownedStreamingPlatform;
     const launchAt = platform.launchCommit?.committedAtAbsoluteWeek;
@@ -262,15 +379,18 @@ export const clearStreamingSlatePlans = (player: Player): { player: Player; chan
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!platform.launchCommit || platform.lifecycle !== 'ACTIVE') return { player, changed: false, removed: [] };
     const planned = plannedEntries(player);
-    if (!planned.length) return { player, changed: false, removed: [] };
     const now = getAbsoluteWeek(player.age, player.currentWeek);
+    /* #291: Originals with a week still ahead come off with the rest */
+    const originals = platform.originalCommissions.filter(item => item.canonicalProjectId && item.releasePlan && item.releasePlan.premiereAtAbsoluteWeek > now
+        && originalOnTheShelf(player, item.canonicalProjectId) && !(platform.launchSlate?.entries || []).some(entry => entry.projectId === item.canonicalProjectId));
+    if (!planned.length && !originals.length) return { player, changed: false, removed: [] };
     const off = new Set(planned.map(entry => entry.projectId));
-    return {
-        player: withSlate(player, (platform.launchSlate?.entries || []).filter(entry => !off.has(entry.projectId)), now,
-            'clear', `${planned.length} planned premiere${planned.length === 1 ? '' : 's'} taken off the slate.`, { removed: planned.length }),
-        changed: true,
-        removed: planned.map(entry => entry.title),
-    };
+    let next = planned.length ? withSlate(player, (platform.launchSlate?.entries || []).filter(entry => !off.has(entry.projectId)), now,
+        'clear', `${planned.length} planned premiere${planned.length === 1 ? '' : 's'} taken off the slate.`, { removed: planned.length }) : player;
+    originals.forEach(item => {
+        next = unscheduleOriginal(next, next.ownedStreamingPlatform, item.canonicalProjectId!).player;
+    });
+    return { player: next, changed: true, removed: [...planned.map(entry => entry.title), ...originals.map(item => item.title)] };
 };
 
 /** Plan Auto-fill around the premieres already planned, or (fresh) as if none were. */

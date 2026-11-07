@@ -12,6 +12,7 @@
  * Each change writes a ledger line (SERVICE_CONFIGURATION_COMMITTED, metadata.brandChange LOOK or IDENT), which the
  * world reads (#117).
  */
+import { getStreamingOpeningLock } from './streamingOpeningLock';
 import type {
     OwnedStreamingCostCommitment, OwnedStreamingCustomIdentAudio, OwnedStreamingLedgerEntry, OwnedStreamingPlatformIdentity, Player,
     StreamingIdentPackageId, StreamingSoundIdentKey, StreamingTypefaceId, StreamingWordmarkStyleId,
@@ -117,6 +118,9 @@ const money = (value: number) => `$${value >= 1e6 ? `${Math.round(value / 1e5) /
 export const applyStreamingBrandLook = (player: Player, next: StreamingBrandLook): StreamingBrandChangeResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!platform.identity) return { player, changed: false, reason: 'INVALID_STATE', message: 'There is no service to rebrand yet.' };
+    /* #253 */
+    const buildLock = getStreamingOpeningLock(player);
+    if (buildLock.planLocked) return { player, changed: false, reason: 'INVALID_STATE', message: buildLock.message };
     const changes = streamingBrandLookChanges(getStreamingBrandLook(platform.identity), next);
     if (!changes.length) return { player, changed: false, reason: 'NO_CHANGE', message: 'This is the look you have.' };
     const week = getAbsoluteWeek(player.age, player.currentWeek);

@@ -1,5 +1,6 @@
 import type { Commitment, Player, RoleType, Genre, PastProject, OutcomeTier } from '../types';
 import { spendPlayerEnergy } from './premiumLogic';
+import { getCareerProjects, isOutsideOriginal } from './outsideOriginals';
 
 export const ACTOR_CAREER_BALANCE_VERSION = 1 as const;
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Number.isFinite(n) ? n : lo));
@@ -18,7 +19,7 @@ export const getCareerEvidence = (p: Player, includeCreativeWork = false) => {
     const seen = new Set<string>();
     const now = absoluteWeek(p);
     const credits = [...(p.pastProjects || []), ...(p.activeReleases || [])].flatMap((row: any) => {
-        if (!row.id || seen.has(row.id) || row.isQaArchive) return [];
+        if (!row.id || seen.has(row.id) || row.isQaArchive || isOutsideOriginal(row)) return [];
         const cast = row.castList?.length ? row.castList : row.projectDetails?.castList || [];
         const details = row.projectDetails || row;
         const creativeCredit = includeCreativeWork && (['PLAYER_SELF', 'player'].includes(details.directorId)
@@ -50,7 +51,7 @@ export const ensureActorCareerBalance = (p: Player): Player => {
     if (p.flags?.careerBalanceVersion === 1) return p;
     const wasLegend = p.stats.fame >= 94 && p.stats.reputation >= 85 && p.stats.experience >= 85
         && ((p.awards || []).filter(a => a.outcome === 'WON').length >= 2
-            || (p.pastProjects || []).filter(c => !c.isQaArchive).length >= 18);
+            || getCareerProjects(p).filter(c => !c.isQaArchive).length >= 18);
     return { ...p, flags: { ...p.flags, careerBalanceVersion: 1, careerBalanceStartedAtAbsoluteWeek: absoluteWeek(p),
         ...(wasLegend ? { careerLegendRecognized: true } : {}) } };
 };

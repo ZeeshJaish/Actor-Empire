@@ -256,15 +256,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         lastIssueReportId: issueId,
         lastIssueReportCategory: reportCategory,
       },
-      logs: [
-        {
+      logs: [...(prev.logs || []), {
           week: prev.currentWeek,
           year: prev.age,
           message: tr('settings.support.issueReportLog', { id: issueId }),
           type: 'neutral'
-        },
-        ...prev.logs
-      ].slice(0, 50)
+        }]
     }));
   };
 

@@ -6,6 +6,7 @@ const PHASE_COPY: Record<ReleaseWizardPhase, { title: string; subtitle: string }
   DISTRIBUTION: { title: 'Distribution', subtitle: 'Choose the life this picture will have.' },
   DESK: { title: 'Theatrical Desk', subtitle: 'Build the footprint. Own the risk.' },
   WAR: { title: 'The War Room', subtitle: 'Buyers are live. Terms move fast.' },
+  YOURS: { title: 'Your Platform', subtitle: 'No buyers in the room. It goes on your own service.' },
   CAMPAIGN: { title: 'Campaign', subtitle: 'Decide what the audience should feel.' },
   FESTIVALS: { title: 'Festivals', subtitle: 'Choose the rooms that can change the story.' },
   CALENDAR: { title: 'Calendar', subtitle: 'Find the week the market belongs to you.' },

@@ -4,6 +4,7 @@ import { getStreamingOriginalLiveStatus, getOwnedStreamingProgramEntries } from 
 import { normalizeOwnedStreamingPlatformState } from '../services/ownedStreamingPlatform';
 import { activateAuctionFutureFunding, processAuctionFutureFunding } from '../services/streamingAuctionFunding';
 import { recognizeStreamingContentCost } from '../services/streamingContentAccounting';
+import { originalOnTheShelf } from '../services/streamingSlateProgramming';
 
 const fixture = (commitment: 'FIRM' | 'OPTION' = 'FIRM'): Player => {
  const p = structuredClone(INITIAL_PLAYER);
@@ -31,6 +32,17 @@ for(let week=101;week<=152;week++) {
  p.age=Math.floor(week/52)+1;p.currentWeek=week%52+1;
  p=processAuctionFutureFunding(p,week);
 }
+/* #294: delivered is not released: it waits for its week on the Slate, and the deadline is met */
+assert.equal(p.world.projects.filter(x=>x.id!=='parent').length,0,'Delivered titles wait for the Slate');
+assert.equal(p.ownedStreamingPlatform.rightsObligations[0].status,'SATISFIED','Delivered in time meets the promise');
+assert.ok(p.ownedStreamingPlatform.originalCommissions.every(c=>getStreamingOriginalLiveStatus(p,c)==='DELIVERED'));
+const onShelf=p;
+assert.ok(p.ownedStreamingPlatform.originalCommissions.every(c=>originalOnTheShelf(onShelf,c.canonicalProjectId!)),'They are on the shelves');
+const held=processAuctionFutureFunding(p,200);
+assert.equal(held.ownedStreamingPlatform.rightsObligations[0].status,'SATISFIED','Waiting past the deadline is not a breach');
+assert.equal(held.world.projects.filter(x=>x.id!=='parent').length,0,'and nothing opens by itself');
+p={...p,ownedStreamingPlatform:{...p.ownedStreamingPlatform,originalCommissions:p.ownedStreamingPlatform.originalCommissions.map(c=>({...c,releasePlan:{scope:'GLOBAL',releasePattern:'FULL_SEASON',marketingPlan:'STANDARD',premiereAtAbsoluteWeek:152,authorizedAtAbsoluteWeek:152}}))}};
+p=processAuctionFutureFunding(p,152);
 const delivered=p.world.projects.filter(x=>x.id!=='parent') as any[];
 assert.equal(delivered.length,2);
 assert.ok(p.ownedStreamingPlatform.originalCommissions.every(c=>getStreamingOriginalLiveStatus(p,c)==='RELEASED'));

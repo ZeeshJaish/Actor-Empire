@@ -1,4 +1,5 @@
 import { calculateCinemaCraftQuality } from '../../../services/boxOffice/boxOfficeDelivery';
+import { getEffectsCostShare } from '../../../services/greenlightSetupEffects';
 import { interpolateProductionBudget } from '../../../services/studioProductionEconomy';
 import { getOwnedEquipmentProjectCost } from '../../../services/studioProductionEconomy';
 
@@ -33,6 +34,8 @@ export interface CalculateGreenlightBudgetInput {
     ownedEquipmentLevels: Partial<Record<string, number>>;
     gearTiers: Record<string, GreenlightGearCostTier>;
     baseCost?: number;
+    /** 0 practical, 100 CGI */
+    tone?: number;
 }
 
 export interface GreenlightBudgetBreakdown {
@@ -45,6 +48,8 @@ export interface GreenlightBudgetBreakdown {
     crew: number;
     locationCost: number;
     equipmentCost: number;
+    /** #275: the bill for the effects mix */
+    effectsCost: number;
 }
 
 export const calculateGreenlightBudget = ({
@@ -60,6 +65,7 @@ export const calculateGreenlightBudget = ({
     ownedEquipmentLevels,
     gearTiers,
     baseCost = 5_000_000,
+    tone = 50,
 }: CalculateGreenlightBudgetInput): GreenlightBudgetBreakdown => {
     let castCost = 0;
     for (const role of castRoles) {
@@ -98,14 +104,9 @@ export const calculateGreenlightBudget = ({
         + (Number(crewCosts.vfx) || 0);
     const normalizedScriptCost = Number(scriptCost) || 0;
     const normalizedBackgroundCost = Number(backgroundCastingCost) || 0;
-    const total = baseCost
-        + normalizedScriptCost
-        + directorCost
-        + crewCost
-        + castCost
-        + normalizedBackgroundCost
-        + locationCost
-        + equipmentCost;
+    const madeCost = baseCost + directorCost + crewCost + castCost + normalizedBackgroundCost + locationCost + equipmentCost;
+    const effectsCost = Math.round(madeCost * getEffectsCostShare(tone));
+    const total = madeCost + normalizedScriptCost + effectsCost;
 
     return {
         total: Number(total) || 0,
@@ -117,6 +118,7 @@ export const calculateGreenlightBudget = ({
         crew: crewCost,
         locationCost,
         equipmentCost,
+        effectsCost,
     };
 };
 
@@ -253,7 +255,9 @@ export const calculateGreenlightEstimatedQuality = ({
     backgroundAuthenticity,
     backgroundReliability,
     backgroundSetCare,
+    setupQualityAdjustment,
 }: {
+    setupQualityAdjustment?: number;
     scriptQuality?: number;
     directorQuality: number;
     castingStrength: number;
@@ -271,6 +275,6 @@ export const calculateGreenlightEstimatedQuality = ({
         scriptQuality, directorQuality, castingStrength, crewQualities,
         equipmentQualityLevels: Object.entries(equipmentChoices).map(([id, choice]) => choice === 'OWNED'
             ? ownedEquipmentLevels[id] ?? 0 : gearTiers[choice]?.quality ?? 0),
-        locationQualities, storyFitQualityAdjustment, backgroundAuthenticity, backgroundReliability, backgroundSetCare,
+        locationQualities, storyFitQualityAdjustment, backgroundAuthenticity, backgroundReliability, backgroundSetCare, setupQualityAdjustment,
     });
 };

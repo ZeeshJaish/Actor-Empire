@@ -1,7 +1,10 @@
+import type { StreamingShelfNoticeModel } from '../../../components/StreamingShelfNotice';
+import { getStreamingSeasonFunding } from '../../../services/streamingSeasonRights';
+import { resolveStreamingPlatformBrandById } from '../../../services/streamingPlatformBrandRegistry';
 import { recordScriptDevelopmentPayment } from '../../../services/scriptDevelopmentFinance';
 import { buildCinemaReleaseDashboardProject, buildCinemaArchiveDashboardProject } from '../../../services/boxOffice/boxOfficePresentation';
 import { calculateStudioPrestigeScore } from '../../../services/studioPrestige';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ProjectType, ActiveRelease, Commitment, Business, LocationDetails, NewsItem, XPost, StudioEquipment, Script, Writer, GameLanguage, PlatformAiPlayerCommissionOffer } from '../../../types';
 import { ArrowLeft, Film, DollarSign, Users, TrendingUp, Calendar, Check, Plus, Star, Award, Zap, Briefcase, LayoutGrid, MapPin, PenTool, Globe, Camera, Clapperboard, ChevronRight, Building2, BarChart3, ShieldAlert, Crown, LogOut, AlertTriangle, Sparkles, BookOpen, Video, X, Clock, Palette, Lightbulb, Mic, Box, Tv, ArrowDownLeft, ArrowUpRight, WalletCards, Landmark } from 'lucide-react';
@@ -19,6 +22,7 @@ import { GreenlightWizard } from "./GreenlightWizard";
 import { ReleaseWizard } from "./ReleaseWizard";
 
 import { FacilitiesView } from './FacilitiesView';
+import { getSeasonEffects } from '../../../services/originalsEpisodeBudget';
 import { StudioPage } from '../../StudioPage';
 import { ProjectDashboardModal } from './components/ProjectDashboardModal';
 import { SequelSetupModal } from './components/SequelSetupModal';
@@ -35,12 +39,13 @@ import { CustomPosterImage } from '../../../components/CustomPosterImage';
 import { StudioSaleEntryCard, StudioSaleRoom } from './components/StudioSaleDeckPanel';
 import { getProjectFundingEconomics, getProjectMarketOutcomeRevenue } from '../../../services/projectFundingEconomics';
 import { StudioDivisionCard } from './components/StudioDivisionCard';
-import StreamingRightsCalendar from '../../../components/StreamingRightsCalendar';
+import RightsRoom from '../../../components/rights/RightsRoom';
 import { getStreamingRightsCalendar } from '../../../services/streamingRightsCalendar';
 import {
     buildPlatformCommissionActiveCardPresentation,
     buildPlatformCommissionFilmography,
     transferPlatformAiPlayerCommission,
+    platformAiCommissionKillFee,
 } from '../../../services/platformAi';
 
 interface ProductionHouseGameProps {
@@ -55,6 +60,9 @@ interface ProductionHouseGameProps {
     onStreamingOriginalConsumed?: () => void;
     onStreamingOriginalGreenlightComplete?: () => void;
     onOpenOwnedStreamingDelivery?: () => void;
+    /** #252: Content, on the Slate */
+    onOpenStreamingSlate?: () => void;
+    onSentToYourService?: (notice: StreamingShelfNoticeModel) => void;
     initialPlatformCommission?: { studioId: string; offerId: string };
     onPlatformCommissionConsumed?: () => void;
 }
@@ -71,6 +79,37 @@ const formatMoney = (val: number) => {
     return `$${val}`;
 };
 
+type SlateRibbon = { label: string; color: string; onColor: string };
+
+/** Black or white, whichever reads on this colour */
+const getReadableInk = (hex: string): string => {
+    const clean = hex.replace('#', '');
+    if (clean.length !== 6) return '#ffffff';
+    const channel = (start: number) => parseInt(clean.slice(start, start + 2), 16) / 255;
+    const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+    return luminance > 0.55 ? '#0a0a0a' : '#ffffff';
+};
+
+/** #271: who a commissioned project is for: a rival platform, or the player's own. Works at every phase. */
+const getSlateRibbon = (project: any, player: Player): SlateRibbon | null => {
+    const stats = project.projectDetails?.hiddenStats;
+    const offerId = project.commissionOffer?.id || stats?.playerPlatformCommissionOfferId;
+    const offer: PlatformAiPlayerCommissionOffer | undefined = project.commissionOffer
+        || (offerId ? player.world.platformAiPlayerCommissionOffers?.[offerId] : undefined);
+    if (offer) {
+        const brand = resolveStreamingPlatformBrandById(offer.platformId, offer.platformName);
+        return { label: `FOR ${offer.platformName.toUpperCase()}`, color: brand.primaryColor, onColor: brand.onPrimaryColor };
+    }
+    const funding = project.concept?.lockedStreamingFunding;
+    const isOwn = stats?.ownedStreamingOriginal === true || funding?.fundingSource === 'OWNED_STREAMING_PLATFORM';
+    if (!isOwn) return null;
+    const identity = player.ownedStreamingPlatform?.identity;
+    const name = stats?.ownedStreamingCommissionedBy || funding?.platformName || identity?.name;
+    if (!name) return null;
+    const color = identity?.primaryColor || '#7c3aed';
+    return { label: `FOR ${String(name).toUpperCase()}`, color, onColor: getReadableInk(color) };
+};
+
 const getCommitmentCommissionSourceLabel = (
     commitment: Commitment,
     offers: Record<string, PlatformAiPlayerCommissionOffer> | undefined,
@@ -80,7 +119,7 @@ const getCommitmentCommissionSourceLabel = (
     return offer ? buildPlatformCommissionActiveCardPresentation(offer).sourceLabel : undefined;
 };
 
-export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialStreamingOriginal, onStreamingOriginalConsumed, onStreamingOriginalGreenlightComplete, onOpenOwnedStreamingDelivery, initialPlatformCommission, onPlatformCommissionConsumed }) => {
+export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialStreamingOriginal, onStreamingOriginalConsumed, onStreamingOriginalGreenlightComplete, onOpenOwnedStreamingDelivery, onOpenStreamingSlate, onSentToYourService, initialPlatformCommission, onPlatformCommissionConsumed }) => {
     const [view, setView] = useState<StudioView>('DASHBOARD');
     const [rightsMarketTargetId, setRightsMarketTargetId] = useState<string | null>(null);
     const [selectedProjectDashboard, setSelectedProjectDashboard] = useState<any>(null);
@@ -238,7 +277,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     );
     const studioRightsItems = Object.values(streamingRightsCalendar.groups)
         .flat()
-        .filter(item => item.seller.type === 'PLAYER_STUDIO');
+        .filter(item => item.seller.type === 'PLAYER_STUDIO' && item.seller.id === studio.id);
     const studioRightsActionCount = studioRightsItems.filter(item => item.status === 'ACTION_REQUIRED').length;
     const studioRightsApproachingCount = studioRightsItems.filter(item => (
         item.outcome === 'PENDING' && item.status !== 'ACTION_REQUIRED'
@@ -301,7 +340,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 sourceLabel: getCommitmentCommissionSourceLabel(p, player.world.platformAiPlayerCommissionOffers),
                 phase: needsFundedPremiereConfirmation || !p.projectDetails?.releaseStrategy
                     ? p.projectDetails?.hiddenStats?.ownedStreamingOriginal
-                        ? 'AWAITING PLATFORM DELIVERY'
+                        ? 'READY FOR THE SLATE'
                         : 'AWAITING RELEASE'
                     : 'PLANNED RELEASE',
                 risk: 'LOW'
@@ -326,11 +365,14 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
     const handleTransferPlatformCommission = (offerId: string) => {
         const offer = player.world.platformAiPlayerCommissionOffers?.[offerId];
         if (!offer) return;
-        if (!window.confirm(`Return "${offer.title}" to ${offer.platformName}? Unpaid producer fees will be forfeited and future offers will cool down.`)) return;
+        const warning = offer.status !== 'ACCEPTED'
+            ? `${offer.platformName} will sue: the fee back and damages for the delay. Future offers cool down.`
+            : `A kill fee of $${(platformAiCommissionKillFee(offer.productionBudget) / 1e6).toFixed(2)}M and no lawsuit. Future offers cool down.`;
+        if (!window.confirm(`Return "${offer.title}" to ${offer.platformName}? ${warning}`)) return;
         const transferred = transferPlatformAiPlayerCommission({
             player,
             offerId,
-            absoluteWeek: (player.age * 52) + player.currentWeek,
+            absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
         });
         if (transferred.changed) {
             setPlatformCommissionTargetId(null);
@@ -425,13 +467,28 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         setView('DASHBOARD');
     };
 
+    /* #316: the Rights room opened a sale or a title: closing it goes back to the room */
+    const backToRightsRef = useRef(false);
     const closeReleaseTool = () => {
         setSelectedProjectDashboard(null);
+        if (backToRightsRef.current) {
+            backToRightsRef.current = false;
+            setView('RIGHTS');
+            return;
+        }
         if (returnAfterStudioTool === 'STUDIO_GROUP') {
             setView('STUDIO_GROUP');
             return;
         }
         setView('DASHBOARD');
+    };
+
+    const closeProjectDashboard = () => {
+        setSelectedProjectDashboard(null);
+        if (backToRightsRef.current) {
+            backToRightsRef.current = false;
+            setView('RIGHTS');
+        }
     };
 
     const returnToMainDashboard = () => {
@@ -674,9 +731,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             ? 0
             : Number(sourceHiddenStats.nextSeasonFundingAmount || 0);
         const sourceFundingPlatformId = sourceHiddenStats.nextSeasonFundingPlatformId || null;
-        const lockedFundRecord = (studio.studioState?.lockedStreamingFunds || []).find((fund: any) =>
-            fund.sourceProjectId === project.id || fund.sourceProjectId === details.id || fund.sourceProjectId === sourceHiddenStats.nextSeasonFundingSourceProjectId
-        );
+        const lockedFundRecord = getStreamingSeasonFunding(studio, project);
         const lockedStreamingFunding = !isSpinoff && sourceProjectType === 'SERIES' && (sourceFundingAmount > 0 || lockedFundRecord)
             ? {
                 id: lockedFundRecord?.id || `stream_fund_${project.id}_${Date.now()}`,
@@ -712,7 +767,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             weeksInDevelopment: 0,
             totalDevelopmentWeeks: writer ? Math.max(4, 20 - writer.speed) : 10,
             returningTalent,
-            lockedStreamingFunding
+            lockedStreamingFunding,
+            /* #301: what the last season's finale built */
+            ...(!isSpinoff && getSeasonEffects(details.episodeBudgetShares || project.episodeBudgetShares).hype
+                ? { previousSeasonHype: getSeasonEffects(details.episodeBudgetShares || project.episodeBudgetShares).hype }
+                : {}),
         };
 
         updatedStudio.studioState.scripts = [...(updatedStudio.studioState.scripts || []), recordScriptDevelopmentPayment(newScript, studio.id, writer?.fee || 0)];
@@ -914,15 +973,28 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
     if (view === 'RIGHTS') {
         return (
-            <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#070706]">
-                <StreamingRightsCalendar
-                    player={player}
-                    context="STUDIO"
-                    studioId={studio.id}
-                    onUpdatePlayer={onUpdatePlayer}
-                    onClose={closeStudioTool}
-                />
-            </div>
+            <RightsRoom
+                player={player}
+                studioId={studio.id}
+                onUpdatePlayer={onUpdatePlayer}
+                onClose={closeStudioTool}
+                /* #305: a title free to sell goes to the same bidding as anywhere else */
+                onSellTitle={projectId => {
+                    const project = (player.activeReleases || []).find(release => release.id === projectId)
+                        || (player.pastProjects || []).find(past => past.id === projectId);
+                    if (!project) return;
+                    backToRightsRef.current = true;
+                    handleStartStreamingBidding(project);
+                }}
+                onOpenFilm={projectId => {
+                    const project = (player.activeReleases || []).find(release => release.id === projectId)
+                        || (player.pastProjects || []).find(past => past.id === projectId);
+                    if (!project) return;
+                    backToRightsRef.current = true;
+                    setSelectedProjectDashboard(project);
+                    setView('DASHBOARD');
+                }}
+            />
         );
     }
 
@@ -936,6 +1008,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                 onBack={closeReleaseTool}
                 onUpdatePlayer={onUpdatePlayer} 
                 onComplete={closeReleaseTool}
+                onSentToYourService={onSentToYourService}
             />
         );
     }
@@ -947,15 +1020,17 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                     project={currentProject}
                     player={player}
                     studio={studio}
-                    onClose={() => setSelectedProjectDashboard(null)}
+                    onClose={closeProjectDashboard}
                     onUpdatePlayer={onUpdatePlayer}
                     onMakeSequel={handleMakeSequel}
                     onMakeSpinoff={handleMakeSpinoff}
                     onStartStreamingBidding={handleStartStreamingBidding}
+                    onOpenStreamingSlate={onOpenStreamingSlate}
                     onRenameProject={handleRenameProject}
                     onConfigureRelease={(p) => {
                         if (p.projectDetails?.hiddenStats?.ownedStreamingOriginal) {
-                            onOpenOwnedStreamingDelivery?.();
+                            /* #296: an Original takes its week on the Slate */
+                            (onOpenStreamingSlate || onOpenOwnedStreamingDelivery)?.();
                             return;
                         }
                         setSelectedProjectDashboard(p);
@@ -1135,7 +1210,8 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         {activeSlate.map((p, idx) => (
                             <ActiveProjectCard 
                                 key={p.id || idx} 
-                                project={p} 
+                                project={p}
+                                ribbon={getSlateRibbon(p, player)}
                                 onClick={() => {
                                     if (p.commissionOffer) {
                                         setSelectedConcept(null);
@@ -1224,7 +1300,11 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             icon={<Building2 size={20}/>}
                             accent="EMERALD"
                             stats={[
-                                { label: tr('services.business.productionDashboard.division.tier'), value: getStudioSubtypeLabel(studio.subtype) }
+                                /* #306: what is in the building. This tile read the studio's type, which never changed */
+                                { label: 'Average level', value: (() => {
+                                    const levels = [...Object.values(studio.studioState?.departments || {}), ...Object.values(studio.studioState?.equipment || {})].map(Number);
+                                    return levels.length ? (levels.reduce((sum, level) => sum + level, 0) / levels.length).toFixed(1) : '0';
+                                })() }
                             ]}
                             onClick={() => setView('OFFICE')}
                         />
@@ -1236,7 +1316,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             icon={<Users size={20}/>}
                             accent="PURPLE"
                             stats={[
-                                { label: tr('services.business.productionDashboard.division.stars'), value: (player.studio?.talentRoster?.length || 0).toString() }
+                                { label: tr('services.business.productionDashboard.division.stars'), value: (getStudioGroup(player).parentStudio?.id === studio.id ? (player.studio?.talentRoster?.length || 0) : (studio.studioState?.talentRoster?.length || 0)).toString() }
                             ]}
                             onClick={() => setView('TALENT')}
                         />
@@ -1257,12 +1337,12 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                             wide
                             eyebrow="BUSINESS AFFAIRS"
                             title="Rights Office"
-                            subtitle="Portfolio, mandates, relationships and statements"
+                            subtitle="What is out earning, and what you can sell"
                             icon={<Calendar size={22}/>}
                             accent="GOLD"
                             stats={[
-                                { label: 'Decisions', value: studioRightsActionCount.toString() },
-                                { label: 'Approaching', value: studioRightsApproachingCount.toString() }
+                                { label: 'Waiting for you', value: studioRightsActionCount.toString() },
+                                { label: 'Ending soon', value: studioRightsApproachingCount.toString() }
                             ]}
                             onClick={() => setView('RIGHTS')}
                         />
@@ -2135,7 +2215,7 @@ const CompactArchiveStat = ({ label, value, tone }: { label: string; value: stri
     </div>
 );
 
-const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete?: () => void }> = ({ project, onClick, onDelete }) => {
+const ActiveProjectCard: React.FC<{ project: any, ribbon?: SlateRibbon | null, onClick?: () => void, onDelete?: () => void }> = ({ project, ribbon, onClick, onDelete }) => {
     // Determine colors based on phase
     let phaseColor = "bg-zinc-500 text-white";
     let riskColor = "text-emerald-400";
@@ -2180,13 +2260,14 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
             tabIndex={onClick ? 0 : undefined}
             aria-label={onClick ? `${project.name} · ${project.phase}` : undefined}
             className={`min-w-[140px] w-[140px] h-[210px] rounded-lg bg-zinc-900 border-2 flex flex-col relative overflow-hidden group shrink-0 cursor-pointer hover:scale-105 transition-all duration-300 shadow-lg ${typeBorder}`}
+            style={ribbon ? { borderColor: ribbon.color, boxShadow: `0 0 16px ${ribbon.color}55` } : undefined}
         >
             {/* Delete Button for Concepts */}
             {onDelete && (
                 <button 
                     onClick={(e) => { e.stopPropagation(); onDelete(); }}
                     title={project.commissionOffer || project.projectDetails?.hiddenStats?.playerPlatformCommissionOfferId ? 'Return commission' : 'Delete concept'}
-                    className="absolute top-2 left-2 z-30 p-1.5 bg-black/50 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition-colors backdrop-blur-sm border border-white/10"
+                    className={`absolute z-30 bg-black/50 hover:bg-red-500 text-zinc-400 hover:text-white rounded-full transition-colors backdrop-blur-sm border border-white/10 ${ribbon ? 'top-[30px] right-1.5 p-1' : 'top-2 left-2 p-1.5'}`}
                 >
                     <X size={12} />
                 </button>
@@ -2229,18 +2310,22 @@ const ActiveProjectCard: React.FC<{ project: any, onClick?: () => void, onDelete
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
 
             {/* Content */}
-            <div className="absolute inset-0 p-3 flex flex-col justify-between">
-                <div className="flex justify-between items-start gap-1">
-                    {project.sourceLabel ? (
-                        <div className="max-w-[82px] truncate rounded-md border border-violet-300/30 bg-violet-950/85 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.12em] text-violet-200 shadow-sm">
-                            {project.sourceLabel}
-                        </div>
-                    ) : <div />}
+            {ribbon && (
+                <div
+                    data-slate-ribbon
+                    className="absolute inset-x-0 top-0 z-20 truncate px-2 py-1.5 text-center text-[10px] font-black uppercase leading-none tracking-[0.08em]"
+                    style={{ background: ribbon.color, color: ribbon.onColor }}
+                >
+                    {ribbon.label}
+                </div>
+            )}
+            <div className={`absolute inset-0 px-3 pb-3 flex flex-col justify-between ${ribbon ? 'pt-8' : 'pt-3'}`}>
+                <div className={`flex items-start gap-1 ${ribbon ? 'justify-start -ml-1.5' : 'justify-end'} ${ribbon && onDelete ? 'pr-4' : ''}`}>
                     <div className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${phaseColor} shadow-sm`}>
                         {project.phase}
                     </div>
                 </div>
-                
+
                 <div className="flex flex-col gap-1">
                     <div className="font-bold text-sm text-white leading-tight line-clamp-2 drop-shadow-md">{project.name}</div>
                     

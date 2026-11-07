@@ -208,12 +208,12 @@ const finishWithNews = (
 ) => ({
     ...player,
     news: [makeNews(player, legalCase, headline, subtext, impactLevel), ...(player.news || [])].slice(0, 80),
-    logs: [{
+    logs: [...(player.logs || []), {
         week: player.currentWeek,
         year: player.age,
         message: log,
         type: impactLevel === 'HIGH' ? 'negative' as const : 'neutral' as const,
-    }, ...(player.logs || [])].slice(0, 80),
+    }],
 });
 
 export const createStudioNameRightsHearing = (player: Player, caseId: string): LifeEvent | null => {

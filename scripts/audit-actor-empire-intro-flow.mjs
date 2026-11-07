@@ -55,9 +55,9 @@ mustInclude(introCss, 'touch-action:pan-y', 'Save-slot phase accepts vertical to
 
 const lifestyle = read('views/LifestylePage.tsx');
 mustInclude(lifestyle, "import StreamingLockedScreen from '../components/StreamingLockedScreen'", 'Lifestyle uses package streaming lock');
-mustInclude(lifestyle, "import CinemaLockedScreen from '../components/CinemaLockedScreen'", 'Lifestyle uses package cinema lock');
-mustInclude(lifestyle, "'CINEMA_CHAIN'", 'Lifestyle exposes cinema-chain view');
-mustInclude(lifestyle, "setView('CINEMA_CHAIN')", 'Lifestyle routes cinema-chain card');
-mustInclude(lifestyle, '<CinemaLockedScreen onBack={() => setView', 'Lifestyle renders cinema lock screen');
+mustInclude(lifestyle, "import UpcomingPacksFlow from '../components/packs/UpcomingPacksFlow'", 'Lifestyle uses the Upcoming Packs flow');
+mustInclude(lifestyle, "'UPCOMING_PACKS'", 'Lifestyle exposes the Upcoming Packs view');
+mustInclude(lifestyle, "setView('UPCOMING_PACKS')", 'Lifestyle routes the hub banner');
+mustInclude(lifestyle, '<UpcomingPacksFlow playerName={player.name} onBack={() => setView', 'Lifestyle renders the Upcoming Packs flow');
 
 console.log('Actor Empire intro and locked-screen audit passed.');

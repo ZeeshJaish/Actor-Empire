@@ -53,7 +53,7 @@ interface Props {
   onOpenProductionHouse?: () => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
-  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS';
+  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE';
   initialContentMarketOfferId?: string;
   onContentMarketOfferConsumed?: () => void;
 }
@@ -198,7 +198,7 @@ export default function StreamingLockedScreen({
     player.ownedStreamingPlatform.identity
     && player.ownedStreamingPlatform.foundingProfile,
   ));
-  const [headquartersDestination, setHeadquartersDestination] = useState<'HOME' | 'FINANCE' | 'STATUS'>(initialDestination);
+  const [headquartersDestination, setHeadquartersDestination] = useState<NonNullable<Props['initialDestination']>>(initialDestination);
   const [feedback, setFeedback] = useState('');
   const eligibility = useMemo(() => evaluateStreamingEligibility(player), [player]);
   const platform = player.ownedStreamingPlatform;

@@ -69,6 +69,12 @@ check('series promise follows canonical season and cannot redirect parent or ord
  const saved=result.session!.bids.at(-1)!.futureFunding!;assert.equal(saved.parentProjectId,lot.sourceProjectId);assert.equal(saved.firstInstallmentNumber,4);assert.equal(saved.baseTitle,'Garden of Glass');
  assert.equal(placeStreamingBuyerAuctionBid(room.player,room.session!.id,{minimumGuarantee:lot.minimumGuarantee,licensorRevenueShare:0,marketingGuarantee:0,futureGreenlight:true,futureFunding:{...future,kind:'SEQUEL'}},1002).changed,false);
 });
+/* #295: delivered waits for its week on the Slate; once booked it opens as it always did */
+const deliverAndBook=(player:any,at:number)=>{
+ const held=processAuctionFutureFunding(player,at);
+ assert.equal(held.world.projects.length,player.world.projects.length,'Delivered waits for its week');
+ return processAuctionFutureFunding({...held,ownedStreamingPlatform:{...held.ownedStreamingPlatform,originalCommissions:held.ownedStreamingPlatform.originalCommissions.map((c:any)=>({...c,releasePlan:c.releasePlan||{scope:'GLOBAL',releasePattern:'FULL_SEASON',marketingPlan:'STANDARD',premiereAtAbsoluteWeek:at,authorizedAtAbsoluteWeek:at}}))}},at);
+};
 check('signed continuation delivers correct part number, legacy original survives',()=>{
  for(const kind of ['SEQUEL','NEXT_SEASON','NEW_ORIGINAL'] as const){const p=fixture();const parent=p.world.projects[0] as any;parent.title=kind==='NEXT_SEASON'?'Dark Garden of Glass Season 2':'Dark Garden of Glass 2';parent.installmentNumber=2;if(kind==='NEXT_SEASON'){parent.mediaType='SERIES';parent.seasonNumber=2;}
  const week=getAbsoluteWeek(p.age,p.currentWeek);const future={kind,count:1,budgetPerProject:2_000_000,format:'ANIMATED' as const,commitment:'FIRM' as const,deadlineWeeks:52,platformRightsPercent:85};
@@ -76,11 +82,12 @@ check('signed continuation delivers correct part number, legacy original survive
  p.ownedStreamingPlatform.costCommitments=[{id:'reserve',idempotencyKey:'reserve',category:'CONTENT',label:'fund',status:'COMMITTED',plannedAmount:2_000_000,committedAmount:2_000_000,paidAmount:0,weeklyAmount:0,createdAtAbsoluteWeek:week,committedAtAbsoluteWeek:week,paidAtAbsoluteWeek:null,sourceReferenceId:'promise'}];
  const started=processAuctionFutureFunding(p,week);assert.equal(started.ownedStreamingPlatform.treasuryCash,p.ownedStreamingPlatform.treasuryCash-2_000_000);
  const legacyInFlight=JSON.parse(JSON.stringify(started));delete legacyInFlight.ownedStreamingPlatform.rightsObligations[0].futureFunding.parentProjectId;delete legacyInFlight.ownedStreamingPlatform.rightsObligations[0].futureFunding.lineageId;delete legacyInFlight.ownedStreamingPlatform.rightsObligations[0].futureFunding.firstInstallmentNumber;delete legacyInFlight.ownedStreamingPlatform.rightsObligations[0].futureFunding.baseTitle;
- if(kind!=='NEW_ORIGINAL'){const legacyDelivered=processAuctionFutureFunding(legacyInFlight,week+52);const legacyProject=legacyDelivered.world.projects.find(x=>!p.world.projects.some(y=>y.id===x.id)) as any;assert.equal(legacyProject.installmentNumber,3,'Existing in-flight production retains numbered installment during migration');}
+ if(kind!=='NEW_ORIGINAL'){const legacyDelivered=deliverAndBook(legacyInFlight,week+52);const legacyProject=legacyDelivered.world.projects.find(x=>!p.world.projects.some(y=>y.id===x.id)) as any;assert.equal(legacyProject.installmentNumber,3,'Existing in-flight production retains numbered installment during migration');}
  if(kind!=='NEW_ORIGINAL')assert.equal(resolveAuctionContinuation(started,parent.id,parent.title,kind==='NEXT_SEASON'?'SERIES':'MOVIE').firstInstallmentNumber,4,'A second funded promise cannot commission the same numbered sequel again');
- const delivered=processAuctionFutureFunding(JSON.parse(JSON.stringify(started)),week+52);const project=delivered.world.projects.find(x=>x.id!==parent.id&&!p.world.projects.some(y=>y.id===x.id)) as any;assert.ok(project);
+ const delivered=deliverAndBook(JSON.parse(JSON.stringify(started)),week+52);const project=delivered.world.projects.find(x=>x.id!==parent.id&&!p.world.projects.some(y=>y.id===x.id)) as any;assert.ok(project);
  if(kind!=='NEW_ORIGINAL'){assert.equal(project.title,kind==='NEXT_SEASON'?'Dark Garden of Glass Season 3':'Dark Garden of Glass 3');assert.equal(project.installmentNumber,3);assert.equal(project.parentProjectId,parent.id);}
- else {assert.match(project.title,/Fixture studio Original 1/);assert.equal(project.parentProjectId,undefined);}
+ /* #295: a real title, not "Fixture studio Original 1" */
+ else {assert.ok(project.title&&!/Original 1/.test(project.title));assert.equal(project.parentProjectId,undefined);}
  assert.equal(processAuctionFutureFunding(delivered,week+52).ownedStreamingPlatform.treasuryCash,delivered.ownedStreamingPlatform.treasuryCash);
  }
 });

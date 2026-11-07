@@ -2,7 +2,6 @@ import { existsSync, readFileSync } from 'node:fs';
 
 const app = readFileSync('views/mobile/ForbesApp.tsx', 'utf8');
 const mobileShell = readFileSync('views/mobile/MobilePage.tsx', 'utf8');
-const legacyMobileShell = readFileSync('views/MobilePage.tsx', 'utf8');
 const profilePath = 'views/mobile/components/ForbesStudioProfile.tsx';
 const profile = existsSync(profilePath) ? readFileSync(profilePath, 'utf8') : '';
 const positionPath = 'views/mobile/components/ForbesCompanyPosition.tsx';
@@ -74,9 +73,7 @@ if (!app.includes('StudioAcquisitionDesk')) failures.push('Forbes does not wire 
 if (!app.includes('getCompanyPosition')) failures.push('Forbes does not derive the player company position.');
 if (!app.includes('onOpenStocks')) failures.push('Forbes does not expose the existing Stocks route.');
 if (!mobileShell.includes('onOpenStocks={() => setAppMode(\'STOCKS\')}')) failures.push('Primary mobile shell does not route Forbes to Stocks.');
-if (!legacyMobileShell.includes('onOpenStocks={() => setAppMode(\'STOCKS\')}')) failures.push('Legacy mobile shell does not route Forbes to Stocks.');
 if (!mobileShell.includes('onUpdatePlayer={handleUpdatePlayer}')) failures.push('Primary mobile shell does not pass player updates into Forbes.');
-if (!legacyMobileShell.includes('onUpdatePlayer={handleUpdatePlayer}')) failures.push('Legacy mobile shell does not pass player updates into Forbes.');
 
 if (profile.includes('text-[clamp(2.1rem,10vw,3.25rem)]')) {
   failures.push('Forbes profile still uses the oversized studio-name header treatment.');

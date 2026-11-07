@@ -10,6 +10,8 @@ import { buildStreamingBiddingRightsLot, resolveStreamingRightsCompatibility } f
 import { buildCinemaAwarenessSnapshot } from './boxOfficeExposureAdapters';
 import { prepareCinemaAudienceWorld } from './boxOfficeWeek';
 import { valueCinemaStreamingRights, type CinemaRightsQuote } from './boxOfficeRightsValue';
+import { getStreamingRightsMarketShare } from '../streamingCataloguePackages';
+import { createDeterministicRng } from '../deterministicRandom';
 /** Read-only buyer value. Existing contracts and their payment history are never repriced. */
 export const quoteCinemaRightsForBuyer = (player: Player, project: ProjectDetails, titleId: string, buyerId: string, startsAtAbsoluteWeek?: number, durationWeeks = 52, offeredCountryIds?: readonly string[], exclusivity: import('../../types').StreamingLicenseExclusivity = 'EXCLUSIVE', windowType: import('../../types').StreamingRightsWindowType = 'FIRST_WINDOW'): CinemaRightsQuote => {
     const now = getAbsoluteWeek(player.age, player.currentWeek), starts = Math.max(now, startsAtAbsoluteWeek ?? now);
@@ -50,7 +52,26 @@ export const quoteCinemaRightsForBuyer = (player: Player, project: ProjectDetail
     const quote = valueCinemaStreamingRights({ titleId, buyerId, absoluteWeek: now, startsAtAbsoluteWeek: starts, durationWeeks, hasRights: (offeredCountryIds ? Boolean(exact?.available) : Boolean(lot)) && Boolean(company) && Boolean(offer) && company.lifecycle !== 'CLOSED' && company.lifecycle !== 'ACQUIRED' && (!core || !getPlatformAiSpendingRestrictions(core, now).blocksNewBids), alreadySigned,
         // A title competes with the rest of the acquisition slate; no minimum cash or budget floor.
         buyerCashCents: Math.floor(Math.max(0, actualCash - obligations) * P.titleCashShare * 100), unpaidObligationsCents: 0, countries, uncertainty: paid?.firstAdmissions ? P.observedUncertainty : P.unobservedUncertainty });
-    return { ...quote, scope: { countryIds: countries.map(c => c.countryId), startsAtAbsoluteWeek: starts, durationWeeks } };
+    return { ...quote, alreadySigned, scope: { countryIds: countries.map(c => c.countryId), startsAtAbsoluteWeek: starts, durationWeeks } };
+};
+/**
+ * #315: people forget a film, but a service still pays to have it on the shelf. Awareness fades by half in about 23 weeks, so without this
+ * a three-year-old film had no buyer at all alone, yet fetched a fortune inside a package. It comes in from half a year after release and
+ * is whole after a year and a half, so a new film still lives on its cinema numbers. A buyer in few markets pays for those markets.
+ */
+export const withShelfValue = (quote: CinemaRightsQuote, input: { titleId: string; buyerId: string; now: number; releasedAtAbsoluteWeek?: number; aloneValue: number; buyerCash: number }): CinemaRightsQuote => {
+    if (quote.alreadySigned || !quote.scope?.countryIds.length) return quote;
+    const released = Number(input.releasedAtAbsoluteWeek);
+    const weight = Number.isFinite(released) ? Math.max(0, Math.min(1, (input.now - released - 26) / 52)) : 1;
+    if (weight <= 0) return quote;
+    const fit = 0.6 + createDeterministicRng(`shelf-value:${input.titleId}:${input.buyerId}`)() * 0.7;
+    const markets = 0.35 + 0.65 * getStreamingRightsMarketShare(quote.scope.countryIds);
+    const shelf = input.aloneValue * 1.6 * fit * markets * weight;
+    const maximumBidCents = Math.floor(Math.min(Math.max(0, input.buyerCash) * P.titleCashShare, shelf) * 100);
+    if (maximumBidCents <= quote.maximumBidCents) return quote;
+    const mid = Math.floor(maximumBidCents * 0.75);
+    return { ...quote, eligible: maximumBidCents > 0, maximumBidCents, range: { low: Math.floor(mid * 0.7), mid, high: maximumBidCents },
+        drivers: [...quote.drivers, 'What the title is worth on the shelf, now that the talk has faded'] };
 };
 export const applyCinemaRightsQuoteToBidder = (platform: StreamingBiddingPlatformInput, quote: CinemaRightsQuote): StreamingBiddingPlatformInput => ({
     ...platform, canStartNewBids: platform.canStartNewBids !== false && quote.eligible && quote.maximumBidCents >= 100000,

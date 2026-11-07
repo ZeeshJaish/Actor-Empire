@@ -511,14 +511,14 @@ export const processRegulatorPressure = (player: Player): Player => {
             regulatorPressureState: nextState,
         },
         logs: reviewCleared
-            ? [{
+            ? [...(agedPlayer.logs || []), {
                 week: agedPlayer.currentWeek,
                 year: agedPlayer.age,
                 message: t(language, 'services.regulatorPressure.log.cleared'),
                 type: 'positive' as const,
-            }, ...(agedPlayer.logs || [])].slice(0, 80)
+            }]
             : shouldPublish
-            ? [{
+            ? [...(agedPlayer.logs || []), {
                 week: agedPlayer.currentWeek,
                 year: agedPlayer.age,
                 message: t(language, 'services.regulatorPressure.log.weekly', {
@@ -527,7 +527,7 @@ export const processRegulatorPressure = (player: Player): Player => {
                     weeks: state.acquisitionMoratoriumWeeksRemaining,
                 }),
                 type: state.pressureScore >= 65 ? 'negative' as const : 'neutral' as const,
-            }, ...(agedPlayer.logs || [])].slice(0, 80)
+            }]
             : agedPlayer.logs,
     };
 };

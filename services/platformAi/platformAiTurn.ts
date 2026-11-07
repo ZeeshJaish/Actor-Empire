@@ -242,6 +242,13 @@ const scheduleReadyPlans = (
                 competingByWeek.set(premiereWeek, previous);
             }
         }
+        /* #242: a title it bought from a studio takes a place on its slate too */
+        for (const contract of Object.values(nextWorld.streamingRightsContracts || {})) {
+            if (contract.status !== 'ACTIVE' || contract.buyer?.platformId !== platformId || contract.startsAtAbsoluteWeek <= absoluteWeek) continue;
+            const previous = competingByWeek.get(contract.startsAtAbsoluteWeek) || { premiereTitleCount: 0, scheduledTitleCount: 0, sameGenreCount: 0, sameAudienceCount: 0 };
+            previous.premiereTitleCount += 1;
+            competingByWeek.set(contract.startsAtAbsoluteWeek, previous);
+        }
         const legalCandidates: Array<{
             premiereAtAbsoluteWeek: number;
             latestRequiredAbsoluteWeek: number;

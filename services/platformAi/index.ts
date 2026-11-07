@@ -121,6 +121,9 @@ export {
 export {
     acceptPlatformAiPlayerCommission,
     calculatePlatformAiPlayerProducerFee,
+    getRivalBudgetLevel,
+    getRivalCapScale,
+    isRivalBigDeal,
     createPlatformAiPlayerCommissionOffer,
     declinePlatformAiPlayerCommission,
     finalizePlatformAiPlayerCommissionGreenlight,
@@ -131,7 +134,10 @@ export {
     normalizePlatformAiPlayerCommissionOffers,
     settlePlatformAiPlayerCommissionDelivery,
     syncPlatformAiPlayerCommissionProductions,
+    decidePlatformAiCommissionRenewals,
     transferPlatformAiPlayerCommission,
+    platformAiCommissionKillFee,
+    PLATFORM_COMMISSION_NOTICE_WEEKS,
     type CreatePlatformAiPlayerCommissionOfferInput,
     type PlatformAiPlayerCommissionResult,
 } from './platformAiPlayerCommissions';

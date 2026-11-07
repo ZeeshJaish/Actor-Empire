@@ -167,7 +167,7 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             // Scale the sample to the paying market, with bounded statistical needs.
             const holdConfidence=clamp(seen/Math.max(50,Math.min(1000,eligible*.01)));
             const excellentResponse=clamp((observedSatisfaction-.75)/.25)*holdConfidence;
-            const firstHalfLife=P.firstInterestHalfLifeWeeks*(1+P.excellentResponseHold*excellentResponse**2*fraction(facts.urgency));
+            const firstHalfLife=P.firstInterestHalfLifeWeeks*(1+P.excellentResponseHold*excellentResponse**2*fraction(facts.urgency))*(facts.interestHold || 1);
             const firstTiming = 2 ** (-releaseAge/firstHalfLife);
             const repeatTiming = 2 ** (-releaseAge/P.repeatInterestHalfLifeWeeks);
             // New recommendations carry fresh urgency; older unconverted awareness fades.

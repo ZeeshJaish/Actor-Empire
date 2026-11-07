@@ -1,3 +1,4 @@
+import { gameWeekText } from '../../services/gameWeek';
 import { readCreatorWorld, claimCreatorAction, creatorPositiveReward } from '../../services/creatorEconomy';
 
 import React, { useMemo, useState } from 'react';
@@ -228,7 +229,7 @@ export const IndustryMediaDiscussionPanel: React.FC<IndustryMediaDiscussionPanel
                     <button onClick={publish} disabled={!canPublish} className="mt-4 w-full rounded-full bg-white px-4 py-3 text-sm font-black text-black disabled:opacity-40">
                         Publish response
                     </button>
-                    <div className="mt-2 text-center text-[10px] text-zinc-600">No comment publishes nothing · Silence has no penalty · Open through week {discussion.responseClosesAbsoluteWeek}</div>
+                    <div className="mt-2 text-center text-[10px] text-zinc-600">No comment publishes nothing · Silence has no penalty · Open through {gameWeekText(discussion.responseClosesAbsoluteWeek)}</div>
                 </div>
             ) : (
                 <div className="mt-4 text-xs text-zinc-500">
@@ -445,14 +446,14 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 ...player.instagram,
                 controversy: Math.max(0, Math.min(100, (player.instagram.controversy || 0) + Math.max(0, controversyDelta)))
             },
-	            logs: [{
+	            logs: [...(player.logs || []), {
 	                week: player.currentWeek,
 	                year: player.age,
 	                message: controversyDelta >= 7
 	                    ? tr('x.log.heatedPost', { type: typeConfig.label.toLowerCase() })
 	                    : tr('x.log.postedUpdate', { type: typeConfig.label.toLowerCase() }),
 	                type: logType
-	            }, ...player.logs].slice(0, 50)
+	            }]
         };
         spendPlayerEnergy(nextPlayer, 5, `X: ${typeConfig.label}`);
         const promotion = promotedProjectId ? applyProjectPromotionAttribution(nextPlayer, {
@@ -572,14 +573,14 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                 ...player.instagram,
                 controversy: Math.max(0, Math.min(100, (player.instagram.controversy || 0) + Math.max(0, toneConfig.controversy)))
             },
-            logs: [{
+            logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: mode === 'QUOTE'
                     ? tr('x.log.quotedPost', { name: post.authorName })
                     : tr('x.log.repliedPost', { name: post.authorName }),
                 type: toneConfig.controversy >= 6 ? 'negative' as const : 'positive' as const
-            }, ...player.logs].slice(0, 50)
+            }]
         };
         spendPlayerEnergy(nextPlayer, mode === 'QUOTE' ? 8 : 5, mode === 'QUOTE' ? `X: Quote ${post.authorName}` : `X: Reply to ${post.authorName}`);
         setFeed(updatedFeed);

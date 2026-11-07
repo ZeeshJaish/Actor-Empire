@@ -506,7 +506,7 @@ export function BuildWizard({ data, operations = false, campaignOnly = false, in
         onBack={index > 0 ? () => go(index - 1) : undefined}
         next={index === BUILD_STAGES.length - 1
           ? { eyebrow: data.commissioned ? 'Done' : 'Sign', label: data.commissioned ? 'Commissioned' : `Commission · ${money(plan.commissionNow ?? plan.total)}`, glyph: <StageIcon stage="launch" />,
-            disabled: data.commissioned || bar.blocking || marketLocked, onClick: () => setCommissionRequest((count) => count + 1) }
+            disabled: data.commissioned || bar.blocking || marketLocked, describedBy: 'bw-commission-guidance', onClick: () => setCommissionRequest((count) => count + 1) }
           : { eyebrow: 'Next', label: BUILD_STAGES[index + 1].label, glyph: <StageIcon stage={BUILD_STAGES[index + 1].id} />, onClick: () => go(index + 1) }}
       />}
 

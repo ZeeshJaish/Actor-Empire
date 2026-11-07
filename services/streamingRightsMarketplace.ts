@@ -1,3 +1,4 @@
+import { getStreamingOpeningLock } from './streamingOpeningLock';
 import {resolveStreamingOriginalRightsSellerId, allocatePrivateCollectionMoney, collectionOpportunityForNegotiation, collectionPrivateDefaults, createCollectionNegotiationSnapshot, validateCollectionPrivateTerms, validatePrivateTermsNumbers} from './streamingCollectionPrivateOffers';
 import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms, minimumStreamingLicenseFee} from './streamingBackendPolicy';
 import { getOwnedPlatformPackageCountryIds } from './streamingContentAvailability';
@@ -1132,6 +1133,8 @@ export const openStreamingRightsNegotiation = (
     inputTerms?: StreamingRightsTermsInput,
     settlementAuctionSessionId?: string,
 ): StreamingRightsActionResult => {
+    const buildLock = getStreamingOpeningLock(player);
+    if (buildLock.catalogueLocked) return { player, changed: false, reason: 'NOT_READY', detail: buildLock.message };
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle)) return { player, changed: false, reason: 'NOT_ACTIVE' };
     const reservedSettlement = Boolean(settlementAuctionSessionId && platform.buyerAuctionSessions.some(session => (
@@ -1598,6 +1601,8 @@ export const signStreamingRightsDeal = (
     player: Player,
     negotiationId: string,
 ): StreamingRightsActionResult => {
+    const buildLock = getStreamingOpeningLock(player);
+    if (buildLock.catalogueLocked) return { player, changed: false, reason: 'NOT_READY', detail: buildLock.message };
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const negotiation = platform.rightsNegotiations.find(item => item.id === negotiationId);
     if (!negotiation || negotiation.status !== 'READY_TO_SIGN') return { player, changed: false, reason: 'NOT_READY' };

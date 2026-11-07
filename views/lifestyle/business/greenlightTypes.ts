@@ -6,6 +6,7 @@ export type GreenlightStep =
     | 'EQUIPMENT'
     | 'LOCATION'
     | 'SETUP'
+    | 'DEAL'
     | 'CONFIRM'
     | 'BUZZ';
 

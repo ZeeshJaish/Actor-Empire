@@ -61,7 +61,8 @@ const localeFiles = [
 });
 
 assert(
-  mobile.includes('<GuideView') && mobile.includes('onOpenApp={(nextMode) => setAppMode(nextMode)}'),
+  /* #255: the Guide's door to the two dating apps goes through the age lock; every other app opens straight away */
+  mobile.includes('<GuideView') && mobile.includes('onOpenApp={(nextMode) => (nextMode === \'TINDER\' || nextMode === \'LUXE\' ? openDating(nextMode) : setAppMode(nextMode))}'),
   'MobilePage should pass phone-app navigation into GuideView.'
 );
 

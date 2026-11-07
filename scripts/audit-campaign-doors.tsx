@@ -45,8 +45,8 @@ async function main() {
     assert.ok(!existsSync(resolve(root, 'components/StreamingPromotionWarRoom.tsx')) && !existsSync(resolve(root, 'styles/streaming-promotion.css')), 'The War Room\'s component and stylesheet are gone');
     const hq = readFileSync(resolve(root, 'components/StreamingPlatformHQ.tsx'), 'utf8');
     assert.ok(!/StreamingPromotionWarRoom|openPromotionWarRoom\(|showPromotionWarRoom|promotionInitial|Enter Growth War Room/.test(hq), 'The HQ never opens it (the old dossier keeps its prop name; comments may still name it)');
-    assert.ok((hq.match(/openCampaignStudio\(/g) || []).length >= 7, 'Its doors open the Campaign Studio (Audience twice, the title page twice, Originals, Rights, the old dossier)');
-    for (const [file, words] of [['components/StreamingOriginalsStudio.tsx', 'Campaign Studio <Megaphone'], ['components/StreamingRightsExchange.tsx', 'Open Campaign Studio'], ['components/StreamingTitleDossier.tsx', 'Open Campaign Studio']] as const) {
+    assert.ok((hq.match(/openCampaignStudio\(/g) || []).length >= 6, 'Its doors open the Campaign Studio (Audience twice, the title page twice, Rights, the old dossier)');
+    for (const [file, words] of [['components/StreamingRightsExchange.tsx', 'Open Campaign Studio'], ['components/StreamingTitleDossier.tsx', 'Open Campaign Studio']] as const) {
         assert.ok(readFileSync(resolve(root, file), 'utf8').includes(words), `${file} names the Campaign Studio`);
     }
     console.log('PASS gone: the War Room\'s component and stylesheet removed; every door opens the Campaign Studio');

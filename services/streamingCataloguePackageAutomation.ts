@@ -147,7 +147,7 @@ export const processStreamingCataloguePackageStrategyAutomation = (
         || candidate.protectionReasons.length > 0
         || candidate.components.length > policy.maximumAutomaticSize
         || candidate.maximumDurationWeeks > policy.maximumAutomaticDurationWeeks
-        || (candidate.requestedExclusivity === 'EXCLUSIVE' && !policy.allowAutomaticExclusive)
+        || (candidate.requestedExclusivity === 'EXCLUSIVE' && (!policy.allowAutomaticExclusive || mandate.exclusivityPolicy !== 'ALLOW_WITHIN_LIMITS'))
         || (candidate.requestedCountryIds.length >= allCountryCount && !policy.allowAutomaticGlobal);
     if (policyBlocked) {
         return {

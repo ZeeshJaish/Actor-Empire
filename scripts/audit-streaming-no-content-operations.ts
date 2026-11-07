@@ -161,8 +161,6 @@ const launch = source('components/StreamingDefineLaunchExperience.tsx');
 assert.ok(!/lock\('feature:early'/.test(launch) && !launch.includes('CONTENT_OPERATIONS'), 'Early access is not locked by Content operations');
 const network = source('components/streaming-transplant/StreamingNetworkExperience.tsx');
 assert.ok(/'DATA_RECOMMENDATIONS', 'CONTENT_OPERATIONS'\]\.includes\(t\.id\)/.test(network) && network.includes("tab === 'TECH' && showEngineering &&"), 'The Engineering list hides Content operations, and itself when empty');
-const studio = source('components/StreamingOriginalsStudio.tsx');
-assert.ok(!studio.includes('CONTENT_OPERATIONS') && !studio.includes('Content Ops'), 'The Originals localization bay shows no Content operations level');
-console.log('PASS UI: Early access open, Engineering list without Content operations, Originals bay without it');
+console.log('PASS UI: Early access open, Engineering list without Content operations');
 
 console.log('done: nothing needs Content operations');

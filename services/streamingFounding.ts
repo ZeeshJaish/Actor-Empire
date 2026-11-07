@@ -1,3 +1,4 @@
+import { advanceOriginalPitches } from './originalsPitches';
 import type {
     OwnedStreamingCapitalAction,
     OwnedStreamingFoundingDraft,
@@ -32,6 +33,7 @@ export {
     getStreamingIncorporationBreakdown,
     STREAMING_INCORPORATION_ECONOMY,
 } from './streamingEconomy';
+import { getCareerProjects } from './outsideOriginals';
 
 /**
  * Founding deliberately makes only three decisions: identity, promise, and
@@ -439,16 +441,16 @@ export const incorporateOwnedStreamingPlatform = (
         reason: 'INCORPORATED',
         issues: [],
         cinematicId,
-        player: advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing({
+        player: advanceOriginalPitches(advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing({
             ...player,
             money: player.money - STREAMING_INCORPORATION_ECONOMY.cashRequired,
             ownedStreamingPlatform: withCinematic,
-        })),
+        }))),
     };
 };
 
 /** Credits come only from the founder's real released work. */
 export const getStreamingFounderCredits = (player: Pick<Player, 'pastProjects' | 'activeReleases'>): string[] => [...new Set([
     ...(player.activeReleases || []).map(project => project.projectDetails?.title),
-    ...(player.pastProjects || []).map(project => project.name),
+    ...getCareerProjects(player).map(project => project.name),
 ].filter((title): title is string => Boolean(title?.trim())))].slice(0, 3);

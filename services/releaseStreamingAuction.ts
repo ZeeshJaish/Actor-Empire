@@ -20,6 +20,8 @@ export interface ReleaseStreamingBidderMarketContext {
     absoluteWeek: number;
     earliestPremiereAbsoluteWeek?: number;
     studioPlatformRelations?: Record<string, unknown>;
+    /** #246: a platform that has to be in the room, if it can pay: the one with the first word */
+    requiredPlatformId?: string;
 }
 
 export const alignStreamingBidderPremiereWeeks = (
@@ -66,13 +68,17 @@ export const buildReleaseStreamingBidderMarket = (
         .filter(company => company.kind !== 'PLAYER' && company.lifecycle !== 'CLOSED' && company.lifecycle !== 'ACQUIRED')
         .filter(company => (company.cashMillions || 0) >= 2)
         .map(company => {
-            const availablePremiereAbsoluteWeeks = getStreamingPlatformAvailablePremiereWeeks(
+            const openWeeks = getStreamingPlatformAvailablePremiereWeeks(
                 launchCalendar,
                 company.id,
                 earliestPremiereAbsoluteWeek,
-                12,
+                24,
             );
-            if (!availablePremiereAbsoluteWeeks.length) return null;
+            if (!openWeeks.length) return null;
+            /* #242: the platform sets the date from its own calendar, some weeks out, not the first open week */
+            const calendarWait = 2 + Math.floor(createDeterministicRng(`release-bidder-wait:${context.projectId}:${company.id}:${context.absoluteWeek}`)() * 9);
+            const laterWeeks = openWeeks.filter(week => week >= earliestPremiereAbsoluteWeek + calendarWait);
+            const availablePremiereAbsoluteWeeks = laterWeeks.length ? laterWeeks : openWeeks.slice(-1);
             const companyRng = createDeterministicRng(`release-bidder:${context.projectId}:${context.title}:${normalizedGenre}:${context.absoluteWeek}:${company.id}`);
             const cashMillions = Math.max(2, Number(company.cashMillions) || 0);
             const subscribers = Math.max(0, Number(company.subscribersMillions) || 0);
@@ -103,7 +109,7 @@ export const buildReleaseStreamingBidderMarket = (
                 0.75,
             );
             const scaleScore = Math.log10(1 + subscribers) * 7 + Math.log10(1 + valuation) * 5 + Math.log10(1 + cashMillions) * 4;
-            const launchDelayWeeks = Math.max(0, availablePremiereAbsoluteWeeks[0] - earliestPremiereAbsoluteWeek);
+            const launchDelayWeeks = Math.max(0, openWeeks[0] - earliestPremiereAbsoluteWeek);
             const fitScore = companyRng() * 62 + scaleScore + prestige * 0.1 + technology * 0.05 + momentum * 0.04 - launchDelayWeeks * 1.75;
             return {
                 fitScore,
@@ -137,6 +143,8 @@ export const buildReleaseStreamingBidderMarket = (
         .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
         .sort((left, right) => right.fitScore - left.fitScore || left.platform.id.localeCompare(right.platform.id));
 
-    return alignStreamingBidderPremiereWeeks(candidates.map(candidate => candidate.platform))
-        .slice(0, Math.min(bidderCount, candidates.length));
+    const aligned = alignStreamingBidderPremiereWeeks(candidates.map(candidate => candidate.platform));
+    const picked = aligned.slice(0, Math.min(bidderCount, candidates.length));
+    const required = context.requiredPlatformId ? aligned.find(platform => platform.id === context.requiredPlatformId) : undefined;
+    return required && !picked.includes(required) ? [...picked, required] : picked;
 };

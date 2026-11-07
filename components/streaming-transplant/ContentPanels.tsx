@@ -372,9 +372,9 @@ export const KeptGrid: React.FC<{ titles: CatalogueTitle[]; live?: boolean; onOp
    shelves, one tap to premiere there. A folded run opens with its weeks as
    chips to pick from. Moving is ✕ in one week and a tap in another. Auto-fill
    places the whole shelf at once (planned in streamingSlateProgramming).
-   Originals premiere through their release in the Originals studio; a licence
-   bought after setup goes live when its rights start. The slate plans weeks
-   only: campaigns are not set here (premieres keep the Standard plan). */
+   A licence bought after setup goes live when its rights start. The slate plans
+   weeks, and an Original series' rhythm: campaigns are not set here (premieres
+   keep the Standard plan). */
 type SlatePlan = 'LEAN' | 'STANDARD' | 'EVENT';
 type SlateActionResult = { ok: boolean; message: string } | undefined;
 export type SlateAutoFillItem = { projectId: string; title: string; absoluteWeek: number; marketingPlan: SlatePlan };
@@ -413,7 +413,7 @@ export const SlatePlanner: React.FC<{
   autoFill?: SlateAutoFillItem[];
   /** the auto-fill plan starting fresh (the planned premieres taken off first) */
   autoFillFresh?: SlateAutoFillItem[];
-  onSchedule?: (projectId: string, absoluteWeek: number, plan: SlatePlan) => SlateActionResult;
+  onSchedule?: (projectId: string, absoluteWeek: number, plan: SlatePlan, rhythm?: 'ALL' | 'WEEKLY') => SlateActionResult;
   onUnschedule?: (projectId: string) => SlateActionResult;
   onAutoFill?: (fresh: boolean) => SlateActionResult;
   onClearPlans?: () => SlateActionResult;
@@ -493,8 +493,18 @@ export const SlatePlanner: React.FC<{
               <b>{release.title}</b>
               <span className={css.metaLine}><SourceBadge kind={release.kind} />{release.format ?? 'Film'}</span>
               {release.rightsRisk && <small className={css.wkRisk}>Its licence ends before this week</small>}
+              {release.rhythm && release.projectId && (
+                <span className={css.slRhythm} role="group" aria-label="How it comes out" data-slate-rhythm>
+                  {(['ALL', 'WEEKLY'] as const).map(rhythm => (
+                    <button key={rhythm} type="button" aria-pressed={release.rhythm === rhythm} className={release.rhythm === rhythm ? css.on : ''}
+                      onClick={() => report(key, onSchedule?.(release.projectId!, week.week, 'STANDARD', rhythm))}>
+                      {rhythm === 'ALL' ? 'All at once' : 'An episode a week'}
+                    </button>
+                  ))}
+                </span>
+              )}
               {!release.editable && (
-                <small className={css.wkNote}>{release.kind === 'ORIGINAL' ? 'Premiere set in the Originals studio' : release.auto ? 'Goes live by itself when its licence starts' : week.now ? 'Premieres this week' : 'Set in the opening slate'}</small>
+                <small className={css.wkNote}>{release.kind === 'ORIGINAL' ? (week.now ? 'Premieres this week' : 'Its week is set') : release.auto ? 'Goes live by itself when its licence starts' : week.now ? 'Premieres this week' : 'Set in the opening slate'}</small>
               )}
             </div>
             {release.editable && release.projectId && canAdd(week) && (

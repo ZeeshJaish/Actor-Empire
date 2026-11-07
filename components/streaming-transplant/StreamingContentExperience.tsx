@@ -67,7 +67,7 @@ export interface CatalogueTitle {
   kind: 'ORIGINAL' | 'LICENSED' | 'OWNED';
   format: string;                 // "Film" | "Series"
   genre: string;
-  status: 'LIVE' | 'STAGED' | 'IN PRODUCTION' | 'READY TO SCHEDULE' | 'SCHEDULED' | 'AWAITING AVAILABILITY' | 'RIGHTS EXPIRED' | 'RIGHTS UNAVAILABLE';
+  status: 'LIVE' | 'STAGED' | 'IN PRODUCTION' | 'READY TO SCHEDULE' | 'SCHEDULED' | 'EARLY ACCESS' | 'AWAITING AVAILABILITY' | 'RIGHTS EXPIRED' | 'RIGHTS UNAVAILABLE';
   rating?: number;
   views?: number;
   completion?: number;
@@ -99,6 +99,8 @@ export interface SlateRelease {
   format?: 'Film' | 'Series';
   /** a premiere still ahead that the slate set: it can be moved or taken off */
   editable?: boolean;
+  /** #291: an Original series: all at once, or an episode a week */
+  rhythm?: 'ALL' | 'WEEKLY';
   /** goes on the service by itself when its licence starts (a licence bought after setup);
       the slate shows it but does not plan it */
   auto?: boolean;
@@ -203,7 +205,7 @@ export const ContentDesk: React.FC<{
   /** Records a renewal decision on the rights calendar's open case. */
   onRenewalDecision?: (caseId: string, action: RenewalAction) => { ok: boolean; message: string };
   /** once live: premiere a title from the shelves in a week */
-  onScheduleTitle?: (projectId: string, absoluteWeek: number, plan: 'LEAN' | 'STANDARD' | 'EVENT') => { ok: boolean; message: string };
+  onScheduleTitle?: (projectId: string, absoluteWeek: number, plan: 'LEAN' | 'STANDARD' | 'EVENT', rhythm?: 'ALL' | 'WEEKLY') => { ok: boolean; message: string };
   /** once live: take a premiere that has not happened yet off the slate */
   onUnscheduleTitle?: (projectId: string) => { ok: boolean; message: string };
   /** once live: premiere everything on the shelves where the auto-fill plan puts it

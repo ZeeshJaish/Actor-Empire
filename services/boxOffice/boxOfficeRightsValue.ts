@@ -20,6 +20,8 @@ export interface CinemaRightsValueInput {
     uncertainty: number;
 }
 export interface CinemaRightsQuote {
+    /** #315: this buyer already holds these rights in this window */
+    alreadySigned?: boolean;
     scope?: {
         countryIds: string[];
         startsAtAbsoluteWeek: number;

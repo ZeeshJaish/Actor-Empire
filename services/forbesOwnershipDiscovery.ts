@@ -130,7 +130,7 @@ export const applyForbesOwnershipDiscovery = ({
                 forbesOwnershipDiscoveries: [...discoveries, record],
             },
             inbox: [message, ...(player.inbox || [])],
-            logs: [{
+            logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: t(language, 'services.forbesOwnership.commandLog', {
@@ -138,7 +138,7 @@ export const applyForbesOwnershipDiscovery = ({
                     studio: profile.name,
                 }),
                 type: 'neutral' as const,
-            }, ...(player.logs || [])].slice(0, 50),
+            }],
         },
     };
 };

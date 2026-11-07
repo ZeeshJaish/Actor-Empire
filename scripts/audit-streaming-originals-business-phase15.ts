@@ -327,14 +327,8 @@ assert(!decideStreamingOriginalFuture(renewed.player, 'original-commission', 'RE
 const serviceSource = readFileSync(resolve(process.cwd(), 'services/streamingOriginalsBusiness.ts'), 'utf8');
 const weeklySource = readFileSync(resolve(process.cwd(), 'services/streamingWeeklyLoop.ts'), 'utf8');
 const gameLoopSource = readFileSync(resolve(process.cwd(), 'services/gameLoop.ts'), 'utf8');
-const componentSource = readFileSync(resolve(process.cwd(), 'components/StreamingOriginalsStudio.tsx'), 'utf8');
-const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
-const styleSource = readFileSync(resolve(process.cwd(), 'styles/streaming-originals-studio.css'), 'utf8');
 assert(serviceSource.includes('commitStreamingOriginalLocalization') && serviceSource.includes('authorizeStreamingOriginalRelease') && serviceSource.includes('decideStreamingOriginalFuture'), 'Phase 15 should expose all three post-production decisions.');
 assert(weeklySource.includes('getOwnedStreamingProgramEntries({'), 'Later Original releases should feed the existing exactly-once weekly processor through normalized platform state.');
 assert(gameLoopSource.includes('isOwnedPlatformOriginal'), 'The canonical release path should not mislabel an owned Original as a rival-platform acquisition.');
-assert(componentSource.includes('FUTURE DECISION ROOM') && componentSource.includes('LOCALIZATION BAY') && componentSource.includes('RELEASE CONTROL'), 'The Originals Studio should present the full pipeline as a game space.');
-assert(hqSource.includes('StreamingOriginalsStudio'), 'Content Room should open the complete Originals Studio.');
-assert(styleSource.includes('@media (max-width: 430px)') && styleSource.includes('prefers-reduced-motion'), 'The Phase 15 visual system should cover mobile and reduced motion.');
 
 console.log('Streaming Originals business Phase 15 audit passed.');

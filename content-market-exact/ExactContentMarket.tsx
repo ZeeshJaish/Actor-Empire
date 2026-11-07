@@ -718,7 +718,7 @@ const Studio: React.FC<{ onBack: () => void; onTake: (l: Lot) => void; ownsStudi
       {!mine.length ? (
         ownsStudio
           ? <Blank glyph="🎞" head="Your studio hasn't released anything yet"
-              body="A title becomes eligible the week it releases. Anything your production house has in development will appear here on its release week."
+              body="A title appears here once its cinema run is over, and with a note if a buyer holds it. To send one sooner, open it in Filmography and tap Bid to Platforms."
               action={onCommission ? { label: 'Commission an Original', onPress: onCommission } : undefined} />
           : <Blank glyph="🏛" head="You don't own a production house"
               body="Titles your own company releases cross over here with no fee. You can buy a production house from Lifestyle → Business. Until then, license from the market."
@@ -728,7 +728,11 @@ const Studio: React.FC<{ onBack: () => void; onTake: (l: Lot) => void; ownsStudi
         {mine.map(l => (
           <button className={css.mkcard} key={l.id} aria-label={`${l.title} · ${l.seller}`} disabled={l.linked || Boolean(l.unavailableReason)} onClick={() => onTake(l)}>
             <Poster id={l.artId || l.id} title={l.title} genre={l.genre} hue={l.hue} poster={l.poster} year={l.year} size="md" />
-            <div className={css.mkcardfoot}><b className={css.mkfree}>NO FEE</b><span>ELIGIBLE MKTS</span></div>
+            {l.linked
+              ? <div className={css.mkcardfoot}><span className={css.mkheld}>Already in your catalogue.</span></div>
+              : l.unavailableReason
+              ? <div className={css.mkcardfoot}><span className={css.mkheld}>{l.unavailableReason}</span></div>
+              : <div className={css.mkcardfoot}><b className={css.mkfree}>NO FEE</b><span>ELIGIBLE MKTS</span></div>}
           </button>
         ))}
       </div>
@@ -1231,6 +1235,8 @@ export const ContentMarket: React.FC<{
   onBack: () => void;
   onCommission?: () => void;
   onAcquired?: (l: Lot) => { changed: boolean; detail: string };
+  /** #252: the service is live, so a studio title is only on the shelf now: the screen says what is left to do, not "acquired" */
+  onBroughtAcross?: (l: Lot) => void;
   onPrepareOffer?: (l: Lot) => Lot | null;
   onOfferSent?: (l: Lot, o: Offer) => { changed: boolean; detail: string };
   onEnterRoom?: (l: Lot) => void;
@@ -1249,7 +1255,7 @@ export const ContentMarket: React.FC<{
   initialLotId?: string | null;
   /** Distinguishes "no production house" from "a studio with nothing released". */
   ownsStudio?: boolean;
-}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onPrepareOffer, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, feedback, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
+}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onBroughtAcross, onPrepareOffer, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, feedback, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
   const c = brandColor(brand);
   const [scene, setScene] = useState<MarketScene>(initialScene);
   const [back, setBack] = useState<MarketScene>(initialScene === 'STUDIO' ? 'STUDIO' : 'MARKET');
@@ -1337,7 +1343,15 @@ export const ContentMarket: React.FC<{
   };
   const take = (l: Lot) => performAction(l.mode === 'STUDIO' ? 'Adding to catalogue…' : 'Checking rights and funds…',
     () => l.mode === 'UPCOMING' ? onFollow?.(l) : onAcquired?.(l),
-    detail => settle(l.title, detail, l.mode === 'UPCOMING' ? 'FOLLOWED' : 'SIGNED', l));
+    detail => {
+      if (l.mode === 'STUDIO' && onBroughtAcross) {
+        setScene('STUDIO');
+        onNavigation?.('STUDIO', null);
+        onBroughtAcross(l);
+        return;
+      }
+      settle(l.title, detail, l.mode === 'UPCOMING' ? 'FOLLOWED' : 'SIGNED', l);
+    });
   const navigate = (next: MarketScene, nextLot: Lot | null = lot) => {
     setActionError('');
     setScene(next);

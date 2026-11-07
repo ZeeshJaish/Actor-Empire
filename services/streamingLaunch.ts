@@ -1,3 +1,4 @@
+import { resolveHistoricalCatalogueTitle } from './historicalCatalogue';
 import type {
     OwnedStreamingLaunchCommit,
     OwnedStreamingLedgerEntry,
@@ -71,7 +72,9 @@ export interface StreamingLaunchReadiness {
     forecastHighConcurrentStreams: number;
     demandRegions: StreamingLaunchDemandRegion[];
     capacityOptions: StreamingLaunchCapacityOption[];
+    /** The title that headlines the night: the Original if there is one, otherwise the slate's biggest */
     openingOriginalTitle: string;
+    openingHasOriginal: boolean;
     openingTitleCount: number;
     weeklyOperatingCost: number;
     runwayWeeks: number;
@@ -90,6 +93,23 @@ export const calculateOpeningPaidSubscriberSeed = (
 ): number => projectStreamingCommercialOffers(pricing).subscriptions.length > 0
     ? Math.max(1, Math.round(likelyConcurrentStreams * (2.45 + readinessScore / 100) * conversionMultiplier))
     : 0;
+
+/** #276: how much a finished Original adds to opening demand */
+export const LAUNCH_ORIGINAL_DEMAND = 10;
+
+/** With no Original, the night is led by the slate's biggest title: the event first, then the best known and best rated */
+const getOpeningHeadlineTitle = (player: Player, slate: { entries: Array<{ projectId: string; title: string; marketingPlan?: string; launchWeek: number }> } | null | undefined): string => {
+    const size = (entry: { projectId: string; marketingPlan?: string }) => {
+        const row: any = (player.world.projects || []).find(project => String(project.id) === entry.projectId)
+            || (player.pastProjects || []).find(project => String(project.id) === entry.projectId)
+            || resolveHistoricalCatalogueTitle(player, entry.projectId) || {};
+        return (entry.marketingPlan === 'EVENT' ? 100 : 0)
+            + Number(row.rating ?? row.imdbRating ?? 0) * 5
+            + Math.min(50, Number(row.boxOffice ?? row.gross ?? 0) / 20_000_000);
+    };
+    const best = [...(slate?.entries || [])].sort((a, b) => size(b) - size(a) || a.launchWeek - b.launchWeek)[0];
+    return best?.title || 'Opening night';
+};
 
 const createItem = (
     id: string,
@@ -171,11 +191,12 @@ const buildStreamingLaunchReadiness = (player: Player, context: StreamingCatalog
     const items: StreamingLaunchReadinessItem[] = [];
     const openingMarkets = platform.marketOperations.filter(operation => operation.entryKind === 'OPENING' && operation.status !== 'EXITED');
     const openingMarketsReady = openingMarkets.length > 0 && openingMarkets.every(operation => ['READY', 'ACTIVE'].includes(operation.status));
-    const definitionReady = Boolean(
+    const openingProgramme = getStreamingOpeningProgrammeView(player, context);
+    /* #253: the plan cannot change while it is being built, and a clearance finishing is not a change to it */
+    const definitionReady = openingProgramme.commissioned || Boolean(
         platform.launchProgram.lastBlueprintSignature
         && platform.launchProgram.lastBlueprintSignature === getStreamingLaunchDefinitionSignature(player),
     );
-    const openingProgramme = getStreamingOpeningProgrammeView(player, context);
 
     items.push(createItem(
         'opening-programme',
@@ -256,15 +277,16 @@ const buildStreamingLaunchReadiness = (player: Player, context: StreamingCatalog
         : undefined;
     const originalStatus = original ? getStreamingOriginalLiveStatus(player, original) : null;
     const originalReady = originalStatus === 'DELIVERED' || originalStatus === 'RELEASED';
+    /* #276: an Original is a choice. It makes a bigger opening, and one still being made has to finish or come off the slate. */
     items.push(createItem(
         'original',
-        'Original delivery',
+        'Original',
         originalReady
-            ? `${original?.title} has a final deliverable ready for the opening window.`
+            ? `${original?.title} is finished. It adds +${LAUNCH_ORIGINAL_DEMAND} to opening demand.`
             : original
-                ? `${original.title} is ${String(originalStatus).toLowerCase().replace(/_/g, ' ')}. Finish production before premiere night.`
-                : 'The locked slate does not contain a canonical platform Original.',
-        originalReady ? 'READY' : 'BLOCKED',
+                ? `${original.title} is ${String(originalStatus).toLowerCase().replace(/_/g, ' ')}. Finish it, or take it off the slate.`
+                : `Opening without an Original. One would add +${LAUNCH_ORIGINAL_DEMAND} to opening demand.`,
+        originalReady || !original ? 'READY' : 'BLOCKED',
         'CONTENT',
     ));
 
@@ -377,7 +399,8 @@ const buildStreamingLaunchReadiness = (player: Player, context: StreamingCatalog
         forecastHighConcurrentStreams,
         demandRegions,
         capacityOptions,
-        openingOriginalTitle: original?.title || 'First Original',
+        openingOriginalTitle: originalReady && original ? original.title : getOpeningHeadlineTitle(player, slate),
+        openingHasOriginal: originalReady,
         openingTitleCount: slate?.entries.length || 0,
         weeklyOperatingCost,
         runwayWeeks,
@@ -387,6 +410,26 @@ const buildStreamingLaunchReadiness = (player: Player, context: StreamingCatalog
 export const getStreamingLaunchReadiness = (player: Player, preparedContext?: StreamingCatalogueReadContext): StreamingLaunchReadiness => {
     const context = getStreamingCatalogueReadContext(player, preparedContext);
     return readStreamingCatalogueDerivedView(context, getStreamingLaunchReadiness, () => buildStreamingLaunchReadiness(player, context));
+};
+
+/** #257: what a way of taking the peak does to the night. The launch commits this number, so Launch Control can show it before the choice is made. */
+export const streamingLaunchPlaybackFor = (
+    platform: Player['ownedStreamingPlatform'],
+    option: Pick<StreamingLaunchCapacityOption, 'protectedPeakConcurrentStreams' | 'effectiveHighConcurrentStreams'>,
+): { playbackSuccessRate: number; outcomeTier: StreamingLaunchOutcomeTier } => {
+    const pressure = option.effectiveHighConcurrentStreams > 0
+        ? option.protectedPeakConcurrentStreams / option.effectiveHighConcurrentStreams
+        : 1;
+    const playbackSuccessRate = clamp(
+        96.8 + pressure * 2.2 + (platform.infrastructureSetup?.reliabilityTarget || 99) * 0.01
+            - resolveStreamingPlatformTechDebt(platform) * 0.035,
+        92,
+        99.99,
+    );
+    return {
+        playbackSuccessRate,
+        outcomeTier: playbackSuccessRate >= 99 ? 'SMOOTH_OPENING' : playbackSuccessRate >= 97 ? 'PRESSURED_OPENING' : 'DEGRADED_OPENING',
+    };
 };
 
 export const commitOwnedStreamingLaunch = (
@@ -412,24 +455,12 @@ export const commitOwnedStreamingLaunch = (
 
     const absoluteWeek = readiness.absoluteWeek;
     const idempotencyKey = `platform-launch:${platform.identity?.slug || player.id}`;
-    const pressure = option.effectiveHighConcurrentStreams > 0
-        ? option.protectedPeakConcurrentStreams / option.effectiveHighConcurrentStreams
-        : 1;
-    const playbackSuccessRate = clamp(
-        96.8 + pressure * 2.2 + (platform.infrastructureSetup?.reliabilityTarget || 99) * 0.01
-            - resolveStreamingPlatformTechDebt(platform) * 0.035,
-        92,
-        99.99,
-    );
-    const outcomeTier: StreamingLaunchOutcomeTier = playbackSuccessRate >= 99
-        ? 'SMOOTH_OPENING'
-        : playbackSuccessRate >= 97
-            ? 'PRESSURED_OPENING'
-            : 'DEGRADED_OPENING';
+    const { playbackSuccessRate, outcomeTier } = streamingLaunchPlaybackFor(platform, option);
     const conversionMultiplier = capacityPlan === 'STAGGERED_PREMIERE' ? 0.92 : 1;
     const openingDemandIndex = clamp(Math.round(
         48
         + readiness.openingTitleCount * 4
+        + (readiness.openingHasOriginal ? LAUNCH_ORIGINAL_DEMAND : 0)
         + (readiness.reachLabel.includes('Global') ? 12 : readiness.reachLabel.includes('National') ? 8 : 4)
         + (outcomeTier === 'SMOOTH_OPENING' ? 8 : outcomeTier === 'DEGRADED_OPENING' ? -7 : 2),
     ), 0, 100);

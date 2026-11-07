@@ -24,7 +24,8 @@ op.titlePerformance = [title];
 const data = getStreamingStudioFinanceData(settled);
 assert.equal(summarize(data.weeks, data.cash).accountingProfit, 700);
 const current = renderToStaticMarkup(<StudioFinance data={data} />);
-assert.match(current, /Operating profit/);
+/* #175: Finance says "Profit after content costs", and still shows the same $700 */
+assert.match(current, /Profit after content costs/);
 assert.match(current, /Operating cash/);
 assert.match(current, /Recorded/);
 assert.match(current, /\+\$700/);
@@ -38,7 +39,7 @@ const legacy = JSON.parse(JSON.stringify(data));
 legacy.weeks.forEach((week: { accountingProfit: number | null }) => { week.accountingProfit = null; });
 const legacyMarkup = renderToStaticMarkup(<StudioFinance data={legacy} />);
 assert.match(legacyMarkup, /Unavailable for legacy accounting weeks/);
-assert.ok(!legacyMarkup.includes('Operating profit</p><p class="sf-changed-copy">$0'));
+assert.ok(!/Profit after content costs<\/p><p class="sf-changed-copy">\$0/.test(legacyMarkup));
 if (process.env.STREAMING_ACCOUNTING_UI_FIXTURE) {
     writeFileSync(process.env.STREAMING_ACCOUNTING_UI_FIXTURE, JSON.stringify({ current: data, legacy }));
 }

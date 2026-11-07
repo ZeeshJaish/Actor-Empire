@@ -1,6 +1,6 @@
 import type { Player } from '../types';
 import { sanitizeAwardRecords } from './awardLogic';
-import { migratePlayerSave } from './saveMigration';
+import { markPlayerSettled, migratePlayerSave } from './saveMigration';
 import { normalizeUniverseMap } from './universeLogic';
 
 const finalizePlayerUiState = (player: Player): Player => ({
@@ -18,12 +18,12 @@ const finalizePlayerUiState = (player: Player): Player => ({
 
 /** Use for imported, loaded, cheat, and component-originated state that may be legacy or partial. */
 export const prepareExternalPlayerUpdateForUi = (player: Player): Player => (
-    finalizePlayerUiState(migratePlayerSave(player))
+    finalizePlayerUiState(migratePlayerSave(player, { fromScreen: true }))
 );
 
 /** Use only after processGameWeek and persistence have produced a canonical current-schema player. */
 export const prepareProcessedWeekForUi = (player: Player): Player => (
-    finalizePlayerUiState(player)
+    markPlayerSettled(finalizePlayerUiState(player))
 );
 
 /** Market services return a complete player derived from the already-migrated live save.

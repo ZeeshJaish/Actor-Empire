@@ -1,3 +1,4 @@
+import { gameWeekShort } from '../../services/gameWeek';
 import { getListedCompanyValuation } from '../../services/stockValuation';
 import { beginPublicControlTransfer } from '../../services/publicStockControl';
 
@@ -843,7 +844,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                 <span>Cash <b className="ml-1 text-zinc-300">{formatPlatformCash(plat.cashMillions || 0)}</b></span>
                                 <span>Tech <b className="ml-1 text-zinc-300">{Math.round(plat.technology || 0)}</b></span>
                                 <span>Catalogue <b className="ml-1 text-zinc-300">{Math.round(plat.cataloguePower || 0)}</b></span>
-                                <span className="ml-auto">W{Math.max(0, plat.lastProcessedAbsoluteWeek || 0)}</span>
+                                <span className="ml-auto">{gameWeekShort(Math.max(0, plat.lastProcessedAbsoluteWeek || 0))}</span>
                             </div>
 
                         </div>

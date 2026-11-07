@@ -4,9 +4,12 @@ import { Player, Business, StudioDepartments, StudioEquipment } from '../../../t
 import { formatMoney } from '../../../services/formatUtils';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import {
+    getInHouseScriptCost,
+    getInHouseWriterSkill,
     getInfrastructureLineAnnualOverhead,
     getStudioAnnualInfrastructureOverhead,
 } from '../../../services/studioProductionEconomy';
+import { getGearLineQuality } from '../../../services/greenlightSetupEffects';
 import { ArrowLeft, Building2, PenTool, Video, Users, Clapperboard, MonitorPlay, Camera, Lightbulb, Mic, Box, Zap } from 'lucide-react';
 
 interface FacilitiesViewProps {
@@ -193,7 +196,16 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                                         <p className="text-xs text-zinc-400 mt-1">{item.desc}</p>
                                         {currentLevel > 0 && (
                                             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-                                                {activeTab === 'DEPARTMENTS' ? (
+                                                {activeTab === 'DEPARTMENTS' && item.id === 'writing' ? (
+                                                    <>
+                                                        <div data-writing-skill className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                                            <Zap size={10} /> Script skill: {getInHouseWriterSkill(currentLevel)}
+                                                        </div>
+                                                        <div className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                                                            Per script: {formatMoney(getInHouseScriptCost(currentLevel))}
+                                                        </div>
+                                                    </>
+                                                ) : activeTab === 'DEPARTMENTS' ? (
                                                     <>
                                                         <div className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                                                             <Zap size={10} /> Quality: {10 + ((currentLevel - 1) * 9)}
@@ -205,7 +217,8 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                                                 ) : (
                                                     <>
                                                         <div className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
-                                                            <Zap size={10} /> Quality: +{currentLevel * 3}
+                                                            {/* #306: what it really adds to a film, the number the gear step shows. It read +3 a level. */}
+                                                            <Zap size={10} /> Quality: +{getGearLineQuality(currentLevel)}
                                                         </div>
                                                         <div className="text-[10px] text-blue-400 font-bold flex items-center gap-1">
                                                             <Box size={10} /> {getEquipmentStageName(item.id, currentLevel)}

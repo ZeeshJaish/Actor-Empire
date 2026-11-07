@@ -20,7 +20,8 @@ const fixturePath='scripts/fixtures/issued-builtin-identities.json';
  const tom=issued.npcs.find((n:any)=>n.name==='Tom Holland');assert.ok(tom);
  assert.equal(NPC_DATABASE.find(n=>n.id===tom.id)?.name,'Tommy Holland','Default Tom Holland should receive the approved subtle alias');
  assert.equal(DEFAULT_GLOBAL_CREATOR_PROFILES.find(n=>n.id==='yt_global_mrbeast')?.name,'MrBeastly');
- for(const prior of issued.npcs){const current=NPC_DATABASE.find(n=>n.id===prior.id);assert.ok(current,`Lost NPC ${prior.id}`);assert.equal(hash(immutableNpc(current)),prior.immutableHash,`Non-cosmetic NPC data changed: ${prior.id}`);}
+ /* #311: the 50 unknowns keep their ids but now have their own fixed details: they were new random people every session until then, so there is nothing issued to protect */
+ for(const prior of issued.npcs){const current=NPC_DATABASE.find(n=>n.id===prior.id);assert.ok(current,`Lost NPC ${prior.id}`);if(/^(npc_rnd_|rnd_dir_)/.test(prior.id))continue;assert.equal(hash(immutableNpc(current)),prior.immutableHash,`Non-cosmetic NPC data changed: ${prior.id}`);}
  for(const prior of issued.creators){const current=DEFAULT_GLOBAL_CREATOR_PROFILES.find(n=>n.id===prior.id);assert.ok(current);assert.equal(hash(immutableNpc(current)),prior.immutableHash);}
  for(const prior of issued.investors){assert.equal(investorOwnerNpcId(PROJECT_INVESTORS.find(n=>n.id===prior.id)!),prior.ownerId,'Producer ownership identity must not change');}
  const countryPacks=JSON.parse(readFileSync('scripts/fixtures/issued-country-pack-identities.json','utf8'));

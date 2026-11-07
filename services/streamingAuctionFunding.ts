@@ -1,5 +1,5 @@
 import type { StreamingAuctionFutureFundingTerms, IndustryProductionCommitment, IndustryProject, OwnedStreamingOriginalCommission, OwnedStreamingRightsObligation, Player, ProjectFormat } from '../types';
-import { createDeterministicId } from './deterministicRandom';
+import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { createProductionCalendar } from './productionCalendar';
 import { upsertCanonicalIndustryProduction } from './industryProductions';
 import { selectIndustryTalentPackage } from './industryTalentSelection';
@@ -8,6 +8,7 @@ import { createStreamingLicenseContract, createStreamingRightsContractFromLicens
 import { getAbsoluteWeek } from './legacyLogic';
 import { resolveStreamingCatalogTitle } from './streamingCatalog';
 import { resolveAuctionContinuation } from './streamingAuctionTerms';
+import { allocateProjectTitle, createProjectTitleReservations } from './projectTitleGeneration';
 
 export type AuctionFutureFundingTerms = StreamingAuctionFutureFundingTerms;
 
@@ -60,9 +61,11 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
  for(const source of obligations(input)) {
   if(!source.sourceAuctionId || source.type!=='FUTURE_GREENLIGHT' || !valid(source.futureFunding))continue;
   const terms=source.futureFunding;
-  if(source.status==='SATISFIED' && source.observedAmount>=terms.count)continue;
+  /* #294: delivered is not released: a delivered title waits for its week on the Slate */
+  const waitingForItsWeek=(source.fundedProductionIds||[]).some(id=>{const made=player.world.industryProductions?.[id];return Boolean(made&&!player.world.projects.some(p=>p.id===made.canonicalProjectId));});
+  if(source.status==='SATISFIED' && source.observedAmount>=terms.count && !waitingForItsWeek)continue;
   if(terms.commitment==='OPTION' && source.fundingActivatedAtAbsoluteWeek===undefined)continue;
-  if(source.status==='BREACHED' || absoluteWeek>source.dueAtAbsoluteWeek) {
+  if(source.status==='BREACHED' || (absoluteWeek>source.dueAtAbsoluteWeek && source.status!=='SATISFIED')) {
    const messageId=createDeterministicId('auction_funding_failed',source.id);
    const alreadyNotified=player.inbox.some(message=>message.id===messageId);
    const stranded=player.ownedStreamingPlatform.costCommitments.some(c=>c.sourceReferenceId===source.id && c.status==='COMMITTED');
@@ -126,7 +129,7 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
     const booking=reserveProjectTalentBookings({bookings:world.talentBookings,projectId,projectOwner:'INDUSTRY_PRODUCTION',
      producerStudioId:producerId,productionCalendar:calendar,actorIds:[talent.leadActor.id],directorIds:[talent.director.id],allowOverlaps:true});
     const isSeries=terms.kind==='NEXT_SEASON' || (terms.kind==='NEW_ORIGINAL' && catalogueParent.projectType==='SERIES');
-    const title=terms.kind==='NEW_ORIGINAL'?`${studio.name} Original ${index+1}`
+    const title=terms.kind==='NEW_ORIGINAL'?allocateProjectTitle(createProjectTitleReservations({...player,world}),createDeterministicRng(id),catalogueParent.genre as any)
      :`${continuation!.baseTitle}${isSeries?' Season':''} ${continuation!.firstInstallmentNumber!+index}`;
     const production:IndustryProductionCommitment={id,canonicalProjectId:projectId,title,projectType:isSeries?'SERIES':'MOVIE',
      genre:catalogueParent.genre as any,producerStudioId:producerId,source:'PLATFORM_COMMISSION',status:'PRE_PRODUCTION',
@@ -178,6 +181,10 @@ export const processAuctionFutureFunding = (input: Player, absoluteWeek: number)
     updatedAtAbsoluteWeek:absoluteWeek,aiExecution:{...production.aiExecution!,lastProgressedAbsoluteWeek:absoluteWeek}};
    player={...player,world:{...player.world,industryProductions:upsertCanonicalIndustryProduction(player.world.industryProductions,production)}};
    if(elapsed<duration)continue;
+   /* #294: its premiere is the player's to set, on the Slate */
+   const orderedAs=player.ownedStreamingPlatform.originalCommissions.find(c=>c.canonicalProjectId===production!.canonicalProjectId);
+   const premiereAt=orderedAs?.releasePlan?.premiereAtAbsoluteWeek;
+   if(orderedAs && (premiereAt===undefined || premiereAt>absoluteWeek)){delivered++;continue;}
    const execution=production.aiExecution!;
    const ordinal=(obligation.fundedProductionIds||[]).indexOf(productionId);
    const format:ProjectFormat=terms.format==='ANY'?'LIVE_ACTION':terms.format;

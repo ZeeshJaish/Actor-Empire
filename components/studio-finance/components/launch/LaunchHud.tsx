@@ -32,7 +32,7 @@ export interface LaunchHudProps {
   ways: Array<{ label: string; primary?: boolean; onClick: () => void }>;
   /** Missing on the first step. */
   onBack?: () => void;
-  next: { label: string; eyebrow?: string; glyph?: ReactNode; disabled?: boolean; onClick: () => void };
+  next: { label: string; eyebrow?: string; glyph?: ReactNode; disabled?: boolean; describedBy?: string; onClick: () => void };
   /** #157: what the plan is called in the detail (The Build: "The build") */
   planLabel?: string;
 }
@@ -107,7 +107,7 @@ export function LaunchHud({ view, page, planned, free, readout, blockers, ways, 
         <button type="button" className="lw-hud-back" aria-label="Back" disabled={!onBack} onClick={onBack}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 2.5L4.5 8l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-        <button type="button" className="lw-hud-next" disabled={next.disabled} onClick={next.onClick}>
+        <button type="button" className="lw-hud-next" disabled={next.disabled} aria-describedby={next.describedBy} onClick={next.onClick}>
           {next.glyph && <span className="lw-hud-next-glyph" aria-hidden="true">{next.glyph}</span>}
           <span className="lw-hud-next-words">
             {next.eyebrow && <em>{next.eyebrow}</em>}

@@ -1,3 +1,4 @@
+import { gameWeekText } from './gameWeek';
 import type {
     OwnedStreamingInfrastructureSetupDraft,
     OwnedStreamingInfrastructureSetup,
@@ -69,6 +70,11 @@ export interface StreamingOpeningProgrammeView {
     rackCount: number;
     releasedCapital: number;
     workstreams: StreamingOpeningWorkstreamView[];
+    /** #253: how far along, 0 to 1: the weeks gone against the weeks from commission to opening */
+    progress: number;
+    totalWeeks: number;
+    /** #253: the cities online, as the network's own weeks pass */
+    citiesOnline: number;
 }
 
 export interface StreamingOpeningCommissionInput {
@@ -316,12 +322,14 @@ const buildStreamingOpeningProgrammeView = (player: Player, context: StreamingCa
         cityCount: setup?.networkPlacements.length || 0,
         rackCount: setup ? physicalRackCount(setup) : 0,
         releasedCapital: setup?.capitalInvested || 0, workstreams: [],
+        progress: 1, totalWeeks: 0, citiesOnline: setup?.networkPlacements.length || 0,
     };
     if (!commission || !setup) return {
         state: getStreamingLaunchProgramView(player, context).status === 'READY' ? 'READY_TO_COMMISSION' : 'DRAFT',
         commissioned: false, commission: null, absoluteWeek, earliestOpeningAbsoluteWeek: null,
         dateCertainty: 'ESTIMATE', controllingWorkstreamId: null, remainingWeeks: 0,
         cityCount: 0, rackCount: 0, releasedCapital: 0, workstreams: [],
+        progress: 0, totalWeeks: 0, citiesOnline: 0,
     };
     const operations = openingOperations(player).filter(operation => commission.openingCountryIds.includes(operation.countryId!));
     const actionOperations = operations.filter(operation => ['ADDITIONAL_REQUIREMENT', 'TEMPORARILY_REJECTED'].includes(operation.clearance?.outcome || ''));
@@ -358,7 +366,7 @@ const buildStreamingOpeningProgrammeView = (player: Player, context: StreamingCa
         },
         {
             id: 'MARKETING', label: 'Launch marketing', status: marketingReady ? 'READY' : 'IN_PROGRESS',
-            detail: marketing ? marketingReady ? 'Opening campaign preparation is ready.' : `Campaign preparation runs through week ${marketing.endsAtAbsoluteWeek}.` : 'No paid opening campaign was commissioned.',
+            detail: marketing ? marketingReady ? 'Opening campaign preparation is ready.' : `Campaign preparation runs through ${gameWeekText(marketing.endsAtAbsoluteWeek, absoluteWeek)}.` : 'No paid opening campaign was commissioned.',
             readyAtAbsoluteWeek: marketing?.endsAtAbsoluteWeek || commission.committedAtAbsoluteWeek,
             elapsedWeeks: elapsed, remainingWeeks: marketing ? Math.max(0, marketing.endsAtAbsoluteWeek - absoluteWeek) : 0,
             controlsDate: controlling?.id === 'MARKETING', actionLabel: null, operationIds: [],
@@ -371,15 +379,21 @@ const buildStreamingOpeningProgrammeView = (player: Player, context: StreamingCa
     const state: StreamingOpeningProgrammeState = actionOperations.length
         ? 'ACTION_REQUIRED'
         : infrastructureReady && clearancesReady && marketingReady ? 'READY_TO_OPEN' : 'EXECUTING';
+    const cityCount = new Set(setup.networkPlacements.map(item => item.cityId)).size;
+    const networkWeeks = Math.max(1, setup.readyAtAbsoluteWeek - setup.committedAtAbsoluteWeek);
+    const totalWeeks = Math.max(1, earliestOpeningAbsoluteWeek - setup.committedAtAbsoluteWeek);
     return {
         state, commissioned: true, commission, absoluteWeek, earliestOpeningAbsoluteWeek,
         dateCertainty: actionOperations.length || !clearancesReady ? 'ESTIMATE' : 'CONFIRMED',
         controllingWorkstreamId: controlling?.id || null,
         remainingWeeks: Math.max(0, earliestOpeningAbsoluteWeek - absoluteWeek),
-        cityCount: new Set(setup.networkPlacements.map(item => item.cityId)).size,
+        cityCount,
         rackCount: physicalRackCount(setup),
         releasedCapital: setup.capitalInvested,
         workstreams,
+        progress: state === 'READY_TO_OPEN' ? 1 : Math.min(1, elapsed / totalWeeks),
+        totalWeeks,
+        citiesOnline: infrastructureReady ? cityCount : Math.floor(cityCount * Math.min(1, elapsed / networkWeeks)),
     };
 };
 

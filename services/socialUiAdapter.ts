@@ -1,4 +1,4 @@
-import type { Player, Relationship } from '../types';
+import type { GameLanguage, Player, Relationship } from '../types';
 import type { IconName } from '../components/ui-overhaul/ui';
 import {
   calculateLegacyScore,
@@ -13,6 +13,9 @@ import { getDivorceLawyerCost, isChildAbandoned } from './familyLogic';
 import { hasOwnedPremiumAssetInCollection } from './premiumLogic';
 import { getDynastyMemberAge, normalizeDynastyCareerState } from './dynastyCareer';
 import { getCanonicalProfileAvatar, isLegacyPixelAvatar } from './profileAvatar';
+import { isUnderAdultAge } from './ageGate';
+import { getPlayerLanguage } from './i18n';
+import { getCareerProjects } from './outsideOriginals';
 
 export type GiftInteractionType = 'GIFT_THOUGHTFUL' | 'GIFT_LUXURY' | 'GIFT_APOLOGY' | 'GIFT_FAMILY_SUPPORT' | 'GIFT_INDUSTRY_FAVOR';
 export type SocialInteractionType = 'CALL' | 'CHECK_IN' | 'DEEP_TALK' | 'FAMILY_DINNER' | 'INDUSTRY_LUNCH' | 'HANGOUT' | 'GIFT' | GiftInteractionType | 'NETWORK' | 'DATE' | 'PROPOSE' | 'INTIMACY' | 'CLUBBING' | 'TRIP' | 'ESTATE_DATE' | 'YACHT_DATE' | 'JET_ESCAPE' | 'LUXURY_GIFT' | 'ABANDON_CHILD' | 'RECONNECT_CHILD' | 'BREAK_UP' | 'DIVORCE_SETTLE' | 'DIVORCE_FIGHT_BUDGET' | 'DIVORCE_FIGHT_ESTABLISHED' | 'DIVORCE_FIGHT_ELITE' | 'PET_FEED' | 'PET_PLAY' | 'PET_GROOM' | 'PET_VET';
@@ -29,6 +32,8 @@ export interface SocialUiMove {
   gain?: number;
   resultLabel?: string;
   disabled?: boolean;
+  /** #255: waits for 18; a tap opens the popup and the sheet stays open */
+  ageLocked?: boolean;
   pickLabel?: string;
   danger?: boolean;
   choices?: SocialUiMove[];
@@ -73,6 +78,7 @@ export interface SocialUiGeneration {
 }
 
 export interface SocialUiModel {
+  language: GameLanguage;
   people: SocialUiPerson[];
   generations: SocialUiGeneration[];
   dynastyScore: number;
@@ -187,10 +193,12 @@ const movesFor = (player: Player, relationship: Relationship): SocialUiMove[] =>
   }
   if (isRomantic(relationship)) {
     moves.push(move(player, 'DATE', 'Date Night', 'Focused time together.', 'heart', 'var(--health)', 20, 200, 10));
-    moves.push(move(player, 'CLUBBING', 'Clubbing', 'A loud night out together.', 'star', 'var(--looks)', 40, 500, 8));
+    /* a locked move still answers a tap, with the "wait till 18" popup */
+    const waitTill18: Partial<SocialUiMove> = isUnderAdultAge(player) ? { note: 'Opens at 18.', disabled: false, ageLocked: true } : {};
+    moves.push(move(player, 'CLUBBING', 'Clubbing', 'A loud night out together.', 'star', 'var(--looks)', 40, 500, 8, waitTill18));
     moves.push(move(player, 'TRIP', 'Luxury Trip', 'A vacation that can fully restore the bond.', 'plane', 'var(--acting)', 0, 5000, undefined, { resultLabel: 'BOND TO 100' }));
-    moves.push(move(player, 'INTIMACY', 'Intimacy', 'Private time together.', 'flame', 'var(--health)', 30, 0, 5));
-    if (relationship.relation === 'Partner') moves.push(move(player, 'PROPOSE', 'Propose', 'A major commitment. Strong bonds have better odds.', 'crown', 'var(--gold-hi)', 0, 5000, undefined, { resultLabel: 'MARRIAGE CHANCE' }));
+    moves.push(move(player, 'INTIMACY', 'Intimacy', 'Private time together.', 'flame', 'var(--health)', 30, 0, 5, waitTill18));
+    if (relationship.relation === 'Partner') moves.push(move(player, 'PROPOSE', 'Propose', 'A major commitment. Strong bonds have better odds.', 'crown', 'var(--gold-hi)', 0, 5000, undefined, { resultLabel: 'MARRIAGE CHANCE', ...waitTill18 }));
 
     const estateLocked = !hasOwnedPremiumAssetInCollection(player, 'bundle_luxury_homes');
     const skyLocked = !hasOwnedPremiumAssetInCollection(player, 'bundle_sky_sea');
@@ -227,7 +235,7 @@ export const buildSocialUiModel = (player: Player): SocialUiModel => {
   const currentScore = calculateLegacyScore({
     netWorth: player.money,
     awards: player.awards?.length || 0,
-    moviesMade: player.pastProjects.length,
+    moviesMade: getCareerProjects(player).length,
     peakFame: player.stats.fame,
     businessCount: player.businesses?.length || 0,
   });
@@ -242,7 +250,7 @@ export const buildSocialUiModel = (player: Player): SocialUiModel => {
     n: currentGeneration,
     label: `Generation ${currentGeneration}`,
     note: 'Current ruler of the family empire',
-    members: [{ id: player.id, name: player.name, score: currentScore, netWorth: player.money, projects: player.pastProjects.length, awards: player.awards?.length || 0, fame: Math.floor(player.stats.fame), businesses: player.businesses?.length || 0, avatarUrl: getCanonicalProfileAvatar(player.avatar, player.gender, player.name) }],
+    members: [{ id: player.id, name: player.name, score: currentScore, netWorth: player.money, projects: getCareerProjects(player).length, awards: player.awards?.length || 0, fame: Math.floor(player.stats.fame), businesses: player.businesses?.length || 0, avatarUrl: getCanonicalProfileAvatar(player.avatar, player.gender, player.name) }],
   });
   if (children.length > 0) generations.push({
     n: currentGeneration + 1,
@@ -295,6 +303,7 @@ export const buildSocialUiModel = (player: Player): SocialUiModel => {
       moves: movesFor(player, relationship),
     })),
     generations,
+    language: getPlayerLanguage(player),
     dynastyScore,
     currentGeneration,
     heirsInLine: children.length,

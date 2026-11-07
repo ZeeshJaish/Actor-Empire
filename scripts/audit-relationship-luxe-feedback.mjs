@@ -17,7 +17,6 @@ const localeFiles = [
 ];
 const luxeApp = read('views/mobile/LuxeApp.tsx');
 const mobilePage = read('views/mobile/MobilePage.tsx');
-const rootMobilePage = read('views/MobilePage.tsx');
 const datingLogic = read('services/datingLogic.ts');
 
 assert(
@@ -63,9 +62,8 @@ assert(
 });
 
 assert(
-  mobilePage.includes("onOpenLuxe={() => setAppMode('LUXE')}") &&
-    rootMobilePage.includes("onOpenLuxe={() => setAppMode('LUXE')}"),
-  'Both mobile surfaces should route the Dating folder Luxe icon into LuxeApp.'
+  mobilePage.includes("onOpenLuxe={() => setAppMode('LUXE')}"),
+  'The mobile surface should route the Dating folder Luxe icon into LuxeApp.'
 );
 
 assert(

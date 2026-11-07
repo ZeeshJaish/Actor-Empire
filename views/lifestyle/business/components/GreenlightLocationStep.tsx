@@ -26,6 +26,7 @@ interface GreenlightLocationStepProps {
     locations: Record<ProductionLocationContinentId, ProductionLocation[]>;
     onBack: () => void;
     onNext: () => void;
+    nextLabel?: string;
     formatMoney: (value: number) => string;
 }
 
@@ -35,6 +36,7 @@ export const GreenlightLocationStep: React.FC<GreenlightLocationStepProps> = ({
     locations,
     onBack,
     onNext,
+    nextLabel = 'Next: Movie Setup',
     formatMoney,
 }) => {
     const [mapView, setMapView] = useState<RegionMapView>(WORLD_VIEW);
@@ -261,7 +263,7 @@ export const GreenlightLocationStep: React.FC<GreenlightLocationStepProps> = ({
                                 : 'bg-emerald-500 hover:bg-emerald-400 text-black'
                         }`}
                     >
-                        Next: Movie Setup
+                        {nextLabel}
                     </button>
                 </div>
             </div>

@@ -15,7 +15,7 @@ import type {
 } from '../types';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { resolveStreamingOfferRevision } from './streamingOfferRevisionIntelligence';
-import { allocateStreamingCatalogueGuarantee } from './streamingCataloguePackages';
+import { allocateStreamingCatalogueGuarantee, getStreamingCatalogueDealValue } from './streamingCataloguePackages';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
 import { normalizeStreamingDayOneMarketIds, STREAMING_DAY_ONE_MARKETS } from './streamingDayOneMarkets';
 
@@ -206,6 +206,8 @@ const applyCatalogueTermsToOffer = (
     if (session.subjectKind !== 'CATALOGUE_PACKAGE' || !session.cataloguePackageId || !session.catalogueComponents?.length) {
         return offer;
     }
+    /* #315: a package offer is for the deal the seller asked for, not a roll of the dice */
+    const terms = { durationWeeks: session.rightsLot.maximumDurationWeeks, exclusivity: session.catalogueExclusivity || offer.exclusivity };
     const titleFloor = session.catalogueComponents.reduce((sum,c)=>sum+Math.max(1_000_000,minimumStreamingLicenseFee(c.referenceValue)),0);
     const minimumGuarantee = Math.max(titleFloor, Math.min(state.fixedExposureCeiling, offer.minimumGuarantee));
     const allocation = allocateStreamingCatalogueGuarantee({
@@ -216,8 +218,8 @@ const applyCatalogueTermsToOffer = (
         bidderValues: state.catalogueComponentValues || Object.fromEntries(
             session.catalogueComponents.map(component => [component.sourceProjectId, component.referenceValue]),
         ),
-        durationWeeks: offer.durationWeeks,
-        exclusivity: offer.exclusivity,
+        durationWeeks: terms.durationWeeks,
+        exclusivity: terms.exclusivity,
         localization: offer.localization,
         localizationRequirements: offer.localizationRequirements || [],
     });
@@ -233,6 +235,7 @@ const applyCatalogueTermsToOffer = (
         : 0;
     return {
         ...offer,
+        ...terms,
         cataloguePackageId: session.cataloguePackageId,
         componentTerms: allocation.rows,
         dealStructure: weightedBackend > 0 ? 'GUARANTEE_REVENUE_SHARE' : 'FLAT_LICENSE',
@@ -455,7 +458,17 @@ export interface CreateStreamingCatalogueBiddingSessionInput {
 export const createStreamingCatalogueBiddingSession = (
     input: CreateStreamingCatalogueBiddingSessionInput,
 ): StreamingBiddingSession => {
-    const cataloguePackage = input.cataloguePackage;
+    /* #315: priced here, when the market opens, so a package saved before this rule pays the same as a new one. Each title is what it
+       fetches alone, scaled by the deal the seller asked for: how long, how many markets, one service or shared, already on another. */
+    const valuedComponents = input.cataloguePackage.components.map(component => ({
+        ...component,
+        referenceValue: getStreamingCatalogueDealValue(component, { maximumDurationWeeks: input.cataloguePackage.maximumDurationWeeks, exclusivity: input.cataloguePackage.requestedExclusivity }),
+    }));
+    const valuedTotal = valuedComponents.reduce((sum, component) => sum + component.referenceValue, 0);
+    const cataloguePackage: StreamingCataloguePackage = {
+        ...input.cataloguePackage,
+        components: valuedComponents.map(component => ({ ...component, referenceWeight: valuedTotal > 0 ? component.referenceValue / valuedTotal : 1 / valuedComponents.length })),
+    };
     if (cataloguePackage.components.length < 2) throw new Error('A catalogue package requires at least two eligible titles.');
     const titleFloor = cataloguePackage.components.reduce((sum,c)=>sum+Math.max(1_000_000,minimumStreamingLicenseFee(c.referenceValue)),0);
     const eligiblePlatforms = input.platforms.filter(platform => (
@@ -501,7 +514,8 @@ export const createStreamingCatalogueBiddingSession = (
         genre: cataloguePackage.components[0]?.genre || 'CATALOGUE',
         projectBudget: Math.max(titleFloor * 2, referenceTotal),
         packageScore: cataloguePackage.components.reduce((sum, component) => sum + clamp(component.quality, 0, 100), 0) / cataloguePackage.components.length,
-        theatricalGross: cataloguePackage.components.reduce((sum, component) => sum + component.theatricalGross, 0),
+        /* #315: each title's box office is already inside its value; added up on its own it would price four loud flops above four great films */
+        theatricalGross: 0,
         platforms: eligiblePlatforms,
         rightsLot: summaryLot,
     });
@@ -520,6 +534,7 @@ export const createStreamingCatalogueBiddingSession = (
         ...session,
         subjectKind: 'CATALOGUE_PACKAGE',
         cataloguePackageId: cataloguePackage.id,
+        catalogueExclusivity: cataloguePackage.requestedExclusivity,
         componentLots: cataloguePackage.components.map(component => ({ ...component.rightsLot })),
         catalogueComponents: cataloguePackage.components.map(component => ({
             ...component,

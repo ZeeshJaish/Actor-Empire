@@ -1631,14 +1631,29 @@ export const Listing: React.FC<{
   const after = useRef<Scene>('ASK');
   const checkpointCallback = useRef(onCheckpoint);
   useEffect(() => { checkpointCallback.current = onCheckpoint; }, [onCheckpoint]);
+  /* Saved when the hand stops, not on every tick of a dial, and after a tap has painted its page. Nothing to save on the way in. */
+  const unsaved = useRef<StreamingListingCheckpoint | null>(null);
+  const saveTimer = useRef<number | null>(null);
+  const entered = useRef(false);
+  const saveNow = useRef(() => {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    const next = unsaved.current;
+    unsaved.current = null;
+    if (next) checkpointCallback.current?.(next);
+  });
   useEffect(() => {
-    checkpointCallback.current?.({
+    if (!entered.current) { entered.current = true; return; }
+    unsaved.current = {
       scene, ask, shares, revision, bankId, marks, omit, answers, attempt,
       diligenceWeeks: weeks, cut, lowPrice: lo, highPrice: hi,
       anchorDiscountAccepted: gave, employeeQuotaPercent: staffPct,
       interviewMove: airMv, book, closePrice: closePx, ticker,
-    });
+    };
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(saveNow.current, 400);
   }, [scene, ask, shares, revision, bankId, marks, omit, answers, attempt, weeks, cut, lo, hi, gave, staffPct, airMv, book, closePx, ticker]);
+  useEffect(() => () => saveNow.current(), []);
 
   const addMark = (m: Mark) => setMarks(x => x.some(y => y.id === m.id) ? x : [...x, m]);
   const total = inputs.preIpoShares + shares;
@@ -1729,6 +1744,10 @@ export const Listing: React.FC<{
 
   /* the closing bell: the listing is committed and public life lands on MARKETS */
   const finishReal = (closePrice: number = closePx) => {
+    /* the bell rang: a checkpoint still waiting must not land on top of the listing */
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    unsaved.current = null;
     const p = book?.price ?? price;
     const bank = BANKS.find(b => b.id === bankId) ?? BANKS[2];
     /* the staff slice is sold at a 10% discount, so it raises less */

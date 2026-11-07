@@ -1,3 +1,9 @@
+import { getSeriesEpisodeRatings, groupSeriesRows } from '../../../../services/seriesIdentity';
+import { getStreamingNextSeasonLine } from '../../../../services/streamingSeasonRights';
+import { getStreamingTitlePlacement } from '../../../../services/streamingTitlePlacement';
+import { StreamingTitlePlacementPanel } from '../../../../components/StreamingTitlePlacementPanel';
+import { StreamingPremiereTimeline } from '../../../../components/StreamingPremiereTimeline';
+import { getStreamingPremiereStatus } from '../../../../services/streamingPremiereStatus';
 import { CinemaFinancePanel } from '../../../../components/CinemaFinancePanel';
 import { CinemaAudiencePanel } from '../../../../components/CinemaAudiencePanel';
 import { getCinemaProjectFinance } from '../../../../services/boxOffice/boxOfficeSettlement';
@@ -73,26 +79,6 @@ const getSeriesScorecardTone = (rating: number) => {
     if (rating >= 5.8) return 'bg-amber-400 text-amber-950';
     if (rating >= 4.5) return 'bg-rose-500 text-white';
     return 'bg-fuchsia-700 text-white';
-};
-
-const normalizeScorecardSeriesTitle = (value: string = '') => value
-    .replace(/\s*[:\-]?\s*season\s+\d+\b/ig, '')
-    .replace(/\s+s\d+\b/ig, '')
-    .trim()
-    .toLowerCase();
-
-const getScorecardSeriesKey = (project: any) => {
-    const details = project?.projectDetails || project || {};
-    const franchiseId = details.franchiseId || project?.franchiseId;
-    const titleKey = normalizeScorecardSeriesTitle(project?.name || project?.title || details.title || '');
-    const sourceScriptId = details.sourceScriptId || project?.sourceScriptId;
-    return franchiseId
-        ? `franchise:${franchiseId}`
-        : titleKey
-            ? `title:${titleKey}`
-            : sourceScriptId
-                ? `script:${sourceScriptId}`
-                : `project:${project?.id || details.id || 'unknown'}`;
 };
 
 const SeriesScorecardPanel: React.FC<{
@@ -214,11 +200,13 @@ interface ProjectDashboardModalProps {
     onMakeSequel?: (project: any) => void;
     onMakeSpinoff?: (project: any) => void;
     onStartStreamingBidding?: (project: any) => void;
+    /** #252: opens Content, on the Slate */
+    onOpenStreamingSlate?: () => void;
     onRenameProject?: (title: string) => void;
     onConfigureRelease?: (project: any) => void;
 }
 
-export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ project, player, studio, onClose, onUpdatePlayer, onMakeSequel, onMakeSpinoff, onStartStreamingBidding, onRenameProject, onConfigureRelease }) => {
+export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ project, player, studio, onClose, onUpdatePlayer, onMakeSequel, onMakeSpinoff, onStartStreamingBidding, onOpenStreamingSlate, onRenameProject, onConfigureRelease }) => {
     const [view, setView] = useState<'DETAILS'>('DETAILS');
     const [isRenamingTitle, setIsRenamingTitle] = useState(false);
     const [isFundingExplainerOpen, setIsFundingExplainerOpen] = useState(false);
@@ -256,19 +244,16 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const backgroundCastingPlan = project.projectDetails?.backgroundCastingPlan;
     const projectAlumniStories = getProjectAlumniStories(player, String(project.id || project.projectDetails?.id || ''));
     const isSeriesProject = resolvedProjectType === 'SERIES';
-    const selectedScorecardKey = getScorecardSeriesKey(project);
-    const scorecardRatingMap = new Map<number, SeasonEpisodeRatings>();
-    if (isSeriesProject) {
-        [project, ...player.pastProjects, ...player.activeReleases]
-            .filter(item => item && getScorecardSeriesKey(item) === selectedScorecardKey)
-            .flatMap(item => item.projectDetails?.episodeRatings || item.episodeRatings || [])
-            .forEach(rating => {
-                if (!scorecardRatingMap.has(rating.season)) {
-                    scorecardRatingMap.set(rating.season, rating);
-                }
-            });
-    }
-    const scorecardRatings = [...scorecardRatingMap.values()].sort((a, b) => a.season - b.season);
+    /* #272: the same show as the IMDb page: one key, one number per season, each season's own ratings */
+    const scorecardRatings = React.useMemo(() => {
+        if (!isSeriesProject) return [];
+        const projectId = String(project?.id || project?.projectDetails?.id || '');
+        const rows = [project, ...player.pastProjects, ...player.activeReleases]
+            .filter((item: any, index) => item && (index === 0 || String(item.id) !== projectId))
+            .filter((item: any) => (item.type === 'SERIES' || item.projectType === 'SERIES' || item.projectDetails?.type === 'SERIES' || item.episodeRatings?.length));
+        const group = groupSeriesRows(rows).find(item => item.seasons.some(season => season.row === project));
+        return getSeriesEpisodeRatings(group);
+    }, [isSeriesProject, project, player.pastProjects, player.activeReleases]);
 
     const sequelEligibility = React.useMemo(() => getContinuationEligibility({
         player,
@@ -1310,6 +1295,16 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             <Globe size={20} /> {getReleasePlanningCtaLabel(project.projectDetails.releasePlanningDraft)}
                                         </button>
                                     )}
+                                    {/* #296: your own studio's Original, delivered: its week is on the Slate */}
+                                    {project.projectDetails?.hiddenStats?.ownedStreamingOriginal && project.projectPhase === 'AWAITING_RELEASE' && !project.projectDetails?.releaseStrategy && onOpenStreamingSlate && (
+                                        <button type="button" data-put-on-slate onClick={onOpenStreamingSlate} className="flex-1 min-w-full flex items-center justify-center gap-2 rounded-xl bg-rose-500 py-3 text-sm font-black uppercase tracking-wider text-white">
+                                            <Globe size={18} /> Put it on the Slate
+                                        </button>
+                                    )}
+                                    {/* #244: where it streams, and the way off the player's own service. #252: nothing to say on a title that is nowhere */}
+                                    {['RELEASED', 'IN THEATERS', 'BIDDING', 'STREAMING', 'PLANNED RELEASE'].includes(project.phase) && getStreamingTitlePlacement(player, project.id).kind !== 'NOWHERE' && (
+                                        <div className="flex-1 min-w-full"><StreamingTitlePlacementPanel player={player} projectId={project.id} title={project.name || project.title || 'this title'} onUpdatePlayer={onUpdatePlayer} onSchedule={onOpenStreamingSlate} /></div>
+                                    )}
                                     {project.phase === 'BIDDING' && onStartStreamingBidding && (
                                         <button 
                                             onClick={() => onStartStreamingBidding(project)}
@@ -1318,7 +1313,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             <TrendingUp size={20} /> {tr('projectDashboard.action.continueBiddingWar')}
                                         </button>
                                     )}
-                                    {['RELEASED', 'IN THEATERS'].includes(project.phase) && !project.streaming && !project.streamingPlatform && onStartStreamingBidding && (
+                                    {['RELEASED', 'IN THEATERS'].includes(project.phase) && getStreamingTitlePlacement(player, project.id).maySellOutside && onStartStreamingBidding && (
                                         <button 
                                             onClick={() => onStartStreamingBidding(project)}
                                             className="flex-1 py-5 bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-xl hover:shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95"
@@ -1326,7 +1321,10 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             <Tv size={20} /> {tr('projectDashboard.action.bidToPlatforms')}
                                         </button>
                                     )}
-                                    {project.streaming && (() => {
+                                    {getStreamingPremiereStatus(player, project.id)?.stage && getStreamingPremiereStatus(player, project.id)!.stage !== 'LIVE' && (
+                                        <div className="flex-1 min-w-full"><StreamingPremiereTimeline status={getStreamingPremiereStatus(player, project.id)!} /></div>
+                                    )}
+                                    {project.streaming && !getStreamingPremiereStatus(player, project.id) && (() => {
                                         const weeksUntilStreaming = getStreamingWeeksUntilStart(
                                             project.streaming,
                                             player.age,
@@ -1355,6 +1353,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             >
                                                 <Sparkles size={20} /> {sequelEligibility.reason === 'ALREADY_IN_DEVELOPMENT' ? tr('projectDashboard.action.sequelInDev') : tr('projectDashboard.action.developSequel')}
                                             </button>
+                                            {getStreamingNextSeasonLine(player, studio as never, project) && (
+                                                <p className="text-[11px] text-zinc-400 leading-snug text-center mt-1">{getStreamingNextSeasonLine(player, studio as never, project)}</p>
+                                            )}
                                             {!sequelEligibility.eligible && (
                                                 <p className="text-[8px] text-amber-500/60 font-black uppercase tracking-widest text-center">{sequelEligibility.message}</p>
                                             )}

@@ -663,6 +663,40 @@ const compactStreamingCataloguePackages = (
   return Object.fromEntries([...protectedPackages, ...terminal].map(cataloguePackage => [cataloguePackage.id, cataloguePackage]));
 };
 
+/* #232 (plan §25.2): the week's royalty receipts were half of a company's save: one row per title × country × plan × source,
+   rebuilt every week. What reads them totals them by contract (calculateStreamingSignedRoyaltyAllocations), so a save keeps one
+   row per platform, contract, source and kind, in first-seen order. The week's close still works on the full rows. Only the
+   current week is here: nothing older is lost. Rolling up a rolled-up list changes nothing. */
+const rollUpRoyaltyReceipts = (viewing: any) => {
+  const rows = viewing?.royaltyReceipts;
+  if (!Array.isArray(rows) || !rows.length) return viewing;
+  const kept = new Map<string, any>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.platformId, row.contractId ?? null, row.sourceKind ?? null, row.kind]);
+    const had = kept.get(key);
+    if (had) had.grossReceipts += row.grossReceipts;
+    else kept.set(key, {
+      receiptId: key, platformId: row.platformId, countryId: 'ALL', projectId: row.projectId, contractId: row.contractId ?? null,
+      kind: row.kind, ...(row.sourceKind !== undefined ? { sourceKind: row.sourceKind } : {}), grossReceipts: row.grossReceipts,
+    });
+  }
+  return { ...viewing, royaltyReceipts: [...kept.values()] };
+};
+
+/* #233 (plan §25.2): each week's row in an AI platform's finance history carried every contract's royalty statement and
+   accrual. Only this week's statements are read (collectStreamingStudioRoyaltyReceipts) and only the last row's accruals
+   (runPlatformAiEconomy); the row's own totals stay. The last two rows keep them, in case a close reads across a save. */
+const slimAiFinanceHistory = (history: unknown) => {
+  if (!Array.isArray(history)) return history;
+  const keepFrom = history.length - 2;
+  return history.map((row: any, index: number) => {
+    if (index >= keepFrom || !row || typeof row !== 'object') return row;
+    /* an empty list, not a missing key: the row must stay in its normalised shape, or the AI state stops counting as canonical */
+    const { storeRoyaltyAccruals: _accruals, ...slim } = row;
+    return { ...slim, contractRoyaltyStatements: [] };
+  });
+};
+
 const compactWorldEconomy = (world: any) => {
   const trimSnapshots = (state: any, limit: number) => state && typeof state === 'object'
     ? { ...state, snapshots: Array.isArray(state.snapshots) ? state.snapshots.slice(-limit) : [] }
@@ -676,7 +710,7 @@ const compactWorldEconomy = (world: any) => {
   const customers = customersBase && typeof customersBase === 'object'
     ? { ...customersBase, recentMovements: Array.isArray(customersBase.recentMovements) ? customersBase.recentMovements.slice(-624) : [] }
     : customersBase;
-  const viewing = trimSnapshots(world.worldStreamingViewing, 52);
+  const viewing = rollUpRoyaltyReceipts(trimSnapshots(world.worldStreamingViewing, 52));
   const economyBase = trimSnapshots(world.worldStreamingPlatformEconomy, 52);
   const economy = economyBase && typeof economyBase === 'object'
     ? {
@@ -824,6 +858,7 @@ const compactWorld = (player: any) => {
           ai: {
             ...platform.ai,
             schemaVersion: PLATFORM_AI_RUNTIME_SCHEMA_VERSION,
+            financeHistory: slimAiFinanceHistory(platform.ai.financeHistory),
             distressEpisodes: normalizePlatformAiDistressEpisodes(
               platform.ai.distressEpisodes,
               platform.id || platformId,

@@ -345,14 +345,14 @@ export const executeStockTakeoverAction = (
             player: {
                 ...withCase,
                 news: [newsItem, ...(withCase.news || [])].slice(0, 80),
-                logs: [{
+                logs: [...(withCase.logs || []), {
                     week: player.currentWeek,
                     year: player.age,
                     message: options.golden
                         ? t(language, 'services.stockTakeover.log.controlGolden', { company: stock.name })
                         : t(language, 'services.stockTakeover.log.control', { company: stock.name }),
                     type: 'positive' as const,
-                }, ...(withCase.logs || [])].slice(0, 50),
+                }],
             },
         };
     }
@@ -416,7 +416,7 @@ export const executeStockTakeoverAction = (
         player: {
             ...withCase,
             news: [newsItem, ...(withCase.news || [])].slice(0, 80),
-            logs: [{
+            logs: [...(withCase.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: t(language, 'services.stockTakeover.log.routeResolved', {
@@ -424,7 +424,7 @@ export const executeStockTakeoverAction = (
                     summary: takeoverCase.summary,
                 }),
                 type: status === 'RIVAL_DEFENCE' ? 'neutral' as const : 'positive' as const,
-            }, ...(withCase.logs || [])].slice(0, 50),
+            }],
         },
     };
 };

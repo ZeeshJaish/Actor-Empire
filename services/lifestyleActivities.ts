@@ -23,6 +23,7 @@ import { getAbsoluteWeek } from './legacyLogic';
 import { AIRCRAFT_CATALOG, CLOTHING_CATALOG, PROPERTY_CATALOG } from './lifestyleLogic';
 import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
 import { applyHealthConditionIncident, getActiveHealthConditions, getHealthConditionLabel, getHealthConditionTreatmentTags, getHealthTreatmentPrivacy, resolveHealthConditionTreatment } from './healthConditions';
+import { isUnderAdultAge } from './ageGate';
 import { getPlayerLanguage, t } from './i18n';
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
@@ -424,6 +425,12 @@ export const createTripDurationChoice = (days?: number): LifestyleActivityChoice
         memoryTag: `${safeDays}-day-trip`,
     });
 };
+
+/** #255: trip cards and industry rooms built around clubs, casinos or drinks wait for 18. The card stays; a tap shows the popup. */
+export const ADULT_ONLY_CHOICE_IDS = new Set([
+    'casino_suite', 'superclub_table', 'rooftop_food_run', 'coastal_wine_day',
+    'awards_afterparty', 'mansion_mixer', 'members_club', 'screening_house',
+]);
 
 export const NIGHTLIFE_TYPE_OPTIONS: LifestyleActivityChoice[] = [
     createSharedChoice({ id: 'club_takeover', label: 'Club Takeover', description: 'A visible club night with big social heat.', kind: 'NIGHTLIFE_TYPE', costMultiplier: 1.25, statEffects: { happiness: 2, fame: 0.7, followers: 900 }, riskShift: 8, memoryTag: 'club' }),
@@ -3481,6 +3488,7 @@ const buildSoloFriendEncounter = (
 ): LifestyleFriendEncounter | undefined => {
     const language = getPlayerLanguage(player);
     if (selections.inviteId !== 'solo') return undefined;
+    if (isUnderAdultAge(player)) return undefined;
     if (!['vacation_escape', 'nightlife_takeover', 'charity_gala'].includes(activity.id)) return undefined;
     const seed = `${player.id || player.name}_${player.age}_${player.currentWeek}_${activity.id}_solo_friend`;
     const encounterChance = activity.id === 'nightlife_takeover' ? 0.58 : activity.id === 'vacation_escape' ? 0.36 : 0.28;
@@ -3577,6 +3585,12 @@ export const resolveLifestyleActivity = (
     const language = getPlayerLanguage(player);
     const activityName = getServiceActivityName(activity, language);
     const quote = buildLifestyleActivityQuote(activity, selections, player);
+    if (isUnderAdultAge(player) && (
+        activity.id === 'nightlife_takeover'
+        || [...(selections.tripActivityIds || []), selections.industryEventId, selections.industryVenueId].some(id => id && ADULT_ONLY_CHOICE_IDS.has(id))
+    )) {
+        return { success: false, player, message: t(language, 'ageGate.body') };
+    }
     if (player.money < quote.totalCost) {
         return { success: false, player, message: t(language, 'services.lifestyle.generic.message.notEnoughCash') };
     }
@@ -3746,16 +3760,13 @@ export const resolveLifestyleActivity = (
         news: newsItems.length
             ? [...newsItems, ...(player.news || [])].slice(0, 100)
             : player.news,
-        logs: [
-            ...(nightlifeOutcome ? [{ week: player.currentWeek, year: player.age, message: nightlifeOutcome.logMessage, type: nightlifeOutcome.logType }] : []),
+        logs: [...(player.logs || []), ...(nightlifeOutcome ? [{ week: player.currentWeek, year: player.age, message: nightlifeOutcome.logMessage, type: nightlifeOutcome.logType }] : []),
             ...(wellnessOutcome ? [{ week: player.currentWeek, year: player.age, message: wellnessOutcome.logMessage, type: wellnessOutcome.logType }] : []),
             ...(industryOutcome ? [{ week: player.currentWeek, year: player.age, message: industryOutcome.logMessage, type: industryOutcome.logType }] : []),
             ...(charityOutcome ? [{ week: player.currentWeek, year: player.age, message: charityOutcome.logMessage, type: charityOutcome.logType }] : []),
             ...(adoptionOutcome ? [{ week: player.currentWeek, year: player.age, message: adoptionOutcome.logMessage, type: adoptionOutcome.logType }] : []),
             ...(petOutcome ? [{ week: player.currentWeek, year: player.age, message: petOutcome.logMessage, type: petOutcome.logType }] : []),
-            { week: player.currentWeek, year: player.age, message: t(language, 'services.lifestyle.generic.log.spent', { amount: quote.totalCost.toLocaleString(), activity: activityName }), type: 'neutral' as const },
-            ...(player.logs || []),
-        ].slice(0, 50),
+            { week: player.currentWeek, year: player.age, message: t(language, 'services.lifestyle.generic.log.spent', { amount: quote.totalCost.toLocaleString(), activity: activityName }), type: 'neutral' as const }],
     };
 
     if (nightlifeOutcome?.nightlifeHealthCondition) {
@@ -3769,10 +3780,7 @@ export const resolveLifestyleActivity = (
             ...incident.player,
             inbox: [...incident.inbox, ...(incident.player.inbox || [])].slice(0, 120),
             news: [...incident.news, ...(incident.player.news || [])].slice(0, 100),
-            logs: [
-                ...incident.logs,
-                ...(incident.player.logs || []),
-            ].slice(0, 50),
+            logs: [...(incident.player.logs || []), ...incident.logs],
         };
     }
 

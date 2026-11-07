@@ -4,8 +4,10 @@ import { Player, AuditionOpportunity, Commitment } from '../../types';
 import { ArrowLeft, Star, Briefcase, ChevronRight, Zap, DollarSign, XCircle, Crown, CheckCircle, Film, Tv, TrendingUp } from 'lucide-react';
 import { ProjectDetailView } from '../../components/ProjectDetailView';
 import { getPlayerLanguage, t } from '../../services/i18n';
+import { isJobOpenToPlayer } from '../../services/roleLogic';
 import { getCharacterIdentityLabels, getOpportunityCharacterProfile, inferStoryCompass } from '../../services/characterIdentityLogic';
 import { evaluateCharacterProfileFit, formatCharacterStoryFitLabel } from '../../services/characterStoryFit';
+import { isOutsideOriginal } from '../../services/outsideOriginals';
 
 interface CastLinkAppProps {
   player: Player;
@@ -23,8 +25,8 @@ export const CastLinkApp: React.FC<CastLinkAppProps> = ({ player, onBack, onAudi
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 
   const currentAuditions = player.weeklyOpportunities?.auditions || [];
-  const currentJobs = player.weeklyOpportunities?.jobs || [];
-  const activeJob = player.commitments.find(c => c.type === 'JOB');
+  const currentJobs = (player.weeklyOpportunities?.jobs || []).filter(job => isJobOpenToPlayer(player, job.name));
+  const activeJob = player.commitments.find(c => c.type === 'JOB' && !isOutsideOriginal(c));
 
   const isApplied = (name: string) => player.applications.some(app => app.name === name);
 

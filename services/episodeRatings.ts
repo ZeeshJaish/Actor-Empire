@@ -33,6 +33,23 @@ const seededNoise = (seed: string, index: number): number => {
     return ((hash % 1000) / 1000) - 0.5;
 };
 
+/** #274: what money does to one episode. 1 is an even share. More helps very little, too little hurts. */
+export const getEpisodeMoneyEffect = (share: number): number => (
+    share >= 1 ? 0.08 * Math.log(share) : -0.7 * Math.pow(1 - Math.max(0, share), 1.5)
+);
+
+/** #274: a season's best hours come from the story: 1 to 3 peaks picked by the script, sized by script and director. Money cannot move them. */
+const getStoryPeaks = (seed: string, episodeCount: number, craft: number): Map<number, number> => {
+    const peaks = new Map<number, number>();
+    const wanted = Math.min(episodeCount, 1 + (hashString(`${seed}:peaks`) % 3));
+    for (let attempt = 0; peaks.size < wanted && attempt < 64; attempt += 1) {
+        const episode = 1 + (hashString(`${seed}:peak:${attempt}`) % episodeCount);
+        if (peaks.has(episode)) continue;
+        peaks.set(episode, (0.2 + (craft / 10) * 0.667) * (1 + seededNoise(`${seed}:size`, episode) * 0.5));
+    }
+    return peaks;
+};
+
 export const getEpisodeRatingVerdict = (rating: number): SeasonEpisodeRatings['verdict'] => {
     if (rating >= 9.2) return 'AWESOME';
     if (rating >= 8.2) return 'GREAT';
@@ -199,16 +216,33 @@ export const generateEpisodeRatings = (release: EpisodeRatingSource): SeasonEpis
 
     const seed = `${release.id || details.title || release.name || 'series'}:${inferSeasonNumber(release)}`;
     const midpoint = Math.max(1, (episodeCount + 1) / 2);
+    /* #274: only a season whose money was laid out episode by episode. Everything else is as it was. */
+    const budgetShares = Array.isArray(details.episodeBudgetShares) && details.episodeBudgetShares.length === episodeCount
+        ? details.episodeBudgetShares.map(Number)
+        : null;
+    const budgetTotal = budgetShares ? budgetShares.reduce((sum, share) => sum + Math.max(0, share), 0) : 0;
+    const storyPeaks = budgetShares && budgetTotal > 0
+        ? getStoryPeaks(`${details.sourceScriptId || seed}:${inferSeasonNumber(release)}`, episodeCount, (scriptRating + directorRating) / 2)
+        : null;
     const episodes = Array.from({ length: episodeCount }, (_, index) => {
         const episode = index + 1;
         const finaleLift = episode === episodeCount ? 0.28 : 0;
         const pilotLift = episode === 1 ? 0.08 : 0;
         const midSeasonDrift = -Math.abs(episode - midpoint) * 0.035;
         const volatility = base >= 8.2 ? 0.52 : base >= 6.8 ? 0.62 : 0.72;
-        const rating = roundRating(base + finaleLift + pilotLift + midSeasonDrift + (seededNoise(seed, episode) * volatility));
+        const made = storyPeaks && budgetShares
+            ? (storyPeaks.get(episode) || 0) + getEpisodeMoneyEffect((Math.max(0, budgetShares[index]) / budgetTotal) * episodeCount)
+            : 0;
+        const rating = roundRating(base + finaleLift + pilotLift + midSeasonDrift + (seededNoise(seed, episode) * volatility) + made);
         return { episode, rating };
     });
 
+    /* #238: a series is one title with one rating: its episodes average to it, whatever their shape */
+    const rawAverage = episodes.reduce((sum, item) => sum + item.rating, 0) / episodes.length;
+    if (imdbRating > 0) {
+        const shift = imdbRating - rawAverage;
+        episodes.forEach(item => { item.rating = roundRating(item.rating + shift); });
+    }
     const averageRating = roundRating(episodes.reduce((sum, item) => sum + item.rating, 0) / episodes.length);
 
     return [{

@@ -1,3 +1,4 @@
+import { gameWeekText } from './gameWeek';
 import type {
     OwnedStreamingCrisis,
     OwnedStreamingCrisisSecurityState,
@@ -875,7 +876,7 @@ export const respondToStreamingCrisis = (
                 responseCost,
                 weeklyRecoveryCost: roundMoney(item.weeklyRecoveryCost * (doctrine === 'SERVICE_FIRST' ? 1.15 : 1)),
                 recoveryReadyAtAbsoluteWeek: absoluteWeek + recoveryWeeks,
-                outcomeNote: `Recovery is funded and targeted for game week ${absoluteWeek + recoveryWeeks}.`,
+                outcomeNote: `Recovery is funded and targeted for game ${gameWeekText(absoluteWeek + recoveryWeeks, absoluteWeek)}.`,
             } : item),
         },
         eventLedger: [...platform.eventLedger, entry],

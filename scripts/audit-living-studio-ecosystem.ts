@@ -86,8 +86,13 @@ mediaStock.priceHistory = Array(12).fill(12.5);
 const originalRandom = Math.random;
 Math.random = () => 0.48;
 try {
-    const stockUpdate = processStockMarket([mediaStock], 20, playerForStock);
-    assert(stockUpdate.stocks[0].price > 12.5, 'Studio-linked stocks should react upward to recent studio hits.');
+    /* #185: a price follows the studio's value, not a weekly multiplier: under the same roll, a studio that has grown lifts its stock against one that has shrunk */
+    const atWorth = (share: number) => {
+        const studios = clone(world.studios!);
+        studios.WARNER_BROS = { ...studios.WARNER_BROS, valuation: studios.WARNER_BROS.valuation * share };
+        return processStockMarket([clone(mediaStock)], 20, { ...playerForStock, world: { ...playerForStock.world, studios } }).stocks[0].price;
+    };
+    assert(atWorth(1.6) > atWorth(0.6), 'Studio-linked stocks should react upward to recent studio hits.');
 } finally {
     Math.random = originalRandom;
 }

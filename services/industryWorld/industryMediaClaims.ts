@@ -1,3 +1,4 @@
+import { gameWeekText } from '../gameWeek';
 import type {
     IndustryEventFact,
     IndustryEventType,
@@ -238,7 +239,7 @@ const leakCategory = (
     };
     if (action.includes('RELEASE')) return {
         category: 'RELEASE_WINDOW',
-        targetName: `a release around week ${nextReviewAbsoluteWeek}`,
+        targetName: `a release around ${gameWeekText(nextReviewAbsoluteWeek)}`,
         target: {
             expectedEventTypes: ['PROJECT_RELEASE_PLANNED', 'PROJECT_RELEASED'], companyId, projectId: subjectId,
             expectedAbsoluteWeek: nextReviewAbsoluteWeek, toleranceWeeks: 4,

@@ -589,6 +589,11 @@ export const normalizeWorldStreamingCompetitionState = (
 
 export const advanceWorldStreamingCompetitionToWeek = normalizeWorldStreamingCompetitionState;
 
+/** #256: this week's state as it stands: the week rebuilds it, and a screen's update does not have to */
+export const isThisWeeksWorldStreamingCompetitionState = (input: unknown, absoluteWeek: number): boolean => (
+    structurallyValid(input) && input.lastProcessedAbsoluteWeek === Math.max(0, Math.round(Number(absoluteWeek) || 0))
+);
+
 export const getWorldStreamingPlayerOutcome = (
     state: WorldStreamingCompetitionState | undefined,
 ): (Pick<WorldStreamingCompetitionGlobalSummary, 'playerHouseholds' | 'playerPrimaryHouseholds' | 'playerMonthlySubscriptionRevenue' | 'playerPlanAllocations'> & {

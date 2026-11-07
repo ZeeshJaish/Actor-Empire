@@ -1,3 +1,4 @@
+import { getStreamingSeasonFunding } from '../../../../services/streamingSeasonRights';
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Archive, ArrowLeft, ChevronRight, Film, Flame, Gauge, Layers, Plus, RotateCcw, SlidersHorizontal, Sparkles, Trophy, Tv } from 'lucide-react';
 import { Business, Player, ProjectType, Script } from '../../../../types';
@@ -502,6 +503,8 @@ export const DevelopmentLabFranchiseManager: React.FC<DevelopmentLabFranchiseMan
                 mode,
                 title,
 	                overrides: {
+	                    /* #246: a platform paid for the next season: this door goes to it as well */
+	                    ...(mode === 'SEQUEL' && getStreamingSeasonFunding(studio, continuationProject) ? { lockedStreamingFunding: getStreamingSeasonFunding(studio, continuationProject)! } : {}),
 	                    genres: [displayFranchise.genre],
 	                    projectType,
 	                    franchiseId: displayFranchise.id,

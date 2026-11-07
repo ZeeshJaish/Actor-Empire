@@ -3,6 +3,7 @@ import { NPC_DATABASE, getGenderedAvatar } from './npcLogic';
 import { getEstimatedNetWorth } from './loanLogic';
 import { getAbsoluteWeek } from './legacyLogic';
 import { getPlayerLanguage, t } from './i18n';
+import { isUnderAdultAge } from './ageGate';
 
 const RANDOM_JOBS = [
     'Actor', 'Assistant Director', 'Barista', 'Chef', 'Choreographer', 'Creative Producer', 'Dancer', 'Designer',
@@ -348,6 +349,8 @@ export const calculateSwipeSuccess = (player: Player, match: DatingMatch): boole
 };
 
 export const advanceTinderConnections = (player: Player): Player => {
+    /* #255: an old save's matches stay frozen until 18 */
+    if (isUnderAdultAge(player)) return player;
     const tinderMatches = player.dating.matches.filter(match => !match.isPremium);
     if (tinderMatches.length === 0) return player;
 
@@ -471,6 +474,7 @@ export const getLuxeInviteOutcome = (
 };
 
 export const advanceLuxeConnections = (player: Player): Player => {
+    if (isUnderAdultAge(player)) return player;
     const premiumMatches = player.dating.matches.filter(match => match.isPremium);
     if (premiumMatches.length === 0) return player;
 

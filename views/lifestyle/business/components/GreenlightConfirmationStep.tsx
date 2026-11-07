@@ -22,6 +22,7 @@ interface GreenlightConfirmationBudget {
     crew: number;
     locationCost: number;
     equipmentCost: number;
+    effectsCost?: number;
     scriptCost: number;
     baseCost: number;
     total: number;
@@ -266,6 +267,12 @@ export const GreenlightConfirmationStep: React.FC<GreenlightConfirmationStepProp
                                 <span className="text-zinc-300">Equipment & Gear</span>
                                 <span className="font-mono text-white">{formatMoney(budgetBreakdown.equipmentCost)}</span>
                             </div>
+                            {(budgetBreakdown.effectsCost || 0) > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-zinc-300">Effects</span>
+                                    <span className="font-mono text-white">{formatMoney(budgetBreakdown.effectsCost || 0)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between items-center">
                                 <span className="text-zinc-300">Script & IP Rights</span>
                                 <span className="font-mono text-white">{formatMoney(budgetBreakdown.scriptCost)}</span>

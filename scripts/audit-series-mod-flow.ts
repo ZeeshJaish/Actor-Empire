@@ -104,8 +104,12 @@ async function license(id: string) {
 }
 const firstDeal = hire('UPFRONT', 1); const originalAmount = firstDeal.totalAmount;
 await reload('hired'); const firstId = greenlight(script); assert.equal(roster().find(c => c.id === firstDeal.id)!.moviesRemaining, 0);
+/* A series renews itself at a 72 to 90% chance, and this audit's own Season Two would then be refused as "already in development".
+   So the rolls of these weeks stay above any renewal chance: what is checked here is the player's own continuation. */
+const fairRandom = Math.random; Math.random = () => 0.5 + fairRandom() * 0.02 + 0.47;
 await produce(firstId); await license(firstId);
 for (let i = 0; i < 8; i++) await tick(); await reload('season-one-viewing');
+Math.random = fairRandom;
 const source = player.activeReleases.find(r => r.id === firstId) || player.pastProjects.find(r => r.id === firstId); assert(source);
 const studio = player.businesses.find(b => b.id === studioId)!;
 const continuation = createContinuationScript({ player, studioScripts: studio.studioState!.scripts, project: source, mode: 'SEQUEL', title: 'Workshop Days: Season Two' });
@@ -133,7 +137,10 @@ for (const isDead of [false, true]) for (const gender of ['MALE', 'FEMALE']) {
     assert.equal(player.businesses.find(b => b.id === studioId)!.balance, parent.businesses.find(b => b.id === studioId)!.balance);
     for (const contract of Object.values(parent.world.streamingRightsContracts || {})) {
         const inherited = player.world.streamingRightsContracts![contract.id]; assert(inherited); assert.equal(inherited.minimumGuarantee, contract.minimumGuarantee);
-        assert.deepEqual(inherited.settlement, contract.settlement);
+        /* #206: one world clock: every date in the world moves back with the heir, so a settlement's week does too. What was paid stays what was paid. */
+        const undated = (settlement: typeof contract.settlement) => { const { settledAtAbsoluteWeek: _moved, ...rest } = (settlement || {}) as any; return rest; };
+        assert.deepEqual(undated(inherited.settlement), undated(contract.settlement));
+        assert.ok(Number((inherited.settlement as any)?.settledAtAbsoluteWeek ?? 0) <= Number((contract.settlement as any)?.settledAtAbsoluteWeek ?? 0));
     }
     await reload(`heir-${gender}-${isDead}`);
     for (let n = 0; n < 3; n++) { await tick(); await reload(`heir-week-${gender}-${isDead}-${n}`); }

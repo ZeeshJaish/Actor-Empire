@@ -75,12 +75,13 @@ export interface StreamingCampaignSubject {
     genre?: string;
 }
 
-/** What a campaign can be about: the service, each title it streams now, and the universes and franchises among them. */
+/** What a campaign can be about: the service, each title it streams now or an Original with its week booked, and the universes and franchises among them. */
 export const streamingCampaignSubjects = (player: Player): StreamingCampaignSubject[] => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const programWeek = platform.launchCommit ? Math.max(1, absoluteWeek - platform.launchCommit.committedAtAbsoluteWeek + 1) : 0;
-    const entries = getOwnedStreamingProgramEntries(player).filter(entry => entry.launchWeek <= programWeek);
+    /* #291: a campaign builds a premiere: the awareness is waiting for it when it opens */
+    const entries = getOwnedStreamingProgramEntries(player).filter(entry => entry.launchWeek <= programWeek || entry.source === 'ORIGINAL');
     const links = new Map<string, { universeId?: string; franchiseId?: string }>();
     const link = (id: string, universeId?: unknown, franchiseId?: unknown) => {
         if (typeof universeId === 'string' || typeof franchiseId === 'string') {

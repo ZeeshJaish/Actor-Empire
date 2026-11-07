@@ -132,7 +132,7 @@ assert.deepEqual(indiaOnly.availableCountryIds, []);
 assert.deepEqual(indiaOnly.blockedCountryIds, ['IN']);
 assert.equal(
     formatStreamingRightsCompatibilitySummary(indiaOnly),
-    'India is exclusively licensed to Netflix until Week 60.',
+    'India is exclusively licensed to Netflix until Week 9 next year.',
 );
 
 const afterExpiry = resolveStreamingRightsCompatibility({

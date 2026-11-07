@@ -1,3 +1,8 @@
+import { createPendingPlatformAiCommissioningLifecycle, createUnfundedPlatformAiProductionEscrow } from './platformAiProductionEscrow';
+import { addActivityLog } from '../activityLog';
+import { getInHouseWriterSkill } from '../studioProductionEconomy';
+import { chargeStudioLegal, fileStreamingPlatformClaim } from '../platformClaim';
+import { ratingFromQuality } from '../titleRating';
 import type {
     Business,
     Genre,
@@ -64,6 +69,7 @@ export const normalizePlatformAiPlayerCommissionOffers = (
                 projectType,
                 genre,
                 ...(raw.targetAudience ? { targetAudience: raw.targetAudience as TargetAudience } : {}),
+                ...(raw.bigDeal ? { bigDeal: true as boolean } : {}),
                 status,
                 productionBudget: roundMoney(Number(raw.productionBudget || 0)),
                 producerFee: roundMoney(Number(raw.producerFee || 0)),
@@ -83,6 +89,10 @@ export const normalizePlatformAiPlayerCommissionOffers = (
                 commitmentId: raw.commitmentId ? String(raw.commitmentId) : null,
                 canonicalProductionId: raw.canonicalProductionId ? String(raw.canonicalProductionId) : null,
                 finalQualityScore: raw.finalQualityScore === null || raw.finalQualityScore === undefined ? null : clamp(Math.round(Number(raw.finalQualityScore) || 0), 1, 100),
+                ...(safeWeek(raw.premiereAnnouncedAtAbsoluteWeek) !== null ? { premiereAnnouncedAtAbsoluteWeek: safeWeek(raw.premiereAnnouncedAtAbsoluteWeek) as number } : {}),
+                ...(safeWeek(raw.deadlineNoticeAtAbsoluteWeek) !== null ? { deadlineNoticeAtAbsoluteWeek: safeWeek(raw.deadlineNoticeAtAbsoluteWeek) as number } : {}),
+                ...(safeWeek(raw.lawsuitFiledAtAbsoluteWeek) !== null ? { lawsuitFiledAtAbsoluteWeek: safeWeek(raw.lawsuitFiledAtAbsoluteWeek) as number } : {}),
+                ...(safeWeek(raw.renewalDecidedAtAbsoluteWeek) !== null ? { renewalDecidedAtAbsoluteWeek: safeWeek(raw.renewalDecidedAtAbsoluteWeek) as number } : {}),
                 deliveredImdbRating: raw.deliveredImdbRating === null || raw.deliveredImdbRating === undefined ? null : Math.round(clamp(Number(raw.deliveredImdbRating) || 0, 0, 10) * 10) / 10,
                 releasedAtAbsoluteWeek: null,
             } satisfies PlatformAiPlayerCommissionOffer;
@@ -143,10 +153,30 @@ const updateStudio = (player: Player, studioId: string, updater: (studio: Busine
     businesses: player.businesses.map(studio => studio.id === studioId ? updater(studio) : studio),
 });
 
+/** #302: how deep a rival's pockets are: 0 at $300M or less, 1 at $10B or more. What it offers follows from this. */
+export const getRivalBudgetLevel = (cashMillions: number): number => (
+    clamp((Math.log10(Math.max(1, Number(cashMillions) || 1)) - 2.5) / 1.5, 0, 1)
+);
+/** The share of the plan's money a rival really puts up: a poor one 80% of it, a rich one 110% */
+export const getRivalCapScale = (cashMillions: number): number => 0.8 + getRivalBudgetLevel(cashMillions) * 0.3;
+export const BIG_DEAL_CAP_SCALE = 1.5;
+export const BIG_DEAL_FEE_EXTRA = 0.08;
+export const BIG_DEAL_RATING_EXTRA = 0.4;
+const BIG_DEAL_CHANCE = 1 / 8;
+const BIG_DEAL_MIN_LEVEL = 0.6;
+
+/** A rich rival can afford a big one and still have three times the money left over */
+export const isRivalBigDeal = (planId: string, cashMillions: number, fundingMillions: number): boolean => (
+    getRivalBudgetLevel(cashMillions) >= BIG_DEAL_MIN_LEVEL
+    && Number(cashMillions) >= fundingMillions * BIG_DEAL_CAP_SCALE * 1.25 * 3
+    && createDeterministicRng(`big-deal:${planId}`)() < BIG_DEAL_CHANCE
+);
+
 export const calculatePlatformAiPlayerProducerFee = (input: {
     player: Player;
     platformId: PlatformId;
     productionBudget: number;
+    bigDeal?: boolean;
 }): number => {
     const studios = input.player.businesses.filter(business => business.type === 'PRODUCTION_HOUSE' && business.studioState);
     const best = studios.sort((left, right) => (right.stats.brandHealth + right.stats.customerSatisfaction) - (left.stats.brandHealth + left.stats.customerSatisfaction))[0];
@@ -155,7 +185,9 @@ export const calculatePlatformAiPlayerProducerFee = (input: {
     const trackRecordBonus = clamp(successfulDeliveries * 0.005, 0, 0.02);
     const trustBonus = clamp(Number(relation?.trustModifier || 0) * 0.001, -0.01, 0.01);
     const brandBonus = clamp(((best?.stats.brandHealth || 50) - 50) / 5_000, -0.005, 0.005);
-    return roundMoney(input.productionBudget * clamp(0.085 + trackRecordBonus + trustBonus + brandBonus, 0.08, 0.12));
+    /* #302: a short-of-money rival pays about 9%, a rich one about 16%, then its record with you. A big deal adds to that. */
+    const level = getRivalBudgetLevel(Number(input.player.world.platforms?.[input.platformId]?.cashReserve || 0));
+    return roundMoney(input.productionBudget * clamp(0.09 + level * 0.07 + trackRecordBonus + trustBonus + brandBonus + (input.bigDeal ? BIG_DEAL_FEE_EXTRA : 0), 0.08, 0.3));
 };
 
 export interface CreatePlatformAiPlayerCommissionOfferInput {
@@ -169,6 +201,7 @@ export interface CreatePlatformAiPlayerCommissionOfferInput {
     productionFundingMillions: number;
     minimumImdbRating?: number;
     absoluteWeek: number;
+    bigDeal?: boolean;
 }
 
 export interface PlatformAiPlayerCommissionResult {
@@ -196,7 +229,7 @@ export const createPlatformAiPlayerCommissionOffer = (
     ));
     if (activeCooldown) return { player: input.player, changed: false, offer: null, reason: 'OFFER_COOLDOWN' };
     const productionBudget = roundMoney(input.productionFundingMillions * FULL_CURRENCY_PER_MILLION);
-    const producerFee = calculatePlatformAiPlayerProducerFee({ player: input.player, platformId: input.platformId, productionBudget });
+    const producerFee = calculatePlatformAiPlayerProducerFee({ player: input.player, platformId: input.platformId, productionBudget, bigDeal: input.bigDeal });
     const minimumImdbRating = Math.round(clamp(Number(input.minimumImdbRating ?? 7), 5.5, 9) * 10) / 10;
     const briefReference = createPlatformCommissionBriefReference(platform.name, id);
     const offer: PlatformAiPlayerCommissionOffer = {
@@ -209,6 +242,7 @@ export const createPlatformAiPlayerCommissionOffer = (
         projectType: input.projectType,
         genre: input.genre,
         ...(input.targetAudience ? { targetAudience: input.targetAudience } : {}),
+        ...(input.bigDeal ? { bigDeal: true } : {}),
         status: 'PENDING',
         productionBudget,
         producerFee,
@@ -236,8 +270,8 @@ export const createPlatformAiPlayerCommissionOffer = (
         inbox: [{
             id: `message_${id}`,
             sender: `${platform.name} Originals`,
-            subject: `${briefReference}: production offer`,
-            text: `${platform.name} wants your studio to produce a ${input.genre.toLowerCase()} ${input.projectType.toLowerCase()}. Production cap: $${input.productionFundingMillions.toFixed(1)}M. Producer fee: $${(producerFee / FULL_CURRENCY_PER_MILLION).toFixed(1)}M. Expected minimum: ${minimumImdbRating.toFixed(1)} IMDb. The deadline will include a fair buffer after Greenlight.`,
+            subject: input.bigDeal ? `Big deal: ${briefReference}` : `${briefReference}: production offer`,
+            text: `${input.bigDeal ? `This is the rare one. ` : ''}${platform.name} wants your studio to produce a ${input.genre.toLowerCase()} ${input.projectType.toLowerCase()}. Production cap: $${input.productionFundingMillions.toFixed(1)}M. Producer fee: $${(producerFee / FULL_CURRENCY_PER_MILLION).toFixed(1)}M. Expected minimum: ${minimumImdbRating.toFixed(1)} IMDb. The deadline will include a fair buffer after Greenlight.`,
             type: 'OFFER_PLATFORM_COMMISSION',
             data: { offerId: id },
             isRead: false,
@@ -286,7 +320,11 @@ export const generatePlatformAiPlayerCommissionOffers = (
         .sort((left, right) => left.plan.id.localeCompare(right.plan.id))[0];
     if (!candidate) return { player, changed: player !== sourcePlayer, offer: null };
     const creative = clamp(Number(candidate.platform.ai?.competence?.creative || 7), 1, 10);
-    const minimumImdbRating = Math.round(clamp(6.1 + creative * 0.12, 6.2, 7.8) * 10) / 10;
+    /* #302: what it can put up follows its money, and once in a while a rich rival makes a big offer */
+    const cash = Number(candidate.platform.cashReserve || 0);
+    const funding = candidate.plan.productionFundingMillions * getRivalCapScale(cash);
+    const bigDeal = isRivalBigDeal(candidate.plan.id, cash, funding);
+    const minimumImdbRating = Math.round(clamp(6.1 + creative * 0.12 + (bigDeal ? BIG_DEAL_RATING_EXTRA : 0), 6.2, 8.2) * 10) / 10;
     const created = createPlatformAiPlayerCommissionOffer({
         player,
         platformId: candidate.platformId,
@@ -295,9 +333,10 @@ export const generatePlatformAiPlayerCommissionOffers = (
         projectType: candidate.plan.projectType,
         genre: candidate.plan.genre,
         targetAudience: candidate.plan.targetAudience,
-        productionFundingMillions: candidate.plan.productionFundingMillions,
+        productionFundingMillions: roundMillions(funding * (bigDeal ? BIG_DEAL_CAP_SCALE : 1)),
         minimumImdbRating,
         absoluteWeek,
+        bigDeal,
     });
     return { player: created.player, changed: created.changed || player !== sourcePlayer, offer: created.offer };
 };
@@ -364,6 +403,21 @@ export const acceptPlatformAiPlayerCommission = (input: {
             ],
         },
     }));
+    /* #302: nobody keeps quiet about one of these */
+    if (offer.bigDeal) {
+        player = {
+            ...player,
+            news: [{
+                id: `news_big_deal_${offer.id}`,
+                headline: `${offer.platformName} hands ${studio.name} one of its biggest orders`,
+                subtext: `"${offer.title}" gets ${Math.round(offer.productionBudget / FULL_CURRENCY_PER_MILLION)}M to make it, and a fee most studios never see.`,
+                category: 'INDUSTRY' as const,
+                week: player.currentWeek,
+                year: Math.floor(player.currentWeek / 52) + 2024,
+                impactLevel: 'MEDIUM' as const,
+            }, ...(player.news || [])].slice(0, 80),
+        };
+    }
     return { player, changed: true, offer: accepted, studioId: studio.id };
 };
 
@@ -431,7 +485,8 @@ export const finalizePlatformAiPlayerCommissionGreenlight = (input: {
         writerSource: 'IN_HOUSE_TEAM',
         writerId: null,
         writerName: `${studio.name} Story Department`,
-        writerSkill: clamp(Math.round(studio.studioState?.departments?.writing || 50), 1, 100),
+        /* #306: this read the room's level (1 to 10) as a skill out of 100 */
+        writerSkill: getInHouseWriterSkill(Number(studio.studioState?.departments?.writing) || 1),
         createdAtAbsoluteWeek: input.absoluteWeek,
         updatedAtAbsoluteWeek: input.absoluteWeek,
     };
@@ -542,9 +597,9 @@ export const settlePlatformAiPlayerCommissionDelivery = (input: {
     const studio = offer.studioId ? getStudio(input.player, offer.studioId) : null;
     if (!studio) return { player: input.player, changed: false, offer, reason: 'STUDIO_NOT_FOUND' };
     const finalQualityScore = clamp(Math.round(input.finalQualityScore), 1, 100);
-    const deliveredImdbRating = Math.round((finalQualityScore / 10) * 10) / 10;
+    const deliveredImdbRating = ratingFromQuality(finalQualityScore);
     const miss = offer.minimumImdbRating - deliveredImdbRating;
-    const severeMiss = miss >= 2;
+    const severeMiss = miss >= 1.5;
     const metTarget = miss <= 0;
     const cooldownWeeks = severeMiss
         ? 15 + Math.floor(createDeterministicRng(`${input.player.id}:${offer.id}:QUALITY_COOLDOWN`)() * 16)
@@ -646,6 +701,11 @@ export const settlePlatformAiPlayerCommissionDelivery = (input: {
     });
     return { player, changed: true, offer: delivered, studioId: studio.id };
 };
+
+/** #241: what handing a brief back costs before greenlight */
+export const platformAiCommissionKillFee = (productionBudget: number) => Math.max(250_000, Math.round(productionBudget * 0.01 / 50_000) * 50_000);
+/** #241: after a missed date, how long a platform waits before it sues */
+export const PLATFORM_COMMISSION_NOTICE_WEEKS = 4;
 
 export const transferPlatformAiPlayerCommission = (input: {
     player: Player;
@@ -793,7 +853,85 @@ export const transferPlatformAiPlayerCommission = (input: {
             },
         },
     }));
+    /* #241: before greenlight a small kill fee. After it, walking away is a breach: the fee back and damages, in court or settled */
+    if (offer.status === 'ACCEPTED') {
+        const killFee = platformAiCommissionKillFee(offer.productionBudget);
+        player = chargeStudioLegal(player, studio.id, killFee, `Kill fee: ${offer.title}`, `kill_${offer.id}`);
+    } else {
+        const calendar = commitment?.productionCalendar;
+        const total = Math.max(1, Number(calendar?.totalWeeks) || Number(commitment?.totalPhaseDuration) || 1);
+        const done = clamp(1 - Number(commitment?.phaseWeeksLeft ?? total) / total, 0, 1);
+        player = fileStreamingPlatformClaim(player, {
+            kind: 'WALKED_AWAY', studioId: studio.id, platformId: offer.platformId, platformName: offer.platformName, titleName: offer.title,
+            feeBack: offer.producerFeePaid,
+            damages: offer.productionBudget * (0.08 + 0.12 * done),
+            key: `walked_${offer.id}`,
+        });
+    }
     return { player, changed: true, offer: transferred, studioId: studio.id };
+};
+
+/** #246 (plan §25.4 Q8): how long a platform watches a commissioned series before it decides on another season */
+export const PLATFORM_COMMISSION_RENEWAL_WEEKS = 16;
+
+const nextSeasonTitle = (title: string) => {
+    const match = /Season\s+(\d+)/i.exec(title);
+    return match ? title.replace(/Season\s+\d+/i, `Season ${Number(match[1]) + 1}`) : `${title} Season 2`;
+};
+
+/** A commissioned series is the platform's. It decides on the next season, and a good one brings the studio back for a new fee. */
+export const decidePlatformAiCommissionRenewals = (sourcePlayer: Player, absoluteWeek: number): Player => {
+    let player = sourcePlayer;
+    for (const offer of Object.values(getOffers(player)).sort((left, right) => left.id.localeCompare(right.id))) {
+        if (offer.status !== 'DELIVERED' || offer.projectType !== 'SERIES' || offer.renewalDecidedAtAbsoluteWeek !== undefined) continue;
+        const from = offer.releasedAtAbsoluteWeek ?? offer.deliveredAtAbsoluteWeek;
+        if (from === null || absoluteWeek - from < PLATFORM_COMMISSION_RENEWAL_WEEKS) continue;
+        const platform = player.world.platforms?.[offer.platformId];
+        const plan = platform?.ai?.slate.find(item => item.id === offer.platformContentPlanId);
+        const fundingMillions = roundMillions(offer.productionBudget / FULL_CURRENCY_PER_MILLION);
+        const worthIt = Boolean(platform && plan && platform.ai?.status === 'ACTIVE') && (offer.deliveredImdbRating ?? 0) >= offer.minimumImdbRating
+            && platform!.cashReserve >= fundingMillions * 1.25
+            && !getPlatformAiSpendingRestrictions(platform!, absoluteWeek).blocksNewGreenlights;
+        player = replaceOffer(player, { ...offer, renewalDecidedAtAbsoluteWeek: absoluteWeek });
+        if (!worthIt) {
+            player = addActivityLog(player, `${offer.platformName} is not renewing "${offer.title}". It owns the show, so that is the end of it.`);
+            continue;
+        }
+        const title = nextSeasonTitle(offer.title);
+        const planId = createDeterministicId('platform_ai_season_plan', offer.platformId, offer.id);
+        player = {
+            ...player,
+            world: {
+                ...player.world,
+                platforms: {
+                    ...player.world.platforms!,
+                    [offer.platformId]: {
+                        ...platform!,
+                        ai: {
+                            ...platform!.ai!,
+                            slate: [...platform!.ai!.slate, {
+                                ...plan!,
+                                id: planId, title, status: 'BRIEF' as const, sourceProjectIds: [], rightsContractIds: [], commissionId: null, sourceStudioId: null,
+                                paidSpendMillions: 0, productionFundingMillions: fundingMillions,
+                                productionEscrow: createUnfundedPlatformAiProductionEscrow(fundingMillions),
+                                commissioningLifecycle: createPendingPlatformAiCommissioningLifecycle(absoluteWeek, 0),
+                                committedAtAbsoluteWeek: absoluteWeek, rightsReadyAtAbsoluteWeek: null, localizationReadyAtAbsoluteWeek: null, premiereAtAbsoluteWeek: null,
+                                releasePattern: null, releaseEntries: [], scheduledAtAbsoluteWeek: null, releasedAtAbsoluteWeek: null, industryProductionId: null, productionHoldStartedAtAbsoluteWeek: null,
+                            }],
+                        },
+                    },
+                },
+            },
+        };
+        const hired = createPlatformAiPlayerCommissionOffer({
+            player, platformId: offer.platformId, planId, title, projectType: offer.projectType, genre: offer.genre, targetAudience: offer.targetAudience,
+            productionFundingMillions: fundingMillions, minimumImdbRating: offer.minimumImdbRating, absoluteWeek,
+        });
+        player = addActivityLog(hired.player, hired.changed
+            ? `${offer.platformName} renewed "${offer.title}" and wants your studio back for ${title}.`
+            : `${offer.platformName} renewed "${offer.title}". Another producer is making ${title}.`, 'positive');
+    }
+    return player;
 };
 
 /** Advances player-produced originals from the existing Production House phases into platform delivery. */
@@ -806,9 +944,24 @@ export const syncPlatformAiPlayerCommissionProductions = (
         .filter(offer => ['GREENLIT', 'IN_PRODUCTION'].includes(offer.status) && offer.commitmentId)
         .sort((left, right) => left.id.localeCompare(right.id));
     for (const offerSnapshot of offers) {
-        const offer = getOffers(player)[offerSnapshot.id];
+        let offer = getOffers(player)[offerSnapshot.id];
         const commitment = player.commitments.find(item => item.id === offer.commitmentId);
         if (!commitment) continue;
+        /* #241: the date in the contract has a reader now */
+        if (commitment.projectPhase !== 'AWAITING_RELEASE' && offer.deliveryDeadlineAtAbsoluteWeek !== null && absoluteWeek > offer.deliveryDeadlineAtAbsoluteWeek && !offer.lawsuitFiledAtAbsoluteWeek) {
+            if (!offer.deadlineNoticeAtAbsoluteWeek) {
+                player = replaceOffer(addActivityLog(player, `${offer.platformName}: "${offer.title}" is past its delivery date. Deliver within ${PLATFORM_COMMISSION_NOTICE_WEEKS} weeks or it goes to court.`, 'negative'), { ...offer, deadlineNoticeAtAbsoluteWeek: absoluteWeek });
+                offer = getOffers(player)[offer.id];
+            } else if (absoluteWeek - offer.deadlineNoticeAtAbsoluteWeek >= PLATFORM_COMMISSION_NOTICE_WEEKS) {
+                player = fileStreamingPlatformClaim(replaceOffer(player, { ...offer, lawsuitFiledAtAbsoluteWeek: absoluteWeek }), {
+                    kind: 'MISSED_DEADLINE', studioId: offer.studioId || undefined, platformId: offer.platformId, platformName: offer.platformName, titleName: offer.title,
+                    feeBack: 0,
+                    damages: Math.max(1_000_000, offer.producerFee * 0.5),
+                    key: `late_${offer.id}`,
+                });
+                offer = getOffers(player)[offer.id];
+            }
+        }
         if (commitment.projectPhase === 'AWAITING_RELEASE') {
             const baseQuality = Number(commitment.projectDetails?.hiddenStats?.qualityScore || offer.finalQualityScore || 50);
             const execution = Number(commitment.productionPerformance ?? 50);
@@ -824,12 +977,12 @@ export const syncPlatformAiPlayerCommissionProductions = (
                 player = {
                     ...settled.player,
                     commitments: settled.player.commitments.filter(item => item.id !== commitment.id),
-                    logs: [{
+                    logs: [...(settled.player.logs || []), {
                         week: settled.player.currentWeek,
                         year: settled.player.age,
                         message: `Delivered ${offer.title} to ${offer.platformName}. The title now waits in the platform's post-delivery pipeline.`,
                         type: 'positive' as const,
-                    }, ...(settled.player.logs || [])].slice(0, 80),
+                    }],
                 };
             }
             continue;

@@ -5725,6 +5725,8 @@ export const frTranslations: Record<TranslationKey, string> = {
         'actions.relationship.reconnectionSubtext': 'Repairing family damage will take time, but the first step is made.',
         'actions.relationship.blockedTitle': 'Blocked',
         'actions.relationship.familyRomanceBlockedSubtext': 'Family members cannot be used for romantic actions.',
+        'ageGate.title': 'Attends tes 18 ans',
+        'ageGate.body': 'Tu ne peux pas encore faire ça. Ça s\'ouvre à tes 18 ans.',
         'actions.relationship.lockedTitle': 'Locked',
         'actions.relationship.lockedHomeSubtext': 'Own a premium home first to host estate dates.',
         'actions.relationship.lockedSkySeaSubtext': 'Own a Sky & Sea asset first to unlock that lifestyle move.',

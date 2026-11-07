@@ -260,11 +260,11 @@ export const processAcquisitionMarketPulse = (player: Player): Player => {
             ...player.x,
             feed: [xPost, ...(player.x?.feed || []).filter(post => post.id !== xPost.id)].slice(0, 80),
         },
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: `Acquisition Market Pulse: ${state.marketMood} mood, ${state.investorConfidenceDelta >= 0 ? '+' : ''}${state.investorConfidenceDelta} investor confidence, ${state.franchiseValueDelta >= 0 ? '+' : ''}${state.franchiseValueDelta} franchise value.`,
             type: state.marketMood === 'BACKLASH' || state.marketMood === 'NERVOUS' ? 'neutral' as const : 'positive' as const,
-        }, ...(player.logs || [])].slice(0, 50),
+        }],
     };
 };

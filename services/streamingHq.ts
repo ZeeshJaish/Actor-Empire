@@ -185,9 +185,9 @@ export const getStreamingHqSnapshot = (player: Player): StreamingHqSnapshot => {
         },
         {
             id: 'ORIGINAL',
-            title: 'Greenlight the first Original',
-            description: 'Find an audience gap and commission the platform’s opening statement.',
-            complete: platform.milestoneKeys.includes('first-original-greenlit'),
+            title: 'Commission an Original (optional)',
+            description: 'You can open without one. A finished Original makes a bigger opening.',
+            complete: platform.milestoneKeys.includes('first-original-greenlit') || platform.milestoneKeys.includes('launch-slate-programmed'),
             destination: 'CONTENT',
             phase: 7,
         },

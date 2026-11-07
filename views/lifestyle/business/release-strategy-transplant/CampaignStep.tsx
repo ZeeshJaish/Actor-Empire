@@ -43,7 +43,7 @@ export const CampaignStep: React.FC<{
   return <div className={css.cmp} style={{ '--ch': String(position?.hue || 28) } as React.CSSProperties}>
     <div className={css.cmpwash} />
     <section className={css.oneup}>
-      <div className={css.oneupsheet}><FilmSheet film={film} size="md" dress={position?.style || 'mass'} /></div>
+      <div className={css.oneupsheet}><FilmSheet film={film} size="md" dress={position?.style || 'mass'} where={cinema ? undefined : 'STREAMING'} /></div>
       <div className={css.oneupside}>
         <span className={css.seclabel}>THE PROMISE</span>
         <b className={css.oneupname}>{position?.shortLabel}</b>

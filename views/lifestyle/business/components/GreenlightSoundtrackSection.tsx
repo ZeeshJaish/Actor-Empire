@@ -1,7 +1,18 @@
-import React from 'react';
-import { Mic, Search } from 'lucide-react';
-import type { MusicCreditRole } from '../../../../types';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, Mic, Music, Search } from 'lucide-react';
+import type { MusicArtist, MusicCreditRole } from '../../../../types';
 import type { MusicArtistSortOption } from '../greenlightUtils';
+import { getMusicArtistById } from '../../../../services/musicIndustry';
+import { getGenderedAvatar } from '../../../../services/npcAvatar';
+
+/** #270: an artist's face, the same seeded portrait as any person; a group or an unknown keeps a music mark */
+const ArtistFace: React.FC<{ artist?: MusicArtist | null; size?: string }> = ({ artist, size = 'h-12 w-12' }) => {
+    const gender = artist?.gender === 'MALE' || artist?.gender === 'FEMALE' ? artist.gender : null;
+    const face = useMemo(() => (gender && artist ? getGenderedAvatar(gender, artist.stageName) : null), [gender, artist?.stageName]);
+    return face
+        ? <img src={face} alt="" draggable={false} className={`${size} shrink-0 rounded-full border-2 border-cyan-300/30 bg-black object-cover object-top`} />
+        : <span className={`${size} grid shrink-0 place-items-center rounded-full border-2 border-cyan-300/30 bg-cyan-400/10 text-cyan-200`}><Music size={18} aria-hidden="true" /></span>;
+};
 
 interface GreenlightSoundtrackSectionProps {
     effectiveMusicArtistCount: number;
@@ -61,7 +72,9 @@ export const GreenlightSoundtrackSection: React.FC<GreenlightSoundtrackSectionPr
     onSearchChange,
     onSortChange,
     onAssignArtist,
-}) => (
+}) => {
+    const [pickerRole, setPickerRole] = useState<MusicCreditRole | null>(null);
+    return (
     <section className="bg-zinc-950/80 border border-cyan-500/20 rounded-2xl p-4 sm:p-5 space-y-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]" aria-labelledby="greenlight-soundtrack-heading">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="min-w-0">
@@ -132,7 +145,7 @@ export const GreenlightSoundtrackSection: React.FC<GreenlightSoundtrackSectionPr
                         {isStudioDecidedMusicPlan
                             ? `Studio decides · ${effectiveMusicArtistCount} planned`
                             : effectiveMusicArtistCount > 0
-                                ? 'Toggle what you want, then assign artists'
+                                ? 'Pick what you want, then the artists'
                                 : 'All music content is off'}
                     </div>
                 </div>
@@ -153,44 +166,73 @@ export const GreenlightSoundtrackSection: React.FC<GreenlightSoundtrackSectionPr
                     const roleQuery = musicRoleSearchQueries[role] || '';
                     const roleSort = musicRoleSortOptions[role] || 'RECOMMENDED';
                     const searchMatches = isIncluded ? getMusicArtistSearchMatches(role) : [];
+                    const creditArtist = credit?.artistId ? (searchMatches.find(artist => artist.id === credit.artistId) || getMusicArtistById(credit.artistId)) : null;
+                    const pickerOpen = isIncluded && pickerRole === role;
 
-                    return (
-                        <div
-                            key={`plan_${role}`}
-                            className={`min-w-0 rounded-xl border p-3 transition-all ${isActiveSlot ? 'border-cyan-300 bg-cyan-400/[0.08] shadow-[0_0_18px_rgba(34,211,238,0.12)]' : isIncluded ? 'border-cyan-400/40 bg-cyan-400/10 hover:border-cyan-300' : 'border-zinc-800 bg-black/20 opacity-70 hover:opacity-100 hover:border-cyan-400/40'}`}
-                        >
-                            <div className="flex items-start justify-between gap-3">
+                    if (!isIncluded) {
+                        return (
+                            <div key={`plan_${role}`} className="flex min-h-[52px] min-w-0 items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-black/20 px-3 py-2">
                                 <div className="min-w-0">
-                                    <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${isIncluded ? 'text-cyan-200/60' : 'text-zinc-600'}`}>
-                                        {getMusicCreditRoleLabel(role)}
-                                    </div>
-                                    <div className="mt-1 truncate text-sm font-black text-white">
-                                        {isIncluded
-                                            ? isStudioDecidedMusicPlan
-                                                ? `Studio pick: ${credit?.artistName || 'Choosing artist'}`
-                                                : credit?.artistName || 'Choose artist'
-                                            : 'Not producing this'}
-                                    </div>
-                                    <div className="mt-1 truncate text-[10px] font-bold text-zinc-500">
-                                        {isIncluded
-                                            ? isStudioDecidedMusicPlan
-                                                ? 'Auto preview - tap to customize'
-                                                : credit?.songTitle || 'Artist not assigned yet'
-                                            : 'Toggle on to add artist'}
-                                    </div>
+                                    <div className="truncate text-xs font-black text-zinc-300">{getMusicCreditRoleLabel(role)}</div>
+                                    <div className="truncate text-[10px] font-bold text-zinc-600">Not producing this</div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={event => {
                                         event.stopPropagation();
-                                        onToggleRole(role, isIncluded);
+                                        onToggleRole(role, false);
                                     }}
-                                    className={`shrink-0 rounded-full px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] ${isIncluded ? 'bg-cyan-300 text-black hover:bg-cyan-200' : 'bg-zinc-900 text-zinc-500 hover:bg-cyan-400/10 hover:text-cyan-200'}`}
+                                    className="min-h-9 shrink-0 rounded-full bg-zinc-900 px-4 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-400 hover:bg-cyan-400/10 hover:text-cyan-200"
                                 >
-                                    {isIncluded ? (isStudioDecidedMusicPlan ? 'Auto' : 'On') : 'Off'}
+                                    Add
                                 </button>
                             </div>
-                            {isIncluded && (
+                        );
+                    }
+
+                    return (
+                        <div
+                            key={`plan_${role}`}
+                            className={`min-w-0 rounded-xl border p-3 transition-all ${isActiveSlot ? 'border-cyan-300 bg-cyan-400/[0.08] shadow-[0_0_18px_rgba(34,211,238,0.12)]' : 'border-cyan-400/40 bg-cyan-400/10'}`}
+                        >
+                            <div className="grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3">
+                                <ArtistFace artist={creditArtist} />
+                                <div className="min-w-0">
+                                    <div className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200/60">{getMusicCreditRoleLabel(role)}</div>
+                                    <div className="mt-0.5 truncate text-sm font-black text-white">{credit?.artistName || 'Choose artist'}</div>
+                                    <div className="mt-0.5 truncate text-[10px] font-bold text-zinc-400">
+                                        {isStudioDecidedMusicPlan ? 'The studio picked this artist' : credit?.songTitle || 'Artist not assigned yet'}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="font-mono text-sm font-black text-cyan-300">{credit ? formatMoney(credit.estimatedCost) : '—'}</div>
+                                    {credit && <div className="mt-0.5 text-[9px] font-black text-emerald-300">+{credit.buzz} buzz</div>}
+                                </div>
+                            </div>
+                            <div className="mt-2.5 grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPickerRole(pickerOpen ? null : role);
+                                        if (!pickerOpen) onFocusRole(role, roleIndex);
+                                    }}
+                                    aria-expanded={pickerOpen}
+                                    className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-cyan-300/30 bg-black/30 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100"
+                                >
+                                    {credit?.artistName ? 'Change artist' : 'Pick artist'} <ChevronDown size={13} aria-hidden="true" className={`transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={event => {
+                                        event.stopPropagation();
+                                        onToggleRole(role, true);
+                                    }}
+                                    className="min-h-11 rounded-xl border border-zinc-800 bg-black/30 text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                            {pickerOpen && (
                                 <div className="mt-3 space-y-2">
                                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_132px] gap-2">
                                         <div className="relative">
@@ -199,7 +241,7 @@ export const GreenlightSoundtrackSection: React.FC<GreenlightSoundtrackSectionPr
                                                 value={roleQuery}
                                                 onFocus={() => onFocusRole(role, roleIndex)}
                                                 onChange={event => onSearchChange(role, roleIndex, event.target.value)}
-                                                placeholder={credit?.artistName ? `Change ${credit.artistName}` : `Search artist for ${getMusicCreditRoleLabel(role).toLowerCase()}`}
+                                                placeholder={`Search artist for ${getMusicCreditRoleLabel(role).toLowerCase()}`}
                                                 className="w-full rounded-xl border border-zinc-800 bg-black/35 py-2.5 pl-9 pr-3 text-xs font-bold text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-cyan-300"
                                             />
                                         </div>
@@ -215,46 +257,37 @@ export const GreenlightSoundtrackSection: React.FC<GreenlightSoundtrackSectionPr
                                             ))}
                                         </select>
                                     </div>
-                                    {activeMusicSearchRole === role && (
-                                        <div className="rounded-xl border border-zinc-800 bg-zinc-950/85 p-2">
-                                            {searchMatches.length === 0 ? (
-                                                <div className="p-3 text-xs font-bold text-zinc-500">
-                                                    {translate('greenlight.music.noArtistsMatch')}
-                                                </div>
-                                            ) : (
-                                                <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
-                                                    {searchMatches.map(artist => {
-                                                        const displayedCost = hasMusicPreviewProject ? getDisplayedArtistCost(artist) : artist.costLow;
-                                                        const isAssigned = credit?.artistId === artist.id;
-                                                        return (
-                                                            <button
-                                                                key={`${role}_${artist.id}`}
-                                                                type="button"
-                                                                onClick={() => onAssignArtist(role, artist.id)}
-                                                                className={`min-w-[180px] max-w-[180px] rounded-xl border p-3 text-left transition-colors ${isAssigned ? 'border-cyan-200 bg-cyan-300 text-black' : 'border-zinc-800 bg-black/35 hover:border-cyan-300/70 hover:bg-cyan-400/10'}`}
-                                                            >
-                                                                <div className={`truncate text-xs font-black ${isAssigned ? 'text-black' : 'text-white'}`}>{artist.stageName}</div>
-                                                                <div className={`mt-1 truncate text-[9px] font-black uppercase tracking-[0.14em] ${isAssigned ? 'text-black/55' : 'text-cyan-200/55'}`}>
-                                                                    {artist.genre} • {artist.fameTier}
-                                                                </div>
-                                                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                                                    <div>
-                                                                        <div className={`text-[8px] font-black uppercase tracking-[0.16em] ${isAssigned ? 'text-black/45' : 'text-zinc-600'}`}>Rating</div>
-                                                                        <div className={`mt-0.5 text-sm font-black ${isAssigned ? 'text-black' : 'text-emerald-300'}`}>{artist.reputation}/100</div>
-                                                                    </div>
-                                                                    <div className="text-right">
-                                                                        <div className={`text-[8px] font-black uppercase tracking-[0.16em] ${isAssigned ? 'text-black/45' : 'text-zinc-600'}`}>Cost</div>
-                                                                        <div className={`mt-0.5 font-mono text-sm font-black ${isAssigned ? 'text-black' : 'text-cyan-300'}`}>{formatMoney(displayedCost)}</div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className={`mt-2 truncate text-[9px] font-black uppercase tracking-[0.12em] ${isAssigned ? 'text-black/50' : 'text-zinc-500'}`}>
-                                                                    {artist.availability} • {artist.audience}
-                                                                </div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
+                                    {searchMatches.length === 0 ? (
+                                        <div className="rounded-xl border border-zinc-800 p-3 text-xs font-bold text-zinc-500">
+                                            {translate('greenlight.music.noArtistsMatch')}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            {searchMatches.slice(0, 6).map(artist => {
+                                                const displayedCost = hasMusicPreviewProject ? getDisplayedArtistCost(artist) : artist.costLow;
+                                                const isAssigned = credit?.artistId === artist.id;
+                                                return (
+                                                    <button
+                                                        key={`${role}_${artist.id}`}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onAssignArtist(role, artist.id);
+                                                            setPickerRole(null);
+                                                        }}
+                                                        className={`grid w-full grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors ${isAssigned ? 'border-cyan-200 bg-cyan-300/15' : 'border-zinc-800 bg-black/35 hover:border-cyan-300/70'}`}
+                                                    >
+                                                        <ArtistFace artist={artist} size="h-10 w-10" />
+                                                        <span className="min-w-0">
+                                                            <span className="block truncate text-xs font-black text-white">{artist.stageName}</span>
+                                                            <span className="mt-0.5 block truncate text-[9px] font-black uppercase tracking-[0.1em] text-cyan-200/55">{artist.genre} · {artist.fameTier} · {artist.availability}</span>
+                                                        </span>
+                                                        <span className="text-right">
+                                                            <span className="block font-mono text-xs font-black text-cyan-300">{formatMoney(displayedCost)}</span>
+                                                            <span className="mt-0.5 block text-[9px] font-black text-emerald-300">{artist.reputation}/100</span>
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -265,4 +298,5 @@ export const GreenlightSoundtrackSection: React.FC<GreenlightSoundtrackSectionPr
             </div>
         </div>
     </section>
-);
+    );
+};

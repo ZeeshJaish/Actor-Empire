@@ -16,6 +16,8 @@ export interface FinalizeStepModel {
   campaignReturn: number;
   festivalLabel: string | null;
   releaseWeek: number;
+  /** #242: a platform's date is its own */
+  releaseDateLabel?: string;
   screenCount?: number;
   regionCount?: number;
   partnerNames?: string[];
@@ -24,27 +26,30 @@ export interface FinalizeStepModel {
   valueRange?: [number, number];
   buyerName?: string | null;
   buyerNames?: string[];
+  /** #244 */
+  yourPlatformName?: string;
 }
 
 const money = (value: number) => value >= 1_000_000_000 ? `$${(value / 1_000_000_000).toFixed(1)}B` : value >= 1_000_000 ? `$${(value / 1_000_000).toFixed(1)}M` : `$${Math.round(value / 1_000)}k`;
 const Chip: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => <div className={css.mchip}><span>{label}</span><b>{value}</b>{sub && <em>{sub}</em>}</div>;
 
-export const FinalizeStep: React.FC<FinalizeStepModel & { energyCost: number; disabled: boolean; disabledReason?: string; onLock: () => void; onBack: () => void }> = ({ film, route, campaignStyle, campaignLabel, campaignPromise, timelineLabel, channelCount, campaignSpend, campaignReturn, festivalLabel, releaseWeek, screenCount = 0, regionCount = 0, partnerNames = [], bookingCost = 0, studioShare = 0, valueRange, buyerName, buyerNames = [], energyCost, disabled, disabledReason, onLock, onBack }) => <>
+export const FinalizeStep: React.FC<FinalizeStepModel & { energyCost: number; disabled: boolean; disabledReason?: string; onLock: () => void; onBack: () => void }> = ({ yourPlatformName, releaseDateLabel, film, route, campaignStyle, campaignLabel, campaignPromise, timelineLabel, channelCount, campaignSpend, campaignReturn, festivalLabel, releaseWeek, screenCount = 0, regionCount = 0, partnerNames = [], bookingCost = 0, studioShare = 0, valueRange, buyerName, buyerNames = [], energyCost, disabled, disabledReason, onLock, onBack }) => <>
   <div className={css.standee} style={{ '--fh': route === 'STREAMING' ? '210' : String(film.hue) } as React.CSSProperties}>
-    <div className={css.casebox}><div className={css.caseart}><FilmSheet film={film} size="lg" dress={campaignStyle} />{festivalLabel && <span className={css.wonlaurel}><em>OFFICIAL{`\n`}SELECTION</em></span>}</div><div className={css.plate2}><b>{route === 'STREAMING' ? (buyerNames.length > 1 ? 'A SHARED STREAMING RELEASE' : buyerName ? `A ${buyerName.toUpperCase()} RELEASE` : 'A STREAMING RELEASE') : `IN CINEMAS${screenCount ? ` ON ${screenCount.toLocaleString()} SCREENS` : ''}`}</b><em>WEEK {releaseWeek}</em></div></div><span className={css.caseglow} />
+    <div className={css.casebox}><div className={css.caseart}><FilmSheet film={film} size="lg" dress={campaignStyle} where={route === 'STREAMING' ? (yourPlatformName ? `ON ${yourPlatformName.toUpperCase()}` : 'STREAMING') : undefined} />{festivalLabel && <span className={css.wonlaurel}><em>OFFICIAL{`\n`}SELECTION</em></span>}</div><div className={css.plate2}><b>{route === 'STREAMING' ? (yourPlatformName ? `ON ${yourPlatformName.toUpperCase()}` : buyerNames.length > 1 ? 'A SHARED STREAMING RELEASE' : buyerName ? `A ${buyerName.toUpperCase()} RELEASE` : 'A STREAMING RELEASE') : `IN CINEMAS${screenCount ? ` ON ${screenCount.toLocaleString()} SCREENS` : ''}`}</b><em>WEEK {releaseWeek}</em></div></div><span className={css.caseglow} />
   </div>
   <span className={css.manifesthead}>THE STRATEGY</span>
   <div className={css.manifest}>
-    <Chip label="DISTRIBUTION" value={route === 'STREAMING' ? 'Streaming' : 'Theatrical'} />
+    <Chip label="DISTRIBUTION" value={yourPlatformName ? 'Your platform' : route === 'STREAMING' ? 'Streaming' : 'Theatrical'} />
+    {yourPlatformName && <Chip label="WHERE" value={yourPlatformName} sub="No bids and no fee" />}
     {route === 'THEATRICAL' && <Chip label="FOOTPRINT" value={`${screenCount.toLocaleString()} screens`} sub={`${regionCount} regions`} />}
     {route === 'THEATRICAL' && <Chip label="WHO CARRIES IT" value={partnerNames.length ? `${partnerNames.length} chains` : 'None'} sub={partnerNames.join(' · ')} />}
-    {route === 'STREAMING' && buyerNames.length > 1 && <Chip label="BUYERS" value={`${buyerNames.length} platforms`} sub={buyerNames.join(' · ')} />}
-    {route === 'STREAMING' && buyerNames.length <= 1 && buyerName && <Chip label="BUYER" value={buyerName} />}
+    {!yourPlatformName && route === 'STREAMING' && buyerNames.length > 1 && <Chip label="BUYERS" value={`${buyerNames.length} platforms`} sub={buyerNames.join(' · ')} />}
+    {!yourPlatformName && route === 'STREAMING' && buyerNames.length <= 1 && buyerName && <Chip label="BUYER" value={buyerName} />}
     <Chip label="CAMPAIGN POSITION" value={campaignLabel} sub={campaignPromise} />
     <Chip label="TIMELINE" value={timelineLabel} />
     <Chip label="MARKETING" value={`${channelCount} channels`} sub={`${money(campaignReturn)} returns`} />
     <Chip label="FESTIVAL" value={festivalLabel || 'Skipped'} />
-    <Chip label="RELEASE DATE" value={`Week ${releaseWeek}`} />
+    <Chip label="RELEASE DATE" value={releaseDateLabel || `Week ${releaseWeek}`} />
   </div>
   <div className={css.tolls}>
     <div className={css.toll}><span>CAMPAIGN SPEND<em>leaves the wallet on lock</em></span><b>{money(campaignSpend)}</b></div>

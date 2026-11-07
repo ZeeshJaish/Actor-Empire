@@ -1,3 +1,4 @@
+import { getInHouseScriptCost, getInHouseWriterSkill } from '../services/studioProductionEconomy';
 import type { ProjectHiddenStats } from '../types';
 import { calculateWeeklyBoxOffice } from '../services/roleLogic';
 import { createBusiness, processBusinessWeek } from '../services/businessLogic';
@@ -24,6 +25,10 @@ const withFixedRandom = <T>(value: number, fn: () => T): T => {
     }
 };
 
+/* #306: the Writing Room is real: level 1 is what it always was, every level is better, and better costs more */
+assert(getInHouseWriterSkill(1) === 45 && getInHouseScriptCost(1) === 5_000, 'Level 1 is the old in-house writer.');
+assert(getInHouseWriterSkill(10) === 90 && getInHouseScriptCost(10) === 500_000, 'Level 10 is a top writer at a real price.');
+assert(getInHouseWriterSkill(5) > getInHouseWriterSkill(4) && getInHouseScriptCost(5) > getInHouseScriptCost(4), 'Every level moves both.');
 assert(getProductionBudgetTier(8_000_000) === 'LOW', 'An $8M film should remain low-budget.');
 assert(getProductionBudgetTier(15_000_000) === 'MID', 'A $15M film must not inherit the high-budget box-office ceiling.');
 assert(getProductionBudgetTier(60_000_000) === 'HIGH', 'A $60M film should be high-budget.');

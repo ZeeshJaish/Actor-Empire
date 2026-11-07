@@ -69,6 +69,23 @@ import { GreenlightArtDirectionSection } from './components/GreenlightArtDirecti
 import { GreenlightMarketingBudgetSection } from './components/GreenlightMarketingBudgetSection';
 import { GreenlightCastStep } from './components/GreenlightCastStep';
 import { GreenlightSoundtrackSection } from './components/GreenlightSoundtrackSection';
+import { EpisodeNamesCard } from '../../../components/EpisodeNamesEditor';
+import { finalizeOriginalCommission, type OriginalWizardMode } from '../../../services/originalsCommission';
+import { buildOriginalBill, canStudioOfferLicence, getOriginalEpisodeScale, scaleOriginalBudget, type OriginalDealKind } from '../../../services/originalsDeal';
+import { compactEpisodeShares, evenEpisodeShares, getSeasonShape, getStudioSeasonShares, SEASON_SHAPE_NAMES } from '../../../services/originalsEpisodeBudget';
+import { CommissionDealStep, CommissionGoStep, CommissionMoment } from '../../../components/originals/CommissionDealAndGo';
+import { EpisodeBudgetBars } from '../../../components/originals/EpisodeBudgetBars';
+import { getOutsideQualitySwing, getStudioQualityEdge } from '../../../services/originalsStudios';
+import { getFinalQualityRange } from '../../../services/finalCut';
+import { LockedCast, LockedCrew, LockedDirector, LockedGear, LockedLocations, LockedSetupTiles, LockedShell } from '../../../components/originals/LockedSteps';
+import { InteractiveRegionMap } from './components/InteractiveRegionMap';
+import { createGreenlightLocationMapModel } from './components/greenlightLocationMap';
+import { WORLD_VIEW } from './components/regionMapView';
+import { GEAR_CATEGORIES } from './components/GreenlightEquipmentStep';
+import { evaluateCharacterProfileFit, getCharacterIdentityOption } from '../../../services/characterStoryFit';
+import { getBackgroundCastingPlanLabel } from '../../../services/livingEnsemble';
+import { getMusicArtistById } from '../../../services/musicIndustry';
+import { getSetupQualityAdjustment } from '../../../services/greenlightSetupEffects';
 import { GreenlightStoryConnectionSection } from './components/GreenlightStoryConnectionSection';
 import { GreenlightConfirmationStep } from './components/GreenlightConfirmationStep';
 import type { GreenlightParticipationRow } from './components/GreenlightParticipationSection';
@@ -157,9 +174,11 @@ export interface GreenlightWizardProps {
     onUpdatePlayer: (p: Player) => void;
     onComplete: () => void;
     platformCommissionOffer?: PlatformAiPlayerCommissionOffer;
+    /** #282: opened from the player's own Commission page */
+    originalCommission?: OriginalWizardMode;
 }
 
-export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, studio, initialConcept, onBack, onOpenScriptMarket, onOpenScriptDevelopment, onUpdatePlayer, onComplete, platformCommissionOffer }) => {
+export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalCommission, player, studio, initialConcept, onBack, onOpenScriptMarket, onOpenScriptDevelopment, onUpdatePlayer, onComplete, platformCommissionOffer }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
@@ -171,6 +190,12 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     // Setup State
     const [tone, setTone] = useState(initialConcept?.tone || 50); // 0 = Practical, 100 = CGI
     const [visualStyle, setVisualStyle] = useState<GreenlightVisualStyle>('REALISTIC');
+    const [episodeNames, setEpisodeNames] = useState<{ set: number; custom: Record<string, string> }>({ set: 0, custom: {} });
+    /* #286, #287 */
+    const lastCommissionTitle = useRef('');
+    const [commissionDeal, setCommissionDeal] = useState<OriginalDealKind>('BUY');
+    const [episodeShares, setEpisodeShares] = useState<number[] | null>(null);
+    const [commissionMoment, setCommissionMoment] = useState<{ headline: string; subtext: string; post: { handle: string; text: string } } | null>(null);
     const [pacing, setPacing] = useState<GreenlightPacing>('MODERATE');
     const [marketingBudgetPreset, setMarketingBudgetPreset] = useState<MarketingBudgetPreset>(initialConcept?.reservedMarketingBudget !== undefined ? 'CUSTOM' : 'STANDARD');
     const [reservedMarketingBudget, setReservedMarketingBudget] = useState(Math.max(0, Math.round(Number(initialConcept?.reservedMarketingBudget || 0))));
@@ -190,7 +215,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     const [musicRoleSortOptions, setMusicRoleSortOptions] = useState<Record<string, MusicArtistSortOption>>({});
     const [investorRaiseAmount, setInvestorRaiseAmount] = useState<number>(Math.max(0, Math.round(Number(initialConcept?.investorRaiseAmount || initialConcept?.investorPlan?.targetRaise || 0))));
     const [investorFundingMode, setInvestorFundingMode] = useState<ProjectInvestorFundingMode>(initialConcept?.investorFundingMode || initialConcept?.investorPlan?.fundingMode || 'SYNDICATE');
-    const isPlayerPlatformCommission = Boolean(platformCommissionOffer);
+    /* a platform pays: no campaign reserve and no investors here. The campaign comes at release. */
+    const isPlayerPlatformCommission = Boolean(platformCommissionOffer) || Boolean(originalCommission);
 
     useEffect(() => {
         if (!isPlayerPlatformCommission) return;
@@ -377,6 +403,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             tone,
             visualStyle,
             pacing,
+            episodeNameSet: episodeNames.set || undefined,
+            customEpisodeNames: Object.keys(episodeNames.custom).length ? episodeNames.custom : undefined,
+            episodeBudgetShares: episodeShares || undefined,
             reservedMarketingBudget,
             marketingBudgetSpent: 0,
             marketingBudgetRemaining: reservedMarketingBudget,
@@ -445,6 +474,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     // Save Draft Helper
     const saveDraft = () => {
+        /* #282: a commission is made in one go from the Commission page; backing out leaves nothing behind */
+        if (originalCommission) return;
         const updatedStudio = buildStudioWithCurrentDraft();
         if (!updatedStudio) return;
 
@@ -530,6 +561,21 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     }, [selectedScript, step]);
 
     const lockedStreamingFunding = useMemo(() => {
+        /* #282: the player's platform pays, whoever makes it: the whole treasury stands behind it, and the real bill is checked on Go */
+        if (originalCommission) return {
+            id: `funding_${originalCommission.commissionId}`,
+            platformId: 'OWNED_STREAMING',
+            platformName: originalCommission.platformName,
+            amount: originalCommission.treasury,
+            sourceProjectId: originalCommission.commissionId,
+            sourceTitle: selectedScript?.title || '',
+            projectType: selectedScript?.projectType || 'SERIES',
+            createdWeek: player.currentWeek,
+            createdYear: player.age,
+            reason: 'Platform Original',
+            ownedStreamingCommissionId: originalCommission.commissionId,
+            fundingSource: 'OWNED_STREAMING_PLATFORM',
+        } satisfies LockedStreamingFunding;
         if (platformCommissionOffer) return {
             id: `funding_${platformCommissionOffer.id}`,
             platformId: platformCommissionOffer.platformId,
@@ -543,7 +589,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             fixedBudgetCap: true,
         } satisfies LockedStreamingFunding;
         return selectedScript?.lockedStreamingFunding || initialConcept?.lockedStreamingFunding || null;
-    }, [selectedScript?.lockedStreamingFunding, initialConcept?.lockedStreamingFunding, platformCommissionOffer]);
+    }, [selectedScript?.lockedStreamingFunding, initialConcept?.lockedStreamingFunding, platformCommissionOffer, originalCommission?.commissionId, originalCommission?.treasury, selectedScript?.title, selectedScript?.projectType]);
 
     const lockedStreamingFundingAmount = useMemo(() => {
         return Math.max(0, Math.floor(Number(lockedStreamingFunding?.amount || 0)));
@@ -907,6 +953,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 setTone(existingConcept.tone ?? 50);
                 setVisualStyle(existingConcept.visualStyle || 'REALISTIC');
                 setPacing(existingConcept.pacing || 'MODERATE');
+                setEpisodeNames({ set: existingConcept.episodeNameSet || 0, custom: existingConcept.customEpisodeNames || {} });
+                setEpisodeShares(existingConcept.episodeBudgetShares || null);
                 const existingMusicStrategy = existingConcept.musicStrategy || existingConcept.musicPlan?.strategy || 'LEAD_SINGLE';
                 setMusicStrategy(existingMusicStrategy);
                 setMusicArtistTargetCount(getInitialMusicArtistTargetCount(existingConcept));
@@ -966,6 +1014,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 setTone(50);
                 setVisualStyle('REALISTIC');
                 setPacing('MODERATE');
+                setEpisodeNames({ set: 0, custom: {} });
                 setMusicStrategy('LEAD_SINGLE');
                 setMusicArtistTargetCount(getDefaultMusicArtistCount('LEAD_SINGLE'));
                 setSelectedMusicCreditRoles(null);
@@ -1964,7 +2013,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         const lpData = getCrewData('lineProducer');
         const vfxData = getCrewData('vfx');
 
-        return calculateGreenlightBudget({
+        const breakdown = calculateGreenlightBudget({
+            tone,
             scriptCost: selectedScript?.developmentCost || 0,
             crewCosts: {
                 director: directorData.cost || 0,
@@ -1983,7 +2033,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             ownedEquipmentLevels: studio.studioState?.equipment || {},
             gearTiers: GEAR_TIERS,
         });
-    }, [selectedCrew, crewModes, castList, backgroundCastingPlan.estimatedCost, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, productionLocations, crewMarket]);
+        /* #283: on Originals a series costs by its length. 8 episodes is the total itself. */
+        return originalCommission
+            ? scaleOriginalBudget(breakdown, getOriginalEpisodeScale(resolveProjectType(selectedScript?.projectType, (selectedScript as any)?.type), originalCommission.episodes))
+            : breakdown;
+    }, [originalCommission?.episodes, tone, selectedCrew, crewModes, castList, backgroundCastingPlan.estimatedCost, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, productionLocations, crewMarket]);
     const musicPreviewProject = useMemo<ProjectDetails | null>(() => {
         if (!selectedScript) return null;
         const previewBudget = Math.max(1_000_000, budgetBreakdown.total || 1_000_000);
@@ -2483,12 +2537,14 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             .map(talent => getReturningTalentDisplay(talent).name)
             .filter(Boolean),
         unresolvedReturningTalentCount: unresolvedReturningTalent.length,
-        talentConflictNames: selectedTalentConflictNames,
+        talentConflictNames: originalCommission?.locked ? [] : selectedTalentConflictNames,
         effectiveStudioFundingPool,
         netGreenlightCashRequirement,
     }), [selectedScript, selectedLocations, crewModes, selectedCrew, castList, player.flags.extraNPCs, effectiveStudioFundingPool, netGreenlightCashRequirement, unresolvedReturningTalent, selectedTalentConflictNames, effectiveConnectedIntent, linkedUniverseCastCount, selectedUniverseId, selectedFranchiseId, player.energy.current, greenlightEnergyCost]);
 
-    const commissionBudgetError = isPlayerPlatformCommission && packageBudget > lockedStreamingFundingAmount
+    const commissionBudgetError = originalCommission
+        ? null
+        : isPlayerPlatformCommission && packageBudget > lockedStreamingFundingAmount
         ? `Package exceeds the ${platformCommissionOffer!.platformName} production cap by ${formatMoney(packageBudget - lockedStreamingFundingAmount)}. Reduce cast, crew, music, equipment, or locations.`
         : null;
     const talentParticipants: GreenlightParticipationRow[] = castList
@@ -2691,10 +2747,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             studioFranchises,
             visualStyle,
             pacing,
+            episodeNames,
             equipmentChoices,
-            lockedStreamingFunding,
+            lockedStreamingFunding: originalCommission && lockedStreamingFunding ? { ...lockedStreamingFunding, amount: packageBudget } : lockedStreamingFunding,
             isPrimaryStudio,
             studioTalentRoster,
+            /* #301: a season nobody laid out stays as it always was */
+            episodeShares: commissionIsSeries && (originalCommission || episodeShares) ? compactEpisodeShares(commissionEpisodeShares) : undefined,
             findLocation,
             getCrewData,
             getInHouseFame,
@@ -2758,7 +2817,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         } = prepareGreenlightFunding({
             player,
             studio,
-            lockedStreamingFunding,
+            lockedStreamingFunding: originalCommission && lockedStreamingFunding ? { ...lockedStreamingFunding, amount: packageBudget } : lockedStreamingFunding,
             studioCashRequirement,
             newCommitment,
             finalInvestorRaised,
@@ -2839,8 +2898,24 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 });
             })
         };
-        spendPlayerEnergy(updatedPlayerAfterGreenlight, greenlightEnergyCost, `Greenlight: ${newCommitment.name}`);
-        const finalizedOwnedOriginal = finalizeOwnedStreamingOriginalGreenlight(updatedPlayerAfterGreenlight);
+        spendPlayerEnergy(updatedPlayerAfterGreenlight, greenlightEnergyCost, originalCommission ? `Commission: ${newCommitment.name}` : `Greenlight: ${newCommitment.name}`);
+        const commissioned = originalCommission && selectedScript
+            ? finalizeOriginalCommission(updatedPlayerAfterGreenlight, {
+                mode: originalCommission,
+                commitmentId: newCommitment.id,
+                script: selectedScript,
+                makerStudioId: studio.id,
+                makerStudioName: studio.name,
+                bill: commissionBill!,
+                deal: commissionDeal,
+            })
+            : null;
+        if (originalCommission && !commissioned) {
+            setStep('CONFIRM');
+            return;
+        }
+        if (commissioned) setCommissionMoment(commissioned.moment);
+        const finalizedOwnedOriginal = commissioned ? commissioned.player : finalizeOwnedStreamingOriginalGreenlight(updatedPlayerAfterGreenlight);
         if (platformCommissionOffer && newCommitment.productionCalendar && selectedScript) {
             const finalizedCommission = finalizePlatformAiPlayerCommissionGreenlight({
                 player: finalizedOwnedOriginal,
@@ -3131,8 +3206,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             backgroundAuthenticity: backgroundCastingPlan.authenticity,
             backgroundReliability: backgroundCastingPlan.reliability,
             backgroundSetCare: backgroundCastingPlan.setCare,
+            setupQualityAdjustment: getSetupQualityAdjustment(selectedScript?.genres?.[0], visualStyle, tone),
         });
-    }, [selectedScript, selectedCrew, selectedLocations, availableDirectors, productionLocations, crewModes, equipmentChoices, studio, crewMarket, currentCastingStrength, liveCharacterStoryFit, backgroundCastingPlan]);
+    }, [visualStyle, tone, selectedScript, selectedCrew, selectedLocations, availableDirectors, productionLocations, crewModes, equipmentChoices, studio, crewMarket, currentCastingStrength, liveCharacterStoryFit, backgroundCastingPlan]);
     const cinemaGreenlightPreview = useMemo(() => {
         const details = {title:selectedScript?.title || 'Private package', type:resolveProjectType(selectedScript?.projectType,selectedScript?.type), studioId:studio.id,
             genre:selectedScript?.genres?.[0] || 'DRAMA', estimatedBudget:budgetBreakdown.total,
@@ -3144,6 +3220,216 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         } as ProjectDetails;
         return {...details,cinemaExposure:prepareCinemaPackageExposure({player,project:details,titleId:'greenlight-preview',storyAttention:selectedScript?.hype ?? 20,musicAttention:selectedMusicPlan?.musicBuzz || 0})};
     }, [selectedScript,studio.id,budgetBreakdown.total,activeUniverseId,castList,currentEstimatedQuality,selectedMusicPlan,player]);
+    /* #283, #286, #287: the bill and the season's money */
+    const commissionIsSeries = resolveProjectType(selectedScript?.projectType, (selectedScript as any)?.type) === 'SERIES';
+    const seasonEpisodes = originalCommission ? originalCommission.episodes : (Number(selectedScript?.episodes) || 8);
+    const commissionEpisodeShares = commissionIsSeries
+        ? (episodeShares && episodeShares.length === seasonEpisodes
+            ? episodeShares
+            : originalCommission?.locked && originalCommission.studioCard
+                ? getStudioSeasonShares(originalCommission.studioCard.style, seasonEpisodes)
+                : evenEpisodeShares(seasonEpisodes))
+        : [];
+    const billInput = { ...budgetBreakdown, musicBudget };
+    const commissionBuyBill = originalCommission ? buildOriginalBill(billInput, originalCommission.episodes, originalCommission.way === 'OWN_STUDIO' ? 0 : originalCommission.feePercent, 'BUY') : null;
+    const commissionLicenceBill = originalCommission && originalCommission.way !== 'OWN_STUDIO' ? buildOriginalBill(billInput, originalCommission.episodes, originalCommission.feePercent, 'LICENCE') : null;
+    const commissionBill = commissionDeal === 'LICENCE' && commissionLicenceBill ? commissionLicenceBill : commissionBuyBill;
+    const selectedScriptSnapshot = selectedScript?.title || lastCommissionTitle.current;
+    if (selectedScript?.title) lastCommissionTitle.current = selectedScript.title;
+
+    /* #285: on a pitch every step is an overview of what the studio chose */
+    const lockedStudioName = originalCommission?.studioCard?.name || studio.name;
+    const lockedOrder: GreenlightStep[] = ['DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', 'DEAL'];
+    const lockedNextLabel: Partial<Record<GreenlightStep, string>> = { DIRECTOR: 'Next: Cast', CAST: 'Next: Crew', CREW: 'Next: Gear', EQUIPMENT: 'Next: Loc', LOCATION: 'Next: Setup', SETUP: 'Next: Deal' };
+    const renderLockedCommissionStep = (): React.ReactNode => {
+        if (!originalCommission?.locked || !selectedScript || !lockedOrder.includes(step) || step === 'DEAL') return null;
+        const index = lockedOrder.indexOf(step);
+        const shellProps = {
+            studioName: lockedStudioName,
+            nextLabel: lockedNextLabel[step] || 'Next',
+            onBack: () => { if (index === 0) originalCommission.onStepBack('STUDIO'); else setStep(lockedOrder[index - 1]); },
+            onNext: () => setStep(lockedOrder[index + 1]),
+            onSkip: () => setStep('DEAL'),
+        };
+        const peopleOf = (id: string | null | undefined) => [...NPC_DATABASE, ...(player.flags.extraNPCs || [])].find(person => person.id === id) as any;
+        const genreWord = String(selectedScript.genres?.[0] || 'drama').toLowerCase().replace(/_/g, ' ');
+        if (step === 'DIRECTOR') {
+            const data = getCrewData('director') as any;
+            const person = peopleOf(selectedCrew.director);
+            return (
+                <LockedShell {...shellProps}>
+                    <LockedDirector
+                        name={data.name}
+                        gender={person?.gender}
+                        tier={String(person?.tier || data.tier || 'Director')}
+                        talent={Math.round(data.quality || 0)}
+                        fame={Math.round(data.fame ?? person?.stats?.fame ?? 0)}
+                        fee={Number(budgetBreakdown.director) || 0}
+                        specialty={person?.prestigeBias === 'PRESTIGE' ? 'Prestige work' : person?.prestigeBias === 'COMMERCIAL' ? 'Big audience work' : undefined}
+                        why={`${lockedStudioName} wants ${data.name} for this ${genreWord} ${commissionIsSeries ? 'series' : 'film'}. ${originalCommission.studioCard && originalCommission.studioCard.starPull >= 75 ? 'A studio with this much pull gets its first choice.' : 'A good fit for the money it has to spend.'}`}
+                    />
+                </LockedShell>
+            );
+        }
+        if (step === 'CAST') {
+            const compass = selectedStoryCompass;
+            const words = (value: unknown) => String(value || '').toLowerCase().replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase());
+            return (
+                <LockedShell {...shellProps}>
+                    <LockedCast
+                        dna={compass ? [
+                            { label: 'Focus', value: words(compass.perspective) },
+                            { label: 'Conflict', value: words(compass.conflictSource) },
+                            { label: 'World', value: words(compass.worldRule) },
+                            { label: 'Cast', value: words(compass.castShape) },
+                            { label: 'Tone', value: words(compass.tone) },
+                        ] : []}
+                        balance={liveCastStoryRead?.balanceScore}
+                        roles={castList.map((role, roleIndex) => {
+                            const person = peopleOf(role.actorId);
+                            const roleKind = (role.roleType === 'EXTRA' ? 'CAMEO' : role.roleType) as RoleType;
+                            const identity = { storyFunction: role.storyFunction, storyRole: role.storyRole, abilityType: role.abilityType, nature: role.nature, identitySource: role.identitySource } as any;
+                            const fit = compass ? evaluateCharacterProfileFit(compass, identity, roleKind) : null;
+                            return {
+                                id: role.id,
+                                name: person?.name || role.actorName || 'Not cast',
+                                gender: person?.gender,
+                                character: role.characterName,
+                                functionLabel: [role.storyFunction ? getCharacterIdentityOption('storyFunction', role.storyFunction)?.label : null, role.storyRole ? getCharacterIdentityOption('storyRole', role.storyRole)?.label : null].filter(Boolean).join(' · '),
+                                fee: Math.round((role.salary || 0) * getOriginalEpisodeScale('SERIES', commissionIsSeries ? originalCommission.episodes : 8)),
+                                fit: Math.round(fit?.score ?? 0),
+                            };
+                        })}
+                    />
+                </LockedShell>
+            );
+        }
+        if (step === 'CREW') {
+            const roles = [
+                ['cinematographer', 'Cinematographer'],
+                ['composer', 'Composer'],
+                ['lineProducer', 'Line producer'],
+                ['vfx', 'VFX supervisor'],
+            ] as const;
+            const scale = getOriginalEpisodeScale('SERIES', commissionIsSeries ? originalCommission.episodes : 8);
+            return (
+                <LockedShell {...shellProps}>
+                    <LockedCrew
+                        crew={roles.map(([key, label]) => {
+                            const data = getCrewData(key) as any;
+                            const candidate = [...crewMarket.cinematographers, ...crewMarket.composers, ...crewMarket.producers, ...crewMarket.vfxTeams].find(item => item.id === selectedCrew[key]);
+                            return { id: key, name: data.name, gender: candidate?.gender, role: label, talent: Math.round(data.quality || 0), fee: Math.round((data.cost || 0) * scale) };
+                        })}
+                        background={{
+                            title: getBackgroundCastingPlanLabel(backgroundCastingPlan),
+                            line: `Background cast · ${backgroundCastingPlan.performerCount} people`,
+                            cost: budgetBreakdown.backgroundEnsemble,
+                        }}
+                    />
+                </LockedShell>
+            );
+        }
+        if (step === 'EQUIPMENT') {
+            const scale = getOriginalEpisodeScale('SERIES', commissionIsSeries ? originalCommission.episodes : 8);
+            return (
+                <LockedShell {...shellProps}>
+                    <LockedGear
+                        qualityLine={`${lockedStudioName} picked the gear for this budget.`}
+                        gear={GEAR_CATEGORIES.map(category => {
+                            const choice = equipmentChoices[category.id] || 'TIER_3';
+                            const tier = (category.tiers as any)[choice] || { name: choice, desc: '' };
+                            return { id: category.id, icon: category.icon, title: category.name, name: tier.name, desc: tier.desc, cost: Math.round((GEAR_TIERS[choice]?.cost || 0) * scale) };
+                        })}
+                    />
+                </LockedShell>
+            );
+        }
+        if (step === 'LOCATION') {
+            const places = selectedLocations.map(id => findLocation(id)).filter(Boolean) as NonNullable<ReturnType<typeof findLocation>>[];
+            const scale = getOriginalEpisodeScale('SERIES', commissionIsSeries ? originalCommission.episodes : 8);
+            const mapModel = createGreenlightLocationMapModel(Object.values(PRODUCTION_LOCATIONS_BY_CONTINENT).flat(), selectedLocations, WORLD_VIEW);
+            return (
+                <LockedShell {...shellProps}>
+                    <LockedLocations
+                        regionLine={`World · ${places.length} ${places.length === 1 ? 'place' : 'places'}`}
+                        map={(
+                            <div className="pointer-events-none">
+                                <InteractiveRegionMap
+                                    selectedRegionIds={mapModel.selectedRegionIds}
+                                    onSelectRegion={() => {}}
+                                    locationPins={mapModel.locationPins}
+                                    onSelectLocation={() => {}}
+                                    visualTone="release"
+                                    accentColor="#fb7185"
+                                    interaction={mapModel.interaction}
+                                    maximumViewLevel={mapModel.maximumViewLevel}
+                                    minimumPinViewLevel={mapModel.minimumPinViewLevel}
+                                    showSelectedPinsAcrossViews
+                                    focusedLocationId={null}
+                                    showCountryLabels={false}
+                                    highlightMappedCountries={false}
+                                    showCountryFocus={false}
+                                />
+                            </div>
+                        )}
+                        places={places.map(place => ({ id: place.id, name: place.name, desc: place.desc, country: place.countryName, cost: Math.round(place.cost * scale) }))}
+                    />
+                </LockedShell>
+            );
+        }
+        if (step === 'SETUP') {
+            const mix = tone < 30 ? 'Mostly practical' : tone > 70 ? 'Mostly CGI' : 'A mix';
+            const musicRows = (selectedMusicPlan?.credits || []).map((credit: any, creditIndex: number) => ({
+                id: `${credit.role}_${creditIndex}`,
+                name: credit.artistName,
+                gender: getMusicArtistById(credit.artistId)?.gender,
+                kind: getMusicCreditRoleLabel(credit.role),
+                fee: credit.estimatedCost || 0,
+            }));
+            return (
+                <LockedShell {...shellProps}>
+                    <LockedSetupTiles
+                        look={String(visualStyle).toLowerCase().replace(/^./, letter => letter.toUpperCase())}
+                        pacing={pacing === 'SLOW' ? 'Slow burn' : String(pacing).toLowerCase().replace(/^./, letter => letter.toUpperCase())}
+                        effects={mix}
+                        soundtrack={musicBudget > 0 ? formatMoney(musicBudget) : 'Composer only'}
+                        music={musicRows}
+                    />
+                    {commissionIsSeries && (
+                        <EpisodeBudgetBars
+                            readOnly
+                            studioName={lockedStudioName}
+                            shares={commissionEpisodeShares}
+                            total={commissionBuyBill?.making || 0}
+                        />
+                    )}
+                </LockedShell>
+            );
+        }
+        return null;
+    };
+    const lockedCommissionStep = renderLockedCommissionStep();
+
+    /* #282: from the Commission page there are ten steps: Script and Studio come before this wizard, Deal after Setup */
+    const commissionStepOrder: Array<'SCRIPT' | 'STUDIO' | GreenlightStep> = originalCommission
+        ? ['SCRIPT', 'STUDIO', 'DIRECTOR', 'CAST', 'CREW', 'EQUIPMENT', 'LOCATION', 'SETUP', ...(originalCommission.way === 'OWN_STUDIO' ? [] : ['DEAL' as const]), 'CONFIRM']
+        : [];
+    const commissionStepLabels = originalCommission
+        ? ['Script', 'Studio', 'Director', 'Cast', 'Crew', 'Gear', 'Loc', 'Setup', ...(originalCommission.way === 'OWN_STUDIO' ? [] : ['Deal']), 'Go']
+        : [];
+    const commissionStepIndex = commissionStepOrder.indexOf(step);
+    const goToCommissionStep = (index: number) => {
+        const target = commissionStepOrder[index];
+        if (!target || !originalCommission) return;
+        if (target === 'SCRIPT' || target === 'STUDIO') originalCommission.onStepBack(target);
+        else setStep(target);
+    };
+    const commissionHeaderBack = () => {
+        if (step === 'BUZZ') return onComplete();
+        if (originalCommission?.locked && step === 'DIRECTOR') return originalCommission.onStepBack('STUDIO');
+        goToCommissionStep(Math.max(0, commissionStepIndex - 1));
+    };
+
     if (!selectedScript && step !== 'SELECT_SCRIPT' && step !== 'BUZZ') {
         return (
             <div className="fixed inset-0 z-[70] bg-[#020a05] text-white flex flex-col items-center justify-center p-8 text-center font-sans">
@@ -3178,7 +3464,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             {/* GRID BACKGROUND */}
             <div className="absolute inset-0 pointer-events-none z-0"
                 style={{
-                    backgroundImage: 'linear-gradient(to right, rgba(16, 185, 129, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.15) 1px, transparent 1px)',
+                    backgroundImage: originalCommission
+                        ? 'linear-gradient(to right, rgba(244, 63, 94, 0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(244, 63, 94, 0.1) 1px, transparent 1px)'
+                        : 'linear-gradient(to right, rgba(16, 185, 129, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(16, 185, 129, 0.15) 1px, transparent 1px)',
                     backgroundSize: '40px 40px'
                 }}>
             </div>
@@ -3192,22 +3480,28 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 </div>
             )}
 
-            <GreenlightHeader
+            {!(originalCommission && step === 'BUZZ') && <GreenlightHeader
                 step={step}
-                onBack={onBack}
+                onBack={originalCommission ? commissionHeaderBack : onBack}
                 onStepChange={setStep}
+                commission={originalCommission ? {
+                    labels: commissionStepLabels,
+                    index: commissionStepIndex,
+                    chip: step.replace('_', ' '),
+                    onStep: goToCommissionStep,
+                } : undefined}
                 selectedScriptId={selectedScriptId}
                 currentEstimatedBuzz={currentEstimatedBuzz}
                 currentEstimatedQuality={currentEstimatedQuality}
                 budgetBreakdown={budgetBreakdown}
                 musicBudget={musicBudget}
                 reservedMarketingBudget={reservedMarketingBudget}
-                packageBudget={packageBudget}
+                packageBudget={commissionBill ? commissionBill.total : packageBudget}
                 availableFunding={isPlayerPlatformCommission ? lockedStreamingFundingAmount : studio.balance + (studio.studioState?.productionFund || 0) + lockedStreamingFundingAmount}
                 platformCommissionBudget={platformCommissionBudget}
                 formatMoney={formatMoney}
                 translate={tr}
-            />
+            />}
 
             <div
                 className="relative z-10 flex-1 overscroll-contain overflow-y-auto custom-scrollbar"
@@ -3236,7 +3530,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                     </div>
                 )}
 
-                {step === 'DIRECTOR' && (
+                {lockedCommissionStep}
+                {step === 'DIRECTOR' && !originalCommission?.locked && (
                     <GreenlightDirectorStep
                         availableDirectors={availableDirectors}
                         selectedDirectorId={selectedCrew.director}
@@ -3251,8 +3546,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         returningTalent={currentReturningTalent}
                         onNegotiate={handleNegotiate}
                         formatMoney={formatMoney}
-                        isExistingConcept={Boolean(initialConcept)}
-                        onBack={() => initialConcept ? onBack() : setStep('SELECT_SCRIPT')}
+                        isExistingConcept={Boolean(initialConcept) && !originalCommission}
+                        hideSelfDirect={originalCommission?.way === 'OUTSIDE'}
+                        onBack={() => originalCommission ? commissionHeaderBack() : initialConcept ? onBack() : setStep('SELECT_SCRIPT')}
                         onNext={() => {
                             saveDraft();
                             setStep('CAST');
@@ -3261,7 +3557,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 )}
 
                 {/* CAST STEP */}
-                {step === 'CAST' && (
+                {step === 'CAST' && !originalCommission?.locked && (
                     <GreenlightCastStep
                         player={player}
                         castList={castList}
@@ -3312,8 +3608,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         onNext={continueFromCast}
                     />
                 )}
-                {step === 'CREW' && (
+                {step === 'CREW' && !originalCommission?.locked && (
                     <GreenlightCrewStep
+                        outsideStudio={originalCommission?.way === 'OUTSIDE'}
                         crewMarket={crewMarket}
                         crewMarketRefreshIn={crewMarketRefreshIn}
                         crewMarketCycle={crewMarketCycle}
@@ -3338,7 +3635,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 )}
 
                 {/* EQUIPMENT STEP */}
-                {step === 'EQUIPMENT' && (
+                {step === 'EQUIPMENT' && !originalCommission?.locked && (
                     <GreenlightEquipmentStep
                         studioEquipment={studio.studioState?.equipment}
                         choices={equipmentChoices}
@@ -3350,7 +3647,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 )}
 
                 {/* LOCATION STEP */}
-                {step === 'LOCATION' && (
+                {step === 'LOCATION' && !originalCommission?.locked && (
                     <GreenlightLocationStep
                         selectedIds={selectedLocations}
                         onChange={setSelectedLocations}
@@ -3362,19 +3659,62 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                             setStep('SETUP');
                         }}
                         formatMoney={formatMoney}
+                        nextLabel={originalCommission ? (commissionIsSeries ? 'Next: Series Setup' : 'Next: Movie Setup') : undefined}
                     />
                 )}
 
                 {/* SETUP STEP */}
-                {step === 'SETUP' && (
+                {step === 'SETUP' && !originalCommission?.locked && (
                     <div className="space-y-8 animate-in slide-in-from-right-4 duration-300 flex flex-col h-full max-w-4xl mx-auto px-4 pt-6 pb-44 overflow-y-auto custom-scrollbar">
                         <div className="bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-xl p-6 mb-2 shrink-0 shadow-lg">
-                            <h2 className="text-xl font-bold text-white mb-2">Movie Setup</h2>
+                            <h2 className="text-xl font-bold text-white mb-2">{selectedScript && resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' ? 'Series Setup' : 'Movie Setup'}</h2>
                             <p className="text-zinc-400 text-sm">Define the artistic vision and reserve the campaign pool for release.</p>
                         </div>
 
+                        {/* #275: Setup is long: every part is one tap away */}
+                        <div data-setup-jumps className="sticky top-0 z-20 -mx-1 flex shrink-0 gap-1 rounded-xl bg-black/80 p-1 backdrop-blur-md">
+                            {[
+                                ...(commissionIsSeries ? [{ id: 'setup-episodes', label: 'Episodes' }] : []),
+                                { id: 'setup-style', label: 'Look' },
+                                { id: 'setup-pacing', label: 'Pacing' },
+                                { id: 'setup-effects', label: 'Effects' },
+                                { id: 'greenlight-soundtrack-heading', label: 'Music' },
+                                ...(originalCommission ? [] : [{ id: 'setup-campaign', label: 'Campaign' }]),
+                            ].map(jump => (
+                                <button
+                                    key={jump.id}
+                                    type="button"
+                                    onClick={() => document.getElementById(jump.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                    className="min-h-10 min-w-0 flex-auto rounded-lg border border-white/10 bg-white/5 px-0.5 text-[9px] font-black uppercase tracking-normal text-zinc-200 active:bg-emerald-400/20"
+                                >
+                                    {jump.label}
+                                </button>
+                            ))}
+                        </div>
+
                         <div className="space-y-8 pb-20">
+                            {selectedScript && resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' && (
+                                <EpisodeNamesCard
+                                    title={selectedScript.title}
+                                    seed={selectedScript.id}
+                                    genre={selectedScript.genres?.[0]}
+                                    episodes={Number(selectedScript.episodes) || 8}
+                                    season={Number(selectedScript.installmentNumber) || 1}
+                                    value={episodeNames}
+                                    onChange={setEpisodeNames}
+                                />
+                            )}
+                            {commissionIsSeries && (
+                                <EpisodeBudgetBars
+                                    shares={commissionEpisodeShares}
+                                    total={originalCommission ? commissionBill?.making || 0 : budgetBreakdown.total + musicBudget}
+                                    onChange={setEpisodeShares}
+                                />
+                            )}
                             <GreenlightArtDirectionSection
+                                genre={selectedScript?.genres?.[0]}
+                                effectsCost={budgetBreakdown.effectsCost}
+                                formatMoney={formatMoney}
                                 visualStyle={visualStyle}
                                 pacing={pacing}
                                 tone={tone}
@@ -3442,7 +3782,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 onAssignArtist={assignMusicArtistToRole}
                             />
 
-                            {isPlayerPlatformCommission ? (
+                            <div id="setup-campaign" className="scroll-mt-16 -mb-8" />
+                            {originalCommission ? null : isPlayerPlatformCommission ? (
                                 <div className="rounded-2xl border border-violet-400/25 bg-violet-950/25 p-5">
                                     <div className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-300">Platform Release Campaign</div>
                                     <p className="mt-2 text-sm font-semibold leading-relaxed text-violet-100/65">{platformCommissionOffer!.platformName} controls and funds release marketing after delivery. No studio marketing reserve is charged to this production cap.</p>
@@ -3491,7 +3832,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                                 <button
                                     onClick={() => {
                                         saveDraft();
-                                        setStep('CONFIRM');
+                                        setStep(originalCommission && originalCommission.way !== 'OWN_STUDIO' ? 'DEAL' : 'CONFIRM');
                                     }}
                                     className="flex-[2] bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider py-4 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all duration-300 hover:scale-105"
                                 >
@@ -3503,7 +3844,43 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 )}
 
                 {/* CONFIRM STEP */}
-                {step === 'CONFIRM' && selectedScript && (
+                {step === 'DEAL' && originalCommission && commissionBill && commissionLicenceBill && (
+                    <CommissionDealStep
+                        studioName={originalCommission.studioCard?.name || studio.name}
+                        buy={commissionBuyBill!}
+                        licence={commissionLicenceBill}
+                        feePercent={originalCommission.feePercent}
+                        canLicence={originalCommission.studioCard ? canStudioOfferLicence(originalCommission.studioCard) : false}
+                        deal={commissionDeal}
+                        onDeal={setCommissionDeal}
+                        onBack={() => setStep('SETUP')}
+                        onNext={() => setStep('CONFIRM')}
+                        qualityRange={originalCommission.studioCard ? (() => {
+                            const centre = currentEstimatedQuality + getStudioQualityEdge(originalCommission.studioCard);
+                            const reach = 10 + getOutsideQualitySwing(originalCommission.studioCard);
+                            return getFinalQualityRange(centre - reach, centre + reach);
+                        })() : undefined}
+                    />
+                )}
+                {step === 'CONFIRM' && originalCommission && selectedScript && commissionBill && (
+                    <CommissionGoStep
+                        title={selectedScript.title}
+                        studioName={originalCommission.studioCard?.name || studio.name}
+                        isOwnStudio={originalCommission.way === 'OWN_STUDIO'}
+                        episodes={originalCommission.episodes}
+                        isSeries={commissionIsSeries}
+                        seasonName={commissionIsSeries ? SEASON_SHAPE_NAMES[getSeasonShape(commissionEpisodeShares)] : undefined}
+                        deal={commissionDeal}
+                        bill={commissionBill}
+                        energyCost={greenlightEnergyCost}
+                        energy={player.energy.current}
+                        treasury={originalCommission.treasury}
+                        errors={greenlightErrors}
+                        onBack={() => setStep(originalCommission.way === 'OWN_STUDIO' ? 'SETUP' : 'DEAL')}
+                        onCommission={handleGreenlight}
+                    />
+                )}
+                {step === 'CONFIRM' && !originalCommission && selectedScript && (
                     <GreenlightConfirmationStep
                         cinemaForecast={resolveProjectType(selectedScript.projectType, selectedScript.type) === 'MOVIE' ? <CinemaForecastPanel player={player} project={cinemaGreenlightPreview} titleId="greenlight-preview" /> : undefined}
                         projectTitle={selectedScript.title}
@@ -3569,7 +3946,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                         onGreenlight={handleGreenlight}
                     />
                 )}
-                {step === 'BUZZ' && (
+                {step === 'BUZZ' && originalCommission && commissionMoment && selectedScriptSnapshot && (
+                    <CommissionMoment
+                        title={selectedScriptSnapshot}
+                        platformName={originalCommission.platformName}
+                        headline={commissionMoment.headline}
+                        subtext={commissionMoment.subtext}
+                        post={commissionMoment.post}
+                        onDone={onComplete}
+                    />
+                )}
+                {step === 'BUZZ' && !originalCommission && (
                     <GreenlightBuzzStep buzzItems={buzzItems} onComplete={onComplete} />
                 )}
             </div>
@@ -3577,6 +3964,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
             {/* Actor Selection Overlay */}
             {selectingActorFor && (
                 <GreenlightTalentPickerModal
+                    outsideStudio={originalCommission?.way === 'OUTSIDE'}
                     roleId={selectingActorFor}
                     player={player}
                     playerActingTalent={playerActingTalent}

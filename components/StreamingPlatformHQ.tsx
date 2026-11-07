@@ -1,3 +1,5 @@
+import { getStreamingTitleOpening } from '../services/streamingEarlyAccess';
+import { getTitleRating } from '../services/titleRating';
 import { payOffStreamingEstate } from '../services/streamingEstatePlan';
 import { ChairSubtitleContext } from './streaming-transplant/RoomSubtitle';
 import { setStreamingProposedTicker } from '../services/streamingTicker';
@@ -20,6 +22,7 @@ import type {
   StreamingTechnologyBranch,
   StreamingTechnologyCampusBranch,
   StreamingTeamAction,
+  StreamingLaunchCapacityPlan,
 } from '../types';
 import {
   STREAMING_HQ_SECTIONS,
@@ -33,14 +36,25 @@ import {
 } from '../services/streamingHq';
 import { markOwnedStreamingCinematicStatus } from '../services/ownedStreamingPlatform';
 import StreamingCatalogSetup from './StreamingCatalogSetup';
-import StreamingOriginalCommissioning from './StreamingOriginalCommissioning';
+import OriginalsDesk from './originals/OriginalsDesk';
+import CommissionWizard from './originals/CommissionWizard';
+import OriginalTitleDetail from './originals/OriginalTitleDetail';
+import { decideStreamingOriginalFuture } from '../services/streamingOriginalsBusiness';
+import AudienceReportScreen from './originals/AudienceReportScreen';
+import { getActiveAudienceReport, getScriptGapFit } from '../services/originalsAudienceReport';
+import { getLiveOriginalPitches } from '../services/originalsPitches';
 import StreamingLaunchBlueprintReview from './StreamingLaunchBlueprintReview';
+import { StreamingBuildLockNotice } from './StreamingShelfNotice';
+import { getStreamingOpeningLock } from '../services/streamingOpeningLock';
+import type { StreamingIdentPreviewId } from '../services/streamingIdentAudio';
+import { gameWeekLabel } from '../services/gameWeek';
+import { openingNightInputs, openingNightTitles } from './streaming-transplant/opening-night/nightInputs';
+import { streamingPlatformBrand } from './streaming-transplant/streamingPlatformBrand';
 import StreamingSlatePlanner from './StreamingSlatePlanner';
 import StreamingViewerMode from './StreamingViewerMode';
 import StreamingLaunchReceipt from './StreamingLaunchReceipt';
 import StreamingAnalyticsCenter from './StreamingAnalyticsCenter';
 import StreamingTitleDossier from './StreamingTitleDossier';
-import StreamingOriginalsStudio from './StreamingOriginalsStudio';
 import StreamingRightsExchange, { type ExchangeTab as RightsExchangeTab } from './StreamingRightsExchange';
 import { resolveStreamingRightsRenewal } from '../services/streamingRightsCalendar';
 import { autoFillStreamingSlate, clearStreamingSlatePlans, getStreamingSlateFallback, scheduleStreamingSlateTitle, STREAMING_SLATE_REFUSAL_COPY, unscheduleStreamingSlateTitle } from '../services/streamingSlateProgramming';
@@ -79,7 +93,6 @@ import {
   type RegionId as StreamingRegionId,
 } from './streaming-transplant/StreamingBrandVisuals';
 import { ContentDesk as StreamingContentDesk } from './streaming-transplant/StreamingContentExperience';
-import { titleHue as streamingTitleHue } from './streaming-transplant/audienceRoomModel';
 import { PlatformDesk as StreamingPlatformDesk, type PlatformDeskOffer, type PlatformDeskTab, type PlatformProduct } from './streaming-transplant/StreamingNetworkExperience';
 import { AudienceDesk as StreamingAudienceDesk, type AudienceTab } from './streaming-transplant/StreamingAudienceExperience';
 import { CampaignStudio } from './campaigns/studio/CampaignStudio';
@@ -133,7 +146,7 @@ import StreamingFinanceRoom from './streaming-transplant/StreamingFinanceRoom';
 import StreamingContentMarket from './StreamingContentMarket';
 import { establishContentMarketCatalogue } from '../services/streamingContentMarket';
 import StreamingDefineLaunchWizard from './StreamingDefineLaunchExperience';
-import StreamingOpeningProgramme from './streaming-transplant/StreamingOpeningProgramme';
+import StreamingOpeningProgramme, { type StreamingOpeningProgrammeTab } from './streaming-transplant/StreamingOpeningProgramme';
 import {
   PremiereNight as StreamingPremiereExperience,
   type PremiereInputs as StreamingPremiereInputs,
@@ -223,9 +236,9 @@ import {
   migratePlacementsToStreamingFacilities,
 } from '../services/streamingFacilities';
 import { reconstructStreamingRegionPlans } from '../services/streamingRegionalNetworkPlan';
-import { commitOwnedStreamingLaunch, getStreamingLaunchReadiness } from '../services/streamingLaunch';
+import { commitOwnedStreamingLaunch,
+  getStreamingLaunchReadiness } from '../services/streamingLaunch';
 import {
-  checkpointStreamingLaunchBlueprint,
   isStreamingDefineLaunchWizardMilestone,
   getStreamingLaunchBudgetView,
   getStreamingLaunchDefinitionSignature,
@@ -286,7 +299,7 @@ interface Props {
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   /** #75: STATUS opens the Platform room on its STATUS tab (the incident popup's "Open STATUS") */
-  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP';
+  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE';
   initialContentMarketOfferId?: string;
   onContentMarketOfferConsumed?: () => void;
 }
@@ -323,24 +336,6 @@ const formatMoney = (value: number): string => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-
-const colorTone = (hex: string): { hue: number; sat: number } => {
-  const normalized = hex.replace('#', '').trim();
-  if (!/^[0-9a-f]{6}$/i.test(normalized)) return { hue: 258, sat: 78 };
-  const [r, g, b] = [0, 2, 4].map(offset => parseInt(normalized.slice(offset, offset + 2), 16) / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  const lightness = (max + min) / 2;
-  let hue = 0;
-  if (delta > 0) {
-    if (max === r) hue = 60 * (((g - b) / delta) % 6);
-    else if (max === g) hue = 60 * (((b - r) / delta) + 2);
-    else hue = 60 * (((r - g) / delta) + 4);
-  }
-  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
-  return { hue: Math.round((hue + 360) % 360), sat: clamp(Math.round(saturation * 100), 40, 100) };
-};
 
 const stableHue = (key: string): number => (
   [...key].reduce((sum, character) => ((sum * 31) + character.charCodeAt(0)) % 360, 53)
@@ -516,6 +511,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     : 'HOME';
   const [activeSection, setActiveSection] = useState<StreamingHqSection>(initialSection);
   const [contentInitialTab, setContentInitialTab] = useState<'LIBRARY' | 'RIGHTS' | 'SLATE' | 'LOCALIZATION'>('LIBRARY');
+  /* #252: the desk reads its tab when it mounts, and it stays mounted under the market */
+  const [contentDeskOpening, setContentDeskOpening] = useState(0);
   /* the map's region and open country, so the Audience room comes back to them; a ref for the same reason as the tab below */
   const audienceMapMemory = useRef<{ regionId: string | null; countryId: string | null }>({ regionId: null, countryId: null });
   const [audienceEntryRequest, setAudienceEntryRequest] = useState<{ tab: 'CHOOSE' | 'CLEARANCE' } | null>(null);
@@ -539,14 +536,18 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   const [campusInitial, setCampusInitial] = useState<{ view?: 'LAB' | 'RESEARCH'; branch?: StreamingTechnologyCampusBranch }>({});
   useEffect(() => { if (!showTechnologyCampus) setCampusInitial({}); }, [showTechnologyCampus]);
   const [showCampusConstruction, setShowCampusConstruction] = useState(false);
-  const [showLeadershipSuite, setShowLeadershipSuite] = useState(false);
   const [showCatalogSetup, setShowCatalogSetup] = useState(false);
   const [showContentMarket, setShowContentMarket] = useState(Boolean(initialContentMarketOfferId));
   const [contentMarketInitialTab, setContentMarketInitialTab] = useState<'ALL' | 'OWNED' | undefined>(undefined);
   const [catalogueReturnToLaunch, setCatalogueReturnToLaunch] = useState(false);
   const [catalogSetupInitialStep, setCatalogSetupInitialStep] = useState<0 | 2 | undefined>(undefined);
-  const [showOriginalCommissioning, setShowOriginalCommissioning] = useState(false);
-  const [showOriginalsStudio, setShowOriginalsStudio] = useState(false);
+  /* #281: every door to Originals lands on the Desk */
+  const [showOriginalsDesk, setShowOriginalsDesk] = useState(false);
+  const [showAudienceReport, setShowAudienceReport] = useState(false);
+  const [showCommissionWizard, setShowCommissionWizard] = useState(false);
+  const [originalDetailId, setOriginalDetailId] = useState<string | null>(null);
+  const [originalDetailNotice, setOriginalDetailNotice] = useState('');
+  const [commissionPitchId, setCommissionPitchId] = useState<string | null>(null);
   const [showRightsExchange, setShowRightsExchange] = useState(false);
   const [rightsExchangeInitialTab, setRightsExchangeInitialTab] = useState<RightsExchangeTab>('MARKET');
   const [showAcquisitionCommand, setShowAcquisitionCommand] = useState(false);
@@ -555,7 +556,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* #173, #188: MARKETS' Ring the bell opens the listing */
   const [showListing, setShowListing] = useState(false);
   const [showIncidentCommand, setShowIncidentCommand] = useState(false);
-  const [showLegacyOffice, setShowLegacyOffice] = useState(false);
   const [showSlatePlanner, setShowSlatePlanner] = useState(false);
   const [showOriginalReveal, setShowOriginalReveal] = useState(Boolean(pendingOriginalReveal));
   const [showViewerMode, setShowViewerMode] = useState(false);
@@ -566,13 +566,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   const [showTitleDossier, setShowTitleDossier] = useState(false);
   const [titleDossierInitialProjectId, setTitleDossierInitialProjectId] = useState<string | null>(null);
   /* #150: the Originals Studio can open on one title's original (a title page's Season 2, spin-off, licence) */
-  const [originalsInitialProjectId, setOriginalsInitialProjectId] = useState<string | null>(null);
   const [showDefineLaunch, setShowDefineLaunch] = useState(false);
   const [defineLaunchMode, setDefineLaunchMode] = useState<'OPENING' | 'EXPANSION'>('OPENING');
   const [defineLaunchInitialStep, setDefineLaunchInitialStep] = useState<StreamingDefineLaunchStepId | undefined>(undefined);
   const [defineLaunchInitialSheet, setDefineLaunchInitialSheet] = useState<'money' | 'plan' | undefined>(undefined);
   const [showCinematicBuild, setShowCinematicBuild] = useState(false);
-  const [showLaunchBlueprintReview, setShowLaunchBlueprintReview] = useState(false);
+  const [openingProgrammeTab, setOpeningProgrammeTab] = useState<StreamingOpeningProgrammeTab>('BUILD');
+  /* #253: a door the build has closed */
+  const [buildLockNotice, setBuildLockNotice] = useState(false);
   const [showOpeningProgramme, setShowOpeningProgramme] = useState(false);
   const [openingProgrammeFocus, setOpeningProgrammeFocus] = useState<StreamingOpeningProgrammeFocus>('OVERVIEW');
   const [buildInitialSheet, setBuildInitialSheet] = useState<'money' | 'build' | undefined>(undefined);
@@ -709,57 +710,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     campaign: 'NONE',
   }));
 
-  const commandDeckBrand = useStreamingView<StreamingTransplantBrand>(() => {
-    const primary = colorTone(readIdentity.primaryColor);
-    const secondary = colorTone(readIdentity.secondaryColor);
-    const markId = readIdentity.logoKey === 'SIGNAL_RING'
-      ? 'ORBIT'
-      : readIdentity.logoKey === 'SPOTLIGHT'
-        ? 'APERTURE'
-        : readIdentity.logoKey === 'WORDMARK'
-          ? 'LETTER_SOLID'
-          : 'BOLT';
-    const promiseId = readIdentity.brandPromiseId === 'EVENT_HOUSE'
-      ? 'EVENT'
-      : readIdentity.brandPromiseId === 'BINGE_MACHINE'
-        ? 'BINGE'
-        : readIdentity.brandPromiseId === 'FANDOM_FOREVER'
-          ? 'FANDOM'
-          : readIdentity.brandPromiseId === 'WORLD_STAGE'
-            ? 'WORLD'
-            : readIdentity.brandPromiseId === 'EVERYONES_SCREEN'
-              ? 'EVERYONE'
-              : readIdentity.brandPromiseId === 'TECHNOLOGY_FIRST'
-                ? 'TECH'
-                : 'BALANCED';
-    /* #116 (plan §18.6): the real logo, typeface and lockup, as founded or as the brand studio last made them; the family
-       mark stands in only for an identity that never chose one */
-    return {
-      name: readIdentity.name,
-      markId: readIdentity.visualMarkId || markId,
-      customMark: readIdentity.customMarkDataUrl || null,
-      hue: primary.hue,
-      sat: primary.sat,
-      identId: readIdentity.soundIdentKey === 'ASCENT'
-        ? 'RISE'
-        : readIdentity.soundIdentKey === 'PREMIERE'
-          ? 'ANTHEM'
-          : readIdentity.soundIdentKey === 'SILENT'
-            ? 'HUSH'
-            : 'PULSE',
-      customIdent: null,
-      promiseId,
-      publicManifesto: readIdentity.publicManifesto || '',
-      layoutId: readPlatform.serviceConfiguration.storefrontLayoutId || 'cinema',
-      typeId: readIdentity.typefaceId || (readIdentity.logoKey === 'WORDMARK' ? 'GEOMETRIC' : 'GROTESK'),
-      accentHue: secondary.hue,
-      identMode: readIdentity.soundIdentKey === 'SILENT' ? 'none' : 'badge',
-      identLen: 2,
-      ratingId: 'MATURE',
-      lockupId: readIdentity.wordmarkStyleId || (readIdentity.logoKey === 'WORDMARK' ? 'ICON' : 'SIDE'),
-      serverCity: snapshot().reachLabel,
-    };
-  }, [readIdentity, readPlatform.serviceConfiguration.storefrontLayoutId, snapshot]);
+  const commandDeckBrand = useStreamingView<StreamingTransplantBrand>(() => streamingPlatformBrand(readPlatform, snapshot().reachLabel), [readIdentity, readPlatform.serviceConfiguration.storefrontLayoutId, snapshot]);
 
   /* both incident systems, counted from the save (#49): the HQ alert, the Platform card and its STATUS chip */
   const incidentAlert = useStreamingView(() => getStreamingIncidentAlert(readPlatform), [readPlatform]);
@@ -841,7 +792,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         title: title.title,
         kind: `${isOriginal ? 'Original' : license ? 'Licensed' : 'Library'} · ${title.projectType === 'SERIES' ? 'Series' : 'Film'}`,
         status,
-        rating: title.rating !== null ? clamp(title.rating, 0, 10) : performance && performance.viewingAccounts > 0 ? clamp(performance.satisfactionScore / 10, 0, 10) : null,
+        rating: title.rating !== null ? clamp(title.rating, 0, 10) : getTitleRating(readPlayer, projectId),
         views: performance?.viewingAccounts ?? 0,
         completion: clamp(Math.round(completion), 0, 100),
         expiresIn: license && license.windowType !== 'PERMANENT'
@@ -920,6 +871,22 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       treasury: readPlatform.treasuryCash,
       readiness: { done: launchProgram().completedCount, total: launchProgram().totalCount },
       launchProgram: readPlatform.launchCommit ? undefined : launchProgram(),
+      /* #253: Zeesh (2026-11-05): both wizards done, one card that opens the waiting screen */
+      openingBuild: (() => {
+        const view = openingProgramme();
+        if (readPlatform.launchCommit || !view.commissioned) return undefined;
+        const asked = view.state === 'ACTION_REQUIRED';
+        const ready = view.state === 'READY_TO_OPEN';
+        return {
+          tone: ready ? 'READY' as const : asked ? 'ASK' as const : 'BUILDING' as const,
+          weeksLeft: view.remainingWeeks,
+          percent: Math.round(view.progress * 100),
+          head: ready ? 'Opening night is ready' : asked ? 'A government needs an answer' : `Opening night · ${view.earliestOpeningAbsoluteWeek === null ? 'date pending' : gameWeekLabel(view.earliestOpeningAbsoluteWeek)}`,
+          line: ready ? 'Every crew is done' : `${view.citiesOnline} of ${view.cityCount} cities online`,
+          citiesOnline: view.citiesOnline,
+          cityCount: view.cityCount,
+        };
+      })(),
       nowPlaying: getStreamingHqViewingSpotlight(latestPerformance),
       stats: [
         /* ARPU, churn and engagement are subscription figures; without
@@ -947,12 +914,13 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           id: 'AUDIENCE', label: 'AUDIENCE', sub: 'Opening markets & clearance',
           statLabel: 'OPENING FOOTPRINT',
           stat: openingMarkets.length ? `${clearedMarkets.length}/${openingMarkets.length} CLEARED` : 'CHOOSE MARKETS',
-          pressure: openingMarkets.length === 0 ? 'urgent' : clearedMarkets.length < openingMarkets.length ? 'watch' : 'calm',
+          /* being built, a review in progress asks nothing of the player; only a government's question does */
+          pressure: openingMarkets.length === 0 ? 'urgent' : openingProgramme().commissioned ? (openingProgramme().state === 'ACTION_REQUIRED' ? 'urgent' : 'calm') : clearedMarkets.length < openingMarkets.length ? 'watch' : 'calm',
           note: openingMarkets.length === 0 ? 'Opening markets are not defined.' : undefined,
           /* The room's own pages, as Content does it. Top 10 and Campaigns join
              after launch, when there is something in them. */
           chips: [
-            { id: 'MARKETS', label: 'OPENING MARKETS', alert: openingMarkets.length === 0 || clearedMarkets.length < openingMarkets.length },
+            { id: 'MARKETS', label: 'OPENING MARKETS', alert: openingMarkets.length === 0 || (openingProgramme().commissioned ? openingProgramme().state === 'ACTION_REQUIRED' : clearedMarkets.length < openingMarkets.length) },
             { id: 'ANALYTICS', label: 'ANALYTICS' },
             { id: 'REGIONS', label: 'REGIONS' },
           ],
@@ -965,7 +933,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           note: !readPlatform.starterCatalog ? 'The opening shelves need a catalogue.' : undefined,
           chips: [
             { id: 'CATALOGUE', label: 'CATALOGUE', alert: !readPlatform.starterCatalog },
-            { id: 'MARKETPLACE', label: 'CONTENT MARKET' },
+            { id: 'MARKETPLACE', label: 'CONTENT MARKET', locked: getStreamingOpeningLock(readPlayer).catalogueLocked },
             { id: 'ORIGINALS', label: 'ORIGINALS' },
             { id: 'RIGHTS', label: 'RIGHTS' },
             { id: 'LOCALIZATION', label: 'LOCALIZATION', alert: !openingCatalogue().qualityReady },
@@ -1025,7 +993,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           chips: [
             { id: 'CATALOGUE', label: 'CATALOGUE', alert: !readPlatform.starterCatalog },
             { id: 'MARKETPLACE', label: 'CONTENT MARKET' },
-            { id: 'ORIGINALS', label: 'ORIGINALS', alert: (readPlatform.originalCommissions || []).length === 0 },
+            { id: 'ORIGINALS', label: 'ORIGINALS' },
             { id: 'RIGHTS', label: 'RIGHTS', alert: !readPlatform.starterCatalog },
             { id: 'LOCALIZATION', label: 'LOCALIZATION', alert: readPlatform.localizationOperations.jobs.some(job => job.status !== 'READY') },
             { id: 'SLATE', label: 'SLATE', alert: !readPlatform.launchSlate },
@@ -1275,22 +1243,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         if (/free/i.test(pricing.label)) return 'the free plan with ads';
         return pricing.priceLabel.startsWith('from ') ? `plans ${pricing.priceLabel.replace('/mo', ' a month')}` : pricing.priceLabel;
       })(),
-      flagship: (() => {
-        const original = readPlatform.originalCommissions.find(item => item.canonicalProjectId
-          && ['DELIVERED', 'RELEASED'].includes(getStreamingOriginalLiveStatus(readPlayer, item)));
-        return original ? { id: original.canonicalProjectId!, title: original.title, genre: String(original.genre), hue: streamingTitleHue(original.canonicalProjectId!) } : null;
-      })(),
-      /* the opening catalogue's best-known titles, owned and licensed, for the catalogue push's posters */
-      catalogue: [...new Set([...(readPlatform.catalogProjectIds || []), ...(readPlatform.catalogLicenses || []).map(licence => licence.sourceProjectId)])]
-        .map(id => {
-          const project = readPlayer.world.projects.find(item => item.id === id);
-          const licence = (readPlatform.catalogLicenses || []).find(item => item.sourceProjectId === id);
-          return { id, title: project?.title || licence?.titleAtSigning || 'Untitled', genre: String(project?.genre || licence?.genre || 'DRAMA'), hue: streamingTitleHue(id),
-            famous: project?.isFamous ? 1 : 0, boxOffice: project?.boxOffice ?? 0 };
-        })
-        .sort((left, right) => (right.famous - left.famous) || (right.boxOffice - left.boxOffice))
-        .slice(0, 6)
-        .map(item => ({ id: item.id, title: item.title, genre: item.genre, hue: item.hue })),
+      /* the opening title, and the opening catalogue's best-known titles, for the catalogue push's posters */
+      ...openingNightTitles(readPlayer),
       serviceName: readIdentity.name || 'EMPIRE+',
       brandHue: commandDeckBrand().hue,
       accent: streamingBrandColor(commandDeckBrand()),
@@ -1367,12 +1321,15 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         const rankIn = (rows: typeof lists.ALL) => rows.find(row => row.mine && row.id === titleDossierInitialProjectId)?.rank;
         return rankIn(lists.ALL) ?? rankIn(lists.FILM) ?? rankIn(lists.SERIES);
       })(),
-      rating: performance ? Math.max(1, Math.min(10, performance.satisfactionScore / 10)) : undefined,
+      rating: getTitleRating(readPlayer, titleDossierInitialProjectId) ?? undefined,
       rightsWeeksLeft: catalogue?.rights?.endsInWeeks,
       viewers: performance?.viewingAccounts || catalogue?.views || 0,
+      opening: getStreamingTitleOpening(readPlayer, titleDossierInitialProjectId) ?? undefined,
+      boxOffice: resolveStreamingCatalogueReadTitle(catalogueContext(), titleDossierInitialProjectId)?.gross ?? undefined,
       completion,
-      subsAcquired: Math.round((performance?.viewingAccounts || 0) * 0.03),
-      churnPrevented: Math.round((performance?.viewingAccounts || 0) * 0.015),
+      /* #312: the real counts. This was viewers × 3% and × 1.5%, so the title's page said 189K new subs and this screen 288K for the same title and week */
+      subsAcquired: Math.round(performance?.acquisitionAttributedAccounts ?? (performance?.viewingAccounts || 0) * 0.03),
+      churnPrevented: Math.round(performance?.retentionAttributedAccounts ?? (performance?.viewingAccounts || 0) * 0.015),
       revenue: (performance?.attributedSubscriptionRevenue || 0)
         + (performance?.advertisingRevenue || 0) + (performance?.incrementalRevenue || 0),
       cost: (performance?.allocatedCashCost || 0) + (performance?.allocatedContentAmortization || 0),
@@ -1400,55 +1357,12 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     };
   }, [readPlayer, cinematicContentState, commandDeckBrand, readIdentity.name, readPlatform.catalogLicenses, readPlatform.metrics, readPlatform.weeklyHistory, titleDossierInitialProjectId]);
   const launchReadiness = useStreamingView(() => getStreamingLaunchReadiness(readPlayer, catalogueContext()), [readPlayer]);
-  const cinematicPremiereInputs = useStreamingView<StreamingPremiereInputs>(() => {
-    const commit = readPlatform.launchCommit;
-    const halls = (builtPlacements() || streamingPresetPlacements('STARTER', visualRegions(), null));
-    const totalRacks = Math.max(1, halls.reduce((sum, placement) => sum + placement.racks, 0));
-    const baseline = Math.max(1, commit?.protectedPeakConcurrentStreams || readPlatform.capacity.baselineConcurrentStreams || 65_000);
-    const burst = Math.max(baseline, readPlatform.capacity.burstConcurrentStreams || baseline);
-    const activeInvestor = (readPlatform.finance.equityHolders || [])[0];
-    const engineer = (readPlatform.leadership.appointments || []).find(appointment => (
-      appointment.status === 'ACTIVE' && appointment.role === 'CTO'
-    ));
-    return {
-      title: commit?.openingOriginalTitle || launchReadiness().openingOriginalTitle,
-      projectType: readPlatform.originalCommissions.find(item => item.title === (commit?.openingOriginalTitle || launchReadiness().openingOriginalTitle))?.projectType,
-      halls: halls.map((placement, index) => ({
-        id: placement.cityId,
-        label: placement.cityId.replace(/_/g, ' '),
-        ceiling: Math.round(baseline * placement.racks / totalRacks),
-        burstCeiling: Math.round(burst * placement.racks / totalRacks),
-        share: placement.racks / totalRacks,
-      })),
-      ceiling: baseline,
-      burstCeiling: burst,
-      expected: commit?.forecastLikelyConcurrentStreams || launchReadiness().forecastLikelyConcurrentStreams,
-      wobble: Math.min(1, resolveStreamingPlatformTechDebt(readPlatform) / 100),
-      arpu: readPlatform.metrics.averageRevenuePerUser,
-      treasury: readPlatform.treasuryCash,
-      checks: launchReadiness().items.map(item => ({
-        id: item.id,
-        label: item.label,
-        ok: item.tone !== 'BLOCKED',
-        note: item.detail,
-      })),
-      investor: activeInvestor ? {
-        name: activeInvestor.holderName,
-        agenda: 'Expects the platform to deliver the operating case behind the investment.',
-      } : null,
-      rivals: (readPlatform.competitiveWorld.rivals || []).map(rival => ({
-        name: rival.platformName,
-        subs: `${Math.round(rival.subscribersMillions)}M`,
-      })),
-      engineer: engineer ? { name: engineer.nameAtAppointment, role: 'CTO' } : null,
-      simulationSeed: readPlatform.simulationSeed,
-      committedLaunch: commit,
-      launchAllowed: Boolean(commit) || launchReadiness().canLaunch,
-      launchBlockerMessage: launchReadiness().canLaunch
-        ? undefined
-        : `${launchReadiness().blockerCount} launch requirement${launchReadiness().blockerCount === 1 ? '' : 's'} still need attention. Return to HQ and clear the highlighted rooms.`,
-    };
-  }, [builtPlacements, launchReadiness, readPlatform, visualRegions]);
+  const cinematicPremiereInputs = useStreamingView<StreamingPremiereInputs>(() => openingNightInputs(readPlayer, {
+    readiness: launchReadiness(),
+    network: platformNetworkView(),
+    flagship: launchMarketing().flagship ?? null,
+    catalogue: launchMarketing().catalogue ?? [],
+  }), [launchReadiness, readPlatform, readPlayer]);
   const stockQuote = useStreamingView(() => {
     const listing = readPlatform.publicCompany.listing;
     if (!listing) return null;
@@ -1467,8 +1381,10 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     });
   }, [latestWeeklySnapshot, readPlatform]);
 
+  /* A service's result comes from the live save, already migrated. The App's other door runs the whole save migration, which is for
+     loads and imports: on a big company it cost about 200 ms on every update, and every tick of a dial. */
   const persist = (nextPlayer: Player) => {
-    if (nextPlayer !== player) onUpdatePlayer?.(nextPlayer);
+    if (nextPlayer !== player) (onTrustedMarketUpdate || onUpdatePlayer)?.(nextPlayer);
   };
   /* #220: Your money is a page of Studio Finance › Capital */
   const openYourMoney = () => openFinanceRoom('CAPITAL', 'YOUR_MONEY');
@@ -1586,6 +1502,13 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       openBoardroom(initialDestination === 'TEAM' ? 'TABLE' : 'OWNERSHIP');
       return;
     }
+    /* #252: "Schedule it" lands on Content, on the Slate */
+    if (initialDestination === 'SLATE') {
+      openedStatus.current = true;
+      setContentInitialTab('SLATE');
+      setActiveSection('CONTENT');
+      return;
+    }
     if (initialDestination !== 'STATUS') return;
     openedStatus.current = true;
     openPlatformTab('STATUS');
@@ -1665,7 +1588,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   const platformOffer = (): PlatformDeskOffer => {
     const view = platformOfferView();
     if (!view.live) {
-      return { data: view, actions: { editBeforeLaunch: () => openLaunchDestination('PRICING'), openBrandStudio: () => setShowBrandStudio(true) } };
+      return { data: view, actions: { editBeforeLaunch: () => whenPlanOpen(() => openLaunchDestination('PRICING')), openBrandStudio: () => whenPlanOpen(() => setShowBrandStudio(true)) } };
     }
     return {
       data: view,
@@ -1971,7 +1894,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     if (room === 'OWNERSHIP') return openBoardroom('OWNERSHIP');
     if (room === 'IPO') return openBoardroom('MARKETS');
     /* #168: a pitch taken opens the commissioning desk on its brief */
-    if (room === 'PITCH') return setShowOriginalCommissioning(true);
+    if (room === 'PITCH') return setShowOriginalsDesk(true);
     /* #204: name someone to run it */
     if (room === 'SUCCESSION') return openBoardroom('TABLE');
     return undefined;
@@ -2057,14 +1980,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     if (result.changed) persist(result.player);
   };
 
-  const commitCinematicLaunch = () => {
+  const commitCinematicLaunch = (capacityPlan: StreamingLaunchCapacityPlan = 'STANDARD') => {
     const launchPlayer = buildCommittedPlayerRef.current || player;
     const launchPlatform = launchPlayer.ownedStreamingPlatform;
     if (launchPlatform.launchCommit) {
       return { ok: true, commit: launchPlatform.launchCommit } as const;
     }
     if (!onUpdatePlayer) return { ok: false, message: 'The company save is not available.' } as const;
-    const result = commitOwnedStreamingLaunch(launchPlayer, 'STANDARD');
+    const result = commitOwnedStreamingLaunch(launchPlayer, capacityPlan);
     if (!result.changed) {
       const message = result.reason === 'BLOCKED'
         ? 'Opening night is still blocked. Complete the highlighted readiness items.'
@@ -2146,7 +2069,16 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* "Bring from my studio" must land on the studio vault, while licensing and
      catalogue acquisition open the public listings. A disabled empty route
      cannot explain whether the player owns no studio or is waiting on a release. */
+  /* #253: while the opening is being built: the doors to what the wizards approved */
+  const whenCatalogueOpen = (open: () => void) => { if (getStreamingOpeningLock(readPlayer).catalogueLocked) setBuildLockNotice(true); else open(); };
+  const whenPlanOpen = (open: () => void) => { if (getStreamingOpeningLock(readPlayer).planLocked) setBuildLockNotice(true); else open(); };
+  const openOpeningBuild = (tab: StreamingOpeningProgrammeTab = 'BUILD', focus: StreamingOpeningProgrammeFocus = 'OVERVIEW') => {
+    setOpeningProgrammeTab(tab);
+    setOpeningProgrammeFocus(focus);
+    setShowOpeningProgramme(true);
+  };
   const openStarterCatalogueRoute = (_step: 0 | 2) => {
+    if (getStreamingOpeningLock(readPlayer).catalogueLocked) { setBuildLockNotice(true); return; }
     setContentMarketInitialTab('OWNED');
     setShowContentMarket(true);
   };
@@ -2225,6 +2157,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* #150: every door that opened the old Growth War Room opens the Campaign Studio: its builder on a title (the builder
      starts on What if the title does not stream yet), one of a title's campaigns, or its hub. Nothing before launch:
      campaigns need a live service. Kept light: a tap only sets what to open. */
+  /* #290: an Original has its one page; anything else opens its dossier */
+  const openTitlePage = (projectId: string) => {
+    const commission = platform.originalCommissions.find(item => item.canonicalProjectId === projectId);
+    if (commission) return setOriginalDetailId(commission.id);
+    setTitleDossierInitialProjectId(projectId);
+    setShowTitleDossier(true);
+  };
+
   const openCampaignStudio = (projectId?: string | null, campaignId?: string | null) => {
     if (!platform.launchCommit) return;
     setCampaignStudio({ subject: projectId ? { kind: 'TITLE', id: projectId } : null, ...(campaignId ? { campaignId } : {}) });
@@ -2249,12 +2189,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         setContentInitialTab('LIBRARY');
         return selectSection('CONTENT');
       }
-      if (chip === 'MARKETPLACE') return setShowContentMarket(true);
-      if (chip === 'ORIGINALS') {
-        return platform.originalCommissions.length
-          ? setShowOriginalsStudio(true)
-          : setShowOriginalCommissioning(true);
-      }
+      if (chip === 'MARKETPLACE') return whenCatalogueOpen(() => setShowContentMarket(true));
+      if (chip === 'ORIGINALS') return setShowOriginalsDesk(true);
       if (chip === 'RIGHTS') {
         setContentInitialTab('RIGHTS');
         return selectSection('CONTENT');
@@ -2316,8 +2252,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     if (event.id === 'TEAM_NOTICE' || event.id === 'CHAIR') return openBoardroom('TABLE');
     if (event.id === 'LAUNCH') {
       if (openingProgramme().commissioned && !platform.launchCommit) {
-        setOpeningProgrammeFocus('OVERVIEW');
-        setShowOpeningProgramme(true);
+        openOpeningBuild();
         return;
       }
       return platform.infrastructureSetup ? openCinematicPremiere() : openBuild();
@@ -2326,9 +2261,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
 
   const openLaunchDestination = (destination: StreamingLaunchDestination) => {
     if (openingProgramme().commissioned && !platform.launchCommit) {
-      if (destination === 'LAUNCH_BLUEPRINT') { setShowLaunchBlueprintReview(true); return; }
-      setOpeningProgrammeFocus(getStreamingOpeningProgrammeFocus(destination));
-      setShowOpeningProgramme(true);
+      if (destination === 'LAUNCH_BLUEPRINT') { openOpeningBuild('PLAN'); return; }
+      openOpeningBuild('BUILD', getStreamingOpeningProgrammeFocus(destination));
       return;
     }
     if (destination === 'FINANCE') return openFinanceRoom('CAPITAL', 'INJECT');
@@ -2364,29 +2298,23 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       brand={commandDeckBrand()}
       state={commandDeckState()}
       onBack={onBack}
-      onCommission={() => platform.starterCatalog ? setShowOriginalCommissioning(true) : setShowContentMarket(true)}
+      onCommission={() => platform.starterCatalog ? setShowOriginalsDesk(true) : setShowContentMarket(true)}
       onOpenDivision={openCommandDivision}
       onEvent={openCommandEvent}
       onOpenViewer={() => setShowViewerMode(true)}
-      onOpenBrandStudio={() => setShowBrandStudio(true)}
+      onOpenBrandStudio={() => whenPlanOpen(() => setShowBrandStudio(true))}
       onOpenFinance={() => openFinanceRoom()}
-      onOpenTitle={title => {
-        setTitleDossierInitialProjectId(title.id);
-        setShowTitleDossier(true);
-      }}
+      onOpenTitle={title => openTitlePage(title.id)}
       onSeeAll={() => selectSection('CONTENT')}
       onLaunch={() => {
         if (openingProgramme().commissioned && !platform.launchCommit) {
-          setOpeningProgrammeFocus('OVERVIEW');
-          setShowOpeningProgramme(true);
+          openOpeningBuild();
         } else if (platform.infrastructureSetup) openCinematicPremiere();
         else openBuild();
       }}
       onOpenLaunchTrack={track => {
         if (openingProgramme().commissioned && !platform.launchCommit) {
-          if (track === 'DEFINE_LAUNCH') { setShowLaunchBlueprintReview(true); return; }
-          setOpeningProgrammeFocus('INFRASTRUCTURE');
-          setShowOpeningProgramme(true);
+          openOpeningBuild(track === 'DEFINE_LAUNCH' ? 'PLAN' : 'BUILD');
           return;
         }
         if (track === 'DEFINE_LAUNCH') {
@@ -2396,6 +2324,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         } else openBuild();
       }}
       onOpenLaunchDestination={openLaunchDestination}
+      onOpenOpeningBuild={() => openOpeningBuild()}
     />
   );
 
@@ -2409,11 +2338,12 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   const renderSection = () => {
     if (activeSection === 'CONTENT') return (
       <StreamingContentDesk
+        key={contentDeskOpening}
         brand={commandDeckBrand()}
         state={cinematicContentState()}
         initialTab={contentInitialTab}
-        onAddContent={() => setShowContentMarket(true)}
-        onOpenSlate={() => setShowSlatePlanner(true)}
+        onAddContent={() => whenCatalogueOpen(() => setShowContentMarket(true))}
+        onOpenSlate={() => whenCatalogueOpen(() => setShowSlatePlanner(true))}
         onBack={() => {
           if (catalogueReturnToLaunch) {
             setCatalogueReturnToLaunch(false);
@@ -2421,10 +2351,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             setShowDefineLaunch(true);
           } else selectSection('HOME');
         }}
-        onOpenTitle={title => {
-          setTitleDossierInitialProjectId(title.id);
-          setShowTitleDossier(true);
-        }}
+        onOpenTitle={title => openTitlePage(title.id)}
         entryRoutes={[
           {
             id: 'LICENSE',
@@ -2432,7 +2359,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             title: 'License released titles',
             description: 'Negotiate a temporary streaming window for a completed film or series.',
             status: 'CONTENT MARKET',
-            onSelect: () => { setContentMarketInitialTab('ALL'); setShowContentMarket(true); },
+            onSelect: () => whenCatalogueOpen(() => { setContentMarketInitialTab('ALL'); setShowContentMarket(true); }),
           },
           {
             id: 'ORIGINAL',
@@ -2440,7 +2367,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             title: 'Commission an Original',
             description: 'Order a new project and send it into a real production-house workflow.',
             status: 'PRODUCTION REQUIRED',
-            onSelect: () => setShowOriginalCommissioning(true),
+            onSelect: () => setShowOriginalsDesk(true),
           },
           {
             id: 'OWNED',
@@ -2456,7 +2383,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             title: 'Acquire a catalogue',
             description: 'Purchase a packaged library and its negotiated rights in one transaction.',
             status: 'CONTENT MARKET',
-            onSelect: () => { setContentMarketInitialTab('ALL'); setShowContentMarket(true); },
+            onSelect: () => whenCatalogueOpen(() => { setContentMarketInitialTab('ALL'); setShowContentMarket(true); }),
           },
         ]}
         onRenew={() => { setRightsExchangeInitialTab('CALENDAR'); setShowRightsExchange(true); }}
@@ -2477,15 +2404,19 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         onOpenRightsCalendar={() => { setRightsExchangeInitialTab('CALENDAR'); setShowRightsExchange(true); }}
         /* the Slate tab plans premieres once live: a title from the shelves into a
            week, and a premiere still ahead taken off (weeks only, no campaigns) */
-        onScheduleTitle={(projectId, absoluteWeek, marketingPlan) => {
-          const result = scheduleStreamingSlateTitle(player, { projectId, absoluteWeek, marketingPlan });
+        onScheduleTitle={(projectId, absoluteWeek, marketingPlan, rhythm) => {
+          const result = scheduleStreamingSlateTitle(player, { projectId, absoluteWeek, marketingPlan, ...(rhythm ? { releasePattern: rhythm === 'WEEKLY' ? 'WEEKLY' as const : 'FULL_SEASON' as const } : {}) });
           if (!result.changed) return { ok: false, message: STREAMING_SLATE_REFUSAL_COPY[result.reason ?? 'UNKNOWN_TITLE'] };
           persistCanonical(result.player);
-          const name = result.player.ownedStreamingPlatform.launchSlate?.entries.find(entry => entry.projectId === projectId)?.title ?? 'It';
-          return { ok: true, message: `${name} premieres in year ${Math.floor(absoluteWeek / 52) + 1}, week ${(absoluteWeek % 52) + 1}.` };
+          const name = result.player.ownedStreamingPlatform.launchSlate?.entries.find(entry => entry.projectId === projectId)?.title
+            ?? result.player.ownedStreamingPlatform.originalCommissions.find(item => item.canonicalProjectId === projectId)?.title ?? 'It';
+          return { ok: true, message: rhythm
+            ? (rhythm === 'WEEKLY' ? `${name} comes out an episode a week.` : `${name} comes out all at once.`)
+            : `${name} premieres in year ${Math.floor(absoluteWeek / 52) + 1}, week ${(absoluteWeek % 52) + 1}.` };
         }}
         onUnscheduleTitle={projectId => {
-          const name = player.ownedStreamingPlatform.launchSlate?.entries.find(entry => entry.projectId === projectId)?.title ?? 'It';
+          const name = player.ownedStreamingPlatform.launchSlate?.entries.find(entry => entry.projectId === projectId)?.title
+            ?? player.ownedStreamingPlatform.originalCommissions.find(item => item.canonicalProjectId === projectId)?.title ?? 'It';
           const result = unscheduleStreamingSlateTitle(player, projectId);
           if (!result.changed) return { ok: false, message: STREAMING_SLATE_REFUSAL_COPY[result.reason ?? 'UNKNOWN_TITLE'] };
           persistCanonical(result.player);
@@ -2659,17 +2590,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         onNavigationChange={navigation => { audienceMapMemory.current = { regionId: navigation.regionId, countryId: navigation.countryId }; }}
         initialEntry={audienceEntryRequest}
         onEntryClose={() => setAudienceEntryRequest(null)}
-        onManageMarkets={() => {
+        onManageMarkets={() => whenPlanOpen(() => {
           setDefineLaunchMode('OPENING'); setDefineLaunchInitialStep('MARKETS'); setShowDefineLaunch(true);
-        }}
+        })}
         marketEntry={marketEntry()}
         accessPolicy={platform.audienceAccessPolicy}
         onOpenPlatformOffer={() => { setPlatformInitialTab('OFFER'); selectSection('TECH'); }}
         /* #131: a title doing the work opens its dossier; #150: the next move "Push it" opens the Campaign Studio on it */
-        onOpenTitle={projectId => {
-          setTitleDossierInitialProjectId(projectId);
-          setShowTitleDossier(true);
-        }}
+        onOpenTitle={projectId => openTitlePage(projectId)}
         onPushTitle={projectId => openCampaignStudio(projectId)}
       />
     );
@@ -2770,6 +2698,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             const result = beginStreamingListing(player);
             if (!result.ok) return { ok: false, message: result.message };
             persist(result.player);
+            /* the room comes back on MARKETS when the listing closes: it does not run underneath it */
+            setBoardroomTab('MARKETS');
             setShowListing(true);
             return { ok: true };
           },
@@ -2806,21 +2736,15 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     return renderHome();
   };
 
-  if (showLaunchBlueprintReview && !platform.launchCommit) {
-    return <StreamingLaunchBlueprintReview player={player} brand={commandDeckBrand()}
-      onBack={() => setShowLaunchBlueprintReview(false)}
-      onRefresh={() => {
-        const result = checkpointStreamingLaunchBlueprint(player);
-        if (result.changed) persist(result.player);
-      }} />;
-  }
-
   if (!platform.launchCommit && (showOpeningProgramme || showCinematicBuild || showDefineLaunch)
     && openingProgramme().commissioned) {
     return (
       <StreamingOpeningProgramme
         brand={commandDeckBrand()}
         view={openingProgramme()}
+        network={platformNetworkView()}
+        plan={<StreamingLaunchBlueprintReview player={player} />}
+        initialTab={openingProgrammeTab}
         launchReadiness={launchReadiness()}
         focus={openingProgrammeFocus}
         onBack={() => {
@@ -2828,7 +2752,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           setShowCinematicBuild(false);
           setShowDefineLaunch(false);
         }}
-        onOpenCommissionedPlan={() => setShowLaunchBlueprintReview(true)}
+        onOpenContent={() => {
+          setShowOpeningProgramme(false);
+          setShowCinematicBuild(false);
+          setShowDefineLaunch(false);
+          setContentInitialTab('SLATE');
+          setContentDeskOpening(count => count + 1);
+          selectSection('CONTENT');
+        }}
         onResolveClearance={(operationId) => {
           const operation = player.ownedStreamingPlatform.marketOperations.find(item => item.id === operationId);
           if (!operation?.clearance) return;
@@ -3027,8 +2958,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         }}
         onOpenTitle={titleId => {
           setShowFinanceRoom(false);
-          setTitleDossierInitialProjectId(titleId);
-          setShowTitleDossier(true);
+          openTitlePage(titleId);
         }}
         /* #175: owners, investors and the listing each have one home, in the Boardroom */
         onOpenOwnership={() => {
@@ -3045,9 +2975,12 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   }
 
   if (showCinematicPremiere) {
-    if (platform.launchCommit && !premiereStartedHere) {
+    /* #257: saved but not yet watched (a reload during the show, the developer cheat): the night is still there to watch; after that, its record */
+    if (platform.launchCommit && !premiereStartedHere && !pendingLaunchReveal) {
       return (
         <StreamingLaunchReceipt
+          brand={commandDeckBrand()}
+          network={platformNetworkView()}
           platformName={identity.name}
           commit={platform.launchCommit}
           onBack={() => finishPremiereNight('DISMISSED')}
@@ -3082,10 +3015,20 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           const leave = () => { setShowTitleDossier(false); setTitleDossierInitialProjectId(null); };
           if (action === 'campaign') { leave(); openCampaignStudio(projectId); }
           else if (action === 'campaigns') { leave(); openCampaignStudio(null, titleCampaigns(projectId).latestId); }
-          else if (action === 'renew' || action === 'spinoff' || action === 'licence') {
+          else if (action === 'renew' || action === 'spinoff') {
+            /* #292: what comes next is on the title's own page */
             leave();
-            setOriginalsInitialProjectId(projectId);
-            setShowOriginalsStudio(true);
+            openTitlePage(projectId);
+          } else if (action === 'licence') {
+            leave();
+            const commission = platform.originalCommissions.find(item => item.canonicalProjectId === projectId);
+            if (commission) {
+              const result = decideStreamingOriginalFuture(player, commission.id, 'LICENSE_WINDOW');
+              if (result.changed) persist(result.player);
+              setOriginalDetailNotice(result.changed ? `${commission.title} is open to other services for a window.`
+                : result.reason === 'REPORTS_MATURING' ? 'The first numbers are not in yet.' : 'It cannot be licensed out now.');
+              setOriginalDetailId(commission.id);
+            }
           } else if (action === 'renew-rights' || action === 'lapse') {
             leave();
             setRightsExchangeInitialTab('CALENDAR');
@@ -3147,9 +3090,9 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       } as React.CSSProperties}
     >
       <div className="streaming-zip-viewport" ref={mainRef} id="hq-main">
-        {!showContentMarket && !showCatalogSetup && !showOriginalCommissioning && !showRightsExchange
-          && !showFinanceRoom && !showTechnologyCampus && !showLeadershipSuite
-          && !showOriginalsStudio && !showCampusConstruction && !showSlatePlanner && !showLegacyOffice
+        {!showListing && !showContentMarket && !showCatalogSetup && !showOriginalsDesk && !showCommissionWizard && !showRightsExchange
+          && !showFinanceRoom && !showTechnologyCampus
+          && !showCampusConstruction && !showSlatePlanner
           && !(showIncidentCommand && incidentCommand().available)
           && !(showAnalyticsCenter && platform.launchCommit)
           && !(showTitleDossier && platform.launchCommit) ? renderSection() : null}
@@ -3281,7 +3224,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           }}
         />
       ) : null}
-      {showContentMarket && !showOriginalCommissioning && !showCatalogSetup && !showRightsExchange ? (
+      {showContentMarket && !showCatalogSetup && !showRightsExchange ? (
         <StreamingContentMarket
           initialTab={contentMarketInitialTab}
           player={player} brand={commandDeckBrand()} onUpdatePlayer={onTrustedMarketUpdate || persist}
@@ -3296,8 +3239,15 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
               setShowDefineLaunch(true);
             } else { setContentInitialTab('LIBRARY'); selectSection('CONTENT'); }
           }}
+          onOpenSlate={() => {
+            setShowContentMarket(false);
+            setContentMarketInitialTab(undefined);
+            setContentInitialTab('SLATE');
+            setContentDeskOpening(count => count + 1);
+            selectSection('CONTENT');
+          }}
           onOpenFinance={() => openFinanceRoom('CAPITAL', 'INJECT')}
-          onCommission={() => setShowOriginalCommissioning(true)}
+          onCommission={() => setShowOriginalsDesk(true)}
           onResumeLegacy={() => { setCatalogSetupInitialStep(undefined); setShowCatalogSetup(true); }}
           onExistingNegotiations={() => setShowRightsExchange(true)}
           onReview={() => {
@@ -3319,43 +3269,68 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           initialStep={catalogSetupInitialStep}
         />
       ) : null}
-      {showOriginalCommissioning ? (
-        <StreamingOriginalCommissioning
-          onOpenProductionHouse={onOpenProductionHouse ? () => { setShowOriginalCommissioning(false); onOpenProductionHouse(); } : undefined}
-          brand={commandDeckBrand()}
+      {showOriginalsDesk ? (
+        <OriginalsDesk
           player={player}
-          onUpdatePlayer={onUpdatePlayer!}
-          onClose={() => setShowOriginalCommissioning(false)}
-          onStartProduction={target => {
-            setShowOriginalCommissioning(false);
-            onOpenOriginalProduction?.(target);
+          onUpdatePlayer={persist}
+          onClose={() => setShowOriginalsDesk(false)}
+          onCommission={pitchId => { setShowOriginalsDesk(false); setCommissionPitchId(pitchId || null); setShowCommissionWizard(true); }}
+          onOpenReport={() => setShowAudienceReport(true)}
+          onOpenTitle={commissionId => setOriginalDetailId(commissionId)}
+        />
+      ) : null}
+      {originalDetailId ? (
+        <OriginalTitleDetail
+          key={originalDetailId}
+          player={player}
+          commissionId={originalDetailId}
+          initialNotice={originalDetailNotice}
+          onUpdatePlayer={persist}
+          onClose={() => { setOriginalDetailId(null); setOriginalDetailNotice(''); setTitleDossierInitialProjectId(null); }}
+          onOpenTitle={commissionId => { setOriginalDetailNotice(''); setTitleDossierInitialProjectId(null); setOriginalDetailId(commissionId); }}
+          numbers={!showTitleDossier && cinematicDossier() ? { brand: commandDeckBrand(), title: cinematicDossier()! } : null}
+          onAction={(action, detail) => {
+            const projectId = detail.commission.canonicalProjectId;
+            if (action === 'numbers' && projectId) {
+              /* #317: a title has one page: its numbers open on it */
+              setTitleDossierInitialProjectId(projectId);
+            } else if (action === 'campaign' && projectId) {
+              setOriginalDetailId(null);
+              setShowOriginalsDesk(false);
+              openCampaignStudio(projectId);
+            } else if (action === 'slate') {
+              setOriginalDetailId(null);
+              setShowOriginalsDesk(false);
+              /* before the service opens, the opening programme is the Slate */
+              if (!platform.launchCommit) return whenCatalogueOpen(() => setShowSlatePlanner(true));
+              setContentInitialTab('SLATE');
+              setContentDeskOpening(value => value + 1);
+              setActiveSection('CONTENT');
+            } else if (action === 'studio') {
+              setOriginalDetailId(null);
+              setShowOriginalsDesk(false);
+              if (detail.stage === 'NOT_STARTED') onOpenOriginalProduction?.({ studioId: detail.commission.producerStudioId, scriptId: detail.commission.scriptId, commissionId: detail.commission.id });
+              else onOpenProductionHouse?.();
+            }
           }}
         />
       ) : null}
-      {showOriginalsStudio ? (
-        <StreamingOriginalsStudio
+      {showAudienceReport && getActiveAudienceReport(player) ? (
+        <AudienceReportScreen
+          report={getActiveAudienceReport(player)!}
+          weeksLeft={getActiveAudienceReport(player)!.expiresAtAbsoluteWeek - getAbsoluteWeek(player.age, player.currentWeek)}
+          fittingPitches={getLiveOriginalPitches(player).filter(pitch => getScriptGapFit(player, pitch.script.genres)).length}
+          onClose={() => setShowAudienceReport(false)}
+        />
+      ) : null}
+      {showCommissionWizard ? (
+        <CommissionWizard
           player={player}
           onUpdatePlayer={persist}
-          initialProjectId={originalsInitialProjectId}
-          onClose={() => { setShowOriginalsStudio(false); setOriginalsInitialProjectId(null); }}
-          onOpenPitchRoom={() => {
-            setShowOriginalsStudio(false);
-            setShowOriginalCommissioning(true);
-          }}
-          onOpenProduction={target => {
-            setShowOriginalsStudio(false);
-            onOpenOriginalProduction?.(target);
-          }}
-          onOpenTitleDossier={projectId => {
-            setShowOriginalsStudio(false);
-            setTitleDossierInitialProjectId(projectId);
-            setShowTitleDossier(true);
-          }}
-          onOpenPromotion={projectId => {
-            setShowOriginalsStudio(false);
-            setOriginalsInitialProjectId(null);
-            openCampaignStudio(projectId);
-          }}
+          initialPitchId={commissionPitchId}
+          onClose={() => { setShowCommissionWizard(false); setShowOriginalsDesk(true); }}
+          onCommissioned={() => { setShowCommissionWizard(false); setShowOriginalsDesk(true); }}
+          onOpenProductionHouse={onOpenProductionHouse ? () => { setShowCommissionWizard(false); onOpenProductionHouse(); } : undefined}
         />
       ) : null}
       {showRightsExchange ? (
@@ -3366,8 +3341,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           onClose={() => { setShowRightsExchange(false); setRightsExchangeInitialTab('MARKET'); }}
           onOpenTitleDossier={projectId => {
             setShowRightsExchange(false);
-            setTitleDossierInitialProjectId(projectId);
-            setShowTitleDossier(true);
+            /* #317: an Original opens its one page from here too */
+            openTitlePage(projectId);
           }}
           onOpenPromotion={projectId => {
             setShowRightsExchange(false);
@@ -3385,11 +3360,12 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           initialCampaignId={campaignStudio.campaignId ?? null}
           onOpenTitle={projectId => {
             setCampaignStudio(null);
-            setTitleDossierInitialProjectId(projectId);
-            setShowTitleDossier(true);
+            openTitlePage(projectId);
           }}
         />
       ) : null}
+      {buildLockNotice && <StreamingBuildLockNotice service={identity.name} color={identity.primaryColor} weeksLeft={openingProgramme().remainingWeeks}
+        onClose={() => setBuildLockNotice(false)} onSeeBuild={() => { setBuildLockNotice(false); openOpeningBuild(); }} />}
       {showListing ? (
         <StreamingListingHost
           player={player}

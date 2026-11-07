@@ -1,3 +1,4 @@
+import { getStreamingOpeningLock } from './streamingOpeningLock';
 import type {
     Business,
     Genre,
@@ -715,9 +716,9 @@ export const getStreamingSlateWarnings = (
     const entries = slate.entries;
     if (!entries.some(entry => entry.source === 'ORIGINAL')) warnings.push({
         id: 'missing-original',
-        severity: 'BLOCKER',
+        severity: 'NOTE',
         title: 'No Original in the launch window',
-        detail: 'The first commissioned Original must have a canonical Greenlight project before the slate can lock.',
+        detail: 'You can open without one. A finished Original makes a bigger opening.',
     });
     if (entries.length < 3) warnings.push({
         id: 'thin-slate',
@@ -752,7 +753,7 @@ export const getStreamingSlateWarnings = (
         id: 'original-in-production',
         severity: 'NOTE',
         title: 'Original delivery is still moving',
-        detail: 'The calendar can be programmed now, but Phase 8 launch readiness must verify final delivery.',
+        detail: 'You can set the calendar now. Before launch night it has to be finished, or come off the slate.',
     });
     const originalEntry = entries.find(entry => entry.source === 'ORIGINAL');
     if (originalEntry && originalEntry.marketingPlan !== 'EVENT') warnings.push({
@@ -766,7 +767,6 @@ export const getStreamingSlateWarnings = (
 
 export const saveStreamingSlateDraft = (player: Player, slate: OwnedStreamingLaunchSlate): Player => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (!platform.milestoneKeys.includes('first-original-greenlit')) return player;
     const canonical = canonicalizeStreamingSlate(player, slate);
     if (!canonical.valid) return player;
     return {
@@ -785,10 +785,8 @@ export const programStreamingLaunchSlate = (
     player: Player,
     slate: OwnedStreamingLaunchSlate,
 ): { player: Player; changed: boolean; reason?: 'INVALID_STATE' | 'INVALID_CONTENT' | 'BLOCKERS' } => {
-    const sourcePlatform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    if (!sourcePlatform.milestoneKeys.includes('first-original-greenlit')) {
-        return { player, changed: false, reason: 'INVALID_STATE' };
-    }
+    /* #253 */
+    if (getStreamingOpeningLock(player).catalogueLocked) return { player, changed: false, reason: 'INVALID_STATE' };
     const canonical = canonicalizeStreamingSlate(player, slate);
     if (!canonical.valid) {
         return { player, changed: false, reason: 'INVALID_CONTENT' };
@@ -796,7 +794,7 @@ export const programStreamingLaunchSlate = (
     const saved = saveStreamingSlateDraft(player, canonical.slate);
     const platform = normalizeOwnedStreamingPlatformState(saved.ownedStreamingPlatform, saved.id);
     const draft = platform.launchSlateDraft;
-    if (!draft || !platform.milestoneKeys.includes('first-original-greenlit')) {
+    if (!draft) {
         return { player: saved, changed: false, reason: 'INVALID_STATE' };
     }
     if (getStreamingSlateWarnings(saved, draft).some(warning => warning.severity === 'BLOCKER')) {

@@ -16,7 +16,6 @@ import { createCanonicalAudienceState } from '../components/streaming-transplant
 import { AudienceDesk } from '../components/streaming-transplant/StreamingAudienceExperience';
 import { PlatformOffer } from '../components/streaming-transplant/PlatformOffer';
 import { getStreamingPlatformOfferView } from '../services/streamingPlatformOffer';
-import StreamingWeeklyCeoLoop from '../components/StreamingWeeklyCeoLoop';
 
 const player = structuredClone(INITIAL_PLAYER) as Player;
 player.id = 'we5-ui-audit';
@@ -119,9 +118,5 @@ const offerMarkup = renderToStaticMarkup(<PlatformOffer
 ));
 assert.ok(!audienceMarkup.includes('UTILITY SCORE'), 'player UI never exposes raw utility scores');
 
-const weeklyMarkup = renderToStaticMarkup(<StreamingWeeklyCeoLoop player={processed} onUpdatePlayer={() => undefined} onReturnToGame={() => undefined} />);
-['PLAN MOVEMENT', 'UPGRADES', 'DOWNGRADES', 'SHARED ACCESS', 'PIRACY REACH'].forEach(text => (
-    assert.ok(weeklyMarkup.includes(text), `weekly CEO report renders ${text}`)
-));
 
-console.log('WE5 Audience Market, analytics, weekly report, and policy UI audit passed.');
+console.log('WE5 Audience Market, analytics and policy UI audit passed.');

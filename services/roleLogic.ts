@@ -1,3 +1,7 @@
+import { squeezeFinalRating } from "./finalCut";
+import { ratingFromQuality } from './titleRating';
+import { inferSeasonNumber } from './episodeRatings';
+import { getSeriesBaseTitle } from './seriesIdentity';
 import {canonicalPersonName} from './fictionalNames';
 import { resolveCareerOfferRole } from './actorCareerBalance';
 import { quoteActorBackend } from './actorOfferTerms';
@@ -19,6 +23,7 @@ import { ALL_GENRES } from './genreCatalog';
 import { getAbsoluteWeek } from './legacyLogic';
 import { buildAutomaticProjectMusicPlan } from './musicIndustry';
 import { getPlayerLanguage, t } from './i18n';
+import { isUnderAdultAge } from './ageGate';
 import { enrichAuditionOpportunity, inferStoryCompass, suggestCharacterIdentity } from './characterIdentityLogic';
 import { getRoleMasteryLanes } from './actorRoleIdentity';
 import { getRoleOfferMessageLine } from './roleMarketDemand';
@@ -901,9 +906,13 @@ const JOB_POOL: Partial<Commitment>[] = [
     { name: 'Tutor', energyCost: 25, income: 500 }
 ];
 
-export const generatePartTimeJobs = (): Commitment[] => {
+/** #255: these two shifts wait for 18 */
+const ADULT_ONLY_JOBS = new Set(['Club Promoter', 'Bartender']);
+export const isJobOpenToPlayer = (player: Pick<Player, 'age'>, jobName: string): boolean => !(ADULT_ONLY_JOBS.has(jobName) && isUnderAdultAge(player));
+
+export const generatePartTimeJobs = (player?: Pick<Player, 'age'>): Commitment[] => {
     const count = 3 + Math.floor(Math.random() * 2);
-    const shuffled = [...JOB_POOL].sort(() => 0.5 - Math.random());
+    const shuffled = JOB_POOL.filter(job => !player || isJobOpenToPlayer(player, job.name!)).sort(() => 0.5 - Math.random());
     const selected = shuffled.slice(0, count);
 
     return selected.map((job, i) => ({
@@ -1066,11 +1075,8 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
     const genre = details.genre;
     const roleType = commitment.roleType || 'MINOR';
     
-    let baseRating = 0;
-    if (quality < 30) baseRating = 2.0 + (quality / 30) * 2.5; 
-    else if (quality < 70) baseRating = 4.5 + ((quality - 30) / 40) * 2.7;
-    else if (quality < 90) baseRating = 7.2 + ((quality - 70) / 20) * 1.2;
-    else baseRating = 8.4 + ((quality - 90) / 10) * 0.8;
+    /* #238: the one formula from quality to rating */
+    let baseRating = ratingFromQuality(quality);
 
     const perf = commitment.productionPerformance || 50;
     const perfDelta = (perf - 50) / 50; 
@@ -1130,7 +1136,8 @@ export const calculateIMDbRating = (commitment: Commitment): number => {
     const variance = (Math.random() * 0.6) - 0.3; 
     baseRating += variance;
 
-    return Math.max(1.1, Math.min(9.8, parseFloat(baseRating.toFixed(1))));
+    /* #314: the top is squeezed and has a ceiling, like the quality behind it */
+    return Math.max(1.1, squeezeFinalRating(parseFloat(baseRating.toFixed(1))));
 };
 
 const BOX_OFFICE_CAPS: Record<BudgetTier, { opening: number, total: number }> = {
@@ -1559,6 +1566,8 @@ export const generateSequelOffer = (original: ActiveRelease, player: Player): Ne
         cinemaExposure: undefined, offeredCinemaLaunch: undefined,
         reservedMarketingBudget: undefined, marketingBudgetSpent: undefined,
         totalCampaignSpend: undefined, marketingChannelAllocations: undefined,
+        episodeRatings: undefined,
+        episodeNameSeed: undefined, episodeNameSet: undefined, customEpisodeNames: undefined, episodeBudgetShares: undefined,
         title: newTitle,
         subtype: 'SEQUEL',
         franchiseId: original.projectDetails.franchiseId || original.id,
@@ -1608,18 +1617,8 @@ export const generateSequelOffer = (original: ActiveRelease, player: Player): Ne
 // --- NEW: TV RENEWAL GENERATOR ---
 export const generateRenewalOffer = (original: ActiveRelease, player: Player): NegotiationData => {
     // 1. Determine New Title
-    let newTitle = `${original.name}: Season 2`;
-    // Regex to detect "Name: Season X"
-    const seasonMatch = original.name.match(/^(.*?): Season (\d+)$/);
-    if (seasonMatch) {
-        const baseName = seasonMatch[1];
-        const nextSeason = parseInt(seasonMatch[2], 10) + 1;
-        newTitle = `${baseName}: Season ${nextSeason}`;
-    } else {
-        // If current title doesn't have "Season X", append ": Season 2"
-        // E.g. "Breaking Bad" -> "Breaking Bad: Season 2"
-        newTitle = `${original.name}: Season 2`;
-    }
+    // #272: "Name: Season 2" and "Name Season 2" are the same show; the season number comes from the record
+    const newTitle = `${getSeriesBaseTitle(original.name)}: Season ${inferSeasonNumber({ ...original.projectDetails, title: original.name }) + 1}`;
 
     // 2. Pay Increase (20%)
     const basePay = calculateProjectPay(original.roleType, original.projectDetails.budgetTier, original.type, original.projectDetails.estimatedBudget);
@@ -1631,6 +1630,8 @@ export const generateRenewalOffer = (original: ActiveRelease, player: Player): N
         cinemaExposure: undefined, offeredCinemaLaunch: undefined,
         reservedMarketingBudget: undefined, marketingBudgetSpent: undefined,
         totalCampaignSpend: undefined, marketingChannelAllocations: undefined,
+        episodeRatings: undefined,
+        episodeNameSeed: undefined, episodeNameSet: undefined, customEpisodeNames: undefined, episodeBudgetShares: undefined,
         title: newTitle,
         subtype: 'SEQUEL', // Treat as sequel/continuation in the system
         franchiseId: original.projectDetails.franchiseId || original.id,

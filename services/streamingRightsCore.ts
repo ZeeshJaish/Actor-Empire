@@ -185,6 +185,7 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
         sellerType: enumValue(source.sellerType, SELLER_TYPES, seller.type.endsWith('PLATFORM') ? 'PLATFORM' : 'STUDIO'),
         sellerPlatformId: cleanText(source.sellerPlatformId, seller.platformId || '', 80).toUpperCase().replace(/[^A-Z0-9_]/g, '_') || seller.platformId,
         windowType: enumValue(source.windowType, WINDOW_TYPES, permanentPurchase ? 'PERMANENT' : 'FIRST_WINDOW'),
+        ...(source.holdsForCinemaClose === true ? { holdsForCinemaClose: true } : {}),
         permanentPurchase,
         marketingGuarantee: finiteMoney(source.marketingGuarantee),
         viewershipBonusThreshold: finiteMoney(source.viewershipBonusThreshold),

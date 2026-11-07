@@ -152,7 +152,7 @@ assert.equal(
     'Renaming an active pre-production project should create a light industry news item.'
 );
 assert.match(
-    renamedPlayer.logs[0].message,
+    renamedPlayer.logs.at(-1)!.message,
     /renamed from "Old Working Title" to "New Working Title"/,
     'Renaming should leave a local log for debugging and player history.'
 );

@@ -65,7 +65,7 @@ assert.equal(model.liquidCash, 123_456);
 assert.equal(model.assets, PROPERTY_CATALOG[0].price + CAR_CATALOG[0].price);
 assert.equal(model.destinations.find(destination => destination.id === 'studio')?.name, 'Zedbury Studios');
 assert.equal(model.destinations.find(destination => destination.id === 'studio')?.active, true);
-assert.deepEqual(model.destinations.map(destination => destination.id), ['studio', 'business', 'streaming', 'cinema', 'assets', 'activities']);
+assert.deepEqual(model.destinations.map(destination => destination.id), ['studio', 'business', 'streaming', 'assets', 'activities']);
 
 const html = renderToStaticMarkup(
   <LifestylePage
@@ -85,6 +85,8 @@ assert.match(html, />Lifestyle</);
 assert.match(html, />Zedbury Studios</);
 assert.match(html, />Assets</);
 assert.match(html, />Activities</);
+assert.match(html, /aria-label="Upcoming Packs, 5 packs"/, 'the hub shows the Upcoming Packs banner');
+assert.doesNotMatch(html, />Cinema Chain</, 'Cinema Chain is a pack now, not a Ventures row');
 assert.doesNotMatch(html, /Primary game navigation/, 'Lifestyle hub must use the app-level bottom navigation only.');
 
 console.log('Lifestyle UI transplant audit passed.');

@@ -28,12 +28,69 @@ const audioContextConstructor = (): typeof AudioContext | null => {
     || null;
 };
 
+/** #265: each ident as played on real instruments (scripts/audio/render-opening-night.mjs). The notes below stay, in case a file cannot be played. */
+export const IDENT_FILES: Record<Exclude<StreamingIdentPreviewId, 'silent' | 'custom'>, () => string> = {
+  pulse: () => new URL('../assets/audio/idents/pulse.m4a', import.meta.url).href,
+  ascent: () => new URL('../assets/audio/idents/ascent.m4a', import.meta.url).href,
+  premiere: () => new URL('../assets/audio/idents/premiere.m4a', import.meta.url).href,
+  choir: () => new URL('../assets/audio/idents/choir.m4a', import.meta.url).href,
+  machine: () => new URL('../assets/audio/idents/machine.m4a', import.meta.url).href,
+  spark: () => new URL('../assets/audio/idents/spark.m4a', import.meta.url).href,
+  impact: () => new URL('../assets/audio/idents/impact.m4a', import.meta.url).href,
+  orbit: () => new URL('../assets/audio/idents/orbit.m4a', import.meta.url).href,
+  bloom: () => new URL('../assets/audio/idents/bloom.m4a', import.meta.url).href,
+  prism: () => new URL('../assets/audio/idents/prism.m4a', import.meta.url).href,
+  ember: () => new URL('../assets/audio/idents/ember.m4a', import.meta.url).href,
+  signal: () => new URL('../assets/audio/idents/signal.m4a', import.meta.url).href,
+  horizon: () => new URL('../assets/audio/idents/horizon.m4a', import.meta.url).href,
+  analog: () => new URL('../assets/audio/idents/analog.m4a', import.meta.url).href,
+};
+
+const IDENT_SEQUENCES: Record<Exclude<StreamingIdentPreviewId, 'silent' | 'custom'>, Array<[number, number, number, OscillatorType]>> = {
+  pulse: [[92, 0, 0.2, 'sine'], [138, 0.22, 0.28, 'sine']],
+  ascent: [[196, 0, 0.14, 'triangle'], [293.66, 0.14, 0.16, 'triangle'], [440, 0.3, 0.2, 'triangle'], [659.25, 0.49, 0.34, 'sine']],
+  premiere: [[82.41, 0, 0.44, 'triangle'], [220, 0.1, 0.55, 'sine'], [329.63, 0.12, 0.55, 'sine'], [493.88, 0.2, 0.58, 'sine']],
+  choir: [[196, 0, 0.72, 'sine'], [246.94, 0.02, 0.72, 'sine'], [293.66, 0.04, 0.72, 'sine']],
+  machine: [[120, 0, 0.09, 'square'], [72, 0.13, 0.1, 'sawtooth'], [180, 0.27, 0.12, 'square'], [96, 0.43, 0.18, 'sawtooth']],
+  spark: [[659.25, 0, 0.12, 'sine'], [987.77, 0.1, 0.18, 'triangle'], [1318.51, 0.2, 0.24, 'sine']],
+  impact: [[65.41, 0, 0.42, 'sine'], [98, 0.015, 0.36, 'sawtooth'], [49, 0.08, 0.5, 'triangle']],
+  orbit: [[220, 0, 0.22, 'sine'], [329.63, 0.16, 0.24, 'triangle'], [246.94, 0.34, 0.28, 'sine'], [493.88, 0.5, 0.34, 'sine']],
+  bloom: [[174.61, 0, 0.55, 'sine'], [261.63, 0.08, 0.62, 'sine'], [392, 0.18, 0.62, 'triangle']],
+  prism: [[523.25, 0, 0.13, 'triangle'], [783.99, 0.09, 0.17, 'sine'], [1046.5, 0.2, 0.22, 'triangle'], [1567.98, 0.3, 0.26, 'sine']],
+  ember: [[110, 0, 0.34, 'sine'], [164.81, 0.12, 0.44, 'triangle'], [220, 0.28, 0.5, 'sine']],
+  signal: [[440, 0, 0.08, 'square'], [440, 0.15, 0.08, 'square'], [659.25, 0.3, 0.1, 'sine'], [880, 0.45, 0.2, 'triangle']],
+  horizon: [[146.83, 0, 0.7, 'sine'], [220, 0.08, 0.72, 'sine'], [329.63, 0.2, 0.7, 'triangle'], [493.88, 0.38, 0.55, 'sine']],
+  analog: [[196, 0, 0.16, 'sawtooth'], [185, 0.18, 0.18, 'triangle'], [293.66, 0.38, 0.24, 'sawtooth'], [277.18, 0.4, 0.28, 'sine']],
+};
+
+/** #257: an ident's notes on a context already open, from a given moment: the opening night plays them on its own, opened by the tap that went live. Its length, in seconds. */
+export const scheduleStreamingIdentNotes = (context: AudioContext, destination: AudioNode, sound: StreamingIdentPreviewId, at: number): number => {
+  if (sound === 'silent' || sound === 'custom') return 0;
+  const sequence = IDENT_SEQUENCES[sound as keyof typeof IDENT_SEQUENCES] || IDENT_SEQUENCES.pulse;
+  let end = 0;
+  sequence.forEach(([frequency, delay, duration, oscillatorType], index) => {
+    end = Math.max(end, delay + duration);
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = oscillatorType;
+    oscillator.frequency.value = frequency;
+    if (sound === 'machine' || sound === 'analog') oscillator.detune.value = index % 2 ? -18 : 14;
+    gain.gain.setValueAtTime(0.0001, at + delay);
+    gain.gain.exponentialRampToValueAtTime(sound === 'choir' ? 0.055 : 0.1, at + delay + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + delay + duration);
+    oscillator.connect(gain);
+    gain.connect(destination);
+    oscillator.start(at + delay);
+    oscillator.stop(at + delay + duration + 0.03);
+  });
+  return end;
+};
+
 /** #115: stops the ident playing (the app's opening ident when it is skipped). */
 export const stopStreamingIdentPreview = (): void => stopActivePreview();
 
-/** Plays only from an explicit player gesture. Presets are synthesized locally,
-    so the same path works in Safari, Android WebView and Capacitor without a
-    network request or a native audio plugin. */
+/** Plays only from an explicit player gesture. Presets are small files in the game's own assets; if one
+    cannot be played, its notes are synthesized locally, so Safari, Android WebView and Capacitor all sound. */
 export const playStreamingIdentPreview = async (
   sound: StreamingIdentPreviewId,
   customAudio?: Pick<OwnedStreamingCustomIdentAudio, 'dataUrl'> | null,
@@ -52,45 +109,29 @@ export const playStreamingIdentPreview = async (
     return;
   }
 
+  const file = IDENT_FILES[sound as keyof typeof IDENT_FILES];
+  if (file) {
+    const audio = new Audio(file());
+    activeAudio = audio;
+    audio.volume = 0.9;
+    audio.addEventListener('ended', () => {
+      if (activeAudio === audio) activeAudio = null;
+    }, { once: true });
+    try {
+      await audio.play();
+      return;
+    } catch {
+      if (activeAudio === audio) activeAudio = null;
+    }
+  }
+
   const AudioContextClass = audioContextConstructor();
   if (!AudioContextClass) return;
   const context = new AudioContextClass();
   activeContext = context;
   await context.resume();
 
-  const sequences: Record<Exclude<StreamingIdentPreviewId, 'silent' | 'custom'>, Array<[number, number, number, OscillatorType]>> = {
-    pulse: [[92, 0, 0.2, 'sine'], [138, 0.22, 0.28, 'sine']],
-    ascent: [[196, 0, 0.14, 'triangle'], [293.66, 0.14, 0.16, 'triangle'], [440, 0.3, 0.2, 'triangle'], [659.25, 0.49, 0.34, 'sine']],
-    premiere: [[82.41, 0, 0.44, 'triangle'], [220, 0.1, 0.55, 'sine'], [329.63, 0.12, 0.55, 'sine'], [493.88, 0.2, 0.58, 'sine']],
-    choir: [[196, 0, 0.72, 'sine'], [246.94, 0.02, 0.72, 'sine'], [293.66, 0.04, 0.72, 'sine']],
-    machine: [[120, 0, 0.09, 'square'], [72, 0.13, 0.1, 'sawtooth'], [180, 0.27, 0.12, 'square'], [96, 0.43, 0.18, 'sawtooth']],
-    spark: [[659.25, 0, 0.12, 'sine'], [987.77, 0.1, 0.18, 'triangle'], [1318.51, 0.2, 0.24, 'sine']],
-    impact: [[65.41, 0, 0.42, 'sine'], [98, 0.015, 0.36, 'sawtooth'], [49, 0.08, 0.5, 'triangle']],
-    orbit: [[220, 0, 0.22, 'sine'], [329.63, 0.16, 0.24, 'triangle'], [246.94, 0.34, 0.28, 'sine'], [493.88, 0.5, 0.34, 'sine']],
-    bloom: [[174.61, 0, 0.55, 'sine'], [261.63, 0.08, 0.62, 'sine'], [392, 0.18, 0.62, 'triangle']],
-    prism: [[523.25, 0, 0.13, 'triangle'], [783.99, 0.09, 0.17, 'sine'], [1046.5, 0.2, 0.22, 'triangle'], [1567.98, 0.3, 0.26, 'sine']],
-    ember: [[110, 0, 0.34, 'sine'], [164.81, 0.12, 0.44, 'triangle'], [220, 0.28, 0.5, 'sine']],
-    signal: [[440, 0, 0.08, 'square'], [440, 0.15, 0.08, 'square'], [659.25, 0.3, 0.1, 'sine'], [880, 0.45, 0.2, 'triangle']],
-    horizon: [[146.83, 0, 0.7, 'sine'], [220, 0.08, 0.72, 'sine'], [329.63, 0.2, 0.7, 'triangle'], [493.88, 0.38, 0.55, 'sine']],
-    analog: [[196, 0, 0.16, 'sawtooth'], [185, 0.18, 0.18, 'triangle'], [293.66, 0.38, 0.24, 'sawtooth'], [277.18, 0.4, 0.28, 'sine']],
-  };
-  const sequence = sequences[sound as keyof typeof sequences] || sequences.pulse;
-  let end = 0;
-  sequence.forEach(([frequency, delay, duration, oscillatorType], index) => {
-    end = Math.max(end, delay + duration);
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    oscillator.type = oscillatorType;
-    oscillator.frequency.value = frequency;
-    if (sound === 'machine' || sound === 'analog') oscillator.detune.value = index % 2 ? -18 : 14;
-    gain.gain.setValueAtTime(0.0001, context.currentTime + delay);
-    gain.gain.exponentialRampToValueAtTime(sound === 'choir' ? 0.055 : 0.1, context.currentTime + delay + 0.025);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + delay + duration);
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start(context.currentTime + delay);
-    oscillator.stop(context.currentTime + delay + duration + 0.03);
-  });
+  const end = scheduleStreamingIdentNotes(context, context.destination, sound, context.currentTime);
   window.setTimeout(() => {
     if (activeContext === context) activeContext = null;
     void context.close().catch(() => undefined);

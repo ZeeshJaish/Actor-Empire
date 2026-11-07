@@ -8,6 +8,7 @@ import { getProjectReleaseTiming } from './releaseTiming';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { getHistoricalCatalogueAwardProjects } from './historicalCatalogueAwards';
 import { getAbsoluteWeek } from './legacyLogic';
+import { getCareerProjects, getOutsideOriginalAwardRows } from './outsideOriginals';
 
 const resolveAwardMediaType = (...candidates: unknown[]): ProjectType => {
     for (const candidate of candidates) {
@@ -453,7 +454,7 @@ export const getAwardEligibilityDiagnostics = (player: Player) => {
     if (!nextWindow) return {};
     const awardType = nextWindow.definition.type;
     const sourceProjects = [
-        ...player.pastProjects.filter(project => !project.isQaArchive).map(project => ({ project, active: false })),
+        ...getCareerProjects(player).filter(project => !project.isQaArchive).map(project => ({ project, active: false })),
         ...player.activeReleases.map(project => ({ project, active: true })),
     ];
     const seasonal = sourceProjects.filter(({ project, active }) => (
@@ -594,7 +595,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
     };
 
     // Player Past Projects (only their exact award season)
-    player.pastProjects.filter(p => !p.isQaArchive).forEach(p => {
+    getCareerProjects(player).filter(p => !p.isQaArchive).forEach(p => {
         if (isProjectEligibleForAwardSeason(p, awardType, awardYear)) {
             addCandidate(p, false);
         }
@@ -859,7 +860,7 @@ export const isWorldProjectEligibleForAwardSeason = (
 const getWorldProjectsForAwardSeason = (
     player: Player, awardType: AwardType, awardYear: number,
 ): IndustryProject[] => {
-    const savedProjects = (player.world.projects || []).filter(project => (
+    const savedProjects = [...(player.world.projects || []), ...getOutsideOriginalAwardRows(player)].filter(project => (
         isWorldProjectEligibleForAwardSeason(project, awardType, awardYear)
     ));
     if (player.world.awardHistory.some(entry => entry.type === awardType && entry.year === awardYear)) {
@@ -953,7 +954,7 @@ export const generateFullBallot = (
         }
         if (cat.includes('Screenplay')) {
             const creditedPlayerFilms = [
-                ...player.pastProjects.filter(project => !project.isQaArchive).map(project => ({
+                ...getCareerProjects(player).filter(project => !project.isQaArchive).map(project => ({
                     id: project.id, name: project.name, writerId: project.writerId, writerName: project.writerName,
                     quality: project.projectQuality, rating: project.rating, release: project,
                 })),

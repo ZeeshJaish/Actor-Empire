@@ -90,7 +90,7 @@ export const StreamingDecisionEventModal: React.FC<Props> = ({ player, event, on
                                     key={item.id}
                                     type="button"
                                     whileTap={{ scale: 0.98 }}
-                                    onClick={() => (view.figure?.answerId === item.id ? setFiguring(true) : answer(item.id))}
+                                    onClick={() => (item.id === 'OPEN_DOOR' ? onOpenRoom(view.door.room) : view.figure?.answerId === item.id ? setFiguring(true) : answer(item.id))}
                                     className={`w-full p-4 border rounded-2xl flex items-center justify-between gap-3 text-left text-white ${item.primary ? 'bg-amber-950/30 border-amber-500/50' : 'bg-zinc-900/80 border-white/5'}`}
                                 >
                                     <span className="min-w-0">
@@ -103,9 +103,9 @@ export const StreamingDecisionEventModal: React.FC<Props> = ({ player, event, on
                         </div>
                     )}
                     {notice && <p className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">{notice}</p>}
-                    <button type="button" onClick={() => onOpenRoom(view.door.room)} className="mt-4 w-full py-2 text-xs font-bold tracking-wide text-zinc-400 hover:text-white">
+                    {view.door.label && <button type="button" onClick={() => onOpenRoom(view.door.room)} className="mt-4 w-full py-2 text-xs font-bold tracking-wide text-zinc-400 hover:text-white">
                         {view.door.label}
-                    </button>
+                    </button>}
                 </div>
             </motion.div>
         </div>

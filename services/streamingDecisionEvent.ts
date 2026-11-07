@@ -8,10 +8,13 @@
  * While you chair, only the board's and the chief executive's matters come to you. A popup whose decision has gone
  * closes itself.
  */
+import { addActivityLog } from './activityLog';
 import type { OwnedStreamingPlatformState, OwnedStreamingTeamCard, Player, ScheduledEvent, StreamingRivalResponseId } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { STREAMING_BOARD_RENEW_WEEKS, renewStreamingBoardDirector } from './streamingBoard';
+import { resolveStreamingCatalogTitle } from './streamingCatalog';
+import { getStreamingTitlePlacement } from './streamingTitlePlacement';
 import { acceptStreamingStakeOffer, declineStreamingStakeOffer } from './streamingControl';
 import { getStreamingReturnTerms, returnAsStreamingCeo } from './streamingStepDown';
 import { approveStreamingTeamCard, declineStreamingTeamCard } from './team/streamingTeam';
@@ -19,12 +22,12 @@ import { approveStreamingTeamCard, declineStreamingTeamCard } from './team/strea
 export const STREAMING_DECISIONS_A_WEEK = 2;
 
 export type StreamingDecisionKind =
-    | 'BOARD_MOVED' | 'CEO_LEFT' | 'BOARD_WARNS' | 'NOTICE' | 'RIVAL_CALL' | 'BIDS_IN' | 'STAKE_OFFER' | 'INVESTORS_IN' | 'DIRECTOR_LEFT' | 'TERM_ENDING' | 'ESTATE_SOLD' | 'ESTATE_SHORT' | 'RAISE' | 'BIG_CARD';
-export type StreamingDecisionRoom = 'TEAM' | 'OWNERSHIP';
+    | 'BOARD_MOVED' | 'CEO_LEFT' | 'BOARD_WARNS' | 'NOTICE' | 'RIVAL_CALL' | 'BIDS_IN' | 'STAKE_OFFER' | 'INVESTORS_IN' | 'DIRECTOR_LEFT' | 'TERM_ENDING' | 'ESTATE_SOLD' | 'ESTATE_SHORT' | 'RAISE' | 'BIG_CARD' | 'ON_THE_SHELF';
+export type StreamingDecisionRoom = 'TEAM' | 'OWNERSHIP' | 'SLATE';
 
 export interface StreamingDecisionEventData { kind: StreamingDecisionKind; key: string; cardId?: string }
 
-const URGENCY: StreamingDecisionKind[] = ['BOARD_MOVED', 'CEO_LEFT', 'BOARD_WARNS', 'ESTATE_SOLD', 'NOTICE', 'RIVAL_CALL', 'BIDS_IN', 'STAKE_OFFER', 'ESTATE_SHORT', 'INVESTORS_IN', 'DIRECTOR_LEFT', 'TERM_ENDING', 'RAISE', 'BIG_CARD'];
+const URGENCY: StreamingDecisionKind[] = ['BOARD_MOVED', 'CEO_LEFT', 'BOARD_WARNS', 'ESTATE_SOLD', 'NOTICE', 'RIVAL_CALL', 'BIDS_IN', 'STAKE_OFFER', 'ESTATE_SHORT', 'INVESTORS_IN', 'DIRECTOR_LEFT', 'TERM_ENDING', 'RAISE', 'BIG_CARD', 'ON_THE_SHELF'];
 /* while you chair, these are yours; the chief executive answers the rest */
 const CHAIR_MATTERS = new Set<StreamingDecisionKind>(['BOARD_MOVED', 'CEO_LEFT', 'NOTICE', 'BIDS_IN', 'STAKE_OFFER', 'DIRECTOR_LEFT', 'TERM_ENDING', 'ESTATE_SOLD', 'ESTATE_SHORT']);
 
@@ -83,6 +86,15 @@ const decisionsThisWeek = (platform: OwnedStreamingPlatformState, absoluteWeek: 
         .sort((left, right) => URGENCY.indexOf(left.kind) - URGENCY.indexOf(right.kind));
 };
 
+/** nothing to choose in it: an answer that only closes it, and no page that needs the player now */
+const onlyTells = (platform: OwnedStreamingPlatformState, data: StreamingDecisionEventData, view: StreamingDecisionView | null): boolean => {
+    if (!view) return false;
+    if (data.kind === 'BIDS_IN' || data.kind === 'INVESTORS_IN' || data.kind === 'BOARD_WARNS' || data.kind === 'CEO_LEFT' || data.kind === 'ON_THE_SHELF') return false;
+    /* a public company with no director left does need one */
+    if (data.kind === 'DIRECTOR_LEFT') return platform.governance.directors.some(item => item.status === 'ACTIVE');
+    return !view.answers.some(answer => answer.primary);
+};
+
 /** Queues the week's decisions as popups: at most 2 a week, counting incidents; the rest wait on the tray */
 export const queueStreamingDecisionEvents = (player: Player, absoluteWeek: number | undefined): Player => {
     if (absoluteWeek === undefined || !player.ownedStreamingPlatform) return player;
@@ -92,9 +104,16 @@ export const queueStreamingDecisionEvents = (player: Player, absoluteWeek: numbe
     const already = new Set(pending.map(event => event.id));
     const taken = pending.filter(event => event.week === player.currentWeek && (event.type === 'STREAMING_INCIDENT' || event.type === 'STREAMING_DECISION')).length;
     const room = Math.max(0, STREAMING_DECISIONS_A_WEEK - taken);
-    if (room === 0) return player;
-    const events: ScheduledEvent[] = decisionsThisWeek(platform, absoluteWeek, Math.max(0, player.money || 0))
-        .filter(data => !already.has(eventIdOf(data)))
+    /* #247: Zeesh (2026-11-05): "jaruri nahi har notification ke liye pop up use kare". What only tells goes to the activity log; a popup is for a decision */
+    const fresh = decisionsThisWeek(platform, absoluteWeek, Math.max(0, player.money || 0)).filter(data => !already.has(eventIdOf(data)));
+    const told = fresh.filter(data => onlyTells(platform, data, viewOf(player, platform, data, absoluteWeek)));
+    const logged = told.reduce<Player>((next, data) => {
+        const view = viewOf(player, platform, data, absoluteWeek)!;
+        const line = `${view.title}. ${view.detail}`;
+        return (next.logs || []).some(log => log.message === line && log.week === next.currentWeek && log.year === next.age) ? next : addActivityLog(next, line, view.urgent ? 'negative' : 'neutral');
+    }, player);
+    const events: ScheduledEvent[] = fresh
+        .filter(data => !told.includes(data))
         .slice(0, room)
         .map(data => ({
             id: eventIdOf(data),
@@ -103,7 +122,7 @@ export const queueStreamingDecisionEvents = (player: Player, absoluteWeek: numbe
             title: viewOf(player, platform, data, absoluteWeek)?.title || 'A decision',
             data: { streamingDecision: data },
         }));
-    return events.length ? { ...player, pendingEvents: [...pending, ...events] } : player;
+    return events.length ? { ...logged, pendingEvents: [...pending, ...events] } : logged;
 };
 
 export interface StreamingDecisionAnswer { id: string; label: string; line?: string; primary?: boolean }
@@ -124,6 +143,16 @@ const viewOf = (player: Player, platform: OwnedStreamingPlatformState, data: Str
     const service = platform.identity?.name || 'Your service';
     const team: StreamingDecisionRoom = 'TEAM';
     const ownership: StreamingDecisionRoom = 'OWNERSHIP';
+    /* #253: a film out of cinemas, only pushed so far; scheduled already, the popup has nothing to ask */
+    if (data.kind === 'ON_THE_SHELF') {
+        if (!getStreamingTitlePlacement(player, data.key).onShelf) return null;
+        const name = resolveStreamingCatalogTitle(player, data.key)?.title || 'Your film';
+        return {
+            service, kicker: 'Out of cinemas', title: `${name} is on your shelf`, detail: 'Its cinema run is over. It is not live yet. Schedule it in Content.', reason: '', urgent: false, figure: null,
+            answers: [{ id: 'OPEN_DOOR', label: 'Schedule it', primary: true }, { id: 'LATER', label: 'Later', line: 'It waits on the shelf' }],
+            door: { room: 'SLATE', label: '' },
+        };
+    }
     if (data.cardId) {
         const card = platform.leadership.team?.tray.find(item => item.id === data.cardId);
         if (!card || card.status !== 'WAITING' || card.expiresAtAbsoluteWeek < absoluteWeek) return null;

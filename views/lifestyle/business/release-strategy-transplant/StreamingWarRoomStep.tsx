@@ -1,3 +1,4 @@
+import { streamingOfferPremiereWords } from '../../../../services/streamingPremiereStatus';
 import React from 'react';
 import type { StreamingBiddingSession, StreamingOfferVersion } from '../../../../types';
 import { advanceStreamingBiddingSession, getStreamingBiddingClosingOffers } from '../../../../services/streamingBidding';
@@ -38,7 +39,7 @@ const eventCopy = (session: StreamingBiddingSession, event: StreamingBiddingSess
   return `${platform} updated the table.`;
 };
 
-const OfferTerms: React.FC<{ offer: StreamingOfferVersion; scope: string }> = ({ offer, scope }) => (
+const OfferTerms: React.FC<{ offer: StreamingOfferVersion; scope: string; premiere: string }> = ({ offer, scope, premiere }) => (
   <div className={css.warTerms}>
     <span><em>GUARANTEE</em><b>{money(offer.minimumGuarantee)}</b></span>
     <span><em>ESTIMATED TOTAL</em><b>{money(totalValue(offer))}</b></span>
@@ -47,7 +48,7 @@ const OfferTerms: React.FC<{ offer: StreamingOfferVersion; scope: string }> = ({
     <span><em>TERM</em><b>{offer.durationWeeks} weeks</b></span>
     <span><em>RIGHTS</em><b>{scope}</b></span>
     <span><em>EXCLUSIVITY</em><b>{offer.exclusivity === 'EXCLUSIVE' ? 'Exclusive' : 'Shared'}</b></span>
-    <span><em>PREMIERE</em><b>Week {offer.proposedPremiereAbsoluteWeek ? ((offer.proposedPremiereAbsoluteWeek - 1) % 52) + 1 : 'TBA'}</b></span>
+    <span><em>PREMIERE</em><b>{premiere}</b></span>
     <span><em>LOCALIZATION</em><b>{offer.localization === 'DUBS_AND_SUBTITLES' ? 'Dubs + subs' : offer.localization === 'SUBTITLES' ? 'Subtitles' : 'None'}</b></span>
   </div>
 );
@@ -66,16 +67,32 @@ interface StreamingWarRoomStepProps {
   onLeave: () => void;
   onBack: () => void;
   preflightMessage?: string | null;
+  /** #243: the film is in cinemas now */
+  duringCinemaRun?: boolean;
   canStart?: boolean;
   commissionedPremiere?: { platformName: string; platformFunding: number; studioCashAtRisk: number } | null;
+  /** #246: the last season's platform has the first word */
+  firstNegotiation?: { platformName: string; lastSeasonTitle: string; interested: boolean; amount: number; premiere: string } | null;
+  onSignFirstNegotiation?: () => void;
+  onPassFirstNegotiation?: () => void;
+  /** #246: the platform paid for this season: the way out */
+  leaveFunding?: { platformName: string; repay: number; penalty: number; total: number } | null;
+  onLeaveFunding?: () => void;
   onConfirmPremiere?: () => void;
+  /** #252: the player's own service is live: the second door off the rights floor */
+  yourService?: { name: string; color?: string } | null;
+  onSendToYourService?: () => void;
 }
 
 export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
   film, session, marketPlatforms, canAccept, energyCost, onStart, onSessionChange,
   onAccept, onFinish, onContinue, onLeave, onBack, preflightMessage, canStart = true,
-  commissionedPremiere, onConfirmPremiere,
+  commissionedPremiere, onConfirmPremiere, firstNegotiation, onSignFirstNegotiation, onPassFirstNegotiation, leaveFunding, onLeaveFunding,
+  duringCinemaRun = false, yourService, onSendToYourService,
 }) => {
+  const premiereOf = (offer: StreamingOfferVersion) => (duringCinemaRun
+    ? `${offer.platformName}: the week after cinemas close`
+    : streamingOfferPremiereWords(offer.platformName, offer.proposedPremiereAbsoluteWeek));
   const [opening, setOpening] = React.useState(false);
   const [openOfferId, setOpenOfferId] = React.useState<string | null>(null);
   const [leaving, setLeaving] = React.useState(false);
@@ -90,7 +107,8 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
   }, []);
 
   React.useEffect(() => {
-    if (!session || !opening) return undefined;
+    if (!opening) return undefined;
+    /* #315: no room came (no buyer): the button comes back, it does not hang on "opening" */
     const timer = window.setTimeout(() => setOpening(false), 1_050);
     return () => window.clearTimeout(timer);
   }, [opening, session?.id]);
@@ -122,11 +140,38 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
         <h2>{commissionedPremiere.platformName}</h2>
         <p>This platform funded the production. Confirmation creates no second rights fee.</p>
         <div><em><b>{money(commissionedPremiere.platformFunding)}</b>platform covered</em><em><b>{money(commissionedPremiere.studioCashAtRisk)}</b>studio at risk</em></div>
+        {leaveFunding && <p className={css.seasonExitNote}>To sell it to anyone else, repay {money(leaveFunding.repay)} and a {money(leaveFunding.penalty)} penalty.</p>}
       </div>
+      {preflightMessage && <p className={css.seasonExitNote}>{preflightMessage}</p>}
       <footer className={css.warGateFoot}>
         <button type="button" className={join(css.warGateGo, !canAccept && css.dead)} disabled={!canAccept} onClick={onConfirmPremiere}>
           {canAccept ? `CONFIRM PREMIERE · ${energyCost}E` : `NEED ${energyCost}E`}
         </button>
+        {leaveFunding && <button type="button" className={css.seasonExitGo} onClick={onLeaveFunding}>LEAVE {leaveFunding.platformName.toUpperCase()} · {money(leaveFunding.total)}</button>}
+      </footer>
+    </section>
+  );
+
+  if (firstNegotiation) return (
+    <section className={join(css.war, css.warGate)} data-war-room data-first-negotiation>
+      <header className={css.warGateTop}>
+        <button type="button" className={css.warGateBack} onClick={onBack} aria-label="Go back">←</button>
+        <span>FIRST NEGOTIATION</span>
+      </header>
+      <div className={css.warPremiere}>
+        <span>IT STREAMED {firstNegotiation.lastSeasonTitle.toUpperCase()}</span>
+        <h2>{firstNegotiation.platformName}</h2>
+        {firstNegotiation.interested ? <>
+          <p>It gets the first word on this season. Sign now, or pass and let every platform bid. The last season stays with it until its licence ends.</p>
+          <div><em><b>{money(firstNegotiation.amount)}</b>its offer</em><em><b>52 wk</b>exclusive</em></div>
+          {firstNegotiation.premiere && <p>{firstNegotiation.premiere}.</p>}
+        </> : <p>It had the first word on this season and passed. The floor is open.</p>}
+      </div>
+      <footer className={css.warGateFoot}>
+        {firstNegotiation.interested && <button type="button" className={join(css.warGateGo, !canAccept && css.dead)} disabled={!canAccept} onClick={onSignFirstNegotiation}>
+          {canAccept ? `SIGN WITH ${firstNegotiation.platformName.toUpperCase()} · ${energyCost}E` : `NEED ${energyCost}E`}
+        </button>}
+        <button type="button" className={firstNegotiation.interested ? css.seasonExitGo : css.warGateGo} onClick={onPassFirstNegotiation}>{firstNegotiation.interested ? 'PASS · OPEN THE FLOOR' : 'OPEN THE FLOOR'}</button>
       </footer>
     </section>
   );
@@ -147,8 +192,8 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
             <div className={css.warLotSide}>
               <span>LOT 01 · ON OFFER</span>
               <h2>{film.title}</h2>
-              <p>Worldwide streaming rights. Exclusive, first window.</p>
-              <div><em>WORLDWIDE</em><em>EXCLUSIVE</em><em>FIRST WINDOW</em></div>
+              <p>Worldwide streaming rights. Exclusive, {session?.rightsLot.windowType === 'SECOND_WINDOW' ? 'after its cinema run' : 'first window'}.</p>
+              <div><em>WORLDWIDE</em><em>EXCLUSIVE</em><em>{session?.rightsLot.windowType === 'SECOND_WINDOW' ? 'AFTER CINEMAS' : 'FIRST WINDOW'}</em></div>
             </div>
           </div>
 
@@ -180,6 +225,9 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
           <button type="button" className={join(css.warGateGo, opening && css.warGoing, !canStart && css.dead)} disabled={!canStart || opening} onClick={beginRoom}>
             {!canStart ? 'NO ELIGIBLE MARKET' : opening ? 'THE DOORS ARE OPENING' : 'OPEN THE ROOM'}
           </button>
+          {yourService && <button type="button" className={css.warGateOwn} style={(yourService.color ? { '--svc': yourService.color } : {}) as React.CSSProperties} disabled={opening} onClick={onSendToYourService}>
+            <b>SEND TO {yourService.name.toUpperCase()}</b><em>NO BIDS · NO FEE</em>
+          </button>}
         </footer>
       </section>
     );
@@ -215,7 +263,7 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
           {acceptedOffers.map(offer => <article key={offer.id} style={{ '--pf': session.platformStates.find(platform => platform.platformId === offer.platformId)?.color || '#6fc9ff' } as React.CSSProperties}>
             <header><strong>{offer.platformName}</strong><em>{offer.exclusivity === 'NON_EXCLUSIVE' ? 'SHARED · CO-STREAMS' : 'EXCLUSIVE · SOLE HOME'}</em></header>
             <div><span><i>GUARANTEE</i><b>{money(offer.minimumGuarantee)}</b></span><span><i>BACKEND</i><b>{offer.licensorRevenueShare}%</b></span></div>
-            <p>{acceptedScope} · {offer.durationWeeks} weeks · premieres W{offer.proposedPremiereAbsoluteWeek ? ((offer.proposedPremiereAbsoluteWeek - 1) % 52) + 1 : 'TBA'}</p>
+            <p>{acceptedScope} · {offer.durationWeeks} weeks · {premiereOf(offer)}</p>
           </article>)}
         </div>
       </div>
@@ -252,7 +300,7 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
         {leader && <section className={css.warBest} style={{ '--pf': session.platformStates.find(platform => platform.platformId === leader.platformId)?.color || '#6fc9ff' } as React.CSSProperties}>
           <span>BEST ESTIMATED DEAL VALUE</span>
           <b>{money(totalValue(leader))}</b>
-          <div><strong>{leader.platformName}</strong><em>{leader.exclusivity === 'EXCLUSIVE' ? 'EXCLUSIVE · CLOSES ROOM' : 'SHARED · UP TO 3'}</em><em>{money(certainValue(leader))} guaranteed now</em><em>{leader.licensorRevenueShare}% forecast backend</em></div>
+          <div><strong>{leader.platformName}</strong><em>{leader.exclusivity === 'EXCLUSIVE' ? 'EXCLUSIVE · CLOSES ROOM' : session.subjectKind === 'CATALOGUE_PACKAGE' ? 'SHARED · CLOSES ROOM' : 'SHARED · UP TO 3'}</em><em>{money(certainValue(leader))} guaranteed now</em><em>{leader.licensorRevenueShare}% forecast backend</em></div>
           <p>{closed ? 'The room has closed.' : `${leader.platformName} is leading.`}</p>
         </section>}
 
@@ -283,7 +331,7 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
                 </button>
               </div>
               <div className={css.warValueBar}><i style={{ width: `${Math.max(0, certain / bestValue * 100)}%` }} /><em style={{ width: `${Math.max(0, expected / bestValue * 100)}%` }} /></div>
-              {expanded && <OfferTerms offer={offer} scope={scope} />}
+              {expanded && <OfferTerms offer={offer} scope={scope} premiere={premiereOf(offer)} />}
             </article>;
           })}
           {offers.length === 0 && <p className={css.empty}>The first contracts have not landed yet.</p>}

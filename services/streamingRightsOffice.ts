@@ -7,10 +7,11 @@ import {
     type StreamingRightsControlMode,
     type StreamingRightsStudioMandate,
 } from '../types';
-import { getStreamingCataloguePackageDesk } from './streamingCataloguePackages';
+import { getStreamingCataloguePackageDesk, normalizeStreamingCataloguePackageRegistry } from './streamingCataloguePackages';
 import {
     getStreamingRightsCalendar,
     getStreamingRightsStudioMandate,
+    normalizeStreamingRightsCalendarState,
 } from './streamingRightsCalendar';
 import {
     isStreamingLicenseActiveAt,
@@ -214,7 +215,23 @@ export const getStreamingRightsOffice = (
             || left.title.localeCompare(right.title)
         ))
         .slice(0, 7);
-    const state = normalizeStreamingRightsOfficeState(player.world.streamingRightsOffice);
+    /* #305: this studio's own last week of activity. The company's weekly digest counts the platform's renewals and other studios' too, so a studio with no titles read "1 routine decision handled". */
+    const ownCases = Object.values(normalizeStreamingRightsCalendarState(player.world.streamingRightsCalendar).renewalCases)
+        .filter(item => item.seller.type === 'PLAYER_STUDIO' && item.seller.id === studioId);
+    const ownPackages = Object.values(normalizeStreamingCataloguePackageRegistry(player.world.streamingCataloguePackages))
+        .filter(item => item.seller.id === studioId && item.lifecycle === 'SIGNED');
+    const lastWeek = Math.max(-1, ...ownCases.map(item => Number(item.resolvedAtAbsoluteWeek ?? -1)), ...ownPackages.map(item => Number((item as any).signedAtAbsoluteWeek ?? -1)));
+    const atLastWeek = ownCases.filter(item => item.resolvedAtAbsoluteWeek === lastWeek);
+    const renewed = atLastWeek.filter(item => item.outcome === 'ACCEPTED' || item.outcome === 'DELEGATED_ACCEPTED').length;
+    const returned = atLastWeek.filter(item => item.outcome === 'RETURN_TO_MARKET').length;
+    const lapsed = atLastWeek.filter(item => item.outcome === 'LET_EXPIRE' || item.outcome === 'NO_OFFER').length;
+    const signed = ownPackages.filter(item => Number((item as any).signedAtAbsoluteWeek ?? -1) === lastWeek).length;
+    const noteParts = [
+        renewed ? `${renewed} ${renewed === 1 ? 'renewal' : 'renewals'} secured` : null,
+        returned ? `${returned} ${returned === 1 ? 'title' : 'titles'} back on the market` : null,
+        lapsed ? `${lapsed} ${lapsed === 1 ? 'licence' : 'licences'} ended` : null,
+        signed ? `${signed} catalogue ${signed === 1 ? 'package' : 'packages'} signed` : null,
+    ].filter((part): part is string => Boolean(part));
     return {
         studioId,
         controlMode: mandate.controlMode,
@@ -222,7 +239,18 @@ export const getStreamingRightsOffice = (
         totalTitles: projects.size,
         actionRail,
         groups,
-        latestDigest: state.digests[0] || null,
+        latestDigest: noteParts.length ? {
+            id: `studio-note:${studioId}:${lastWeek}`,
+            absoluteWeek: lastWeek,
+            actionRequired: 0,
+            delegatedDecisions: 0,
+            renewals: renewed,
+            expiries: lapsed,
+            packages: signed,
+            transfers: 0,
+            royaltySettlements: 0,
+            summary: noteParts.join(' · '),
+        } : null,
     };
 };
 

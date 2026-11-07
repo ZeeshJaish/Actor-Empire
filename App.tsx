@@ -13,6 +13,7 @@ import { NewPlayerTutorialOverlay } from './components/NewPlayerTutorialOverlay'
 import { ProductionCrisisModal } from './components/ProductionCrisisModal';
 import { LifeEventModal } from './components/LifeEventModal';
 import { StreamingIncidentEventModal } from './components/StreamingIncidentEventModal';
+import { OriginalIssueModal } from './components/originals/OriginalIssueModal';
 import { StreamingDecisionEventModal } from './components/StreamingDecisionEventModal';
 import { StockControlEventModal } from './components/StockControlEventModal';
 import { SaveRecoveryModal } from './components/SaveRecoveryModal';
@@ -401,6 +402,8 @@ const normalizeCommitment = (commitment: Partial<Commitment>): Commitment => ({
     ...(commitment.projectPhase !== undefined ? { projectPhase: commitment.projectPhase } : {}),
     ...(commitment.phaseWeeksLeft !== undefined ? { phaseWeeksLeft: commitment.phaseWeeksLeft } : {}),
     ...(commitment.totalPhaseDuration !== undefined ? { totalPhaseDuration: commitment.totalPhaseDuration } : {}),
+    /* #291: a shoot's real length, and how far it has got, survive a reload (a good crew's shorter shoot, the week a studio's issue is due) */
+    ...(commitment.productionCalendar !== undefined ? { productionCalendar: commitment.productionCalendar } : {}),
     ...(commitment.auditionPerformance !== undefined ? { auditionPerformance: commitment.auditionPerformance } : {}),
     ...(commitment.productionPerformance !== undefined ? { productionPerformance: commitment.productionPerformance } : {}),
     ...(commitment.promotionalBuzz !== undefined ? { promotionalBuzz: commitment.promotionalBuzz } : {}),
@@ -416,6 +419,9 @@ const normalizeCommitment = (commitment: Partial<Commitment>): Commitment => ({
     ...(commitment.royaltyPercentage !== undefined ? { royaltyPercentage: commitment.royaltyPercentage } : {}),
     ...(commitment.durationLeft !== undefined ? { durationLeft: commitment.durationLeft } : {}),
     ...(commitment.previousBestBidValue !== undefined ? { previousBestBidValue: commitment.previousBestBidValue } : {}),
+    /* #300: both were lost on every load: a job's translated name, and who is owed an actor's royalties */
+    ...(commitment.nameKey !== undefined ? { nameKey: commitment.nameKey } : {}),
+    ...(commitment.actorRoyaltyPayeeId !== undefined ? { actorRoyaltyPayeeId: commitment.actorRoyaltyPayeeId } : {}),
     ...(commitment.projectDetails ? { projectDetails: normalizeProjectDetails(commitment.projectDetails) } : {}),
 });
 
@@ -1819,7 +1825,7 @@ export const App: React.FC = () => {
 
           if (safePlayer.weeklyOpportunities.jobs.length === 0 || safePlayer.weeklyOpportunities.auditions.length === 0) {
               const usedTitles = [...safePlayer.commitments.map((c: any) => c.name), ...safePlayer.activeReleases.map((r: any) => r.name), ...safePlayer.pastProjects.map((p: any) => p.name)];
-              safePlayer.weeklyOpportunities = { auditions: generateAuditions(safePlayer, usedTitles), jobs: generatePartTimeJobs() };
+              safePlayer.weeklyOpportunities = { auditions: generateAuditions(safePlayer, usedTitles), jobs: generatePartTimeJobs(safePlayer) };
           }
 
           if (safePlayer.instagram.feed.length === 0) safePlayer.instagram.feed = generateWeeklyFeed(safePlayer);
@@ -3435,6 +3441,16 @@ export const App: React.FC = () => {
           />
       )}
 
+      {/* #289: a studio making an Original comes back for money */}
+      {player.pendingEvents && player.pendingEvents.length > 0 && player.pendingEvents[0].type === 'ORIGINAL_ISSUE' && (
+          <OriginalIssueModal
+              key={player.pendingEvents[0].id}
+              player={player}
+              event={player.pendingEvents[0]}
+              onResolve={(updatedPlayer, log) => resolveQueuedEventSafely(player, updatedPlayer, player.pendingEvents?.[0]?.id, log)}
+          />
+      )}
+
       {/* #210: a decision that needs you: answered here, or on its page */}
       {player.pendingEvents && player.pendingEvents.length > 0 && player.pendingEvents[0].type === 'STREAMING_DECISION' && (
           <StreamingDecisionEventModal
@@ -3445,7 +3461,7 @@ export const App: React.FC = () => {
               onOpenRoom={room => {
                   /* the decision stays open on its page */
                   resolveQueuedEventSafely(player, player, player.pendingEvents?.[0]?.id, `${player.pendingEvents?.[0]?.title || 'A decision'}: opened ${room}.`);
-                  setLifestyleInitialView(room === 'TEAM' ? 'STREAMING_TEAM' : 'STREAMING_OWNERSHIP');
+                  setLifestyleInitialView(room === 'TEAM' ? 'STREAMING_TEAM' : room === 'SLATE' ? 'STREAMING_SLATE' : 'STREAMING_OWNERSHIP');
                   setActivePage(Page.LIFESTYLE);
               }}
           />

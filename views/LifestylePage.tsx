@@ -14,7 +14,8 @@ import { getPlayerLanguage, t } from '../services/i18n';
 import { getLifestyleAssetImageInfo } from '../services/lifestyleAssetImages';
 import { AssetShareModal, type ShareableAsset } from './lifestyle/components/AssetShareModal';
 import StreamingLockedScreen from '../components/StreamingLockedScreen';
-import CinemaLockedScreen from '../components/CinemaLockedScreen';
+import { StreamingShelfNotice, type StreamingShelfNoticeModel } from '../components/StreamingShelfNotice';
+import UpcomingPacksFlow from '../components/packs/UpcomingPacksFlow';
 import LifestyleHubScreen from '../components/ui-overhaul/LifestyleHubScreen';
 import { buildLifestyleUiModel, type LifestyleUiDestinationId } from '../services/lifestyleUiAdapter';
 
@@ -30,7 +31,7 @@ interface LifestylePageProps {
   onPremiumPurchase: (productId: PremiumProductId) => void;
   onReturnHome?: () => void;
   onNavVisibilityChange?: (visible: boolean) => void;
-  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'CINEMA_CHAIN';
+  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'STREAMING_SLATE' | 'UPCOMING_PACKS';
   onInitialViewConsumed?: () => void;
   onOpenBank?: () => void;
   initialRightsMarketOpportunityId?: string;
@@ -63,12 +64,14 @@ const CustomizationHeroImage: React.FC<{ item: Property | Vehicle }> = ({ item }
 };
 
 export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem, onSellItem, onSetResidence, onUpdatePlayer, onTrustedMarketUpdate, onPremiumPurchase, onReturnHome, onNavVisibilityChange, initialView, onInitialViewConsumed, onOpenBank, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStreamingContentOfferId, onStreamingContentOfferConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialPlatformCommission, onPlatformCommissionConsumed }) => {
-  const [view, setView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'CINEMA_CHAIN'>('MAIN');
+  const [view, setView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'UPCOMING_PACKS'>('MAIN');
   const [customizationItem, setCustomizationItem] = useState<Property | Vehicle | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
   const [purchaseCelebrationAsset, setPurchaseCelebrationAsset] = useState<ShareableAsset | null>(null);
   const [streamingOriginalTarget, setStreamingOriginalTarget] = useState<{ studioId: string; scriptId: string; commissionId: string } | null>(null);
-  const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP'>('HOME');
+  const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE'>('HOME');
+  /* #252: a title sent to the player's own service from the rights floor */
+  const [shelfNotice, setShelfNotice] = useState<StreamingShelfNoticeModel | null>(null);
   const language = getPlayerLanguage(player);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const trFallback = (key: string, fallback: string) => {
@@ -90,9 +93,9 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   useEffect(() => {
       if (!initialView) return;
-      if (initialView === 'STREAMING_FINANCE' || initialView === 'STREAMING_STATUS' || initialView === 'STREAMING_TEAM' || initialView === 'STREAMING_OWNERSHIP') {
+      if (initialView === 'STREAMING_FINANCE' || initialView === 'STREAMING_STATUS' || initialView === 'STREAMING_TEAM' || initialView === 'STREAMING_OWNERSHIP' || initialView === 'STREAMING_SLATE') {
           /* #75: the incident popup's "Open STATUS" opens the Platform room on STATUS; #210: a decision's door, its Boardroom room */
-          setStreamingDestination(initialView === 'STREAMING_STATUS' ? 'STATUS' : initialView === 'STREAMING_TEAM' ? 'TEAM' : initialView === 'STREAMING_OWNERSHIP' ? 'OWNERSHIP' : 'FINANCE');
+          setStreamingDestination(initialView === 'STREAMING_STATUS' ? 'STATUS' : initialView === 'STREAMING_TEAM' ? 'TEAM' : initialView === 'STREAMING_OWNERSHIP' ? 'OWNERSHIP' : initialView === 'STREAMING_SLATE' ? 'SLATE' : 'FINANCE');
           setView('STREAMING_PLATFORM');
       } else {
           if (initialView === 'STREAMING_PLATFORM') setStreamingDestination('HOME');
@@ -101,7 +104,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
       onInitialViewConsumed?.();
   }, [initialView, view, onInitialViewConsumed]);
 
-  const openStreamingPlatform = (destination: 'HOME' | 'FINANCE' = 'HOME') => {
+  const openStreamingPlatform = (destination: 'HOME' | 'FINANCE' | 'SLATE' = 'HOME') => {
       setStreamingDestination(destination);
       setView('STREAMING_PLATFORM');
   };
@@ -300,7 +303,10 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   if (view === 'PRODUCTION_WIZARD') return <ProductionWizard player={player} onCancel={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} onComplete={() => setView('PRODUCTION_GAME')} />;
 
-  if (view === 'PRODUCTION_GAME') return <ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} initialStudioContinuation={initialStudioContinuation} onStudioContinuationConsumed={onStudioContinuationConsumed} initialPlatformCommission={initialPlatformCommission} onPlatformCommissionConsumed={onPlatformCommissionConsumed} initialStreamingOriginal={streamingOriginalTarget || undefined} onStreamingOriginalConsumed={() => setStreamingOriginalTarget(null)} onStreamingOriginalGreenlightComplete={() => openStreamingPlatform()} onOpenOwnedStreamingDelivery={() => openStreamingPlatform()} />;
+  if (view === 'PRODUCTION_GAME') return <><ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} initialStudioContinuation={initialStudioContinuation} onStudioContinuationConsumed={onStudioContinuationConsumed} initialPlatformCommission={initialPlatformCommission} onPlatformCommissionConsumed={onPlatformCommissionConsumed} initialStreamingOriginal={streamingOriginalTarget || undefined} onStreamingOriginalConsumed={() => setStreamingOriginalTarget(null)} onStreamingOriginalGreenlightComplete={() => openStreamingPlatform()} onOpenOwnedStreamingDelivery={() => openStreamingPlatform()} onOpenStreamingSlate={() => openStreamingPlatform('SLATE')} onSentToYourService={setShelfNotice} />
+      {shelfNotice && <StreamingShelfNotice {...shelfNotice} service={player.ownedStreamingPlatform.identity?.name || 'your service'} color={player.ownedStreamingPlatform.identity?.primaryColor}
+          onClose={() => setShelfNotice(null)} onSchedule={() => { setShelfNotice(null); openStreamingPlatform('SLATE'); }} />}
+  </>;
 
   if (view === 'STREAMING_PLATFORM') return (
       <StreamingLockedScreen
@@ -321,18 +327,17 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
       />
   );
 
-  if (view === 'CINEMA_CHAIN') return (
-      <CinemaLockedScreen onBack={() => setView('MAIN')} />
+  if (view === 'UPCOMING_PACKS') return (
+      <UpcomingPacksFlow playerName={player.name} onBack={() => setView('MAIN')} />
   );
 
   const openLifestyleDestination = (destination: LifestyleUiDestinationId) => {
       if (destination === 'studio') handleProductionClick();
       if (destination === 'business') setView('BUSINESS');
       if (destination === 'streaming') openStreamingPlatform();
-      if (destination === 'cinema') setView('CINEMA_CHAIN');
       if (destination === 'assets') setView('ASSETS');
       if (destination === 'activities') setView('ACTIVITIES');
   };
 
-  return <LifestyleHubScreen {...buildLifestyleUiModel(player)} onOpen={openLifestyleDestination} />;
+  return <LifestyleHubScreen {...buildLifestyleUiModel(player)} onOpen={openLifestyleDestination} onOpenPacks={() => setView('UPCOMING_PACKS')} />;
 };

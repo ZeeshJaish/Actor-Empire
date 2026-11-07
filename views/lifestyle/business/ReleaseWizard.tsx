@@ -1,5 +1,15 @@
+import { getStreamingFirstNegotiation, getStreamingSeasonLeaveQuote, leaveStreamingSeasonFunding } from '../../../services/streamingSeasonRights';
+import { streamingOfferPremiereWords } from '../../../services/streamingPremiereStatus';
+import { getStreamingTitlePlacement } from '../../../services/streamingTitlePlacement';
+import { placeTitleOnYourService, sendTitleToYourService } from '../../../services/streamingYourPlatform';
+import { holdStreamingWindowForCinema } from '../../../services/streamingCinemaHold';
+import { StreamingAfterCinemaChoice, type StreamingShelfNoticeModel } from '../../../components/StreamingShelfNotice';
+import { StreamingPlatformDecidesStep } from '../../../components/StreamingPremiereTimeline';
+import { getStreamingPremiereStatus } from '../../../services/streamingPremiereStatus';
+import { weekOfYear } from "../../../services/gameWeek";
 import { buildSeriesStreamingSessionInput, quoteSeriesStreamingRights } from '../../../services/seriesStreamingValue';
-import { quoteCinemaRightsForBuyer, applyCinemaRightsQuoteToBidder } from '../../../services/boxOffice/boxOfficeRightsAdapter';
+import { quoteCinemaRightsForBuyer, applyCinemaRightsQuoteToBidder, withShelfValue } from '../../../services/boxOffice/boxOfficeRightsAdapter';
+import { calculateStreamingCatalogueReferenceValue } from '../../../services/streamingCataloguePackages';
 import React, { useState, useMemo } from 'react';
 import { commitCinemaReleaseExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
 import { Player, PendingEvent, ScreeningStrategy, ProjectHiddenStats, NextSeasonFundingTier, CampaignPositioning, CampaignTimeline, MarketingChannelAllocations, MarketingChannelId, BoxOfficeRegionId, CinemaChainId, CinemaChain, CinemaChainRegionalTerms, ReleasePlanningDraft, StreamingBiddingSession, StreamingOfferVersion, PlatformId } from '../../../types';
@@ -53,6 +63,8 @@ interface ReleaseWizardProps {
     onUpdatePlayer: (p: Player) => void;
     onComplete: () => void;
     isPostTheatricalBidding?: boolean;
+    /** #252: a released title went to the player's own service from the rights floor */
+    onSentToYourService?: (notice: StreamingShelfNoticeModel) => void;
 }
 
 const appendInvestorPayoutSummary = (summary: any, payout: number) => {
@@ -363,7 +375,7 @@ export const calculateStreamingAuctionOffer = (
     };
 };
 
-export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, project, onBack, onUpdatePlayer, onComplete, isPostTheatricalBidding }) => {
+export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, project, onBack, onUpdatePlayer, onComplete, isPostTheatricalBidding, onSentToYourService }) => {
     const savedDraft = project.projectDetails?.releasePlanningDraft as ReleasePlanningDraft | undefined;
     const [commitmentState, setCommitmentState] = useState<'DRAFT' | 'SIGNED'>(savedDraft?.commitmentState || 'DRAFT');
     const [lockedPremiereAbsoluteWeek, setLockedPremiereAbsoluteWeek] = useState<number | null>(savedDraft?.lockedPremiereAbsoluteWeek ?? null);
@@ -389,6 +401,14 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const [selectedStreamingContractIds, setSelectedStreamingContractIds] = useState<string[]>(
         savedDraft?.selectedStreamingContractIds || []
     );
+    /* #244, #252: the rights floor's second door, while the player's own service is live. A draft saved before the floor had it starts on the floor. */
+    const [yourPlatformChoice, setYourPlatformChoice] = useState<boolean>(savedDraft?.ownPlatformRoute === true && Number(savedDraft?.step) > 2);
+    const titlePlacement = getStreamingTitlePlacement(player, project.id);
+    const yourPlatformOpen = !isPostTheatricalBidding && Boolean(titlePlacement.serviceName) && titlePlacement.kind !== 'THEIRS' && titlePlacement.kind !== 'EXCLUSIVE_OUTSIDE';
+    const yourPlatformRoute = yourPlatformChoice && yourPlatformOpen;
+    const sendToYourServiceOpen = isPostTheatricalBidding ? titlePlacement.mayPutOnYours : yourPlatformOpen;
+    /* #246: the last season's platform has the first word on this one */
+    const [firstNegotiationDone, setFirstNegotiationDone] = useState<boolean>(savedDraft?.firstNegotiationDone === true);
     const distributionLocked = commitmentState === 'SIGNED'
         && releaseType === 'STREAMING_ONLY'
         && selectedStreamingContractIds.length > 0;
@@ -419,6 +439,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         releaseWeek,
         commitmentState,
         lockedPremiereAbsoluteWeek,
+        ...(yourPlatformRoute ? { ownPlatformRoute: true } : {}),
+        ...(firstNegotiationDone ? { firstNegotiationDone: true } : {}),
         updatedAt: Date.now(),
     });
     const writeReleasePlanningDraft = (sourcePlayer: Player, draft: ReleasePlanningDraft): Player => {
@@ -461,6 +483,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         project.id,
         releaseType,
         releaseWeek,
+        yourPlatformRoute,
+        firstNegotiationDone,
         screeningStrategy,
         selectedPlatform,
         selectedStreamingPlatformIds,
@@ -498,8 +522,13 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         : null;
     const lockedPremiereFundingTier = projectHiddenStats.nextSeasonFundingTier;
     const lockedPremiereFundingReason = projectHiddenStats.nextSeasonFundingReason;
+    /* #246: any funder, not only the five in the old list: Prime Video funded a season and the wizard opened the floor */
     const lockedPremierePlatform = lockedPremierePlatformId
         ? PLATFORMS.find(platform => platform.id === lockedPremierePlatformId)
+            || (() => {
+                const company = getForbesStreamingCompanies(player).find(item => item.id === lockedPremierePlatformId);
+                return company ? { id: company.id as PlatformId, name: company.name } : null;
+            })()
         : null;
     const lockedPremiereBid: Bid | null = lockedPremierePlatform
         ? {
@@ -585,7 +614,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         sellerPartyId: biddingSellerStudioId,
         startsAtAbsoluteWeek: biddingRightsStartWeek,
         maximumDurationWeeks: 156,
-        windowType: 'FIRST_WINDOW',
+        /* #243: after a cinema run it is not the first window */
+        windowType: project.distributionPhase === 'THEATRICAL' || (project as { weeklyGross?: number[] }).weeklyGross?.length || (project as { streaming?: unknown }).streaming ? 'SECOND_WINDOW' : 'FIRST_WINDOW',
     }), [biddingRightsStartWeek, biddingSellerStudioId, player.world.streamingRightsContracts, project.id]);
     const [biddingRightsMessage, setBiddingRightsMessage] = useState<string | null>(null);
     const [biddingSession, setBiddingSession] = useState<StreamingBiddingSession | null>(() => {
@@ -621,6 +651,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     };
 
     const startAuction = () => {
+        /* #244: it is on the player's own service: pull it first */
+        if (!yourPlatformRoute && titlePlacement.onYours && titlePlacement.whyNotSellOutside) {
+            setBiddingRightsMessage(titlePlacement.whyNotSellOutside);
+            return;
+        }
         if (!biddingLotBuild.lot) {
             setBiddingRightsMessage(biddingLotBuild.compatibility.summary);
             return;
@@ -636,6 +671,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             earliestPremiereAbsoluteWeek: biddingRightsStartWeek,
             studioPlatformRelations: studio?.studioState?.platformRelations || {},
         });
+        const auction = getProjectAuctionContext();
+        const shelfAloneValue = calculateStreamingCatalogueReferenceValue({ quality: Number(auction.hiddenStats.qualityScore) || 50, audience: Number(project.totalViews || project.streaming?.totalViews) || 0,
+            budget: projectBudget, theatricalGross, streamingRevenue: Number(project.streamingRevenue || project.projectDetails?.streamingRevenue) || 0, franchiseProtected: auction.hasProvenIp });
         try {
         const roomInput: Parameters<typeof createStreamingBiddingSession>[0] = {
             projectId: project.id,
@@ -659,8 +697,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         requestedLevel: 'DUBS_AND_SUBTITLES',
                     })
                     : { localizationLevel: 'NONE' as const, requirements: [] };
-                const valuedPlatform = !isSeries ? applyCinemaRightsQuoteToBidder(platform,
-                    quoteCinemaRightsForBuyer(player,project.projectDetails || project,project.id,platform.id,biddingRightsStartWeek,52,biddingLotBuild.lot.countryIds)) : platform;
+                const valuedPlatform = !isSeries ? applyCinemaRightsQuoteToBidder(platform, withShelfValue(
+                    quoteCinemaRightsForBuyer(player,project.projectDetails || project,project.id,platform.id,biddingRightsStartWeek,52,biddingLotBuild.lot.countryIds),
+                    { titleId: project.id, buyerId: platform.id, now: biddingAbsoluteWeek, releasedAtAbsoluteWeek: project.releasedAtAbsoluteWeek, aloneValue: shelfAloneValue, buyerCash: platform.cashAvailable })) : platform;
                 return {
                     ...valuedPlatform,
                     canStartNewBids: valuedPlatform.canStartNewBids !== false && (worldPlatform
@@ -676,7 +715,33 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             ? buildSeriesStreamingSessionInput(player, project.projectDetails, project.id, biddingLotBuild.lot, roomInput.platforms)
             : roomInput);
         persistBiddingSession(session);
-        } catch(error) {setBiddingRightsMessage(error instanceof Error ? error.message : 'No eligible buyer can fund this room.');}
+        } catch(error) {setBiddingRightsMessage(error instanceof Error && !/financially capable/.test(error.message) ? error.message : 'No service wants to bid on this today. Try again in a few weeks.');}
+    };
+
+    /* #253: a film in cinemas asks which road first */
+    const [afterCinemaChoice, setAfterCinemaChoice] = useState(false);
+    /* #252: a film the wizard is releasing carries on: its Calendar is the date. A released one goes on the shelves, or waits for its cinemas to close. */
+    const sendToYourService = (afterCinemaWeeks = 0) => {
+        if (!isPostTheatricalBidding) {
+            setYourPlatformChoice(true);
+            setStep(3);
+            return;
+        }
+        const sent = sendTitleToYourService(player, project.id, afterCinemaWeeks);
+        if (!sent.changed) {
+            setBiddingRightsMessage(sent.detail);
+            return;
+        }
+        releaseDraftClearedRef.current = true;
+        onUpdatePlayer({
+            ...sent.player,
+            activeReleases: sent.player.activeReleases.map(release => (release.id === project.id
+                ? { ...release, projectDetails: { ...release.projectDetails, releasePlanningDraft: undefined } }
+                : release)),
+        });
+        /* a film in cinemas chose its road on the popup: nothing left to tell */
+        if (!titlePlacement.inCinemas) onSentToYourService?.({ what: project.name || project.title || 'Your title' });
+        onComplete();
     };
 
     const leaveAuction = () => {
@@ -717,12 +782,14 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const handleAcceptBid = (
         bid: Bid | null,
         structuredAcceptance?: { session: StreamingBiddingSession; offer: StreamingOfferVersion },
+        firstNegotiationWeek?: number,
     ) => {
         if (!bid) return;
         if (!hasStreamingDealEnergy) return;
         const signedAtAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
         const promisedPremiereAbsoluteWeek = structuredAcceptance?.session.lockedPremiereAbsoluteWeek
             ?? structuredAcceptance?.offer.proposedPremiereAbsoluteWeek
+            ?? firstNegotiationWeek
             ?? biddingRightsStartWeek;
         const fundedPremiere = bid.id.startsWith('locked_premiere_');
         if (structuredAcceptance && !isSeries && !Object.values(player.world.streamingRightsContracts || {}).some((c:import('../../../types').StreamingRightsContract)=>c.sourceOfferId===structuredAcceptance.offer.id)) {
@@ -774,7 +841,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             setSelectedStreamingContractIds(nextSelectedStreamingContractIds);
             setCommitmentState('SIGNED');
             setLockedPremiereAbsoluteWeek(promisedPremiereAbsoluteWeek);
-            setReleaseWeek(((promisedPremiereAbsoluteWeek - 1) % 52) + 1);
+            setReleaseWeek(weekOfYear(promisedPremiereAbsoluteWeek));
         }
 
         const updatedPlayer = structuredAcceptance
@@ -943,12 +1010,13 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             updatedPlayer.commitments[commitmentIndex] = {
                 ...commitment,
                 projectPhase: 'AWAITING_RELEASE',
-                phaseWeeksLeft: 1, // Streaming releases happen quickly
+                /* #242: it waits for the week the platform picked; signing and leaving must not release it next week */
+                phaseWeeksLeft: Math.max(1, promisedPremiereAbsoluteWeek - getAbsoluteWeek(player.age, player.currentWeek)),
                 totalPhaseDuration: 1,
                 projectDetails: commitment.projectDetails ? {
                     ...commitment.projectDetails,
                     releaseStrategy: 'STREAMING_ONLY',
-                    releaseDate: ((promisedPremiereAbsoluteWeek - 1) % 52) + 1,
+                    releaseDate: weekOfYear(promisedPremiereAbsoluteWeek),
                     streamingRevenue: Math.max(0, Number(commitment.projectDetails.streamingRevenue || 0)) + bid.amount,
                     investorPayouts: nextInvestorPayouts,
                     hiddenStats: {
@@ -982,7 +1050,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 const isStillTheatrical = release.distributionPhase === 'THEATRICAL';
                 
                 // If still in theaters, calculate when it should start streaming (week after theatrical ends)
-                let startWeek = ((promisedPremiereAbsoluteWeek - 1) % 52) + 1;
+                let startWeek = weekOfYear(promisedPremiereAbsoluteWeek);
                 let startWeekAbsolute = promisedPremiereAbsoluteWeek;
                 if (isStillTheatrical) {
                     const completedTheatricalWeeks = Math.max(
@@ -993,7 +1061,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     const weeksRemaining = (release.maxTheatricalWeeks || 8) - completedTheatricalWeeks;
                     const waitWeeks = Math.max(1, weeksRemaining + 1);
                     startWeekAbsolute = Math.max(promisedPremiereAbsoluteWeek, getAbsoluteWeek(player.age, player.currentWeek) + waitWeeks);
-                    startWeek = ((startWeekAbsolute - 1) % 52) + 1;
+                    startWeek = weekOfYear(startWeekAbsolute);
                 }
 
                 updatedPlayer.activeReleases[releaseIndex] = {
@@ -1063,7 +1131,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         }
 
         const signedRelease = updatedPlayer.activeReleases?.find(release => release.id === project.id);
-        const startsAtAbsoluteWeek = structuredAcceptance
+        const startsAtAbsoluteWeek = structuredAcceptance || firstNegotiationWeek !== undefined
             ? promisedPremiereAbsoluteWeek
             : signedRelease?.streaming?.startWeekAbsolute
             ?? (commitmentIndex !== -1 ? signedAtAbsoluteWeek + 1 : signedAtAbsoluteWeek);
@@ -1086,6 +1154,19 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             startsAtAbsoluteWeek,
             durationWeeks: 52,
             });
+        /* #243: signed during a run: the window waits for the cinema */
+        if (updatedPlayer.activeReleases?.find(release => release.id === project.id)?.distributionPhase === 'THEATRICAL') {
+            registeredSigning.player = holdStreamingWindowForCinema(registeredSigning.player, registeredSigning.contract?.id);
+        }
+        /* #246: signed on the first word: the deal is as locked as one from the floor */
+        if (firstNegotiationWeek !== undefined && registeredSigning.contract) {
+            setFirstNegotiationDone(true);
+            setCommitmentState('SIGNED');
+            setSelectedStreamingPlatformIds([bid.platformId]);
+            setSelectedStreamingContractIds([registeredSigning.contract.id]);
+            setLockedPremiereAbsoluteWeek(promisedPremiereAbsoluteWeek);
+            setReleaseWeek(weekOfYear(promisedPremiereAbsoluteWeek));
+        }
         spendPlayerEnergy(registeredSigning.player, streamingDealEnergyCost, `Streaming deal: ${project.name}`);
         if (structuredAcceptance) setBiddingSession(structuredAcceptance.session);
         const playerWithSynchronousDraft = structuredAcceptance && !isPostTheatricalBidding
@@ -1096,7 +1177,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 selectedStreamingContractIds: nextSelectedStreamingContractIds,
                 commitmentState: 'SIGNED',
                 lockedPremiereAbsoluteWeek: promisedPremiereAbsoluteWeek,
-                releaseWeek: ((promisedPremiereAbsoluteWeek - 1) % 52) + 1,
+                releaseWeek: weekOfYear(promisedPremiereAbsoluteWeek),
                 updatedAt: Date.now(),
             })
             : registeredSigning.player;
@@ -1396,8 +1477,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
         const effectiveReleaseAbsoluteWeek = releaseType === 'STREAMING_ONLY' && lockedPremiereAbsoluteWeek
             ? lockedPremiereAbsoluteWeek
-            : currentAbsoluteWeek + ((releaseWeek - player.currentWeek + 52) % 52);
-        const effectiveReleaseWeek = ((effectiveReleaseAbsoluteWeek - 1) % 52) + 1;
+            : Math.max(yourPlatformRoute ? currentAbsoluteWeek + 1 : currentAbsoluteWeek, currentAbsoluteWeek + ((releaseWeek - player.currentWeek + 52) % 52));
+        const effectiveReleaseWeek = weekOfYear(effectiveReleaseAbsoluteWeek);
         const weeksUntilRelease = Math.max(0, effectiveReleaseAbsoluteWeek - currentAbsoluteWeek);
         let festivalCost = 0;
 
@@ -1498,6 +1579,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     releaseDate: effectiveReleaseWeek,
                     hiddenStats: {
                         ...applyMusicImpactToHiddenStats(commitment.projectDetails.hiddenStats, musicImpact, commitment.projectDetails.musicPlan),
+                        ...(yourPlatformRoute ? { ownPlatformRelease: true } : {}),
                         redCarpetHype: (normalizedChannelMix.allocations.RED_CARPET || 0) > 0 ? 20 : 0,
                         festivalPremiere: festivalPremiere || undefined,
                         campaignFitScore: campaignFit.fitScore,
@@ -1542,9 +1624,12 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             }
         }
 
-        spendPlayerEnergy(updatedPlayer, releaseStrategyEnergyCost, `Release strategy: ${project.name}`);
+        /* #244: on the shelves and on the Slate from now; the close releases it on that week */
+        const placedOnYours = yourPlatformRoute ? placeTitleOnYourService(updatedPlayer, project.id, effectiveReleaseAbsoluteWeek) : null;
+        const lockedPlayer = placedOnYours?.changed ? placedOnYours.player : updatedPlayer;
+        spendPlayerEnergy(lockedPlayer, releaseStrategyEnergyCost, `Release strategy: ${project.name}`);
         releaseDraftClearedRef.current = true;
-        onUpdatePlayer(updatedPlayer);
+        onUpdatePlayer(lockedPlayer);
         onComplete();
     };
 
@@ -1556,6 +1641,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             onUpdatePlayer(writeReleasePlanningDraft(player, draft));
             onBack();
         } else {
+            /* #252: back on the rights floor, both doors are open again */
+            if (step === 3) setYourPlatformChoice(false);
             setStep(step - 1);
         }
     };
@@ -1593,14 +1680,17 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         8,
     );
     const displayReleaseWeek = distributionLocked && lockedPremiereAbsoluteWeek
-        ? ((lockedPremiereAbsoluteWeek - 1) % 52) + 1
+        ? weekOfYear(lockedPremiereAbsoluteWeek)
         : releaseWeek;
     const rivalsThisWeek = upcomingRivals.filter(r => r.weekReleased === displayReleaseWeek);
 
     const releaseFilm = buildReleaseFilmArt(project);
+    const firstNegotiation = step === 2 && releaseType === 'STREAMING_ONLY' && !yourPlatformRoute && !lockedPremiereBid && !firstNegotiationDone && !biddingSession && !distributionLocked && project.projectDetails
+        ? getStreamingFirstNegotiation(player, project.projectDetails, project.id, biddingRightsStartWeek)
+        : null;
     const releasePhase = getReleaseWizardPhase(step, releaseType, Boolean(isPostTheatricalBidding));
     const releaseRoute = releaseType ? toReleaseWizardRoute(releaseType) : null;
-    const releaseProgress = getReleaseWizardProgress(step, releaseType);
+    const releaseProgress = getReleaseWizardProgress(step, releaseType, yourPlatformRoute);
     const positionPresentation = {
         MASS_EVENT: { hue: 28, style: 'mass' as const },
         PRESTIGE_PUSH: { hue: 274, style: 'prestige' as const },
@@ -1725,7 +1815,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     theatricalNote={isSeries ? 'Series seasons premiere through streaming platforms.' : undefined}
                     streamingNote={isSeries ? 'Take this season into the live platform market.' : undefined}
                     onSelect={route => {
-                        if (!distributionLocked) setReleaseType(route === 'THEATRICAL' ? 'THEATRICAL' : 'STREAMING_ONLY');
+                        if (!distributionLocked) { setYourPlatformChoice(false); setReleaseType(route === 'THEATRICAL' ? 'THEATRICAL' : 'STREAMING_ONLY'); }
                     }}
                     onContinue={nextStep}
                     locked={distributionLocked}
@@ -1750,8 +1840,32 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 />
             )}
 
+            {afterCinemaChoice && <StreamingAfterCinemaChoice what={project.name || project.title || 'Your film'} service={titlePlacement.serviceName || 'your service'}
+                color={player.ownedStreamingPlatform.identity?.primaryColor}
+                onClose={() => setAfterCinemaChoice(false)} onSend={weeks => { setAfterCinemaChoice(false); sendToYourService(weeks); }} />}
             {step === 2 && releaseType === 'STREAMING_ONLY' && (
                 <StreamingWarRoomStep
+                    yourService={sendToYourServiceOpen ? { name: titlePlacement.serviceName!, color: player.ownedStreamingPlatform.identity?.primaryColor } : null}
+                    onSendToYourService={() => (isPostTheatricalBidding && titlePlacement.inCinemas ? setAfterCinemaChoice(true) : sendToYourService())}
+                    firstNegotiation={firstNegotiation ? {
+                        platformName: firstNegotiation.platformName,
+                        lastSeasonTitle: firstNegotiation.lastSeasonTitle,
+                        interested: firstNegotiation.interested,
+                        amount: firstNegotiation.amount,
+                        premiere: firstNegotiation.premiereWeek !== null ? streamingOfferPremiereWords(firstNegotiation.platformName, firstNegotiation.premiereWeek, getAbsoluteWeek(player.age, player.currentWeek)) : '',
+                    } : null}
+                    onSignFirstNegotiation={() => firstNegotiation && firstNegotiation.premiereWeek !== null && handleAcceptBid({
+                        id: `first_negotiation_${project.id}_${firstNegotiation.platformId}`, platformId: firstNegotiation.platformId as PlatformId, amount: firstNegotiation.amount,
+                        type: 'UPFRONT_ONLY', fundingAmount: 0, backendPct: 0, bidValue: firstNegotiation.amount, timestamp: 0,
+                    }, undefined, firstNegotiation.premiereWeek)}
+                    onPassFirstNegotiation={() => setFirstNegotiationDone(true)}
+                    leaveFunding={lockedPremiereBid && lockedPremierePlatform ? getStreamingSeasonLeaveQuote(project, lockedPremierePlatform.name) : null}
+                    onLeaveFunding={() => {
+                        const left = leaveStreamingSeasonFunding(player, project.id);
+                        if (left.changed) onUpdatePlayer(left.player);
+                        else setBiddingRightsMessage(left.detail);
+                    }}
+                    duringCinemaRun={project.distributionPhase === 'THEATRICAL'}
                     film={releaseFilm}
                     session={biddingSession}
                     marketPlatforms={streamingMarketPlatforms}
@@ -1823,7 +1937,15 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 />
             )}
 
-            {step === 5 && (
+            {step === 5 && releaseType === 'STREAMING_ONLY' && distributionLocked && (
+                <StreamingPlatformDecidesStep
+                    status={getStreamingPremiereStatus(player, project.id)}
+                    platformName={getStreamingPremiereStatus(player, project.id)?.platformName || 'The platform'}
+                    onContinue={nextStep}
+                    onBack={prevStep}
+                />
+            )}
+            {step === 5 && !(releaseType === 'STREAMING_ONLY' && distributionLocked) && (
                 <CalendarStep
                     cinema={releaseType === 'THEATRICAL'}
                     film={releaseFilm}
@@ -1851,12 +1973,14 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     campaignReturn={hasReservedMarketingPool ? campaignBudgetRemaining : 0}
                     festivalLabel={chosenFestival ? getFestivalName(chosenFestival) : null}
                     releaseWeek={displayReleaseWeek}
+                    releaseDateLabel={releaseType === 'STREAMING_ONLY' && distributionLocked ? (getStreamingPremiereStatus(player, project.id)?.label ?? 'The platform decides') : undefined}
                     screenCount={distributionDealSummary.totalScreens}
                     regionCount={normalizedSelectedRegionIds.length}
                     partnerNames={partnerNames}
                     bookingCost={distributionDealSummary.bookingCost}
                     studioShare={distributionDealSummary.studioShare}
                     valueRange={cinemaRead ? [distributionDealSummary.studioOpeningLow, distributionDealSummary.studioOpeningHigh] : undefined}
+                    yourPlatformName={yourPlatformRoute ? titlePlacement.serviceName! : undefined}
                     buyerName={streamingMarketPlatforms.find(platform => platform.id === selectedPlatform)?.name || selectedPlatform}
                     buyerNames={Array.from(new Set([
                         ...((biddingSession?.offers || [])

@@ -4,7 +4,6 @@ import { FilmSheet } from './FilmSheet';
 import css from './ReleaseStrategy.module.css';
 
 const join = (...names: Array<string | false | undefined>) => names.filter(Boolean).join(' ');
-
 export const DistributionStep: React.FC<{
   film: ReleaseFilmArt;
   selected: ReleaseWizardRoute | null;

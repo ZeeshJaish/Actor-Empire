@@ -1,3 +1,4 @@
+import { getInHouseScriptCost, getInHouseWriterSkill } from '../../../../services/studioProductionEconomy';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Archive, ArrowLeft, BookOpen, ChevronRight, Clapperboard, Clock, Edit2, Globe, Layers, PenTool, ShieldCheck, Sparkles, Star, Trash2, Users } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
@@ -76,6 +77,8 @@ export interface DevelopmentLabScriptVaultProps {
     onRenewRight: (rightId: string) => { changed: boolean; message: string };
     onDevelopRight: (rightId: string, choice: OwnedRightDevelopmentChoice) => string | null;
     onAssign: (scriptId: string, writerId: string, cost: number, skill: number, speed: number) => void;
+    /** #306 */
+    writingRoomLevel?: number;
     onUpdateScript: (script: Script, costType?: 'ENERGY' | 'MONEY', costAmount?: number) => void;
     onDelete: (id: string) => void;
     onRename: (id: string, title: string) => void;
@@ -84,7 +87,7 @@ export interface DevelopmentLabScriptVaultProps {
     initialScriptId?: string;
 }
 
-export const DevelopmentLabScriptVault: React.FC<DevelopmentLabScriptVaultProps> = ({ scripts, writers, studioBalance, studioId, player, ownedRights, onOpenProject, onOpenFranchise, onOpenUniverse, onRenewRight, onDevelopRight, onAssign, onUpdateScript, onDelete, onRename, onDeductEnergy, onDeductMoney, initialScriptId }) => {
+export const DevelopmentLabScriptVault: React.FC<DevelopmentLabScriptVaultProps> = ({ writingRoomLevel = 1, scripts, writers, studioBalance, studioId, player, ownedRights, onOpenProject, onOpenFranchise, onOpenUniverse, onRenewRight, onDevelopRight, onAssign, onUpdateScript, onDelete, onRename, onDeductEnergy, onDeductMoney, initialScriptId }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptForAssignment, setSelectedScriptForAssignment] = useState<string | null>(null);
@@ -231,7 +234,7 @@ export const DevelopmentLabScriptVault: React.FC<DevelopmentLabScriptVaultProps>
 
                         {/* In-House Team */}
                         <button
-                            onClick={() => handleAssign(script.id, 'in-house', 5000, 45, 1.0)}
+                            onClick={() => handleAssign(script.id, 'in-house', getInHouseScriptCost(writingRoomLevel), getInHouseWriterSkill(writingRoomLevel), 1.0)}
                             className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl hover:border-amber-500/50 transition-colors flex items-center justify-between"
                         >
                             <div className="flex items-center gap-4">
@@ -240,7 +243,7 @@ export const DevelopmentLabScriptVault: React.FC<DevelopmentLabScriptVaultProps>
                                 </div>
                                 <div className="text-left">
                                     <h3 className="font-bold">In-House Team</h3>
-                                    <p className="text-xs text-zinc-500">Skill: 45 | Cost: $5,000</p>
+                                    <p className="text-xs text-zinc-500">Skill: {getInHouseWriterSkill(writingRoomLevel)} | Cost: ${getInHouseScriptCost(writingRoomLevel).toLocaleString('en-US')} <span className="text-zinc-600">· Writing Room level {Math.max(1, writingRoomLevel)}</span></p>
                                 </div>
                             </div>
                             <ChevronRight className="text-zinc-600" />

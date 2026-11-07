@@ -19,6 +19,7 @@ import { getDynastyCareerArchives } from '../../services/dynastyCareer';
 import { getCanonicalReleasedMarketProjects } from '../../services/industryWorld/publicIndustryProjection';
 import { ResponsiveGrid } from '../../ui-layout/ResponsiveGrid';
 import type { ColumnPolicy } from '../../ui-layout/policy';
+import { getCareerProjects } from '../../services/outsideOriginals';
 
 interface BoxOfficeAppProps {
   player: Player;
@@ -429,9 +430,8 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           const cinemaFinance = getCinemaProjectFinance(rel);
           const studioReceipts = cinemaFinance.producerReceiptsCents / 100;
           const budget = Math.max(1, rel.budget || rel.projectDetails?.estimatedBudget || 1);
-          const openingWeekend = rel.distributionPhase === 'STREAMING'
-              ? streamingRevenue
-              : getOpeningWeekend(rel);
+          /* #245: an opening is tickets; a platform's fee is not an opening */
+          const openingWeekend = getOpeningWeekend(rel);
           const type = rel.distributionPhase === 'STREAMING'
               ? 'Streaming'
               : streamingRevenue > 0
@@ -462,7 +462,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
 	          };
       });
 
-      const pastEntries: BoxOfficeArchiveEntry[] = (player.pastProjects || []).map((project: any) => {
+      const pastEntries: BoxOfficeArchiveEntry[] = getCareerProjects(player).map((project: any) => {
           const worldwideGross = Math.max(0, Number(project.gross || 0));
           const streamingRevenue = Math.max(0, Number(project.streamingRevenue || 0));
           const soundtrackRevenue = Math.max(0, Number(project.soundtrackRevenue || 0));
@@ -859,6 +859,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                       {isStreamingRelease ? (
                           <>
 	                              {renderMetric(tr('box.totalViews'), formatViews(rel.streaming!.totalViews))}
+	                              {rel.totalGross > 0 && renderMetric(tr('box.worldwideGross'), formatMoney(rel.totalGross))}
 	                              {renderMetric(tr('box.streamingReceipts'), formatMoney(streamingContract!.totalReceipts), 'text-emerald-300')}
 	                              {soundtrackRevenue > 0 && renderMetric(tr('box.soundtrackRevenue'), formatMoney(soundtrackRevenue), 'text-cyan-300')}
 	                              {renderMetric(tr('box.latestWeek'), streamingRolloutStatus?.isPending ? 'Pending' : formatViews(weeklyValues.slice(-1)[0] || 0), streamingRolloutStatus?.isPending ? 'text-indigo-200' : 'text-white')}
@@ -1640,6 +1641,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                     <div className="bg-black/20 p-3 rounded-xl min-w-0">
                                         <div className="text-[10px] text-zinc-500 uppercase font-bold">{tr('box.totalViews')}</div>
                                         <div className="text-white font-bold font-mono text-lg break-all">{formatViews(rel.streaming!.totalViews)}</div>
+                                        {rel.totalGross > 0 && <div className="mt-1 text-[10px] text-zinc-400 font-mono break-all">{tr('box.worldwideGross')} {formatMoney(rel.totalGross)}</div>}
                                     </div>
                                     <div className="bg-black/20 p-3 rounded-xl flex flex-col justify-center min-w-0">
                                         <div className="text-[10px] text-zinc-500 uppercase font-bold">{tr('box.latestWeek')}</div>

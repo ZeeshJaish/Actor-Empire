@@ -18,8 +18,11 @@ export const FilmSheet: React.FC<{
   film: ReleaseFilmArt;
   size?: 'sm' | 'md' | 'lg';
   dress?: FilmSheetStyle;
-}> = ({ film, size = 'md', dress }) => {
-  const dressing = dress ? DRESS[dress] : null;
+  /** #244: a streaming release's poster does not say IN CINEMAS */
+  where?: string;
+}> = ({ film, size = 'md', dress, where }) => {
+  const dressed = dress ? DRESS[dress] : null;
+  const dressing = dressed && where && dressed.strip?.includes('CINEMAS') ? { ...dressed, strip: where } : dressed;
   const words = film.title.toUpperCase().split(' ');
   const lines: string[] = [];
   let current = '';

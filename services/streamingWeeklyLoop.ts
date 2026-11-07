@@ -1,3 +1,6 @@
+import { advanceOriginalPitches } from './originalsPitches';
+import { runOriginalLicenceWeek, runOriginalPitchRivalsWeek } from './originalsRivals';
+import { gameWeekText } from './gameWeek';
 import { processAuctionFutureFunding } from './streamingAuctionFunding';
 import type {
     OwnedStreamingLedgerEntry,
@@ -458,7 +461,9 @@ export const processOwnedStreamingPlatformWeek = (
             },
         };
     }
-    player = advanceStreamingOpportunityMarket(player);
+    /* #294: rivals move first: what a rival takes this week is gone before the room is refilled */
+    player = runOriginalLicenceWeek(runOriginalPitchRivalsWeek(player));
+    player = advanceOriginalPitches(advanceStreamingOpportunityMarket(player));
     player = processRivalBrokeredOpportunityWeek(player, getAbsoluteWeek(player.age, player.currentWeek));
     player = processHistoricalMarketRivalWeek(player);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -1187,11 +1192,11 @@ export const processOwnedStreamingPlatformWeek = (
     const summary = `${netSubscriberMovement >= 0 ? '+' : ''}${netSubscriberMovement.toLocaleString()} net subscribers, ${(reportedChurnRate * 100).toFixed(1)}% churn and ${playbackSuccessRate.toFixed(2)}% playback success. ${netCashContribution >= 0 ? 'Treasury gained' : 'Treasury used'} ${Math.abs(netCashContribution).toLocaleString()}.`;
     const nextWeekHook = infrastructureOperationsEffects.activeIncident
         ? infrastructureOperationsEffects.activeIncident.stage === 'RECOVERING'
-            ? `Facility recovery verification is scheduled for game week ${infrastructureOperationsEffects.activeIncident.recoveryReadyAtAbsoluteWeek}.`
+            ? `Facility recovery verification is scheduled for game ${gameWeekText(infrastructureOperationsEffects.activeIncident.recoveryReadyAtAbsoluteWeek, absoluteWeek)}.`
             : 'Incident Command is waiting for an emergency action, rerouting target, insurance claim and compensation decision.'
         : crisisEffects.activeCrisis
         ? crisisEffects.activeCrisis.stage === 'RECOVERING'
-            ? `Recovery verification is scheduled for game week ${crisisEffects.activeCrisis.recoveryReadyAtAbsoluteWeek}.`
+            ? `Recovery verification is scheduled for game ${gameWeekText(crisisEffects.activeCrisis.recoveryReadyAtAbsoluteWeek, absoluteWeek)}.`
             : 'Incident Command is waiting for a response doctrine, compensation decision and public message.'
         : buildNextWeekHook(
             platform,

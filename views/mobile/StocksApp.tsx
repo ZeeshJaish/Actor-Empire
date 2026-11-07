@@ -14,6 +14,7 @@ import { formatMoney } from '../../services/formatUtils';
 import {
     calculatePortfolioValue,
     executeStockTrade,
+    isStockLockedByControl,
     calculateStockTradeQuote,
     getEstimatedAnnualDividend,
     getSharesForCashOrder,
@@ -247,9 +248,11 @@ export const StocksApp: React.FC<StocksAppProps> = ({
         const resultingOwnership = isOwn ? ownBuy?.founderAfter ?? snapshot.ownershipPercent : quote.resultingOwnershipPercent;
         const priceImpact = isOwn ? (ownBuy ? (ownBuy.priceAfter / selectedStock.price - 1) * 100 : 0) : quote.priceImpactPercent;
         const canAfford = isOwn ? inputAmount > 0 && Boolean(ownBuy) && !ownBuy!.blocked : inputAmount > 0 && cost <= player.money;
+        /* #237: you control this company: your shares are the company now */
+        const controlLocked = !isOwn && isStockLockedByControl(player, selectedStock);
         const canSell = isOwn
             ? orderMode === 'SHARES' && inputAmount > 0 && Boolean(ownSell) && !ownSell!.blocked
-            : orderMode === 'SHARES' && Boolean(holding && inputAmount > 0 && inputAmount <= holding.shares);
+            : orderMode === 'SHARES' && !controlLocked && Boolean(holding && inputAmount > 0 && inputAmount <= holding.shares);
         /* #196: our own shares keep their rules, inside this one box */
         const tradeOwn = (side: 'BUY' | 'SELL') => {
             const warning = side === 'SELL' ? ownSell?.warning : null;
@@ -426,6 +429,9 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                             <p className="mt-3 text-xs leading-relaxed text-zinc-400">
                                 {ownBuy?.blocked ? `Buy: ${ownBuy.blocked}. ` : ''}{ownSell?.blocked ? `Sell: ${ownSell.blocked}.` : ''}
                             </p>
+                        ) : null}
+                        {controlLocked && snapshot.holdingShares > 0 ? (
+                            <p className="mt-3 text-xs leading-relaxed text-zinc-400">You control {selectedStock.name}, so these shares are the company now. To get out, sell the studio from its page.</p>
                         ) : null}
                         {isOwn && controlFeedback ? <p className="mt-3 text-xs font-bold text-amber-200" role="status">{controlFeedback}</p> : null}
                     </div>

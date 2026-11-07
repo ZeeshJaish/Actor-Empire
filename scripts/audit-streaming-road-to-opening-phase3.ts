@@ -241,7 +241,6 @@ assert(!expansionDuplicate.changed && expansionDuplicate.reason === 'NO_MARKETS'
 
 const commandDeckSource = readFileSync('components/streaming-transplant/StreamingPlatformCommandDeck.tsx', 'utf8');
 const hqSource = readFileSync('components/StreamingPlatformHQ.tsx', 'utf8');
-const wizardSource = readFileSync('components/StreamingDefineLaunchWizard.tsx', 'utf8');
 assert(
     commandDeckSource.includes('state.launchProgram')
         && commandDeckSource.includes('launchCommandRows')
@@ -251,15 +250,5 @@ assert(
 );
 assert(hqSource.includes("openFinanceRoom('CAPITAL', 'INJECT')"), 'The Fund Company deep-link must open the existing Studio Finance injection flow.');
 assert(hqSource.includes('onOpenFinance={() => openFinanceRoom()}'), 'The headquarters treasury figure must open Studio Finance without forcing the capital-injection modal.');
-assert(hqSource.includes('onOpenLaunchTrack=') && hqSource.includes('StreamingDefineLaunchWizard'), 'Both campaign tracks must open their dedicated playable wizard.');
-assert(wizardSource.includes('BEGIN MARKET ENTRY') && wizardSource.includes('SAVE LAUNCH BLUEPRINT'), 'The Define wizard must connect free planning, paid entry and the version checkpoint.');
-assert(!wizardSource.includes("id: 'RIGHTS_LOCALIZATION'") && !wizardSource.includes('MISSION 07 · TERRITORY RIGHTS'), 'Rights and localization must not return as a separate Define the Launch mission.');
-assert(
-    wizardSource.includes('RULES, RIVALS & NETWORK')
-        && wizardSource.includes('WHO ALREADY OWNS ATTENTION')
-        && wizardSource.includes('REGION IMPACT')
-        && wizardSource.includes('YOUR OPENING FOOTPRINT'),
-    'Opening Markets must retain the complete country dossier and regional intelligence from the original Day-One Market experience.',
-);
 
 console.log('Streaming Road to Opening Night Phase 3 audit passed.');

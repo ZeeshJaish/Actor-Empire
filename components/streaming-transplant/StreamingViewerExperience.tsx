@@ -49,6 +49,8 @@ export interface AppTitle {
   genre: string;
   hue: number;
   logline: string;
+  /** #238: the title's one rating */
+  rating?: number | null;
   progress?: number;
   leavingInWeeks?: number;
   rank?: number;
@@ -334,7 +336,7 @@ export const ViewerApp: React.FC<{
                   <span className={css.otag}><i><Mark brand={brand} /></i>ORIGINAL</span>
                 )}
                 <b style={{ fontFamily: tf.stack }}>{hero.title}</b>
-                <span className={css.hmeta}>{hero.genre} · {hero.format}</span>
+                <span className={css.hmeta}>{hero.rating ? `★ ${hero.rating.toFixed(1)} · ` : ''}{hero.genre} · {hero.format}</span>
                 <QualityBadges badges={quality?.badges} />
                 <div className={css.hacts}>
                   <span className={css.pbtn} onClick={e => { e.stopPropagation(); play(hero); }}>
@@ -665,7 +667,7 @@ const TitlePage: React.FC<{
       <div className={css.tbody}>
         {t.kind === 'ORIGINAL' && <span className={css.otag}><i><Mark brand={brand} /></i>ORIGINAL</span>}
         <h1 style={{ fontFamily: tf.stack }}>{t.title}</h1>
-        <div className={css.tmeta2}>{t.genre} · {t.format}{t.episodes ? ` · ${t.episodes.length} episodes` : ''}</div>
+        <div className={css.tmeta2}>{t.rating ? `★ ${t.rating.toFixed(1)} · ` : ''}{t.genre} · {t.format}{t.episodes ? ` · ${t.episodes.length} episodes` : ''}</div>
         <QualityBadges badges={badges} />
         <p className={css.tlog}>{t.logline}</p>
 

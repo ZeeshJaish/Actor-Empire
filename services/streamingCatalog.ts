@@ -26,6 +26,7 @@ import { getStreamingMarketCycle, getStreamingMarketDiscovery, selectStreamingMa
 import { getHistoricalCatalogueTitles, resolveHistoricalCatalogueTitle } from './historicalCatalogue';
 import { normalizeStreamingDayOneMarketIds } from './streamingDayOneMarkets';
 import { resolveStreamingRightsCompatibility } from './streamingRightsCompatibility';
+import { isOutsideOriginal } from './outsideOriginals';
 
 export interface StreamingCatalogTitle {
     id: string;
@@ -147,11 +148,14 @@ const getOwnedStudioNames = (player: Player): Map<string, string> => new Map(
 const toOwnedTitle = (
     project: PastProject | Record<string, any>,
     studioNames: Map<string, string>,
+    worldStudios?: Player['world']['studios'],
 ): StreamingCatalogTitle | null => {
     const source = project as Record<string, any>;
     const id = String(source.id || '').trim();
     const studioId = String(source.studioId || source.projectDetails?.studioId || '').trim();
-    if (!id || !studioNames.has(studioId)) return null;
+    /* #288: an Original made outside is the platform's, whoever's name is on the studio */
+    const outside = isOutsideOriginal(source);
+    if (!id || (!studioNames.has(studioId) && !outside)) return null;
     return {
         id,
         title: String(source.name || source.title || source.projectDetails?.title || 'Untitled').trim(),
@@ -163,22 +167,27 @@ const toOwnedTitle = (
         budgetTier: ['LOW', 'MID', 'HIGH', 'BLOCKBUSTER'].includes(String(source.budgetTier || source.projectDetails?.budgetTier))
             ? (source.budgetTier || source.projectDetails?.budgetTier) as BudgetTier : undefined,
         studioId,
-        studioName: studioNames.get(studioId) || 'Owned studio',
+        studioName: studioNames.get(studioId) || (outside && (worldStudios as any)?.[studioId]?.name) || 'Owned studio',
         source: 'OWNED_LIBRARY',
     };
 };
 
 export const getEligibleOwnedStreamingTitles = (player: Player): StreamingCatalogTitle[] => {
     const studioNames = getOwnedStudioNames(player);
-    if (!studioNames.size) return [];
+    const inheritedOutside = getInheritedStudioProjects(player).filter(isOutsideOriginal);
+    if (!studioNames.size && !inheritedOutside.length && !(player.pastProjects || []).some(isOutsideOriginal)) return [];
     const inherited = Array.from(studioNames.keys()).flatMap(studioId => getInheritedStudioProjects(player, studioId));
     const candidates = [
         ...(player.pastProjects || []),
         ...inherited,
+        ...inheritedOutside,
+        /* #244: going on the player's own service, so on its shelves before it is archived */
+        ...(player.commitments || []).filter(item => item.projectDetails?.hiddenStats?.ownPlatformRelease),
+        ...(player.activeReleases || []).filter(item => item.projectDetails?.hiddenStats?.ownPlatformRelease),
     ];
     const byId = new Map<string, StreamingCatalogTitle>();
     candidates.forEach(project => {
-        const title = toOwnedTitle(project, studioNames);
+        const title = toOwnedTitle(project, studioNames, player.world?.studios);
         if (title) byId.set(title.id, title);
     });
     return Array.from(byId.values()).sort((a, b) => (
@@ -186,6 +195,22 @@ export const getEligibleOwnedStreamingTitles = (player: Player): StreamingCatalo
         || (b.rating || 0) - (a.rating || 0)
         || a.title.localeCompare(b.title)
     ));
+};
+
+/**
+ * #244: every title of the player's that has opened, for Bring it across: one still running on an outside platform shows there too, saying who
+ * holds it and until when. A film in cinemas waits for them to close.
+ */
+export const getReleasedOwnedStreamingTitles = (player: Player): StreamingCatalogTitle[] => {
+    const studioNames = getOwnedStudioNames(player);
+    const titles = getEligibleOwnedStreamingTitles(player);
+    if (!studioNames.size) return titles;
+    const known = new Set(titles.map(title => title.id));
+    const running = (player.activeReleases || []).filter(item => item.distributionPhase !== 'THEATRICAL' && !known.has(item.id)).flatMap(item => {
+        const title = toOwnedTitle(item, studioNames);
+        return title ? [title] : [];
+    });
+    return [...titles, ...running];
 };
 
 const toWorldLicenseTitle = (
@@ -210,7 +235,7 @@ const toCareerLicenseTitle = (
     ownedStudioNames: Map<string, string>,
 ): StreamingCatalogTitle | null => {
     const studioId = String(project.studioId || '');
-    if (!project.id || ownedStudioNames.has(studioId)) return null;
+    if (!project.id || ownedStudioNames.has(studioId) || isOutsideOriginal(project)) return null;
     return {
         id: String(project.id),
         title: project.name,

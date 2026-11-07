@@ -5,6 +5,7 @@ import { Skull, ArrowRight, RefreshCw, Trophy, DollarSign, Film, Crown, Users, Q
 import { calculateDynastyScore, calculateLegacyScore, getLegacyArchetype, getLegacyObituary, getLegacyTributes, getRelationshipAge } from '../services/legacyLogic';
 import { getHealthConditionLabel, getHealthConditionSummary } from '../services/healthConditions';
 import { getPlayerLanguage } from '../services/i18n';
+import { getCareerProjects } from '../services/outsideOriginals';
 
 interface DeathScreenProps {
     player: Player;
@@ -38,7 +39,7 @@ export const DeathScreen: React.FC<DeathScreenProps> = ({
     const [run, setRun] = useState<'HEIR' | 'SUCCESSOR'>('HEIR');
     const estateNow = getStreamingEstate(player, { estate: payment });
     const totalAwards = player.awards?.length || 0;
-    const totalProjects = player.pastProjects.length;
+    const totalProjects = getCareerProjects(player).length;
     const businessCount = player.businesses?.length || 0;
     const dynastyScore = calculateDynastyScore(player);
     const currentLegacyScore = calculateLegacyScore({

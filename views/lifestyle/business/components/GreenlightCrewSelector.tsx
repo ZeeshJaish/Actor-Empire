@@ -20,6 +20,8 @@ export interface GreenlightCrewSelectorProps {
     returningTalent?: any[];
     onNegotiate?: (talentId: string, returningData: any) => void;
     formatMoney: (value: number) => string;
+    /** #284: an outside studio hires from the market: no Direct Self, no in-house staff of yours */
+    outsideStudio?: boolean;
 }
 
 const normalizeCrewReturningRole = (role?: string) => {
@@ -45,6 +47,7 @@ export const GreenlightCrewSelector: React.FC<GreenlightCrewSelectorProps> = ({
     returningTalent,
     onNegotiate,
     formatMoney,
+    outsideStudio,
 }) => {
     const canonicalRole = normalizeCrewReturningRole(role);
     const directorConnections = role === 'DIRECTOR'
@@ -64,7 +67,7 @@ export const GreenlightCrewSelector: React.FC<GreenlightCrewSelectorProps> = ({
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 animate-in slide-in-from-bottom-2 duration-500">
             <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">{icon} {title}</h3>
 
-            <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className={`${outsideStudio ? 'hidden' : 'grid'} grid-cols-3 gap-2 mb-4`}>
                 <button
                     type="button"
                     onClick={() => onModeChange('HIRE')}

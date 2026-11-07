@@ -32,19 +32,37 @@ export const getCanonicalProfileAvatar = (
     return getGenderedAvatar(gender || 'NON_BINARY', legacySeed || nameSeed || 'Profile');
 };
 
-export const replaceLegacyPixelAvatarUrls = <T,>(value: T): T => {
-    if (isLegacyPixelAvatar(value)) {
-        return getCanonicalProfileAvatar(value, 'NON_BINARY', legacySeedFromUrl(value)) as T;
-    }
-    if (Array.isArray(value)) {
-        return value.map(item => replaceLegacyPixelAvatarUrls(item)) as T;
-    }
-    if (!value || typeof value !== 'object') return value;
+/* #256: the save's big slices, walked once and found clean. An update from a screen keeps them, so the walk visits only what changed. Nothing writes these URLs any more. */
+const KNOWN_CLEAN_DEPTH = 3;
+const knownClean = new WeakSet<object>();
 
-    return Object.fromEntries(
-        Object.entries(value).map(([key, nested]) => [key, replaceLegacyPixelAvatarUrls(nested)]),
-    ) as T;
+const walkLegacyAvatars = (value: unknown, depth: number): unknown => {
+    if (isLegacyPixelAvatar(value)) return getCanonicalProfileAvatar(value, 'NON_BINARY', legacySeedFromUrl(value));
+    if (!value || typeof value !== 'object') return value;
+    if (depth <= KNOWN_CLEAN_DEPTH && knownClean.has(value)) return value;
+    let next: unknown = value;
+    if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index += 1) {
+            const item = walkLegacyAvatars(value[index], depth + 1);
+            if (item === value[index]) continue;
+            if (next === value) next = value.slice();
+            (next as unknown[])[index] = item;
+        }
+    } else {
+        for (const key of Object.keys(value)) {
+            const nested = (value as Record<string, unknown>)[key];
+            const item = walkLegacyAvatars(nested, depth + 1);
+            if (item === nested) continue;
+            if (next === value) next = { ...value };
+            (next as Record<string, unknown>)[key] = item;
+        }
+    }
+    if (depth <= KNOWN_CLEAN_DEPTH) knownClean.add(next as object);
+    return next;
 };
+
+/** A clean object comes back as itself. */
+export const replaceLegacyPixelAvatarUrls = <T,>(value: T): T => walkLegacyAvatars(value, 0) as T;
 
 /** One migration boundary for existing saves and imported careers. */
 export const normalizePlayerProfileAvatars = (player: Player): Player => {

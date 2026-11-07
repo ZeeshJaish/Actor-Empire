@@ -466,7 +466,7 @@ const createArcPulseMedia = (
     const nextPlayer: Player = {
         ...player,
         news: [newsItem, ...(player.news || [])].slice(0, 80),
-        logs: [logEntry, ...(player.logs || [])].slice(0, 50),
+        logs: [...(player.logs || []), logEntry],
     };
     if (nextPlayer.x?.feed) {
         const post: XPost = {
@@ -614,7 +614,7 @@ export const processSubsidiaryDecisionEngine = (player: Player): Player => {
             player: {
                 ...nextPlayer,
                 inbox: [message, ...(nextPlayer.inbox || [])].slice(0, 120),
-                logs: [logEntry, ...(nextPlayer.logs || [])].slice(0, 50),
+                logs: [...(nextPlayer.logs || []), logEntry],
             },
             studio: updatedStudio,
             decision,
@@ -875,7 +875,7 @@ export const resolveSubsidiaryDecision = ({
             : t(language, 'services.subsidiaryDecisions.resolve.log.declined', { studio: updatedStudio.name, title: decision.title }),
         type: optionId === 'APPROVE' ? 'positive' : 'neutral',
     };
-    nextPlayer.logs = [logEntry, ...(nextPlayer.logs || [])].slice(0, 50);
+    nextPlayer.logs = [...(nextPlayer.logs || []), logEntry];
     const finalDecision = updatedStudio.studioState?.subsidiaryDecisions?.find(candidate => candidate.id === decision.id);
     return {
         success: true,

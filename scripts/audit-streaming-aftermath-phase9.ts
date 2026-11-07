@@ -132,7 +132,6 @@ assert(degraded.outcomeLabel === 'Degraded opening', 'A degraded launch needs a 
 assert(degraded.reactions.find(reaction => reaction.id === 'OPERATIONS')?.tone === 'CRITICAL', 'Severe playback and headroom pressure must surface as an operations warning.');
 
 const viewerSource = readFileSync(resolve(process.cwd(), 'components/StreamingViewerMode.tsx'), 'utf8');
-const aftermathSource = readFileSync(resolve(process.cwd(), 'components/StreamingLaunchAftermathPanel.tsx'), 'utf8');
 const hqSource = readFileSync(resolve(process.cwd(), 'components/StreamingPlatformHQ.tsx'), 'utf8');
 const viewerStyle = readFileSync(resolve(process.cwd(), 'styles/streaming-viewer-mode.css'), 'utf8');
 const hqStyle = readFileSync(resolve(process.cwd(), 'styles/streaming-hq.css'), 'utf8');
@@ -148,12 +147,6 @@ const hqStyle = readFileSync(resolve(process.cwd(), 'styles/streaming-hq.css'), 
     'Opening facts stay visible; unprocessed weekly metrics are never shown as zero.',
 ].forEach(fragment => assert(viewerSource.includes(fragment), `Live Viewer Home should include ${fragment}.`));
 assert(!viewerSource.includes('Continue Watching'), 'The customer home must not invent viewing history.');
-[
-    'PHASE 9 • LAUNCH AFTERMATH',
-    'REACTION ROOM',
-    'REPORT QUEUE',
-    'Open live Viewer Home',
-].forEach(fragment => assert(aftermathSource.includes(fragment), `HQ aftermath should include ${fragment}.`));
 /* #176: the aftermath panel lived in the weekly brief, which left the game */
 assert(!hqSource.includes('<StreamingLaunchAftermathPanel'), 'Platform HQ no longer mounts the Phase 9 aftermath (#176).');
 assert(viewerStyle.includes('.stream-viewer-opening-story'), 'Viewer Home needs a live opening-week visual treatment.');

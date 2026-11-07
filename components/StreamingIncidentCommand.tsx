@@ -1,3 +1,4 @@
+import { gameWeekText } from '../services/gameWeek';
 import { useMemo, useState } from 'react';
 import {
     Activity,
@@ -183,7 +184,7 @@ export default function StreamingIncidentCommand({
                     <>
                         <p>{activeCrisis.detail}</p>
                         <dl className="sic-incident-facts">
-                            <div><dt>Detected</dt><dd>Game week {activeCrisis.detectedAtAbsoluteWeek}</dd></div>
+                            <div><dt>Detected</dt><dd>Game {gameWeekText(activeCrisis.detectedAtAbsoluteWeek)}</dd></div>
                             <div><dt>Affected audience</dt><dd>{activeCrisis.affectedSubscribers.toLocaleString()}</dd></div>
                             <div><dt>Revenue at risk</dt><dd>{formatMoney(activeCrisis.estimatedRevenueAtRisk)}</dd></div>
                             <div><dt>Verified cause</dt><dd>{activeCrisis.cause}</dd></div>
@@ -266,7 +267,7 @@ export default function StreamingIncidentCommand({
                 <section className="sic-recovery-card">
                     <Gauge size={29} />
                     <span>RECOVERY IN PROGRESS</span>
-                    <h2>Verification is scheduled for game week {activeCrisis.recoveryReadyAtAbsoluteWeek}.</h2>
+                    <h2>Verification is scheduled for game {gameWeekText(activeCrisis.recoveryReadyAtAbsoluteWeek)}.</h2>
                     <p>{activeCrisis.outcomeNote}</p>
                     <dl>
                         <div><dt>Doctrine</dt><dd>{titleCase(activeCrisis.responseDoctrine || '')}</dd></div>
@@ -527,7 +528,7 @@ export default function StreamingIncidentCommand({
                 kind: 'DELAYED EVIDENCE',
                 title: `${titleCase(item.type)} • ${item.targetPlatformName}`,
                 detail: item.status === 'EVIDENCE_PENDING'
-                    ? `Attribution resolves in game week ${item.evidenceDueAtAbsoluteWeek}.`
+                    ? `Attribution resolves in game ${gameWeekText(item.evidenceDueAtAbsoluteWeek)}.`
                     : item.exposureConsequence || item.outcomeNote,
                 tone: item.status === 'EXPOSED' ? 'risk' : item.status === 'CLEARED' ? 'clear' : 'pending',
             })),

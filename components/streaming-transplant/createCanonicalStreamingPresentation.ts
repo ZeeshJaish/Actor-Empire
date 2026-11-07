@@ -1,7 +1,9 @@
+import { getTitleRating } from "../../services/titleRating";
 import type { StreamingIdentPreviewId } from '../../services/streamingIdentAudio';
 import type { CustomPoster, Player } from '../../types';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStreamingPlatform';
+import { getStreamingTitleEarlyWeekViews } from '../../services/streamingEarlyAccess';
 import { getStreamingPlayableCatalogProjectIds, getStreamingContentAvailability, CONTENT_AVAILABILITY_LABELS,
   getStreamingCatalogueReadContext, resolveStreamingCatalogueReadTitle, type StreamingCatalogueReadContext } from '../../services/streamingContentAvailability';
 import { getOwnedPlatformPackageCountryIds } from '../../services/streamingContentAvailability';
@@ -19,7 +21,7 @@ import type { AppState } from './StreamingViewerExperience';
 import { readNetworkSignals } from '../../services/streamingNetworkSignals';
 import { normalizeStreamingRightsCalendarState } from '../../services/streamingRightsCalendar';
 import { getOwnedStreamingProgramEntries } from '../../services/streamingOriginals';
-import { planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
+import { originalOnTheShelf, planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
 import { getStreamingViewerPersonal, getStreamingViewerPlans, getStreamingViewerQuality, streamingNetworkPictureTier } from '../../services/streamingViewerQuality';
 import { getStreamingViewerOutage } from '../../services/streamingViewerOutage';
 import {
@@ -86,11 +88,14 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
     const status = (availability.status === 'READY' && programmed ? (premiered ? 'LIVE' : 'SCHEDULED')
       : CONTENT_AVAILABILITY_LABELS[availability.status].toUpperCase()) as ContentDeskState['titles'][number]['status'];
     /* on the shelves, not on the service: the slate can give it a premiere week */
-    const schedulable = live && launchedAt !== null && availability.source !== 'ORIGINAL' && availability.status === 'READY' && !programmed;
+    /* #291: a delivered Original too */
+    const schedulable = live && launchedAt !== null && availability.status === 'READY' && !programmed;
     /* A permanent window or purchase is stored with an expiry of about 9e15
        weeks; it is a licence kept for good, not one ending in 9e15 weeks. */
     const perpetual = Boolean(license && (license.windowType === 'PERMANENT' || license.expiresAtAbsoluteWeek - absoluteWeek > 100_000));
     const renewal = renewalByProject.get(projectId);
+    /* #293: an Original ordered on licence */
+    const licensedOriginal = platform.originalCommissions.find(item => item.canonicalProjectId === projectId && item.licenceEndsAtAbsoluteWeek);
     /* completion is a 0–1 rate in the weekly loop (rounding it as a percent
        printed 1% for every title) */
     const completionRate = performance?.completionRate ?? 0;
@@ -101,8 +106,8 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       format: title.projectType === 'SERIES' ? 'Series' : 'Film',
       genre: title.genre,
       status,
-      rating: title.rating ?? (performance ? clamp(performance.satisfactionScore / 10, 0, 10) : undefined),
-      views: performance?.viewingAccounts,
+      rating: title.rating ?? getTitleRating(player, projectId) ?? undefined,
+      views: performance?.viewingAccounts ?? (availability.status === 'EARLY_ACCESS' ? getStreamingTitleEarlyWeekViews(player, projectId) : undefined),
       completion: performance ? clamp(Math.round(completionRate <= 1 ? completionRate * 100 : completionRate), 0, 100) : undefined,
       hue: hueOf(projectId),
       year: title.releaseYear,
@@ -112,8 +117,15 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
          window included — it leaves when it ends). Kept: no licence end at
          all. Lapsed: a licensed title with no active licence — it was listed
          under "Owned outright" before. */
-      rightsState: perpetual ? 'KEPT' as const : license ? 'WINDOW' as const : availability.source === 'LICENSED' ? 'LAPSED' as const : 'KEPT' as const,
-      rights: license ? {
+      rightsState: licensedOriginal ? 'WINDOW' as const : perpetual ? 'KEPT' as const : license ? 'WINDOW' as const : availability.source === 'LICENSED' ? 'LAPSED' as const : 'KEPT' as const,
+      rights: licensedOriginal ? {
+        licensor: licensedOriginal.producerStudioName,
+        territory: 'GLOBAL',
+        endsInWeeks: Math.max(0, licensedOriginal.licenceEndsAtAbsoluteWeek! - absoluteWeek),
+        windowWeeks: 156,
+        exclusive: true,
+        perpetual: false,
+      } : license ? {
         licensor: license.licensorName,
         territory: license.territory.replaceAll('_', ' '),
         endsInWeeks: perpetual ? undefined : Math.max(0, license.expiresAtAbsoluteWeek - absoluteWeek),
@@ -167,7 +179,7 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       genre: resolveStreamingCatalogueReadTitle(context, entry.projectId)?.genre,
       rightsRisk: riskOf(entry.projectId, launchedAt === null ? null : at), at,
       format: formatOf(entry.projectId, entry.projectType),
-      /* a premiere still ahead that the slate set can be moved or taken off (Originals premiere through their release) */
+      /* a premiere still ahead that the slate set can be moved or taken off */
       editable: launchedAt !== null && live && entry.source !== 'ORIGINAL' && at > absoluteWeek,
       ...(entry.source === 'LICENSED_WINDOW' ? windowOf(entry.projectId) : {}),
     };
@@ -178,10 +190,13 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       const premiere = commission.releasePlan?.premiereAtAbsoluteWeek;
       const projectId = commission.canonicalProjectId || commission.id;
       if (!premiere || scheduled.has(projectId)) return;
+      /* #291: its week and its rhythm are the player's until it premieres */
+      const ahead = live && premiere > absoluteWeek && Boolean(originalOnTheShelf(player, projectId));
       items.push({
         id: `original-${commission.id}`, projectId, title: commission.title, kind: 'ORIGINAL',
         marketing: commission.releasePlan!.marketingPlan, hue: hueOf(projectId), poster: posterById.get(projectId),
         genre: commission.genre, rightsRisk: false, at: premiere, format: formatOf(projectId, commission.projectType),
+        ...(ahead ? { editable: true, ...(commission.projectType === 'SERIES' ? { rhythm: commission.releasePlan!.releasePattern === 'WEEKLY' ? 'WEEKLY' as const : 'ALL' as const } : {}) } : {}),
       });
       scheduled.add(projectId);
     });
@@ -537,6 +552,7 @@ export const createCanonicalViewerState = (player: Player, preparedContext?: Str
       kind: original ? 'ORIGINAL' as const : title.source === 'OWNED_LIBRARY' ? 'OWNED' as const : 'LICENSED' as const,
       format: title.projectType === 'SERIES' ? 'Series' : 'Film',
       genre: title.genre,
+      rating: title.rating ?? getTitleRating(player, projectId),
       hue: hueOf(projectId),
       logline: `${title.genre} ${title.projectType === 'SERIES' ? 'series' : 'film'} from ${title.studioName}.`,
       /* completionRate is a 0–1 share and the card draws progress × 100%: rounding it drew

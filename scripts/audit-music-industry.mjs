@@ -81,10 +81,10 @@ assert(greenlight.includes('getMusicArtistCatalog(player.world)'), 'Greenlight a
 assert(greenlight.includes('<GreenlightSoundtrackSection'), 'Greenlight setup renders the extracted soundtrack desk');
 assert(greenlightModules.includes('Soundtrack Desk'), 'Greenlight setup exposes soundtrack desk controls');
 assert(greenlightModules.includes('Content Types') && greenlightModules.includes('Let Studio Decide'), 'Greenlight soundtrack desk exposes direct music content choices');
-assert(greenlightModules.includes('Toggle on to add artist') && greenlightModules.includes('Search artist for'), 'Greenlight content rows clearly connect toggles to inline artist assignment');
+assert(greenlightModules.includes('Not producing this') && greenlightModules.includes('Search artist for'), 'Greenlight content rows clearly connect Add to inline artist assignment');
 assert(greenlightModules.includes('musicRoleSearchQueries') && greenlightModules.includes('assignMusicArtistToRole'), 'Greenlight soundtrack desk assigns artists per music content type');
 assert(greenlightModules.includes('All music content is off'), 'Greenlight soundtrack desk supports turning every music content type off');
-assert(greenlightModules.includes('overflow-x-auto') && greenlightModules.includes('Rating'), 'Greenlight artist picker uses a horizontal rated artist rail');
+assert(greenlightModules.includes('searchMatches.slice(0, 6)') && greenlightModules.includes('/100'), 'Greenlight artist picker lists rated artists with faces');
 assert(greenlightModules.includes('musicRoleSortOptions') && greenlightModules.includes('MUSIC_ARTIST_SORT_OPTIONS'), 'Greenlight artist rails expose per-row sorting');
 assert(greenlightUtils.includes("'COST_LOW'") && greenlightUtils.includes("'FOLLOWERS'") && greenlightUtils.includes("'AVAILABILITY'"), 'Greenlight artist sorting includes cost, reach, and availability options');
 assert(greenlight.includes('selectedMusicCreditRoles'), 'Greenlight persists selected music deliverables in drafts');

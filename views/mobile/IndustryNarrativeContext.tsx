@@ -1,3 +1,4 @@
+import { gameWeekShort } from '../../services/gameWeek';
 import React from 'react';
 import type { IndustryMediaNarrativeTheme, Player } from '../../types';
 import { describeIndustryMediaRelationship, getIndustryNarrativeContext } from '../../services/industryWorld';
@@ -51,7 +52,7 @@ export const IndustryNarrativeContext: React.FC<{
                         <div className="mt-3 border-l border-zinc-800 pl-3">
                             {narrative.landmarks.slice(-3).map(landmark => (
                                 <div key={landmark.id} className="py-1 text-[11px] leading-4 text-zinc-500">
-                                    <span className="mr-2 font-mono text-zinc-700">W{landmark.absoluteWeek}</span>{landmark.summary}
+                                    <span className="mr-2 font-mono text-zinc-700">{gameWeekShort(landmark.absoluteWeek)}</span>{landmark.summary}
                                 </div>
                             ))}
                         </div>

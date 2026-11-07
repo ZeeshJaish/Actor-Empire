@@ -195,7 +195,7 @@ const blockedAcquisition = signStreamingRightsDeal(blockedAcquisitionPlayer, acq
 assert(!blockedAcquisition.changed, 'A player platform cannot acquire a global scope already granted in India.');
 assert(blockedAcquisition.reason === 'RIGHTS_UNAVAILABLE', 'Compatibility failure should have a rights-specific reason.');
 assert(
-    blockedAcquisition.detail === `India is exclusively licensed to Hotstar until Week ${hotstarIndiaContract.expiresAtAbsoluteWeek}.`,
+    /^India is exclusively licensed to Hotstar until Week \d+( next year| in \d+ years)?\.$/.test(blockedAcquisition.detail || ''),
     'The player should receive a short factual controlling-contract explanation.',
 );
 assert(blockedAcquisition.player.ownedStreamingPlatform.treasuryCash === blockedTreasury, 'A rejected rights deal must not debit treasury.');

@@ -1,3 +1,4 @@
+import { gameWeekText } from '../../services/gameWeek';
 import React from 'react';
 import type { IndustryMediaClaim, IndustryMediaSourceRecord, Player } from '../../types';
 
@@ -77,7 +78,7 @@ export const IndustryClaimResolutionStrip: React.FC<{ claim: IndustryMediaClaim 
     <div className={`border-l-2 px-3 py-2.5 ${statusTone[claim.status]}`} data-claim-resolution={claim.status}>
       <div className="text-[9px] font-black uppercase tracking-[0.18em]">What happened next · {statusLabel[claim.status]}</div>
       <p className="mt-1 text-xs leading-relaxed text-zinc-200">{claim.resolution.explanation}</p>
-      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-500">Resolved in week {claim.resolution.absoluteWeek}</div>
+      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-500">Resolved in {gameWeekText(claim.resolution.absoluteWeek)}</div>
     </div>
   );
 };

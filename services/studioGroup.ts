@@ -680,7 +680,7 @@ export const performStudioTreasuryTransfer = ({
             ...player.finance,
             history: retainBankTransactionHistory(financeHistory),
         } : player.finance,
-        logs: [logEntry, ...(player.logs || [])].slice(0, 50),
+        logs: [...(player.logs || []), logEntry],
     };
 
     return {
@@ -882,7 +882,7 @@ export const executeFullStudioMerger = ({
             ])),
         },
         news: [newsItem, ...(player.news || [])].slice(0, 80),
-        logs: [logEntry, ...(player.logs || [])].slice(0, 50),
+        logs: [...(player.logs || []), logEntry],
     };
 
     return {
@@ -1046,12 +1046,12 @@ export const reverseFullStudioMerger = ({
                 return business;
             }),
             news: [newsItem, ...(player.news || [])].slice(0, 80),
-            logs: [{
+            logs: [...(player.logs || []), {
                 week: player.currentWeek,
                 year: player.age,
                 message: `${studio.name} was restored as a controlled subsidiary. HQ paid ${terms.totalCost.toLocaleString()} for the carve-out.`,
                 type: 'neutral' as const,
-            }, ...(player.logs || [])].slice(0, 50),
+            }],
         },
     };
 };

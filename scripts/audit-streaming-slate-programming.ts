@@ -160,7 +160,8 @@ async function main() {
     /* Refusals. */
     const original = getStreamingSlateCandidates(shelf).find(candidate => candidate.source === 'ORIGINAL')!;
     const live = getOwnedStreamingProgramEntries(shelf).find(entry => entry.source !== 'ORIGINAL' && launchAt + entry.launchWeek - 1 <= now)!;
-    refused('an Original', scheduleStreamingSlateTitle(shelf, { projectId: original.projectId, absoluteWeek: now + 2, marketingPlan: 'EVENT' }), 'ORIGINAL_USES_RELEASE', shelf);
+    /* #291: an Original takes its week on the Slate once it is delivered. One that has opened cannot be moved */
+    refused('an Original that has opened', scheduleStreamingSlateTitle(shelf, { projectId: original.projectId, absoluteWeek: now + 2, marketingPlan: 'EVENT' }), 'ALREADY_PREMIERED', shelf);
     refused('this week', scheduleStreamingSlateTitle(shelf, { projectId: title.projectId, absoluteWeek: now, marketingPlan: 'STANDARD' }), 'WEEK_OUT_OF_RANGE', shelf);
     refused('past the horizon', scheduleStreamingSlateTitle(shelf, { projectId: title.projectId, absoluteWeek: now + STREAMING_SLATE_HORIZON_WEEKS + 1, marketingPlan: 'STANDARD' }), 'WEEK_OUT_OF_RANGE', shelf);
     refused('a title already live', scheduleStreamingSlateTitle(shelf, { projectId: live.projectId, absoluteWeek: now + 2, marketingPlan: 'STANDARD' }), 'ALREADY_PREMIERED', shelf);

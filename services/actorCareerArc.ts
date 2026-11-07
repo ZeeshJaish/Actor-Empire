@@ -1,6 +1,7 @@
 import { hasCareerLegendStanding, getCareerReportedOutcome } from './actorCareerBalance';
 import { PastProject, Player } from '../types';
 import { getRoleIdentityArcCandidate } from './actorRoleIdentity';
+import { getCareerProjects } from './outsideOriginals';
 
 export type ActorCareerArcId =
     | 'NEWCOMER'
@@ -206,7 +207,7 @@ export const getActorCareerArc = (player: Player): ActorCareerArc => {
     const fame = Number(player.stats?.fame || 0);
     const reputation = Number(player.stats?.reputation || 0);
     const experience = Number(player.stats?.experience || 0);
-    const projects = [...(player.pastProjects || [])]
+    const projects = getCareerProjects(player)
         .filter(project => !project.isQaArchive)
         .sort((a, b) => getProjectSortWeek(b) - getProjectSortWeek(a));
     const recentProjects = projects.slice(0, 5);

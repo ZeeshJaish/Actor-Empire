@@ -41,12 +41,12 @@ const createRenameSignal = (player: Player, oldTitle: string, newTitle: string):
     return {
         ...player,
         news: [newsItem, ...(player.news || [])].slice(0, 80),
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: `🎬 Working title renamed from "${oldTitle}" to "${newTitle}".`,
             type: 'neutral' as const
-        }, ...(player.logs || [])].slice(0, 50)
+        }]
     };
 };
 

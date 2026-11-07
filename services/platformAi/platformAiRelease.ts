@@ -1,3 +1,4 @@
+import { ratingFromQuality } from '../titleRating';
 import type {
     BudgetTier,
     IndustryProductionCommitment,
@@ -165,11 +166,15 @@ const scheduledTitleCountAt = (
     platform: PlatformState,
     absoluteWeek: number,
     excludePlanId: string,
+    world?: WorldState,
 ): number => platform.ai!.slate
     .filter(plan => plan.id !== excludePlanId)
     .flatMap(plan => plan.releaseEntries || [])
     .filter(entry => entry.premiereAtAbsoluteWeek === absoluteWeek)
-    .length;
+    .length
+    /* #242: a title bought from a studio takes a place on the slate too */
+    + Object.values(world?.streamingRightsContracts || {})
+        .filter(contract => contract.status === 'ACTIVE' && contract.buyer?.platformId === platform.id && contract.startsAtAbsoluteWeek === absoluteWeek).length;
 
 const productionForPlan = (
     world: WorldState,
@@ -321,7 +326,7 @@ export const schedulePlatformStreamingWindow = (
     }
 
     const existingAtPremiere = input.scheduledTitleCountAtPremiere
-        ?? scheduledTitleCountAt(platform, input.premiereAtAbsoluteWeek, plan.id);
+        ?? scheduledTitleCountAt(platform, input.premiereAtAbsoluteWeek, plan.id, input.world);
     if (existingAtPremiere + sourceProjectIds.length > releaseCapacityFor(input.platformId)) {
         return unchanged(input.world, plan, 'RELEASE_CAPACITY_EXCEEDED');
     }
@@ -618,6 +623,8 @@ const createOriginalProject = (
     plan: PlatformAiContentPlan,
     production: IndustryProductionCommitment,
     absoluteWeek: number,
+    /* #238: a title the player delivered keeps the rating it has in their filmography */
+    deliveredRating?: number | null,
 ): IndustryProject => {
     const quality = clamp(round(production.aiExecution?.finalQuality ?? production.aiExecution?.qualityForecast ?? plan.forecast.creative), 1, 100);
     const { year, week } = releaseYearWeek(absoluteWeek);
@@ -630,7 +637,7 @@ const createOriginalProject = (
         studioId: production.producerStudioId,
         budgetTier: budgetTierFor(production.budgetMillions),
         quality,
-        rating: round(clamp(4.5 + quality * 0.055, 1, 10), 10),
+        rating: deliveredRating && deliveredRating > 0 ? deliveredRating : ratingFromQuality(quality),
         boxOffice: 0,
         year,
         weekReleased: week,
@@ -758,7 +765,8 @@ export const releasePlatformContentPlan = (
         return unchanged(input.world, plan, 'SOURCE_IDENTITY_CONFLICT');
     }
     if (production && !projectsById.has(production.canonicalProjectId)) {
-        projectsById.set(production.canonicalProjectId, createOriginalProject(plan, production, input.absoluteWeek));
+        const delivered = Object.values(input.world.platformAiPlayerCommissionOffers || {}).find(offer => offer.platformContentPlanId === plan.id);
+        projectsById.set(production.canonicalProjectId, createOriginalProject(plan, production, input.absoluteWeek, delivered?.deliveredImdbRating));
     }
     if (plan.releaseEntries.some(entry => !projectsById.has(entry.canonicalProjectId))) {
         return unchanged(input.world, plan, 'SOURCE_NOT_FOUND');

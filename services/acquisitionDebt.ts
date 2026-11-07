@@ -383,14 +383,14 @@ export const processAcquisitionDebtService = (player: Player): AcquisitionDebtSe
 
     nextPlayer = {
         ...nextPlayer,
-        logs: [{
+        logs: [...(nextPlayer.logs || []), {
             week: nextPlayer.currentWeek,
             year: nextPlayer.age,
             message: unpaidAmount > 0
                 ? t(language, 'services.acquisitionDebt.log.missed', { amount: unpaidAmount.toLocaleString() })
                 : t(language, 'services.acquisitionDebt.log.serviced', { amount: servicedAmount.toLocaleString() }),
             type: unpaidAmount > 0 ? 'negative' as const : 'neutral' as const,
-        }, ...(nextPlayer.logs || [])].slice(0, 80),
+        }],
     };
 
     return {
@@ -455,12 +455,12 @@ export const payDownAcquisitionDebt = (player: Player, amount: number, studioId?
     nextPlayer = addTransaction(nextPlayer, -paidAmount, t(language, 'services.acquisitionDebt.transaction.paydown'), 'FINANCING');
     nextPlayer = {
         ...nextPlayer,
-        logs: [{
+        logs: [...(nextPlayer.logs || []), {
             week: nextPlayer.currentWeek,
             year: nextPlayer.age,
             message: t(language, 'services.acquisitionDebt.log.paidDown', { amount: paidAmount.toLocaleString() }),
             type: 'positive' as const,
-        }, ...(nextPlayer.logs || [])].slice(0, 80),
+        }],
     };
 
     return {

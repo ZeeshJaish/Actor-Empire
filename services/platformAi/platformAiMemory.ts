@@ -1,3 +1,4 @@
+import { gameWeekText } from '../gameWeek';
 import type {
     Genre,
     IndustryProductionCommitment,
@@ -456,7 +457,7 @@ export const getPlatformAiPresentationEvents = (
         summary: decision.summary,
         reason: decision.reason,
         cashImpactMillions: decision.cashImpactMillions,
-        timing: `Absolute week ${decision.absoluteWeek}`,
+        timing: `Absolute ${gameWeekText(decision.absoluteWeek)}`,
         playerConsequence: consequenceFor(decision),
     }))
     .slice(-20);

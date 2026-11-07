@@ -1,5 +1,7 @@
+import { gameWeekLabel, gameWeekText } from '../services/gameWeek';
 import { getStreamingRightsContract } from '../services/streamingRightsCore';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StreamingShelfNotice, type StreamingShelfNoticeModel } from './StreamingShelfNotice';
 import { validCollectionSnapshot } from '../services/streamingCollectionPrivateOffers';
 import { advanceStreamingPresentationCursor } from '../services/streamingPresentationInputs';
 import { sameStreamingContentMarketDraft } from '../services/streamingContentMarketDraft';
@@ -50,6 +52,8 @@ export function persistContentMarketDraft(player: Player, draft: Draft, onUpdate
 interface Props {
     player: Player; brand: Brand; onUpdatePlayer: (player: Player) => void; onClose: () => void;
     onOpenFinance: () => void; onCommission: () => void; onReview: () => void;
+    /** #252: Content, on the Slate */
+    onOpenSlate?: () => void;
     returnToLaunch?: boolean;
     /** Opens straight onto a shelf, so "Bring from my studio" lands on the studio
         vault rather than the general listings. */
@@ -170,7 +174,7 @@ function ContentMarketGate({ player, funds, listingPrices, owned, liveRooms, bra
     </AccessibleDialog>;
 }
 
-export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, initialTab, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
+export default function StreamingContentMarket({ player, brand, onUpdatePlayer, onClose, onOpenFinance, onCommission, onReview, returnToLaunch, onOpenSlate, initialTab, onResumeLegacy, onExistingNegotiations, initialOfferId, initialAuctionId }: Props) {
     const projectionSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
     projectionSourceRef.current = advanceStreamingPresentationCursor(projectionSourceRef.current, player);
     const readPlayer: Player = projectionSourceRef.current.source;
@@ -184,6 +188,11 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         ? { ...(platform.contentMarketDraft || { search: '', ownedIds: [] }), tab: initialTab, selectedId: null }
         : platform.contentMarketDraft || { tab: 'ALL', search: '', selectedId: null, ownedIds: platform.catalogSetupDraft?.selectedOwnedProjectIds || [] });
     const [feedback, setFeedback] = useState('');
+    /* #252: a studio title on a live service is only on the shelf now */
+    const serviceLive = platform.lifecycle === 'ACTIVE';
+    const [shelfNotice, setShelfNotice] = useState<StreamingShelfNoticeModel | null>(null);
+    const shelfNoticeView = shelfNotice && <StreamingShelfNotice {...shelfNotice} service={platform.identity?.name || 'your service'} color={platform.identity?.primaryColor}
+        onClose={() => setShelfNotice(null)} onSchedule={onOpenSlate ? () => { setShelfNotice(null); leave(onOpenSlate); } : undefined} />;
     const draftTimer = useRef<number | null>(null);
     const scoutLock = useRef(false);
     const [busy, setBusy] = useState(false);
@@ -524,6 +533,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             onBack={() => leave(onClose)}
             onCommission={() => leave(onCommission)}
             onAcquired={acquireExactLot}
+            onBroughtAcross={serviceLive ? lot => setShelfNotice({ what: lot.title }) : undefined}
             onPrepareOffer={lot => prepareExactContentMarketOffer(player, lot)}
             onOfferSent={sendExactOffer}
             onEnterRoom={openExactRoom}
@@ -534,6 +544,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 patch({ tab: 'OFFERS', selectedId: null });
             }}
         />
+        {shelfNoticeView}
     </AccessibleDialog>;
     if (activeAuctionSession) return <AccessibleDialog className="cm-market-exact-shell" data-epx-root style={brandVars(brand)} aria-label="Content Market" onEscape={() => patch({ tab: 'AUCTIONS', selectedId: null })}>
         <StreamingBuyerAuctionRoom player={player} session={activeAuctionSession} onUpdatePlayer={onUpdatePlayer} onExit={() => patch({ tab: 'AUCTIONS', selectedId: null })} />
@@ -568,11 +579,11 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             </> : selectedUpcoming ? <>
                 <div className="cm-title"><StreamingTitleArt id={selectedUpcoming.sourceProjectId} title={selectedUpcoming.title} poster={posterById.get(selectedUpcoming.sourceProjectId)} size={68} /><div><span className="cm-kicker">UPCOMING · {selectedUpcoming.publicInterest} INTEREST</span><h1>{selectedUpcoming.title}</h1><p>{selectedUpcoming.sellerName}</p></div></div>
                 <p className="cm-note">This is a real production-linked sale, not a guaranteed hit. Public interest can change with production progress, marketing, delays, and release results.</p>
-                <dl className="cm-terms cm-terms-compact"><div><dt>Sale status</dt><dd>{selectedUpcoming.status.replaceAll('_', ' ')}</dd></div><div><dt>Bidding opens</dt><dd>Week {selectedUpcoming.opensAtAbsoluteWeek}</dd></div><div><dt>Expected availability</dt><dd>Week {selectedUpcoming.plannedAvailabilityAbsoluteWeek}</dd></div><div><dt>Markets</dt><dd>{countries(selectedUpcoming.countryIds)}</dd></div><div><dt>Opening level</dt><dd>{money(selectedUpcoming.minimumGuarantee)}</dd></div><div><dt>Public interest</dt><dd>{selectedUpcoming.publicInterestScore}/100</dd></div></dl>
+                <dl className="cm-terms cm-terms-compact"><div><dt>Sale status</dt><dd>{selectedUpcoming.status.replaceAll('_', ' ')}</dd></div><div><dt>Bidding opens</dt><dd>{gameWeekLabel(selectedUpcoming.opensAtAbsoluteWeek, absoluteWeek)}</dd></div><div><dt>Expected availability</dt><dd>{gameWeekLabel(selectedUpcoming.plannedAvailabilityAbsoluteWeek, absoluteWeek)}</dd></div><div><dt>Markets</dt><dd>{countries(selectedUpcoming.countryIds)}</dd></div><div><dt>Opening level</dt><dd>{money(selectedUpcoming.minimumGuarantee)}</dd></div><div><dt>Public interest</dt><dd>{selectedUpcoming.publicInterestScore}/100</dd></div></dl>
                 <div className="cm-interest-drivers">{selectedUpcoming.publicInterestDrivers.map(driver => <span key={driver}>{driver}</span>)}</div>
                 {selectedUpcoming.status === 'ANNOUNCED' && <button className="cm-secondary" onClick={toggleUpcomingFollow}>{selectedUpcoming.followedAtAbsoluteWeek == null ? <Bell size={16} /> : <BellOff size={16} />}{selectedUpcoming.followedAtAbsoluteWeek == null ? 'Follow this sale' : 'Stop following'}</button>}
                 {selectedUpcoming.status === 'LIVE' && selectedUpcomingLot && <button className="cm-primary" disabled={busy || funds < selectedUpcomingLot.minimumGuarantee} onClick={enterUpcomingAuction}>Enter live auction</button>}
-                {selectedUpcoming.status === 'ACQUIRED' && <p className="cm-feedback">Future rights acquired. The title remains unavailable until canonical delivery and week {selectedUpcoming.plannedAvailabilityAbsoluteWeek}.</p>}
+                {selectedUpcoming.status === 'ACQUIRED' && <p className="cm-feedback">Future rights acquired. The title remains unavailable until canonical delivery and {gameWeekText(selectedUpcoming.plannedAvailabilityAbsoluteWeek, absoluteWeek)}.</p>}
                 {selectedUpcoming.status === 'LOST' && <p className="cm-feedback">{selectedUpcoming.winnerName || 'Another platform'} won this rights window.</p>}
                 {selectedUpcoming.status === 'WITHDRAWN' && <p className="cm-feedback">The sale was withdrawn because the underlying production is no longer eligible.</p>}
             </> : auctionLot ? <>
@@ -633,7 +644,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                 </> : draft.tab === 'UPCOMING' ? <>
                     <button className="cm-finance-link" onClick={() => patch({ tab: 'ALL', selectedId: null })}><ArrowLeft size={14} /> Browse available content</button>
                     <div className="cm-section-heading"><span>RIGHTS CALENDAR</span><b>What opens next</b><small>Follow public sales tied to real productions before the room opens.</small></div>
-                    <div className="cm-upcoming-list">{upcomingSales.map(sale => <button className="cm-upcoming-card" key={sale.id} onClick={() => patch({ selectedId: sale.id })}><span className="cm-upcoming-date"><small>{sale.status === 'ANNOUNCED' ? 'OPENS' : 'STATUS'}</small><b>{sale.status === 'ANNOUNCED' ? `WK ${sale.opensAtAbsoluteWeek}` : sale.status.replaceAll('_', ' ')}</b></span><span className="cm-row-copy"><strong>{sale.title}</strong><small>{sale.sellerName} · {sale.genre.replaceAll('_', ' ')}</small><small>Expected week {sale.plannedAvailabilityAbsoluteWeek} · {sale.publicInterest.toLowerCase()} interest</small></span><span className="cm-upcoming-mark">{sale.followedAtAbsoluteWeek != null && <Bell size={14} />}<ChevronRight size={15} /></span></button>)}</div>
+                    <div className="cm-upcoming-list">{upcomingSales.map(sale => <button className="cm-upcoming-card" key={sale.id} onClick={() => patch({ selectedId: sale.id })}><span className="cm-upcoming-date"><small>{sale.status === 'ANNOUNCED' ? 'OPENS' : 'STATUS'}</small><b>{sale.status === 'ANNOUNCED' ? `WK ${sale.opensAtAbsoluteWeek}` : sale.status.replaceAll('_', ' ')}</b></span><span className="cm-row-copy"><strong>{sale.title}</strong><small>{sale.sellerName} · {sale.genre.replaceAll('_', ' ')}</small><small>Expected {gameWeekText(sale.plannedAvailabilityAbsoluteWeek, absoluteWeek)} · {sale.publicInterest.toLowerCase()} interest</small></span><span className="cm-upcoming-mark">{sale.followedAtAbsoluteWeek != null && <Bell size={14} />}<ChevronRight size={15} /></span></button>)}</div>
                     {!upcomingSales.length && <div className="cm-empty"><CalendarDays size={28} /><h2>No announced sales</h2><p>Eligible future productions appear here after their rights holder schedules a public sale.</p></div>}
                 </> : <>
                 {!platform.starterCatalog && platform.catalogSetupDraft?.opportunityProjectId && onResumeLegacy && <button className="cm-finance-link" onClick={() => leave(onResumeLegacy)}>Resume your saved opening agreement <ChevronRight size={14} /></button>}
@@ -660,7 +671,12 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
                             ? <><h2>Your studio hasn't released anything yet</h2><p>A title becomes available the week it releases. Anything your production house has in development will appear here on its release week.</p></>
                             : <><h2>No release matches that search</h2><p>Clear the search to see all {owned.length} {owned.length === 1 ? 'release' : 'releases'} from your studio.</p></>}
                     </div>}
-                    {ownedIds.length > 0 && <div className="cm-studio-action"><span><b>{ownedIds.length}</b> selected</span><button className="cm-primary" disabled={busy} onClick={() => accept(() => linkContentMarketOwnedTitles(player, ownedIds))}>Add {ownedIds.length} studio {ownedIds.length === 1 ? 'title' : 'titles'} · No internal fee</button></div>}
+                    {ownedIds.length > 0 && <div className="cm-studio-action"><span><b>{ownedIds.length}</b> selected</span><button className="cm-primary" disabled={busy} onClick={() => accept(() => {
+                        const brought = ownedIds.length === 1 ? owned.find(title => title.id === ownedIds[0])?.title : `${ownedIds.length} titles`;
+                        const result = linkContentMarketOwnedTitles(player, ownedIds);
+                        if (result.changed && serviceLive) setShelfNotice({ what: brought || 'Your title', plural: ownedIds.length > 1 });
+                        return result;
+                    })}>Add {ownedIds.length} studio {ownedIds.length === 1 ? 'title' : 'titles'} · No internal fee</button></div>}
                 </> : <>{librarySearchActive && draft.tab !== 'COLLECTIONS' && <section className="cm-library-results" aria-label="Shared library results">
                     <div className="cm-section-heading"><span>SHARED LIBRARY</span><b>Released titles</b><small>{libraryResults.length} results shown · A title needs a current rights offer before you can buy it.</small></div>
                     {libraryResults.map(row => {
@@ -688,5 +704,6 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
             </>}
         </main>
         <footer className="cm-footer"><button onClick={() => leave(onClose)}>{returnToLaunch ? 'Return to launch plan' : 'Back to Content Desk'}</button>{platform.starterCatalog && <button onClick={() => leave(onReview)}>Open Content Desk <ChevronRight size={14} /></button>}</footer>
+        {shelfNoticeView}
     </AccessibleDialog>;
 }

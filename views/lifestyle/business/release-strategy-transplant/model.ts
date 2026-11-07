@@ -1,6 +1,7 @@
 export type ReleaseWizardPhase =
   | 'DISTRIBUTION'
   | 'WAR'
+  | 'YOURS'
   | 'DESK'
   | 'CAMPAIGN'
   | 'FESTIVALS'

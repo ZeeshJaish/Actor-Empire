@@ -15,6 +15,7 @@ import { WRITER_NPC_LIBRARY } from './writerNpcLibrary';
 import { getNpcRelationshipScore } from './relationshipBond';
 export { getGenderedAvatar } from './npcAvatar';
 import { getGenderedAvatar } from './npcAvatar';
+import { createDeterministicRng } from './deterministicRandom';
 
 const ACTOR_TRAITS: ActorTrait[] = ['DIVA', 'METHOD', 'WORKAHOLIC', 'UNRELIABLE', 'EASY_GOING', 'BOX_OFFICE_POISON', 'PROFESSIONAL', 'AMBITIOUS'];
 
@@ -672,10 +673,10 @@ const FIRST_NAMES = ['Kai', 'Luna', 'Nova', 'Ezra', 'Milo', 'Ayla', 'Finn', 'Ivy
 const LAST_NAMES = ['Rivers', 'Stone', 'Wilder', 'Frost', 'Knight', 'Woods', 'Black', 'Steel', 'Moon', 'Storm', 'Fox', 'Wolf', 'Hart', 'Drake', 'Cross', 'Banks', 'Reid', 'Cole', 'West', 'Gray', 'Brooks', 'Hayes', 'Price', 'Rice', 'Lane', 'Ford', 'King', 'Rose', 'Snow', 'Lake'];
 const GENRES: Genre[] = ALL_GENRES;
 
-const createGenreXP = (favored: Genre[]): Record<Genre, number> => {
+const createGenreXP = (favored: Genre[], random: () => number = Math.random): Record<Genre, number> => {
     const xp: any = hydrateGenreXP();
     ALL_GENRES.forEach(g => {
-        xp[g] = favored.includes(g) ? 80 + Math.floor(Math.random() * 20) : Math.floor(Math.random() * 20);
+        xp[g] = favored.includes(g) ? 80 + Math.floor(random() * 20) : Math.floor(random() * 20);
     });
     return xp;
 };
@@ -767,18 +768,18 @@ export const recoverInheritedGlobalActorPackIds = (flags: Player['flags']): stri
     return [...recovered];
 };
 
-const generateRandomNPC = (seed: number | string): NPCActor => {
-    const gender: Gender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
-    const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
-    const last = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+const generateRandomNPC = (seed: number | string, random: () => number = Math.random, id?: string): NPCActor => {
+    const gender: Gender = random() > 0.5 ? 'MALE' : 'FEMALE';
+    const first = FIRST_NAMES[Math.floor(random() * FIRST_NAMES.length)];
+    const last = LAST_NAMES[Math.floor(random() * LAST_NAMES.length)];
     const name = `${first} ${last}`;
-    const handle = `@${first.toLowerCase()}${last.toLowerCase()}${Math.floor(Math.random()*99)}`;
+    const handle = `@${first.toLowerCase()}${last.toLowerCase()}${Math.floor(random()*99)}`;
     
     // Low stats for randoms
-    const followers = 5000 + Math.floor(Math.random() * 50000);
-    const netWorth = 50000 + Math.floor(Math.random() * 200000);
-    const tier: NPCTier = Math.random() > 0.8 ? 'RISING' : 'UNKNOWN';
-    const openness = 50 + Math.floor(Math.random() * 40); // Very open to networking
+    const followers = 5000 + Math.floor(random() * 50000);
+    const netWorth = 50000 + Math.floor(random() * 200000);
+    const tier: NPCTier = random() > 0.8 ? 'RISING' : 'UNKNOWN';
+    const openness = 50 + Math.floor(random() * 40); // Very open to networking
 
     const bios = [
         "Chasing dreams in LA.",
@@ -793,18 +794,18 @@ const generateRandomNPC = (seed: number | string): NPCActor => {
         "Storyteller."
     ];
 
-    const randomGenres = [GENRES[Math.floor(Math.random() * GENRES.length)], GENRES[Math.floor(Math.random() * GENRES.length)]];
+    const randomGenres = [GENRES[Math.floor(random() * GENRES.length)], GENRES[Math.floor(random() * GENRES.length)]];
     
     // Random traits
     const traits: ActorTrait[] = [];
-    const traitCount = Math.floor(Math.random() * 2) + 1;
+    const traitCount = Math.floor(random() * 2) + 1;
     for(let i=0; i<traitCount; i++) {
-        const t = pick(ACTOR_TRAITS);
+        const t = ACTOR_TRAITS[Math.floor(random() * ACTOR_TRAITS.length)];
         if(!traits.includes(t)) traits.push(t);
     }
 
     return {
-        id: `npc_rnd_${seed}_${Date.now()}`,
+        id: id || `npc_rnd_${seed}_${Date.now()}`,
         name,
         handle,
         gender,
@@ -815,17 +816,20 @@ const generateRandomNPC = (seed: number | string): NPCActor => {
         followers,
         netWorth,
         occupation: 'ACTOR',
-        bio: bios[Math.floor(Math.random() * bios.length)],
+        bio: bios[Math.floor(random() * bios.length)],
         stats: {
-            talent: 20 + Math.random() * 50, // 20-70 for randoms
-            fame: tier === 'RISING' ? 15 + Math.random() * 15 : Math.random() * 10,
-            genreXP: createGenreXP(randomGenres)
+            talent: 20 + random() * 50, // 20-70 for randoms
+            fame: tier === 'RISING' ? 15 + random() * 15 : random() * 10,
+            genreXP: createGenreXP(randomGenres, random)
         },
         traits,
-        potential: 40 + Math.random() * 60, // High potential for unknowns
-        isIndependent: Math.random() > 0.7
+        potential: 40 + random() * 60, // High potential for unknowns
+        isIndependent: random() > 0.7
     };
 };
+
+/** #311: a built-in unknown's id, the same every session */
+export const getBuiltinUnknownId = (index: number | string): string => `npc_rnd_${index}_1700000000000`;
 
 // --- NPC DATABASE FACTORY ---
 export const generateNPCs = (): NPCActor[] => {
@@ -881,12 +885,14 @@ export const generateNPCs = (): NPCActor[] => {
     });
 
     // 5. Add Random Directors (Cheap/Indie options)
+    /* #313: the same 40 people every session. Their ids were fixed but their names were new each time the game opened. */
     for(let i=0; i<40; i++) {
-        const gender: Gender = Math.random() > 0.5 ? 'MALE' : 'FEMALE';
-        const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
-        const last = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+        const random = createDeterministicRng(`builtin-director:${i}`);
+        const gender: Gender = random() > 0.5 ? 'MALE' : 'FEMALE';
+        const first = FIRST_NAMES[Math.floor(random() * FIRST_NAMES.length)];
+        const last = LAST_NAMES[Math.floor(random() * LAST_NAMES.length)];
         
-        const tier: NPCTier = Math.random() > 0.8 ? 'RISING' : 'INDIE';
+        const tier: NPCTier = random() > 0.8 ? 'RISING' : 'INDIE';
 
         npcs.push({
             id: `rnd_dir_${i}`,
@@ -895,23 +901,24 @@ export const generateNPCs = (): NPCActor[] => {
             gender,
             avatar: getGenderedAvatar(gender, `${first} ${last}`),
             tier,
-            prestigeBias: Math.random() > 0.5 ? 'PRESTIGE' : 'COMMERCIAL',
-            openness: 40 + Math.floor(Math.random() * 40),
-            followers: 1000 + Math.floor(Math.random() * 10000),
-            netWorth: 10000 + Math.floor(Math.random() * 50000),
+            prestigeBias: random() > 0.5 ? 'PRESTIGE' : 'COMMERCIAL',
+            openness: 40 + Math.floor(random() * 40),
+            followers: 1000 + Math.floor(random() * 10000),
+            netWorth: 10000 + Math.floor(random() * 50000),
             occupation: 'DIRECTOR',
             bio: "Aspiring director looking for a break.",
             stats: {
-                talent: 25 + Math.random() * 50, // 25-75 for randoms
-                fame: 5 + Math.random() * 10,
-                genreXP: createGenreXP([GENRES[Math.floor(Math.random() * GENRES.length)]])
+                talent: 25 + random() * 50, // 25-75 for randoms
+                fame: 5 + random() * 10,
+                genreXP: createGenreXP([GENRES[Math.floor(random() * GENRES.length)]], random)
             }
         });
     }
 
     // 5. Add Random Actors (Filler for low budget)
+    /* #311: the same 50 people in every session. Each game open used to roll new names and new ids, so a pitch or a draft saved with one of them found nobody after a reload: "Actor profile unavailable". */
     for(let i=0; i<50; i++) {
-        npcs.push(generateRandomNPC(i));
+        npcs.push(generateRandomNPC(i, createDeterministicRng(`builtin-unknown:${i}`), getBuiltinUnknownId(i)));
     }
 
     return npcs.map(projectBuiltinPerson);

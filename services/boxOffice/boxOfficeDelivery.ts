@@ -1,3 +1,4 @@
+import { getGearQuality } from '../greenlightSetupEffects';
 import type { ProjectDetails } from '../../types';
 import type { CinemaDeliveryInput } from './boxOfficeTypes';
 import { CINEMA_CRAFT_WEIGHTS } from './boxOfficeProfiles';
@@ -10,6 +11,8 @@ const mean = (values: number[], fallback: number, max = 100) => values.length
 export interface CinemaCraftInput {
     scriptQuality?: number; directorQuality: number; castingStrength: number; crewQualities: number[];
     equipmentQualityLevels: number[]; locationQualities: number[]; storyFitQualityAdjustment: number;
+    /** #275: how the look and the effects mix fit the genre */
+    setupQualityAdjustment?: number;
     backgroundAuthenticity: number; backgroundReliability: number; backgroundSetCare: number;
 }
 
@@ -20,16 +23,17 @@ export const calculateCinemaCraftQuality = (input: CinemaCraftInput): number => 
         + finite(input.castingStrength, 50) * CINEMA_CRAFT_WEIGHTS.cast
         + mean(input.crewQualities, 50) * CINEMA_CRAFT_WEIGHTS.crew;
     // Four standard equipment lines: extra keys cannot create unlimited quality.
-    const equipmentLevel = input.equipmentQualityLevels.reduce((sum, value) => sum + finite(value, 0, 0, 10), 0)
+    const equipmentLevel = input.equipmentQualityLevels.reduce((sum, value) => sum + finite(value, 0, 0, 30), 0)
         / Math.max(4, input.equipmentQualityLevels.length);
-    const gear = 4 * (1 - Math.exp(-equipmentLevel / 4));
+    const gear = getGearQuality(equipmentLevel);
+    const setup = finite(input.setupQualityAdjustment, 0, -3, 4);
     const location = (mean(input.locationQualities, 5, 10) - 5) * 0.6;
     const story = finite(input.storyFitQualityAdjustment, 0, -5, 5);
     const background = Math.max(-3, Math.min(3,
         (finite(input.backgroundAuthenticity, 50) - 50) * 0.04
         + (finite(input.backgroundReliability, 50) - 50) * 0.03
         + (finite(input.backgroundSetCare, 50) - 50) * 0.025));
-    return Math.round(Math.max(1, Math.min(100, craft + gear + location + story + background)));
+    return Math.round(Math.max(1, Math.min(100, craft + gear + setup + location + story + background)));
 };
 
 export const buildCinemaDeliveryInput = (project: ProjectDetails): CinemaDeliveryInput => ({

@@ -17,6 +17,7 @@
  * - **Capacity counts each maker's power** (Scout 0.6, Workhorse 1, Titan 1.8); a revision counted before #89 is
  *   recounted once by the weekly close.
  */
+import { gameWeekText } from './gameWeek';
 import type {
     OwnedStreamingFacility,
     OwnedStreamingInfrastructureSetup,
@@ -283,7 +284,7 @@ export const orderStreamingNetworkRegion = (
         idempotencyKey: `${key}:ordered`,
         absoluteWeek,
         type: 'INFRASTRUCTURE_COMMITTED',
-        summary: `Network order: ${preview.message}, ready week ${preview.readyAtAbsoluteWeek}.`,
+        summary: `Network order: ${preview.message}, ready ${gameWeekText(preview.readyAtAbsoluteWeek, absoluteWeek)}.`,
         source: 'PLAYER_ACTION',
         metadata: {
             kind: 'NETWORK_ORDER',
@@ -331,7 +332,7 @@ export const speedUpStreamingNetworkOrder = (player: Player, orderId: string): S
         }, player.id),
     };
     spendPlayerEnergy(nextPlayer, energy, `Network: ${STREAMING_NETWORK_REGION_NAMES[order.regionId] || order.regionId} build sped up`);
-    return { changed: true, message: `Ready week ${next.readyAtAbsoluteWeek}.`, player: nextPlayer, order: next };
+    return { changed: true, message: `Ready ${gameWeekText(next.readyAtAbsoluteWeek, absoluteWeek)}.`, player: nextPlayer, order: next };
 };
 
 const strategyOf = (platform: OwnedStreamingPlatformState, setup: OwnedStreamingInfrastructureSetup) => (

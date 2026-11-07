@@ -851,7 +851,7 @@ const reviveDormantSubsidiaryProduction = (
         message: `🎞️ ${studio.name} moved stalled slate item ${dormantProposal.title} into real production.`,
         type: 'positive',
     };
-    launched.player.logs = [logEntry, ...(launched.player.logs || [])].slice(0, 50);
+    launched.player.logs = [...(launched.player.logs || []), logEntry];
     return launched.player;
 };
 
@@ -952,12 +952,12 @@ export const prepareSubsidiaryProjectsForGameLoop = (player: Player): Player => 
         ...player,
         commitments,
         activeReleases,
-        logs: [{
+        logs: [...(player.logs || []), {
             week: player.currentWeek,
             year: player.age,
             message: `📅 Subsidiary distribution teams scheduled ${repairedCount} stalled release${repairedCount === 1 ? '' : 's'}.`,
             type: 'positive',
-        } as LogEntry, ...(player.logs || [])].slice(0, 50),
+        } as LogEntry],
     };
 };
 
@@ -991,7 +991,7 @@ export const approveSubsidiaryProjectProposal = (
         message: `🎬 ${studio.name} board approved ${proposal.title}. Production is now active under the studio banner.`,
         type: 'positive',
     };
-    updatedPlayer.logs = [logEntry, ...(updatedPlayer.logs || [])].slice(0, 50);
+    updatedPlayer.logs = [...(updatedPlayer.logs || []), logEntry];
     return { success: true, player: updatedPlayer };
 };
 
@@ -1035,7 +1035,7 @@ export const rejectSubsidiaryProjectProposal = (
         message: `🧾 ${studio.name} board rejected ${proposal.title}. The studio will wait for a stronger mandate fit.`,
         type: 'neutral',
     };
-    updatedPlayer.logs = [logEntry, ...(updatedPlayer.logs || [])].slice(0, 50);
+    updatedPlayer.logs = [...(updatedPlayer.logs || []), logEntry];
     return { success: true, player: updatedPlayer };
 };
 
@@ -1077,7 +1077,7 @@ export const processSubsidiaryAutonomousOperations = (player: Player): Player =>
                 message: `🏛️ ${currentStudio.name} autonomously greenlit ${proposal.title} and scheduled its release plan.`,
                 type: 'positive',
             };
-            nextPlayer.logs = [logEntry, ...(nextPlayer.logs || [])].slice(0, 50);
+            nextPlayer.logs = [...(nextPlayer.logs || []), logEntry];
             return;
         }
 
@@ -1117,7 +1117,7 @@ export const processSubsidiaryAutonomousOperations = (player: Player): Player =>
             message: `📋 ${currentStudio.name} submitted ${proposal.title} for board approval.`,
             type: 'neutral',
         };
-        nextPlayer.logs = [logEntry, ...(nextPlayer.logs || [])].slice(0, 50);
+        nextPlayer.logs = [...(nextPlayer.logs || []), logEntry];
     });
 
     return nextPlayer;

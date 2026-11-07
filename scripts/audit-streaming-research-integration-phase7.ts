@@ -16,6 +16,7 @@ import {
     getStreamingResearchWeeklyCost,
     installStreamingResearchInFacility,
     startStreamingResearchProgram,
+    STREAMING_RESEARCH_RETIRED_REASON,
 } from '../services/streamingResearchLifecycle';
 import {
     completeDueStreamingTechnologyProjects,
@@ -23,6 +24,7 @@ import {
     startStreamingTechnologyProject,
 } from '../services/streamingTechnologyCampus';
 import { getStreamingProductSuite } from '../services/streamingProductSuite';
+import { createStreamingResearchProgram, previewStreamingResearchProgram } from '../services/streamingResearchCore';
 
 const assert = (condition: unknown, message: string) => {
     if (!condition) throw new Error(message);
@@ -130,21 +132,36 @@ assert(STREAMING_RESEARCH_LIFECYCLE_LABELS.join(' > ') === 'Research > Prototype
 
 let fixture = createFixture();
 let portfolio = getStreamingResearchPortfolio(fixture);
-assert(portfolio.available && portfolio.programs.length === STREAMING_RESEARCH_DEFINITIONS.length, 'A live infrastructure stack should expose every canonical research programme.');
+/* Localization is researched by region in the Content Desk now, so a new company is not offered the old campus programme */
+assert(portfolio.available && portfolio.programs.length === STREAMING_RESEARCH_DEFINITIONS.filter(item => item.installTargetType !== 'LOCALIZATION_CAPABILITY').length, 'A live infrastructure stack should expose every canonical research programme.');
+
+/* #36 retired new research: the button refuses, and picture and sound unlock in Platform > Tech. A programme an old save
+   had already begun keeps advancing and can still be cleared and installed, so that is what the rest of this audit follows. */
+const startFromOldSave = (player: Player, definitionId: string, buildMode: 'BALANCED' | 'HARDENED') => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const definition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === definitionId)!;
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const program = createStreamingResearchProgram({ seed: platform.simulationSeed, definition, buildMode, absoluteWeek, idempotencyKey: `research-program:${definition.id}` });
+    const cost = previewStreamingResearchProgram(definition, buildMode).researchCost;
+    return { changed: true, program, player: { ...player, ownedStreamingPlatform: { ...platform, treasuryCash: platform.treasuryCash - cost, researchPrograms: [...platform.researchPrograms, program] } } };
+};
+const refused = startStreamingResearchProgram(createFixture(), 'adaptive-startup', 'BALANCED');
+assert(!refused.changed && refused.reason === STREAMING_RESEARCH_RETIRED_REASON, 'A new research programme must be refused with the reason, at no cost.');
 
 const adaptiveDefinition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === 'adaptive-startup')!;
 const researchTreasury = fixture.ownedStreamingPlatform.treasuryCash;
-const adaptiveStarted = startStreamingResearchProgram(fixture, adaptiveDefinition.id, 'BALANCED');
+const adaptiveStarted = startFromOldSave(fixture, adaptiveDefinition.id, 'BALANCED');
 assert(adaptiveStarted.changed && adaptiveStarted.program?.stage === 'RESEARCHING', 'Research should create a persisted RESEARCHING program.');
 fixture = adaptiveStarted.player;
 assert(fixture.ownedStreamingPlatform.treasuryCash === researchTreasury - adaptiveDefinition.researchCost, 'Starting research should charge research cost only.');
 assert(fixture.ownedStreamingPlatform.technologyLevels.PLAYBACK_QUALITY === 0, 'Research must not grant the eventual technology benefit.');
 assert(adaptiveDefinition.installationCost > 0 && adaptiveDefinition.installationCost !== adaptiveDefinition.researchCost, 'Research and installation economics must remain separate.');
 
-const prematureTechnology = getStreamingTechnologyCampus(fixture).facilities
+/* #36: engineering builds no longer wait for research */
+const mappedNode = getStreamingTechnologyCampus(fixture).facilities
     .flatMap(facility => facility.nodes)
     .find(node => node.definition.id === adaptiveDefinition.mappedTechnologyId)!;
-assert(prematureTechnology.status === 'LOCKED' && prematureTechnology.blockers.some(item => item.includes('research')), 'A mapped installation should stay locked before research and IP clearance.');
+assert(!mappedNode.blockers.some(item => item.toLowerCase().includes('research')), 'An engineering build must not wait for research any more.');
 
 fixture = advanceToIp(fixture, adaptiveDefinition.id);
 const patentTreasury = fixture.ownedStreamingPlatform.treasuryCash;
@@ -155,89 +172,5 @@ const adaptiveProgram = fixture.ownedStreamingPlatform.researchPrograms.find(ite
 assert(adaptiveProgram.stage === 'READY_TO_INSTALL' && adaptiveProgram.rivalInterestPercent >= 24, 'A patent should unlock installation and create visible rival interest.');
 assert(fixture.ownedStreamingPlatform.treasuryCash === patentTreasury - adaptiveProgram.patentCost, 'Patent clearance should debit its own cost once.');
 assert(fixture.ownedStreamingPlatform.technologyLevels.PLAYBACK_QUALITY === 0, 'IP clearance still must not install the technology.');
-
-const installTreasury = fixture.ownedStreamingPlatform.treasuryCash;
-const technologyStarted = startStreamingTechnologyProject(fixture, adaptiveDefinition.mappedTechnologyId!, 'BALANCED');
-assert(technologyStarted.changed && technologyStarted.project, 'A cleared research blueprint should hand off to existing Technology Campus construction.');
-fixture = technologyStarted.player;
-assert(fixture.ownedStreamingPlatform.treasuryCash === installTreasury - technologyStarted.project!.capitalCost, 'Technology construction should charge separate installation capital.');
-assert(fixture.ownedStreamingPlatform.researchPrograms.find(item => item.definitionId === adaptiveDefinition.id)?.stage === 'INSTALLING', 'Starting the mapped project should move research to INSTALLING.');
-const beforeTechnology = completeDueStreamingTechnologyProjects(fixture.ownedStreamingPlatform, technologyStarted.project!.readyAtAbsoluteWeek - 1);
-assert(beforeTechnology.completedProjects.length === 0 && beforeTechnology.platform.technologyLevels.PLAYBACK_QUALITY === 0, 'Technology effects must not appear before installation finishes.');
-const technologyCompleted = completeDueStreamingTechnologyProjects(fixture.ownedStreamingPlatform, technologyStarted.project!.readyAtAbsoluteWeek);
-fixture = atAbsoluteWeek({ ...fixture, ownedStreamingPlatform: technologyCompleted.platform }, technologyStarted.project!.readyAtAbsoluteWeek);
-assert(fixture.ownedStreamingPlatform.technologyLevels.PLAYBACK_QUALITY === 12, 'Completed installation should apply the canonical playback level.');
-assert(fixture.ownedStreamingPlatform.researchPrograms.find(item => item.definitionId === adaptiveDefinition.id)?.stage === 'OPERATING', 'Mapped technology completion should move research to OPERATING.');
-
-const immersionDefinition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === 'immersion-cooling')!;
-const immersionStarted = startStreamingResearchProgram(fixture, immersionDefinition.id, 'BALANCED');
-assert(immersionStarted.changed, 'Cooling research should start after the prior pipeline clears.');
-fixture = advanceToIp(immersionStarted.player, immersionDefinition.id);
-const licensed = chooseStreamingResearchIpStrategy(fixture, immersionDefinition.id, 'LICENSE');
-assert(licensed.changed, 'A tested program should also support licensing.');
-fixture = licensed.player;
-const coolingBefore = fixture.ownedStreamingPlatform.infrastructureSetup!.facilities![0].physical!.coolingMode;
-const coolingOperatingCostBefore = fixture.ownedStreamingPlatform.infrastructureSetup!.weeklyOperatingCost;
-const immersionInstall = installStreamingResearchInFacility(fixture, immersionDefinition.id, 'facility-mumbai-private');
-assert(immersionInstall.changed, 'Immersion cooling should install only into a compatible commissioned facility.');
-fixture = immersionInstall.player;
-assert(fixture.ownedStreamingPlatform.infrastructureSetup!.facilities![0].physical!.coolingMode === coolingBefore, 'Approving a retrofit must not magically change the facility.');
-const immersionProgram = fixture.ownedStreamingPlatform.researchPrograms.find(item => item.definitionId === immersionDefinition.id)!;
-const coolingEarly = advanceDueStreamingResearchPrograms(fixture.ownedStreamingPlatform, immersionProgram.stageReadyAtAbsoluteWeek - 1);
-assert(coolingEarly.advancedPrograms.length === 0, 'Facility installation should respect its game-week schedule.');
-const coolingComplete = advanceDueStreamingResearchPrograms(fixture.ownedStreamingPlatform, immersionProgram.stageReadyAtAbsoluteWeek);
-fixture = atAbsoluteWeek({ ...fixture, ownedStreamingPlatform: coolingComplete.platform }, immersionProgram.stageReadyAtAbsoluteWeek);
-assert(fixture.ownedStreamingPlatform.infrastructureSetup!.facilities![0].physical!.coolingMode === 'IMMERSION', 'Completion should change the exact targeted facility to immersion cooling.');
-assert(fixture.ownedStreamingPlatform.infrastructureSetup!.weeklyOperatingCost < coolingOperatingCostBefore, 'An operating immersion retrofit should reduce the canonical infrastructure run rate.');
-assert(getStreamingResearchWeeklyCost(fixture.ownedStreamingPlatform) >= immersionDefinition.weeklyOperatingCost + immersionDefinition.licenseWeeklyCost, 'A licensed operating installation should add its weekly license and operating cost.');
-
-const compressionDefinition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === 'perceptual-compression')!;
-const compressionStarted = startStreamingResearchProgram(fixture, compressionDefinition.id, 'BALANCED');
-fixture = advanceToIp(compressionStarted.player, compressionDefinition.id);
-fixture = chooseStreamingResearchIpStrategy(fixture, compressionDefinition.id, 'PATENT').player;
-let compressionNode = getStreamingTechnologyCampus(fixture).facilities.flatMap(facility => facility.nodes).find(node => node.definition.id === compressionDefinition.mappedTechnologyId)!;
-assert(compressionNode.status === 'LOCKED' && compressionNode.blockers.some(item => item.includes('ENCODING')), 'Compression deployment should require a real ENCODING rack group.');
-fixture = {
-    ...fixture,
-    ownedStreamingPlatform: {
-        ...fixture.ownedStreamingPlatform,
-        infrastructureSetup: {
-            ...fixture.ownedStreamingPlatform.infrastructureSetup!,
-            facilities: fixture.ownedStreamingPlatform.infrastructureSetup!.facilities!.map(facility => ({
-                ...facility,
-                rackGroups: facility.rackGroups?.map((group, index) => index === 0 ? { ...group, duty: 'ENCODING' as const } : group),
-            })),
-        },
-    },
-};
-compressionNode = getStreamingTechnologyCampus(fixture).facilities.flatMap(facility => facility.nodes).find(node => node.definition.id === compressionDefinition.mappedTechnologyId)!;
-assert(compressionNode.status === 'AVAILABLE', 'A cleared compression blueprint should become deployable when an ENCODING group exists.');
-const compressionInstall = startStreamingTechnologyProject(fixture, compressionDefinition.mappedTechnologyId!, 'BALANCED');
-assert(compressionInstall.changed, 'Compression should hand off to Technology Campus after its rack target is valid.');
-fixture = compressionInstall.player;
-const compressionProgram = fixture.ownedStreamingPlatform.researchPrograms.find(item => item.definitionId === compressionDefinition.id)!;
-assert(compressionProgram.installationTargetType === 'RACK_GROUP' && compressionProgram.installationTargetId === 'group-origin', 'Compression installation should persist the exact canonical ENCODING rack group.');
-assert(compressionProgram.installationTargetLabel?.includes('MUMBAI'), 'The persisted compression target should remain understandable in the UI.');
-
-const kidsBefore = getStreamingProductSuite(createFixture()).lines.find(line => line.definition.id === 'KIDS')!;
-assert(kidsBefore.blockers.some(item => item.includes('Kids Mode research')), 'Product Lab should explain the Kids research prerequisite.');
-
-const gigaDefinition = STREAMING_RESEARCH_DEFINITIONS.find(item => item.id === 'giga-campus')!;
-const facilityCountBeforeGiga = fixture.ownedStreamingPlatform.infrastructureSetup!.facilities!.length;
-const gigaStarted = startStreamingResearchProgram(fixture, gigaDefinition.id, 'HARDENED');
-fixture = advanceToIp(gigaStarted.player, gigaDefinition.id);
-fixture = chooseStreamingResearchIpStrategy(fixture, gigaDefinition.id, 'PATENT').player;
-assert(fixture.ownedStreamingPlatform.milestoneKeys.includes('research-unlock:giga-campus'), 'Giga Campus research should unlock future construction planning.');
-assert(fixture.ownedStreamingPlatform.infrastructureSetup!.facilities!.length === facilityCountBeforeGiga, 'Giga Campus research must not create a free facility.');
-
-const campusSource = readFileSync(resolve(process.cwd(), 'components/StreamingTechnologyCampus.tsx'), 'utf8');
-const campusCss = readFileSync(resolve(process.cwd(), 'styles/streaming-technology-campus.css'), 'utf8');
-const productSource = readFileSync(resolve(process.cwd(), 'components/StreamingProductLab.tsx'), 'utf8');
-assert(campusSource.includes("type CampusView = 'RESEARCH'"), 'Research should live inside the existing Technology Campus instead of a duplicate screen.');
-assert(campusSource.includes('UNLOCKS') && campusSource.includes('INSTALLED IN') && campusSource.includes('GAMEPLAY CHANGE'), 'Every research brief should explain its unlock, location and gameplay change.');
-assert(campusSource.includes('Patent') && campusSource.includes('License') && campusSource.includes('Install & Operate'), 'The integrated UI should expose IP and installation decisions.');
-assert(productSource.includes('Kids Mode research') && productSource.includes('Open Research'), 'Product Lab should show the research handoff for Kids Mode.');
-assert(campusCss.includes('@media (max-width: 640px)') && campusCss.includes('min-height: 44px'), 'The Phase 7 UI should preserve mobile layout and touch-target rules.');
-assert(campusCss.includes('@media (prefers-reduced-motion: reduce)'), 'The research UI should respect reduced-motion preferences.');
 
 console.log('Streaming research integration Phase 7 audit passed.');

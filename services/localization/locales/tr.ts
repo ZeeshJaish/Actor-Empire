@@ -5725,6 +5725,8 @@ export const trTranslations: Record<TranslationKey, string> = {
         'actions.relationship.reconnectionSubtext': 'Repairing family damage will take time, but the first step is made.',
         'actions.relationship.blockedTitle': 'Blocked',
         'actions.relationship.familyRomanceBlockedSubtext': 'Family members cannot be used for romantic actions.',
+        'ageGate.title': '18 yaşını bekle',
+        'ageGate.body': 'Bunu henüz yapamazsın. 18 yaşına girince açılır.',
         'actions.relationship.lockedTitle': 'Locked',
         'actions.relationship.lockedHomeSubtext': 'Own a premium home first to host estate dates.',
         'actions.relationship.lockedSkySeaSubtext': 'Own a Sky & Sea asset first to unlock that lifestyle move.',

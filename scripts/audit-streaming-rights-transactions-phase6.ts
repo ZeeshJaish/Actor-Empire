@@ -22,7 +22,7 @@ import {
 } from '../services/streamingRightsMarketplace';
 import { processPlatformAiRightsResaleWeek } from '../services/platformAi/platformAiRightsResale';
 import StreamingRightsExchange from '../components/StreamingRightsExchange';
-import StreamingRightsCalendar from '../components/StreamingRightsCalendar';
+import { getRightsTitleSheet } from '../services/rightsRoom';
 import { compactPlayerForPersistence } from '../services/saveCompaction';
 import { migratePlayerSave } from '../services/saveMigration';
 
@@ -559,15 +559,12 @@ assert.match(exchangeMarkup, /60 weeks remaining/);
 assert.match(exchangeMarkup, /30% studio backend/);
 assert.match(exchangeMarkup, /No inherited actions/);
 
-const studioLedgerMarkup = renderToStaticMarkup(React.createElement(StreamingRightsCalendar, {
-    player: settled.player,
-    context: 'STUDIO',
-    onUpdatePlayer: () => undefined,
-}));
-assert.match(studioLedgerMarkup, /Rights transfer ledger/);
-assert.match(studioLedgerMarkup, /Empire Studios.*Hulu.*Netflix/);
-assert.match(studioLedgerMarkup, /Current holder.*Netflix/);
-assert.match(studioLedgerMarkup, /Japan.*60 weeks remaining/);
+/* #316: the studio sees a resold licence on the title's own sheet: who has it now, and how it got there */
+const resoldSheet = getRightsTitleSheet(settled.player, 'empire-studios', 'empire-drama-1')!;
+assert.equal(resoldSheet.buyerName, 'Netflix');
+assert.ok(resoldSheet.history.some(row => /Sold to Hulu/.test(row.what)), 'the first sale');
+assert.ok(resoldSheet.history.some(row => /Hulu passed it to Netflix/.test(row.what)), 'and who it was passed to');
+assert.equal(resoldSheet.weeksLeft, 60);
 
 const persisted = migratePlayerSave(compactPlayerForPersistence(settled.player));
 const persistedTransaction = persisted.world.streamingRightsTransactions![settled.transaction.id];

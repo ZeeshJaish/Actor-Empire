@@ -18,6 +18,7 @@ import { getStreamingNewCompanyWait, startNewStreamingCompany } from '../service
 import { getStreamingEstate } from '../services/streamingLegacy';
 import { OWN_SHARES_LOCKUP_WEEKS, tradeOwnStreamingShares } from '../services/streamingOwnShares';
 import { returnAsStreamingCeo, stepDownFromStreamingCompany, streamingChiefExecutive } from '../services/streamingStepDown';
+import { atTheTable } from './fixtures/atTheTable';
 import { getStreamingYourMoneyView, setStreamingDividend, setStreamingFounderSalary } from '../services/streamingYourMoney';
 import { nameStreamingTeamSuccessor } from '../services/team/streamingTeam';
 import { streamingTeamSeatHolders } from '../services/team/teamState';
@@ -101,9 +102,12 @@ const main = async () => {
     /* 5: the heir takes over */
     const stillRuns = streamingChiefExecutive(platformOf(player));
     if (stillRuns) {
-        const taken = returnAsStreamingCeo(withBoard(player));
-        assert.ok(taken.changed, taken.message);
-        player = taken.player;
+        const seated = withBoard(player);
+        const asked = returnAsStreamingCeo(seated);
+        /* #228: under 51% it goes to the board's table */
+        const taken = asked.vote ? atTheTable(seated, asked, returnAsStreamingCeo).done : asked;
+        assert.ok(taken?.changed, taken?.message || 'the board said no');
+        player = taken!.player;
     }
     assert.equal(platformOf(player).leadership.currentCeo.holderType, 'FOUNDER');
     player = await weeks(player, 4);

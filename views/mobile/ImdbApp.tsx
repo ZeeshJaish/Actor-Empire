@@ -1,3 +1,5 @@
+import { getProjectEpisodeNames } from '../../services/episodeNames';
+import { getSeriesEpisodeRatings, getSeriesRating, groupSeriesRows } from '../../services/seriesIdentity';
 import { CinemaAudiencePanel } from '../../components/CinemaAudiencePanel';
 
 // ... existing imports
@@ -15,6 +17,7 @@ import { inferSeasonNumber } from '../../services/episodeRatings';
 import { CustomPosterImage } from '../../components/CustomPosterImage';
 import { resolveProjectType } from '../../services/businessLogic';
 import { getDynastyCareerArchives } from '../../services/dynastyCareer';
+import { getCareerProjects } from '../../services/outsideOriginals';
 
 interface ImdbAppProps {
   player: Player;
@@ -160,29 +163,6 @@ const inferBudgetTierFromBudget = (budget = 0): BudgetTier => {
     return 'LOW';
 };
 
-const normalizeSeriesTitleKey = (title = '') => title
-    .replace(/\bseason\s+\d+\b/gi, '')
-    .replace(/\bs\d+\b/gi, '')
-    .replace(/[:\-–]+$/g, '')
-    .replace(/[^a-z0-9]+/gi, ' ')
-    .trim()
-    .toLowerCase();
-
-const getDisplayProjectSeriesKey = (project: DisplayProject) => {
-    const original = project.originalObject as any;
-    const details = original.projectDetails || original;
-    const franchiseId = details.franchiseId || original.franchiseId;
-    const titleKey = normalizeSeriesTitleKey(project.name || details.title || original.name || original.title);
-    const sourceScriptId = details.sourceScriptId || original.sourceScriptId;
-    return franchiseId
-        ? `franchise:${franchiseId}`
-        : titleKey
-            ? `title:${titleKey}`
-            : sourceScriptId
-                ? `script:${sourceScriptId}`
-                : `project:${project.id}`;
-};
-
 const getEpisodeRatingCellTone = (rating: number) => {
     if (rating >= 9.2) return 'bg-emerald-400 text-emerald-950 shadow-[0_0_14px_rgba(52,211,153,0.22)]';
     if (rating >= 8.2) return 'bg-green-500 text-green-950';
@@ -195,7 +175,8 @@ const getEpisodeRatingCellTone = (rating: number) => {
 const EpisodeRatingsHeatmap: React.FC<{
     ratings: SeasonEpisodeRatings[];
     tr: (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => string;
-}> = ({ ratings, tr }) => {
+    activeSeason?: number;
+}> = ({ ratings, tr, activeSeason }) => {
     const sortedRatings = [...ratings].sort((a, b) => a.season - b.season);
     const maxEpisodes = Math.max(...sortedRatings.map(season => season.episodes.length), 0);
     if (!sortedRatings.length || maxEpisodes === 0) return null;
@@ -243,7 +224,7 @@ const EpisodeRatingsHeatmap: React.FC<{
                     <div />
                     {sortedRatings.map(season => (
                         <div key={`season_head_${season.season}`} className="text-center">
-                            <div className="text-[8px] font-black text-zinc-300 uppercase tracking-widest">
+                            <div className={`text-[8px] font-black uppercase tracking-widest ${season.season === activeSeason ? 'text-yellow-300' : 'text-zinc-300'}`}>
                                 {tr('imdb.project.seasonShort', { season: season.season })}
                             </div>
                             <div className="mt-0.5 text-[8px] font-mono font-black text-emerald-300">
@@ -276,6 +257,26 @@ const EpisodeRatingsHeatmap: React.FC<{
                         );
                     })}
                 </div>
+            </div>
+        </div>
+    );
+};
+
+/** #273: the open season, episode by episode, with its names */
+const SeasonEpisodeList: React.FC<{ season: SeasonEpisodeRatings; names: string[] }> = ({ season, names }) => {
+    const best = season.episodes.reduce((top, episode) => episode.rating > top ? episode.rating : top, 0);
+    return (
+        <div data-season-episodes className="px-3 py-2.5 border-b border-zinc-800 bg-zinc-950">
+            <div className="mb-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-500">Season {season.season} episodes</div>
+            <div className="divide-y divide-zinc-800/70 rounded-xl border border-zinc-800 bg-zinc-900/50">
+                {season.episodes.map(episode => (
+                    <div key={episode.episode} className="flex min-h-[38px] items-center gap-2.5 px-3 py-1.5">
+                        <span className="w-6 shrink-0 text-[10px] font-black text-zinc-500">E{episode.episode}</span>
+                        <span className="min-w-0 flex-1 truncate text-xs font-bold text-zinc-100">{names[episode.episode - 1]}</span>
+                        {episode.rating === best && <span className="shrink-0 rounded bg-yellow-400 px-1 py-0.5 text-[8px] font-black uppercase text-black">Best</span>}
+                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${getEpisodeRatingCellTone(episode.rating)}`}>{episode.rating.toFixed(1)}</span>
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -400,7 +401,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	      };
   });
 
-  const pastList: DisplayProject[] = player.pastProjects.map(p => {
+  const pastList: DisplayProject[] = getCareerProjects(player).map(p => {
       const timing = getProjectReleaseTiming(p, releaseFallback);
       return {
           id: p.id, name: p.name, year: timing.releaseYear || p.year, role: p.roleType || 'Role', rating: p.imdbRating || 0, status: 'ARCHIVED' as const,
@@ -490,6 +491,21 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       if (creditFilter === 'MOVIE') return p.mediaType === 'MOVIE';
       if (creditFilter === 'TV') return p.mediaType === 'SERIES';
       return true;
+  });
+  /* #272: a show is one row, however many seasons; it opens on its latest */
+  const creditSeries = groupSeriesRows(filteredCredits.filter(p => p.mediaType === 'SERIES'), p => p.originalObject);
+  const creditSeriesShown = new Set<string>();
+  const creditRows = filteredCredits.flatMap(project => {
+      const group = project.mediaType === 'SERIES' ? creditSeries.find(item => item.seasons.some(season => season.row === project)) : undefined;
+      if (!group || group.seasons.length < 2) return [{ project, opens: project, seasonCount: 0 }];
+      if (creditSeriesShown.has(group.key)) return [];
+      creditSeriesShown.add(group.key);
+      const latest = group.seasons[group.seasons.length - 1].row;
+      return [{
+          project: { ...latest, name: group.name, rating: getSeriesRating(group.seasons.map(season => season.row.rating)) },
+          opens: latest,
+          seasonCount: group.seasons.length,
+      }];
   });
 
 
@@ -1204,14 +1220,24 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	        ? Math.max(selectedProjectMusicImpact.controversyRisk, selectedProjectMusicImpact.mismatchBacklashRisk)
 	        : 0;
 	    const returnStatusMeta = getReturnStatusMeta(futurePotential?.playerReturnStatus);
-	    const selectedProjectSeriesKey = selectedProject.mediaType === 'SERIES' ? getDisplayProjectSeriesKey(selectedProject) : '';
-	    const selectedProjectEpisodeRatings = selectedProject.mediaType === 'SERIES'
-        ? (selectedProject.isLegacyArchive ? legacyFullList : fullList)
-	            .filter(project => project.mediaType === 'SERIES' && getDisplayProjectSeriesKey(project) === selectedProjectSeriesKey)
-	            .flatMap(project => project.episodeRatings || [])
-	            .filter((season, index, seasons) => seasons.findIndex(item => item.season === season.season) === index)
-	            .sort((a, b) => a.season - b.season)
-	        : [];
+	    /* #272: one page for the whole show: the seasons in tabs, the page below follows the tab */
+	    const selectedSeries = selectedProject.mediaType === 'SERIES'
+	        ? groupSeriesRows((selectedProject.isLegacyArchive ? legacyFullList : fullList).filter(project => project.mediaType === 'SERIES'), project => project.originalObject)
+	            .find(group => group.seasons.some(season => season.row.id === selectedProject.id)) || null
+	        : null;
+	    const selectedSeason = selectedSeries?.seasons.find(season => season.row.id === selectedProject.id)?.season;
+	    const selectedHasSeasons = (selectedSeries?.seasons.length || 0) > 1;
+	    const selectedTitle = selectedHasSeasons && selectedSeries ? selectedSeries.name : selectedProject.name;
+	    const selectedProjectEpisodeRatings = getSeriesEpisodeRatings(selectedSeries, project => project.originalObject);
+	    const selectedSeasonRatings = selectedProjectEpisodeRatings.find(season => season.season === selectedSeason);
+	    const selectedEpisodeTotal = selectedProjectEpisodeRatings.reduce((sum, season) => sum + season.episodes.length, 0);
+	    const selectedSeriesRating = selectedSeries ? getSeriesRating(selectedSeries.seasons.map(season => season.row.rating)) : 0;
+	    const selectedSeriesLine = selectedHasSeasons && selectedSeries ? (
+	        <div data-series-line className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold text-zinc-200">
+	            <span>{selectedSeries.seasons.length} seasons{selectedEpisodeTotal > 0 ? ` · ${selectedEpisodeTotal} episodes` : ''}</span>
+	            {selectedSeriesRating > 0 && <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black text-black">Series {selectedSeriesRating.toFixed(1)}</span>}
+	        </div>
+	    ) : null;
         const selectedAudienceReception = selectedProject.audienceReception || buildDisplayAudienceReception(selectedProject);
         const selectedCriticReviews = getDisplayCriticReviews(
             selectedProject,
@@ -1221,7 +1247,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
         <div className="absolute inset-0 bg-zinc-950 flex flex-col z-50 text-white animate-in slide-in-from-right duration-300">
             <div className="bg-zinc-900 p-4 pt-12 pb-3 shadow-lg flex items-center gap-3 border-b border-zinc-800">
                 <button onClick={() => setSelectedProject(null)} aria-label="Back to credits" className="grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-white/10"><ArrowLeft size={20}/></button>
-                <div className="min-w-0 flex-1 break-words font-bold text-lg leading-tight">{selectedProject.name}</div>
+                <div className="min-w-0 flex-1 break-words font-bold text-lg leading-tight">{selectedTitle}</div>
                 <div className="bg-yellow-400 text-black px-2 py-1 rounded font-black text-xs">IMDb</div>
             </div>
 
@@ -1234,7 +1260,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                             <div className="relative min-h-[230px] bg-zinc-900 overflow-hidden">
                                 <CustomPosterImage poster={customPoster} alt={selectedProject.name} className="absolute inset-0 w-full h-full object-cover" />
                                 <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/85 to-transparent z-10">
-                                    <h1 className="text-[26px] font-black leading-[1.02] mb-2">{selectedProject.name}</h1>
+                                    <h1 className="text-[26px] font-black leading-[1.02] mb-2">{selectedTitle}</h1>
+                                    {selectedSeriesLine}
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400 mb-2">
                                         <span>{selectedProject.releaseDetailLabel}</span>
                                         <span>•</span>
@@ -1258,18 +1285,19 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         );
                     }
                     
-                    const bgClass = customPoster?.type === 'CONFIG' && customPoster.bgGradient ? customPoster.bgGradient : getPosterBg(selectedProject.name);
+                    const bgClass = customPoster?.type === 'CONFIG' && customPoster.bgGradient ? customPoster.bgGradient : getPosterBg(selectedTitle);
                     const textColor = customPoster?.type === 'CONFIG' && customPoster.textColor ? customPoster.textColor : 'text-white';
                     
                     return (
                         <div className={`relative min-h-[230px] bg-gradient-to-br ${bgClass} overflow-hidden`}>
                             <div className="absolute inset-0 flex items-center justify-center p-4">
                                 <div className={`text-center font-serif font-black ${textColor} opacity-20 text-5xl leading-none uppercase tracking-tighter transform -rotate-6 scale-125 mix-blend-overlay`}>
-                                    {selectedProject.name}
+                                    {selectedTitle}
                                 </div>
                             </div>
                             <div className="absolute bottom-0 left-0 p-4 w-full bg-gradient-to-t from-zinc-950 via-zinc-950/85 to-transparent z-10">
-                                <h1 className="text-[26px] font-black leading-[1.02] mb-2">{selectedProject.name}</h1>
+                                <h1 className="text-[26px] font-black leading-[1.02] mb-2">{selectedTitle}</h1>
+                                {selectedSeriesLine}
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400 mb-2">
                                     <span>{selectedProject.releaseDetailLabel}</span>
                                     <span>•</span>
@@ -1292,6 +1320,45 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         </div>
                     );
                 })()}
+
+                {selectedHasSeasons && selectedSeries && (
+                    <div data-series-season-tabs className="flex gap-1.5 overflow-x-auto no-scrollbar border-b border-zinc-800 bg-zinc-950 px-3 py-2.5">
+                        {selectedSeries.seasons.map(({ season, row }) => (
+                            <button
+                                key={row.id}
+                                type="button"
+                                aria-pressed={season === selectedSeason}
+                                onClick={() => setSelectedProject(row)}
+                                className={`min-h-11 min-w-[84px] flex-1 shrink-0 rounded-xl px-2 text-[11px] font-black uppercase tracking-[0.06em] transition-colors ${season === selectedSeason ? 'bg-yellow-400 text-black' : 'border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'}`}
+                            >
+                                Season {season}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+	                {selectedProject.mediaType === 'SERIES' && (
+	                    selectedProjectEpisodeRatings.length > 0 ? (
+	                        <>
+	                            <EpisodeRatingsHeatmap ratings={selectedProjectEpisodeRatings} tr={tr} activeSeason={selectedSeason} />
+	                            {selectedSeasonRatings && (
+	                                <SeasonEpisodeList
+	                                    season={selectedSeasonRatings}
+	                                    names={getProjectEpisodeNames(selectedProject.originalObject, selectedSeasonRatings.episodes.length)}
+	                                />
+	                            )}
+	                        </>
+	                    ) : (
+	                        <div className="p-4 border-b border-zinc-800 bg-zinc-950">
+	                            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+	                                <LayoutGrid size={16} className="text-emerald-400"/> {tr('imdb.project.episodeRatings')}
+	                            </h3>
+	                            <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs font-semibold text-zinc-500">
+	                                {tr('imdb.project.noEpisodeRatings')}
+	                            </div>
+	                        </div>
+	                    )
+	                )}
 
                 {/* Awards Banner */}
                 {selectedProject.awards && selectedProject.awards.length > 0 && (
@@ -1360,21 +1427,6 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                         </div>
                     </div>
                 )}
-
-	                {selectedProject.mediaType === 'SERIES' && (
-	                    selectedProjectEpisodeRatings.length > 0 ? (
-	                        <EpisodeRatingsHeatmap ratings={selectedProjectEpisodeRatings} tr={tr} />
-	                    ) : (
-	                        <div className="p-4 border-b border-zinc-800 bg-zinc-950">
-	                            <h3 className="text-white font-bold text-sm flex items-center gap-2">
-	                                <LayoutGrid size={16} className="text-emerald-400"/> {tr('imdb.project.episodeRatings')}
-	                            </h3>
-	                            <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs font-semibold text-zinc-500">
-	                                {tr('imdb.project.noEpisodeRatings')}
-	                            </div>
-	                        </div>
-	                    )
-	                )}
 
 	                {selectedProject.musicPlan?.credits?.length ? (
                     <div className="px-4 py-3 border-b border-zinc-800 bg-gradient-to-br from-cyan-950/20 via-zinc-950 to-zinc-950">
@@ -1751,7 +1803,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                      )}
                      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                          <h3 className="text-yellow-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
-                            {tr('imdb.profile.filmography')} <span className="bg-zinc-700 text-white px-1.5 py-0.5 rounded-full text-[10px]">{filteredCredits.length}</span>
+                            {tr('imdb.profile.filmography')} <span className="bg-zinc-700 text-white px-1.5 py-0.5 rounded-full text-[10px]">{creditRows.length}</span>
                          </h3>
                          {/* FILTER PILLS */}
                          <div className="flex bg-zinc-900 rounded-lg p-0.5 border border-zinc-700">
@@ -1768,8 +1820,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                      </div>
 
                      <div className="divide-y divide-zinc-800 bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
-                         {filteredCredits.length === 0 ? <div className="text-zinc-600 text-center py-8 text-sm">{tr('imdb.profile.noCredits')}</div> : filteredCredits.map((project) => (
-                             <div key={project.id} onClick={() => setSelectedProject(project)} className="flex gap-4 p-4 hover:bg-zinc-800 transition-colors cursor-pointer group">
+                         {creditRows.length === 0 ? <div className="text-zinc-600 text-center py-8 text-sm">{tr('imdb.profile.noCredits')}</div> : creditRows.map(({ project, opens, seasonCount }) => (
+                             <div key={project.id} onClick={() => setSelectedProject(opens)} className="flex gap-4 p-4 hover:bg-zinc-800 transition-colors cursor-pointer group">
                                  {hasCustomPosterMedia(project.customPoster) ? (
                                      <div className={`w-12 h-16 rounded shrink-0 flex items-center justify-center border-2 relative overflow-hidden ${project.mediaType === 'MOVIE' ? 'border-blue-500/60' : project.mediaType === 'SERIES' ? 'border-red-500/60' : 'border-zinc-700'}`}>
                                          <CustomPosterImage poster={project.customPoster} alt={project.name} className="absolute inset-0 w-full h-full object-cover" />
@@ -1792,6 +1844,7 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
                                      <div className="flex items-center gap-3 mt-1.5">
                                          {project.rating > 0 && <span className="flex items-center gap-1 text-zinc-200 text-xs font-bold"><Star size={10} className="text-yellow-400 fill-yellow-400"/> {project.rating.toFixed(1)}</span>}
                                          <span className="text-[10px] text-zinc-600 font-bold uppercase border border-zinc-700 px-1.5 rounded">{getProjectMediaTypeLabel(project.mediaType, 'short')}</span>
+                                         {seasonCount > 1 && <span className="text-[10px] text-yellow-300 font-bold uppercase border border-yellow-400/40 px-1.5 rounded whitespace-nowrap">{seasonCount} seasons</span>}
                                      </div>
                                  </div>
                                  <ChevronRight size={16} className="text-zinc-600"/>

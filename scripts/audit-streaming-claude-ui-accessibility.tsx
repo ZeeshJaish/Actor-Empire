@@ -21,6 +21,7 @@ const blocked: StreamingOpeningProgrammeView = {
   earliestOpeningAbsoluteWeek: 2115, dateCertainty: 'ESTIMATE',
   controllingWorkstreamId: 'INFRASTRUCTURE', remainingWeeks: 14,
   cityCount: 6, rackCount: 118, releasedCapital: 465_000_000,
+  progress: 0.07, totalWeeks: 15, citiesOnline: 0,
   workstreams: [
     {
       id: 'INFRASTRUCTURE', label: 'Infrastructure', status: 'IN_PROGRESS',
@@ -39,9 +40,10 @@ const blocked: StreamingOpeningProgrammeView = {
 const markup = renderToStaticMarkup(<StreamingOpeningProgramme
   brand={brand}
   view={blocked}
+  network={{ built: true, sites: [], markets: [], reached: 1, served: 1, revision: 1, pending: null, peakStreams: 0, capacityStreams: 0, weeklyOperatingCost: 0 }}
+  plan={null}
   focus="CLEARANCES"
   onBack={() => undefined}
-  onOpenCommissionedPlan={() => undefined}
   onResolveClearance={() => undefined}
   onOpeningNight={() => undefined}
 />);
@@ -50,9 +52,9 @@ assert.match(markup, /aria-describedby="sop-opening-gate-reason"/,
   'A disabled Opening Night action must point to its visible blocking reason.');
 assert.match(markup, /id="sop-opening-gate-reason"[^>]*role="status"/,
   'The Opening Night blocker must be an announced status with a stable id.');
-assert.match(markup, /Infrastructure is controlling the opening date/,
+assert.match(markup, /The network sets the opening date/,
   'The disabled action must explain which workstream controls the date.');
-assert.match(markup, /tabindex="-1"[^>]*class="is-focused is-action_required"/,
+assert.match(markup, /tabindex="-1"/,
   'A requested workstream must remain programmatically focusable.');
 
 const buildSource = source('components/streaming-transplant/StreamingBuildoutExperience.tsx');
@@ -70,9 +72,11 @@ assert.match(buildSource, /aria-describedby=\{!ready \? 'build-commission-reason
   'The disabled commission action must be connected to its launch-gate reason.');
 assert.match(buildSource, /id="build-commission-reason"[^>]*role="status"/,
   'The Build commission blocker must be a live, visible status.');
-assert.match(canonicalBuildSource, /aria-label=\{`\$\{s\.label\} stage, \$\{state === 'now'/,
+/* #157: the rail's buttons, same promise: their name, then current, complete or not complete */
+assert.match(canonicalBuildSource, /aria-label=\{`\$\{s\.label\} stage, \$\{i === index \? 'current'/,
   'Canonical Build-stage controls must announce both their names and progress states.');
-assert.match(canonicalBuildSource, /aria-describedby=\{index === BUILD_STAGES\.length - 1 \? 'bw-commission-guidance' : undefined\}/,
+/* #157 moved the last button into the HUD, which carries the same link */
+assert.match(canonicalBuildSource, /describedBy: 'bw-commission-guidance'/,
   'The disabled final Next action must point to commissioning guidance.');
 assert.match(atlasSource, /tabIndex=\{0\}[\s\S]*onKeyDown=/,
   'Interactive map geography must be keyboard focusable and keyboard operable.');

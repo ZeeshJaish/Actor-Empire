@@ -6,7 +6,7 @@
  *  - market buys: the weakest shelf by genre (what the market watches against what you carry), one title through the
  *    Content Market's own Buy inside the limit; never the same title twice; a pause after a no; a collection through
  *    its own signing (10⚡);
- *  - the Original pitch: Ask me only, once a quarter; taking it fills the commissioning desk;
+ *  - the Original pitch: Ask me only, once a quarter; taking it marks the pitch on the Originals Desk;
  *  - what you said no to is not asked again for eight weeks. */
 import assert from 'node:assert/strict';
 import { INITIAL_PLAYER, type Player, type StreamingRightsRenewalCase } from '../types';
@@ -250,11 +250,10 @@ async function main() {
     const taken = approveStreamingTeamCard(pitched, pitchCard.id);
     assert.ok(taken.changed);
     assert.deepEqual(taken.openRoom, { room: 'PITCH' });
-    const draft = platformOf(taken.player).originalCommissionDraft!;
-    const sent = (pitch.action as unknown as { draft: { title: string; genre: string } }).draft;
-    assert.ok(draft.title === sent.title && draft.genre === sent.genre && draft.currentStep === 1);
+    const marked = platformOf(taken.player).originalPitches?.recommendedPitchId;
+    assert.equal(marked, (pitch.action as { pitchId?: string }).pitchId, 'taking it marks the pitch on the Desk');
     assert.equal(runOriginalPitch(contextOf(taken.player)).length, 0, 'once a quarter');
-    pass(`taken: the commissioning desk opens on the brief, "${draft.title}" (${draft.genre}, ${draft.projectType}); no second pitch this quarter`);
+    pass(`taken: the Desk marks ${pitch.title}; the commission stays the player's; no second pitch this quarter`);
 
     console.log(`Team Content audit passed in ${Math.round((performance.now() - started) / 1000)} s.`);
 }

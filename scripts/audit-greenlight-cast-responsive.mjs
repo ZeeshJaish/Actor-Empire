@@ -7,13 +7,13 @@ const controls = readFileSync('views/lifestyle/business/components/CharacterIden
 
 assert.match(
   castStep,
-  /grid-cols-\[56px_minmax\(0,1fr\)\][^"]*sm:grid-cols-\[64px_minmax\(0,1fr\)_8rem\]/,
+  /grid-cols-\[56px_minmax\(0,1fr\)\]/,
   'Cast cards should reserve a flexible, non-overflowing content column.',
 );
 assert.match(
   castStep,
-  /col-span-2 min-w-0 sm:col-span-1 sm:col-start-2/,
-  'Character profile should use the full card width on phones.',
+  /isOpen && \(\s*<div className="mt-3 space-y-3 border-t/,
+  'Character profile should use the full card width, and open only when asked (#269).',
 );
 assert.match(
   castStep,

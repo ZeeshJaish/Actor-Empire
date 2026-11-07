@@ -529,12 +529,12 @@ export const applyPartnerBreakup = (player: Player, partnerId: string): Player =
 
     nextPlayer.stats.happiness = Math.max(0, nextPlayer.stats.happiness - 10);
     nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 4);
-    nextPlayer.logs = [{
+    nextPlayer.logs = [...(nextPlayer.logs || []), {
         week: nextPlayer.currentWeek,
         year: nextPlayer.age,
         message: `💔 You and ${partner.name} split. ${hasChildren ? 'Support obligations now follow the breakup.' : 'It ends without formal settlement.'}`,
         type: 'negative' as const,
-    }, ...nextPlayer.logs].slice(0, 50);
+    }];
 
     if (nextPlayer.stats.fame > 25) {
         nextPlayer.news.unshift(createTemplatedNews(
@@ -680,12 +680,12 @@ export const applyDivorceOutcome = (
         ? sample(COURTROOM_FLAVOR.SETTLE)
         : sample(COURTROOM_FLAVOR[lawyerTier || 'BUDGET']);
 
-    nextPlayer.logs = [{
+    nextPlayer.logs = [...(nextPlayer.logs || []), {
         week: nextPlayer.currentWeek,
         year: nextPlayer.age,
         message: `⚖️ Divorce finalized with ${spouse.name}. Settlement: ${settlementAmount.toLocaleString()} cash${legalCost > 0 ? ` + ${legalCost.toLocaleString()} legal fees` : ''}. ${courtroomFlavor}`,
         type: 'negative' as const,
-    }, ...nextPlayer.logs].slice(0, 50);
+    }];
 
     return nextPlayer;
 };
