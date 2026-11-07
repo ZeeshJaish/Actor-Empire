@@ -1,6 +1,7 @@
+import { getPrepaidScriptDevelopmentCash } from '../../../services/scriptDevelopmentFinance';
 import { CinemaForecastPanel } from '../../../components/CinemaForecastPanel';
 import { prepareCinemaPackageExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
-import { calculateActorRoleSalary } from '../../../services/talentService';
+import { calculateActorRoleSalary, calculateDirectorProjectSalary } from '../../../services/talentService';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Player, BudgetTier, Genre, ProjectDetails, ActiveRelease, Business, LocationDetails, Universe, UniverseId, ProjectMusicStrategy, MusicCreditRole, MusicArtist, ProjectInvestorFundingMode, StudioContract, RoleType, BackgroundCastingPlan, PlatformAiPlayerCommissionOffer, LockedStreamingFunding } from '../../../types';
@@ -1194,15 +1195,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         }
 
         const pricedTalent = talent.map(t => {
-            // Deterministic salary based on ID hash
+            // Public market fluctuations are seeded separately from the fee estimate.
             const seed = t.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            const rand = (seed % 100) / 100; // 0.00 to 0.99
 
-            let standardSalary = 0;
-            if (t.tier === 'A_LIST') standardSalary = 150000000 + (rand * 150000000); // 150M - 300M
-            else if (t.tier === 'ESTABLISHED') standardSalary = 50000000 + (rand * 50000000); // 50M - 100M
-            else if (t.tier === 'RISING') standardSalary = 10000000 + (rand * 20000000); // 10M - 30M
-            else standardSalary = 1000000 + (rand * 4000000); // 1M - 5M (Indie)
+            const standardSalary = t.salary && t.salary > 0 ? t.salary : calculateDirectorProjectSalary(t);
 
             const relationship = (player.relationships || []).find(rel => (
                 (rel.relation === 'Director' || rel.relation === 'Connection') &&
@@ -1944,15 +1940,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
                 else {
                     // Dynamic salary for NPCs
                     if (role === 'director') {
-                        // INFLATED DIRECTOR SALARIES (Max 250-300M)
-                        // Note: We use a deterministic "random" based on ID char codes to ensure price stays consistent between views
-                        const seed = candidate.id.charCodeAt(0) + candidate.id.charCodeAt(candidate.id.length - 1);
-                        const rand = (seed % 100) / 100;
-
-                        if (candidate.tier === 'A_LIST') cost = 150000000 + rand * 150000000;
-                        else if (candidate.tier === 'ESTABLISHED') cost = 50000000 + rand * 50000000;
-                        else if (candidate.tier === 'RISING') cost = 10000000 + rand * 20000000;
-                        else cost = 1000000 + rand * 4000000;
+                        cost = calculateDirectorProjectSalary(candidate);
                     } else {
                         // Standard Actor/Crew Salaries
                         if (candidate.tier === 'A_LIST') cost = 15000000;
@@ -2218,6 +2206,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         setActiveMusicSlotIndex(roleIndex);
     };
 
+    const prepaidDevelopmentCash = getPrepaidScriptDevelopmentCash(selectedScript, studio.id);
     const availableGreenlightFunds = useMemo(() => (
         isPlayerPlatformCommission ? lockedStreamingFundingAmount : calculateAvailableGreenlightFunds(
             studio.balance,
@@ -2228,11 +2217,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
 
     const maxMarketingBudget = useMemo(() => (
         calculateMaxGreenlightMarketingBudget(
-            availableGreenlightFunds,
+            availableGreenlightFunds + (isPlayerPlatformCommission ? 0 : prepaidDevelopmentCash),
             budgetBreakdown.total,
             musicBudget,
         )
-    ), [availableGreenlightFunds, budgetBreakdown.total, musicBudget]);
+    ), [availableGreenlightFunds, budgetBreakdown.total, musicBudget, prepaidDevelopmentCash, isPlayerPlatformCommission]);
 
     useEffect(() => {
         if (marketingBudgetPreset === 'CUSTOM') {
@@ -2253,13 +2242,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         platformCommissionOffer ? buildPlatformCommissionBudgetPresentation(packageBudget, platformCommissionOffer) : undefined
     ), [packageBudget, platformCommissionOffer]);
 
+    const unpaidPackageBudget = Math.max(0, packageBudget - prepaidDevelopmentCash);
     const maxInvestorRaise = useMemo(() => (
-        isPlayerPlatformCommission ? 0 : getMaxInvestorRaise(packageBudget, lockedStreamingFundingAmount)
-    ), [packageBudget, lockedStreamingFundingAmount, isPlayerPlatformCommission]);
-
+        isPlayerPlatformCommission ? 0 : getMaxInvestorRaise(unpaidPackageBudget, lockedStreamingFundingAmount)
+    ), [unpaidPackageBudget, lockedStreamingFundingAmount, isPlayerPlatformCommission]);
     const normalizedInvestorRaise = useMemo(() => (
-        normalizeInvestorRaiseAmount(investorRaiseAmount, packageBudget, lockedStreamingFundingAmount)
-    ), [investorRaiseAmount, packageBudget, lockedStreamingFundingAmount]);
+        isPlayerPlatformCommission ? 0 : normalizeInvestorRaiseAmount(investorRaiseAmount, unpaidPackageBudget, lockedStreamingFundingAmount)
+    ), [investorRaiseAmount, unpaidPackageBudget, lockedStreamingFundingAmount, isPlayerPlatformCommission]);
 
     const investorRaisePercent = useMemo(() => (
         calculateInvestorRaisePercent(normalizedInvestorRaise, maxInvestorRaise)
@@ -2272,11 +2261,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
     };
 
     useEffect(() => {
-        const normalized = normalizeInvestorRaiseAmount(investorRaiseAmount, packageBudget, lockedStreamingFundingAmount);
+        const normalized = isPlayerPlatformCommission ? 0 : normalizeInvestorRaiseAmount(investorRaiseAmount, unpaidPackageBudget, lockedStreamingFundingAmount);
         if (normalized !== investorRaiseAmount) {
             setInvestorRaiseAmount(normalized);
         }
-    }, [investorRaiseAmount, packageBudget, lockedStreamingFundingAmount]);
+    }, [investorRaiseAmount, unpaidPackageBudget, lockedStreamingFundingAmount, isPlayerPlatformCommission]);
 
     const investorPreviewProject = useMemo(() => (
         musicPreviewProject
@@ -2334,6 +2323,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ player, stud
         studioBalance: studio.balance,
         productionFund: studio.studioState?.productionFund || 0,
         lockedStreamingFundingAmount,
+        prepaidDevelopmentCash,
     });
     const investorOfferCards = useMemo(() => (
         investorOffers.map(offer => {

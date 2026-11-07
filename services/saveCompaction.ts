@@ -6,7 +6,6 @@ import { PLATFORM_AI_RUNTIME_SCHEMA_VERSION, type Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import {
   externalizeCustomPostersInPlayer,
-  stripEmbeddedPosterImageDataForPersistence,
 } from './customPosterMedia';
 import { compactOwnedStreamingPlatformForPersistence } from './ownedStreamingPlatform';
 import {
@@ -170,72 +169,18 @@ const compactAudienceReception = (audienceReception: any) => {
   };
 };
 
-const compactProjectDetails = (details: any) => {
-  if (!details || typeof details !== 'object') return details;
-  return {
-    ...details,
-    castList: trimHead(details.castList, PROJECT_CAST_MAX_ITEMS),
-    crewList: trimHead(details.crewList, PROJECT_CREW_MAX_ITEMS),
-    reviews: trimHead(details.reviews, PROJECT_REVIEW_MAX_ITEMS),
-    audienceReception: compactAudienceReception(details.audienceReception),
-  };
-};
-
-const compactRelease = (release: any) => {
-  if (!release || typeof release !== 'object') return release;
-  const compactedStreaming = release.streaming && typeof release.streaming === 'object'
-    ? {
-        ...release.streaming,
-        weeklyViews: trimRecent(release.streaming.weeklyViews, PROJECT_WEEKLY_HISTORY_MAX_ITEMS) || [],
-      }
-    : release.streaming;
-
-  return {
-    ...release,
-    projectDetails: compactProjectDetails(release.projectDetails),
-    weeklyGross: trimRecent(release.weeklyGross, PROJECT_WEEKLY_HISTORY_MAX_ITEMS) || [],
-    weeklyStudioReceipts: trimRecent(release.weeklyStudioReceipts, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyExhibitorReceipts: trimRecent(release.weeklyExhibitorReceipts, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyDistributionBreakdowns: trimRecent(release.weeklyDistributionBreakdowns, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyStreamingBreakdowns: trimRecent(release.weeklyStreamingBreakdowns, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklySoundtrackRevenue: trimRecent(release.weeklySoundtrackRevenue, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklySoundtrackBreakdowns: trimRecent(release.weeklySoundtrackBreakdowns, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    generatedNewsKeys: trimRecent(release.generatedNewsKeys, STUDIO_NOTICE_MAX_ITEMS),
-    streaming: compactedStreaming,
-  };
-};
-
-const compactPastProject = (project: any) => {
-  if (!project || typeof project !== 'object') return project;
-  return {
-    ...project,
-    weeklyViews: trimRecent(project.weeklyViews, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyGross: trimRecent(project.weeklyGross, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyStudioReceipts: trimRecent(project.weeklyStudioReceipts, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyExhibitorReceipts: trimRecent(project.weeklyExhibitorReceipts, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyDistributionBreakdowns: trimRecent(project.weeklyDistributionBreakdowns, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklyStreamingBreakdowns: trimRecent(project.weeklyStreamingBreakdowns, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklySoundtrackRevenue: trimRecent(project.weeklySoundtrackRevenue, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    weeklySoundtrackBreakdowns: trimRecent(project.weeklySoundtrackBreakdowns, PROJECT_WEEKLY_HISTORY_MAX_ITEMS),
-    castList: trimHead(project.castList, PROJECT_CAST_MAX_ITEMS),
-    reviews: trimHead(project.reviews, PROJECT_REVIEW_MAX_ITEMS),
-    audienceReception: compactAudienceReception(project.audienceReception),
-  };
-};
-
-const compactCommitment = (commitment: any) => {
-  if (!commitment || typeof commitment !== 'object') return commitment;
-  return {
-    ...commitment,
-    projectDetails: compactProjectDetails(commitment.projectDetails),
-  };
-};
+// User career records are permanent. Rendering may paginate them; persistence
+// must not turn display/history limits into destructive career truncation.
+const compactProjectDetails = (details: any) => details;
+const compactRelease = (release: any) => release;
+const compactPastProject = (project: any) => project;
+const compactCommitment = (commitment: any) => commitment;
 
 const compactStudioState = (studioState: any) => {
   if (!studioState || typeof studioState !== 'object') return studioState;
   return {
     ...studioState,
-    financeLedger: trimHead(studioState.financeLedger, STUDIO_FINANCE_LEDGER_MAX_ITEMS),
+    financeLedger: studioState.financeLedger,
     rightsMarketNotices: trimHead(studioState.rightsMarketNotices, STUDIO_NOTICE_MAX_ITEMS),
     subsidiaryDecisions: trimHead(studioState.subsidiaryDecisions, STUDIO_DECISION_MAX_ITEMS),
     activeDecisionArcs: trimHead(studioState.activeDecisionArcs, STUDIO_DECISION_MAX_ITEMS),
@@ -246,7 +191,7 @@ const compactBusiness = (business: any) => {
   if (!business || typeof business !== 'object') return business;
   return {
     ...business,
-    history: trimRecent(business.history, BUSINESS_HISTORY_MAX_ITEMS) || [],
+    history: business.history,
     studioState: compactStudioState(business.studioState),
   };
 };
@@ -282,12 +227,7 @@ const compactStudioAiCompanies = (value: unknown, absoluteWeek: number) => {
 const compactDynastyCareerArchives = (player: any) => {
   const archives = player.flags?.dynastyCareerArchives;
   if (!archives || typeof archives !== 'object' || Array.isArray(archives)) return {};
-  return Object.fromEntries(Object.entries(archives).map(([actorId, archive]: [string, any]) => [actorId, {
-    ...archive,
-    pastProjects: Array.isArray(archive?.pastProjects) ? archive.pastProjects.map(compactPastProject) : [],
-    activeReleases: Array.isArray(archive?.activeReleases) ? archive.activeReleases.map(compactRelease) : [],
-    awards: Array.isArray(archive?.awards) ? archive.awards.slice(-120) : [],
-  }]));
+  return archives;
 };
 
 const compactExtraNPCs = (player: any) => {
@@ -412,22 +352,22 @@ const retainBoundedHistory = <T,>(input: {
   activityWeekOf: (item: T) => number;
   terminalLimit: number;
 }): T[] => {
-  const protectedIds = new Set(input.items.filter(input.isProtected).map(input.idOf).filter(Boolean));
-  const terminalIds = input.items
-    .filter(item => !input.isProtected(item))
-    .map(item => ({ item, id: input.idOf(item), week: input.activityWeekOf(item) }))
+  const classified = input.items.map(item => ({ item, protected: input.isProtected(item), id: input.idOf(item) }));
+  const protectedIds = new Set(classified.filter(row => row.protected).map(row => row.id).filter(Boolean));
+  const terminalIds = classified
+    .filter(row => !row.protected)
+    .map(row => ({ id: row.id, week: input.activityWeekOf(row.item) }))
     .filter(entry => Boolean(entry.id))
     .sort((left, right) => right.week - left.week || left.id.localeCompare(right.id))
     .slice(0, input.terminalLimit)
     .map(entry => entry.id);
   const retainedIds = new Set([...protectedIds, ...terminalIds]);
   const seenIds = new Set<string>();
-  return input.items.filter(item => {
-    const id = input.idOf(item);
+  return classified.filter(({id}) => {
     if (!id || seenIds.has(id) || !retainedIds.has(id)) return false;
     seenIds.add(id);
     return true;
-  });
+  }).map(row => row.item);
 };
 
 const compactAwardHistory = (value: unknown): any[] => {
@@ -469,10 +409,13 @@ const compactPlatformAiSlate = (
   catalogueDistressDeals: any[],
   retainedAwardProjectIds: Set<string>,
   absoluteWeek: number,
+  worldWindowPlanIds: ReadonlySet<string>,
 ): any[] => {
   const ai = platform?.ai;
   const slate = Array.isArray(ai?.slate) ? ai.slate : [];
-  const protectedPlanIds = activeStreamingWindowPlanIds(world, absoluteWeek);
+  // The world index is immutable during compaction; local obligations belong
+  // only to this platform and must never leak into another platform's set.
+  const protectedPlanIds = new Set(worldWindowPlanIds);
   (Array.isArray(ai?.pendingAudienceSettlements) ? ai.pendingAudienceSettlements : [])
     .filter((settlement: any) => settlement?.status === 'PENDING')
     .forEach((settlement: any) => protectedPlanIds.add(stableHistoryId(settlement?.planId)));
@@ -771,6 +714,7 @@ const compactWorld = (player: any) => {
   const catalogueDistressDeals = normalizePlatformAiCatalogueDistressDeals(world.platformAiCatalogueDistressDeals);
   const awardHistory = compactAwardHistory(world.awardHistory);
   const retainedAwardProjectIds = awardLinkedProjectIds(awardHistory);
+  let worldWindowPlanIds: ReadonlySet<string> | undefined;
   const platforms = world.platforms && typeof world.platforms === 'object'
     ? Object.fromEntries(Object.entries(world.platforms).map(([platformId, platformValue]) => {
         const rawPlatform = platformValue as any;
@@ -831,6 +775,7 @@ const compactWorld = (player: any) => {
           catalogueDistressDeals,
           retainedAwardProjectIds,
           absoluteWeek,
+          worldWindowPlanIds || (worldWindowPlanIds = activeStreamingWindowPlanIds(world, absoluteWeek)),
         );
         const compactedRightsContracts = compactPlatformAiRightsContracts(
           rightsContracts,
@@ -1022,8 +967,7 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
     .filter((entry: CompactTimelineEntry) => entry?.title)
     .forEach((entry: CompactTimelineEntry) => highlightById.set(entry.id, entry));
   const legacyHighlights = Array.from(highlightById.values())
-    .sort((a, b) => b.absoluteWeek - a.absoluteWeek)
-    .slice(0, LEGACY_HIGHLIGHT_MAX_ITEMS);
+    .sort((a, b) => b.absoluteWeek - a.absoluteWeek);
   const protectedRivalMoveIds = new Set<string>();
   Object.values(nextPlayer.world?.platforms || {}).forEach((platform: any) => {
     (Array.isArray(platform?.ai?.externalCommitments) ? platform.ai.externalCommitments : [])
@@ -1032,7 +976,9 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
         if (moveId) protectedRivalMoveIds.add(moveId);
       });
   });
-  const safePlayer: any = stripEmbeddedPosterImageDataForPersistence({
+  // Keep supplied poster source intact. Explicit media externalization owns
+  // replacing embedded images; compaction must not mutate shared career records.
+  const safePlayer: any = {
     ...nextPlayer,
     commitments: Array.isArray(nextPlayer.commitments) ? nextPlayer.commitments.map(compactCommitment) : [],
     activeReleases: Array.isArray(nextPlayer.activeReleases) ? nextPlayer.activeReleases.map(compactRelease) : [],
@@ -1070,12 +1016,12 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
         legacyHighlightItems: legacyHighlights.length,
       },
     },
-  } as Player);
+  } as Player;
 
   if (safePlayer.instagram) {
     safePlayer.instagram = {
       ...safePlayer.instagram,
-      posts: Array.isArray(safePlayer.instagram.posts) ? safePlayer.instagram.posts.slice(0, SOCIAL_POST_MAX_ITEMS) : [],
+      posts: Array.isArray(safePlayer.instagram.posts) ? safePlayer.instagram.posts : [],
       feed: Array.isArray(safePlayer.instagram.feed) ? safePlayer.instagram.feed.slice(0, SOCIAL_FEED_MAX_ITEMS) : [],
     };
   }
@@ -1083,7 +1029,7 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
   if (safePlayer.x) {
     safePlayer.x = {
       ...safePlayer.x,
-      posts: Array.isArray(safePlayer.x.posts) ? safePlayer.x.posts.slice(0, SOCIAL_POST_MAX_ITEMS) : [],
+      posts: Array.isArray(safePlayer.x.posts) ? safePlayer.x.posts : [],
       feed: Array.isArray(safePlayer.x.feed) ? safePlayer.x.feed.slice(0, SOCIAL_FEED_MAX_ITEMS) : [],
     };
   }
@@ -1091,13 +1037,7 @@ export const compactPlayerForPersistence = (nextPlayer: Player): Player => {
   if (safePlayer.youtube) {
     safePlayer.youtube = {
       ...safePlayer.youtube,
-      videos: Array.isArray(safePlayer.youtube.videos)
-        ? safePlayer.youtube.videos.slice(0, YOUTUBE_VIDEO_MAX_ITEMS).map((video: any) => ({
-            ...video,
-            comments: Array.isArray(video.comments) ? video.comments.slice(0, YOUTUBE_COMMENT_MAX_ITEMS) : [],
-            weeklyHistory: Array.isArray(video.weeklyHistory) ? video.weeklyHistory.slice(-YOUTUBE_WEEKLY_HISTORY_MAX_ITEMS) : [],
-          }))
-        : [],
+      videos: Array.isArray(safePlayer.youtube.videos) ? safePlayer.youtube.videos : [],
     };
   }
 
@@ -1110,7 +1050,7 @@ export const compactPlayerForTransfer = async <T extends Player>(player: T): Pro
     const posterResult = await externalizeCustomPostersInPlayer(optimized);
     optimized = posterResult.player;
   } catch {
-    // Keep the transfer moving; persistence compaction still removes duplicate embedded poster data.
+    // Preserve supplied images when media externalization is unavailable.
   }
   return compactPlayerForPersistence(optimized) as T;
 };

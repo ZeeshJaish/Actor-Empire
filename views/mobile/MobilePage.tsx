@@ -25,7 +25,7 @@ import { YoutubeApp } from './YoutubeApp';
 import { GuideView } from '../../components/GuideView'; // Imported GuideView
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
-import { normalizeUniverseMap } from '../../services/universeLogic';
+import { normalizeUniverseMap, buildUniverseContractProject } from '../../services/universeLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { applyOpportunityIdentityToProject } from '../../services/characterIdentityLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
@@ -451,12 +451,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
               contract.films.forEach((film, index) => {
                   const isFirst = index === 0;
 
-                  // Clone project details but update title/role for specific film
-                  const filmDetails = {
-                      ...opp.project,
-                      title: film.title,
-                      subtype: film.type
-                  };
+                  const filmDetails = buildUniverseContractProject(opp.project, film);
                   const identifiedFilmDetails = applyOpportunityIdentityToProject({
                       ...opp,
                       roleType: film.role,

@@ -1480,6 +1480,9 @@ export interface Script {
     customPoster?: CustomPoster;
     lockedStreamingFunding?: LockedStreamingFunding;
     developmentCost?: number;
+    /** Recorded only when this studio actually pays new development/acquisition
+     * cash. Missing legacy evidence receives no retrospective cash credit. */
+    developmentPayment?: { studioId: string; cashPaid: number; allocatedProjectId?: string };
     purchaseCost?: number;
     createdAtWeek?: number;
     producedAtWeek?: number;
@@ -2163,6 +2166,7 @@ export interface StudioFinanceEntry {
 }
 
 export interface ProjectHiddenStats {
+    prepaidDevelopmentCash?: number;
     /** Idempotent personal premiere recognition; never a financial payout. */
     careerRecognitionApplied?: boolean;
     /** Player-visible production estimate, distinct from hidden delivered quality. */
@@ -7429,6 +7433,7 @@ export interface ContractFilm {
     title: string;
     role: RoleType;
     type: ProjectSubtype;
+    projectType?: ProjectType;
     weeksOffset: number;
 }
 

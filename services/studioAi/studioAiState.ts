@@ -88,6 +88,20 @@ export interface NormalizeStudioAiContext {
     status?: StudioAiCompanyStatus;
 }
 
+/** Exact intelligence projection without rebuilding unrelated slate/finance history. */
+export const readNormalizedStudioAiIntelligence = (
+    studio: NPCStudioState,
+    context: NormalizeStudioAiContext,
+) => {
+    const raw = studio.ai as Partial<StudioAiRuntimeState> | undefined;
+    return normalizeIndustryIntelligenceState(raw?.intelligence, createInitialIndustryIntelligenceState(
+        studio.id,
+        'PRODUCTION_STUDIO',
+        String(raw?.seed || createDeterministicId('studio_ai_seed', studio.id)),
+        context.absoluteWeek,
+    ));
+};
+
 export const normalizeStudioAiState = (
     studio: NPCStudioState,
     context: NormalizeStudioAiContext,
@@ -120,12 +134,6 @@ export const normalizeStudioAiState = (
     const slate = normalizeStudioAiSlateState(raw?.slate, context.absoluteWeek);
     const committedDevelopmentSlots = slate.commitments.filter(item => ['DEVELOPING', 'REWRITE'].includes(item.status)).length;
     const committedProductionSlots = slate.commitments.filter(item => item.status === 'GREENLIT' && isStudioAiSlateActive(item.status)).length;
-    const intelligenceFallback = createInitialIndustryIntelligenceState(
-        studio.id,
-        'PRODUCTION_STUDIO',
-        String(raw?.seed || createDeterministicId('studio_ai_seed', studio.id)),
-        context.absoluteWeek,
-    );
     return {
         schemaVersion: STUDIO_AI_SCHEMA_VERSION,
         studioId: studio.id,
@@ -164,7 +172,7 @@ export const normalizeStudioAiState = (
         lastProcessedAbsoluteWeek: raw?.lastProcessedAbsoluteWeek === undefined
             ? Math.max(0, whole(context.absoluteWeek) - 1)
             : whole(raw.lastProcessedAbsoluteWeek),
-        intelligence: normalizeIndustryIntelligenceState(raw?.intelligence, intelligenceFallback),
+        intelligence: readNormalizedStudioAiIntelligence(studio, context),
         slate,
     };
 };

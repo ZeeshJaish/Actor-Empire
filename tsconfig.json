@@ -33,6 +33,7 @@
     "android/app/build",
     "android/app/src/main/assets",
     "ios/App/App/public",
-    "docs/reports/**/evidence/**/*.mjs"
+    "docs/reports/**/evidence/**/*.mjs",
+    "cinema-verification.local"
   ]
 }

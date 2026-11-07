@@ -613,7 +613,7 @@ export const performStudioTreasuryTransfer = ({
             financeLedger: [
                 studioLedgerEntry,
                 ...((studio.studioState.financeLedger || [])),
-            ].slice(0, 200),
+            ],
         },
     };
 
@@ -650,7 +650,7 @@ export const performStudioTreasuryTransfer = ({
                 financeLedger: [
                     hqLedgerEntry,
                     ...((parentStudio.studioState.financeLedger || [])),
-                ].slice(0, 200),
+                ],
             },
         };
     }
@@ -796,7 +796,7 @@ export const executeFullStudioMerger = ({
                     id: `${studio.id}_${entry.id}`,
                     label: `${studio.name}: ${entry.label}`,
                 }))),
-            ].slice(0, 200),
+            ],
         },
     };
 
@@ -984,7 +984,7 @@ export const reverseFullStudioMerger = ({
                     label: `${studio.name} restored from HQ integration`,
                 }),
                 ...(restoredStudioState.financeLedger || []),
-            ].slice(0, 200),
+            ],
         },
     };
 
@@ -1019,7 +1019,7 @@ export const reverseFullStudioMerger = ({
                     label: `${studio.name} carve-out and restoration`,
                 }),
                 ...(parentState.financeLedger || []),
-            ].slice(0, 200),
+            ],
         },
     };
 

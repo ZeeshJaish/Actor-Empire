@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {makeCinemaFixture} from './fixtures/boxOfficeScenarios';
+import {prepareVerifiedPlayerForPersistence} from '../services/savePreparation';
+import {createSaveIntegrityManifest,verifySaveIntegrity} from '../services/saveIntegrity';
+const p=makeCinemaFixture().player;let reads=0;
+p.pastProjects=[{id:'projection-probe',name:'Original History',weeklyGross:[17,23],castList:[],reviews:[]}] as any;
+Object.defineProperty(p.pastProjects[0],'originalCareerText',{enumerable:true,get(){reads++;return 'Keep this complete career record'}});
+const prepared=prepareVerifiedPlayerForPersistence(p,'PROCESS_WEEK');
+assert.equal(reads,2,'Prepare should project original and prepared records once each, reusing the verified prepared projection when signing');
+const expected=createSaveIntegrityManifest(prepared.player,'PROCESS_WEEK',prepared.manifest.createdAt,prepared.needsRecoveryCheckpoint);assert.deepEqual(prepared.manifest,expected,'Signature must exactly match independently rebuilt issued projection');
+assert.equal(verifySaveIntegrity(prepared.player,prepared.manifest).ok,true);
+(prepared.player.pastProjects[0] as any).weeklyGross[0]=99;assert.equal(verifySaveIntegrity(prepared.player,prepared.manifest).ok,false,'Subsequent mutation must still fail independent verification');
+console.log(JSON.stringify({passed:3,preparationRecordProjections:2,exactSignature:true,mutationRejected:true}));

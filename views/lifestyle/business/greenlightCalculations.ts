@@ -178,6 +178,7 @@ export const calculateGreenlightFundingPosition = ({
     studioBalance,
     productionFund,
     lockedStreamingFundingAmount,
+    prepaidDevelopmentCash = 0,
 }: {
     packageBudget: number;
     investorRaisedAmount: number;
@@ -185,8 +186,9 @@ export const calculateGreenlightFundingPosition = ({
     studioBalance: number;
     productionFund: number;
     lockedStreamingFundingAmount: number;
+    prepaidDevelopmentCash?: number;
 }): GreenlightFundingPosition => ({
-    netGreenlightCashRequirement: Math.max(0, packageBudget - investorRaisedAmount),
+    netGreenlightCashRequirement: Math.max(0, packageBudget - Math.max(0, prepaidDevelopmentCash) - investorRaisedAmount),
     investorFundingShortfall: Math.max(0, normalizedInvestorRaise - investorRaisedAmount),
     investorFundingOverage: Math.max(0, investorRaisedAmount - normalizedInvestorRaise),
     effectiveStudioFundingPool: studioBalance + productionFund + lockedStreamingFundingAmount,

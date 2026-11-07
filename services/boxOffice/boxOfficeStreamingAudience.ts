@@ -28,8 +28,12 @@ export const cinemaStreamingInterestWeight = (player: Player, titleId: string, c
     return 1 + Math.min(P.maximumWaitingPreference, country.deferredPeople / Math.max(1, country.awarePeople)) * P.intentRetentionPerWeek ** Math.max(0, week - title.lastSettledWeek);
 };
 /** Integer allocation within actual licensed viewing envelopes; repeated starts never become cinema cash. */
-export const allocateCinemaStreamingEvidence = (player: Player, countryId: string, platformId: string, absoluteWeek: number, eligibleTitleIds: readonly string[], accounts: number): CinemaStreamingAudienceEvidence[] => {
-    const ids = [...new Set(eligibleTitleIds)].filter(id => !player.world.cinemaMarket?.titles[id] || (resolveStreamingProductionReadiness(player, id).ready && cinemaStreamingLanguageReady(player, id, countryId, platformId, absoluteWeek))).sort();
+export const allocateCinemaStreamingEvidence = (player: Player, countryId: string, platformId: string, absoluteWeek: number, eligibleTitleIds: readonly string[], accounts: number,
+    // Reuse only a caller's current synchronous read batch. Independent calls
+    // omit this argument and resolve the live production state afresh.
+    productionReady: (titleId: string) => boolean = id => resolveStreamingProductionReadiness(player, id).ready,
+): CinemaStreamingAudienceEvidence[] => {
+    const ids = [...new Set(eligibleTitleIds)].filter(id => !player.world.cinemaMarket?.titles[id] || (productionReady(id) && cinemaStreamingLanguageReady(player, id, countryId, platformId, absoluteWeek))).sort();
     if (!ids.length || accounts <= 0)
         return [];
     if (!Number.isSafeInteger(accounts))

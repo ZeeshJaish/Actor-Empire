@@ -18,7 +18,14 @@ export const migrateNpcVentureToStudio = (
     venture: NpcVentureState,
     existing: NPCStudioState | undefined,
     absoluteWeek: number,
+    options?: { applyLegacyProgress?: true },
 ): NPCStudioState => {
+    // Once promoted, this compatibility record is only a projection. Cinema
+    // receipts and studio spending can update the canonical cash after that
+    // projection was made. Loading/synchronizing it must not reverse those
+    // transactions. Only the actual weekly legacy processor submits new progress.
+    if (!options?.applyLegacyProgress && existing?.id === venture.id && existing.isNpcVenture
+        && existing.ai?.legacyVenture?.id === venture.id) return existing;
     const migrationKey = `npc-venture:${venture.id}`;
     const base: NPCStudioState = {
         ...(existing || {} as NPCStudioState),

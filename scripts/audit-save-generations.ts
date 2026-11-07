@@ -139,7 +139,9 @@ const v1Hash = (value: unknown): string => {
     }
     return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`;
 };
-const { digest: _v2Digest, createdAt: _v2CreatedAt, digestSchemaVersion: _v2Schema, ...v1Core } = oldManifest;
+const { digest: _v2Digest, createdAt: _v2CreatedAt, digestSchemaVersion: _v2Schema, ...currentCore } = oldManifest;
+const {userCareerRecords:_v5Records,...v1Protected}=oldManifest.protected;
+const v1Core={...currentCore,protected:v1Protected};
 const rolloutV1Manifest: SaveIntegrityManifest = {
     ...v1Core,
     createdAt: oldManifest.createdAt,

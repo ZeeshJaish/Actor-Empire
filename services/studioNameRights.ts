@@ -104,7 +104,7 @@ const addStudioLegalCharge = (
                     amount: -charge,
                     type: 'LEGAL' as const,
                     label,
-                }, ...(candidate.studioState.financeLedger || [])].slice(0, 200),
+                }, ...(candidate.studioState.financeLedger || [])],
             },
         };
     });

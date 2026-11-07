@@ -49,37 +49,74 @@ const validate = (input:CinemaWeekInput):void => {
 /** Population changes update current modeled segments, never immutable historical financial facts. */
 const reconcilePopulation = (input:CinemaWeekInput):CinemaWeekInput => {
     if(!input.marketState)return input;
-    const state=structuredClone(input.marketState),current=new Map(input.cohorts.map(c=>[c.id,c.people]));
+    // Reconciliation is a private read-only view. Clone only changed population
+    // rows; the allocator separately detaches every published audience/run row.
+    const state=input.marketState,current=new Map(input.cohorts.map(c=>[c.id,c.people]));
     const previous=new Map(Object.entries(state.cohortPopulations || {}));
     const known=new Set(previous.keys());
     // Legacy states need one fixed baseline per cohort across every title; never infer it mid-loop.
     for(const t of state.titles)for(const c of t.cells)if(!known.has(c.cohortId))
         previous.set(c.cohortId,Math.max(previous.get(c.cohortId)||0,current.get(c.cohortId)||0,c.awarePeople,c.seenBands.reduce((n,b)=>n+b.people,0)));
     for(const a of state.affinities)if(!known.has(a.cohortId))previous.set(a.cohortId,Math.max(previous.get(a.cohortId)||0,current.get(a.cohortId)||0,a.people));
-    for(const t of state.titles)for(const cell of t.cells) {
-        const n=current.get(cell.cohortId);if(n===undefined)continue;
+    const titles=state.titles.map(t=>{
+      let changed=false;
+      const cells=t.cells.map(cell=>{
+        const n=current.get(cell.cohortId);if(n===undefined)return cell;
         const old=previous.get(cell.cohortId) ?? Math.max(n,cell.awarePeople,cell.seenBands.reduce((n,b)=>n+b.people,0));
         cinemaCount(old,'prior cohort population');
         if(old>n) {
             const scaled=(count:number)=>Number(BigInt(cinemaCount(count,'prior audience'))*BigInt(n)/BigInt(old));
             const total=scaled(cell.seenBands.reduce((n,b)=>n+b.people,0));
             const bands=apportionCinemaIntegers(total,cell.seenBands.map((b,i)=>({id:String(i),weight:b.people})),input.seed,input.absoluteWeek);
-            cell.seenBands=cell.seenBands.map((b,i)=>({...b,people:bands.get(String(i)) || 0,repeatAdmissions:scaled(b.repeatAdmissions)})).filter(b=>b.people>0);
-            cell.awarePeople=scaled(cell.awarePeople);cell.deferredPeople=scaled(cell.deferredPeople);
+            changed=true;
+            return {...cell,seenBands:cell.seenBands.map((b,i)=>({...b,people:bands.get(String(i)) || 0,repeatAdmissions:scaled(b.repeatAdmissions)})).filter(b=>b.people>0),
+                awarePeople:scaled(cell.awarePeople),deferredPeople:scaled(cell.deferredPeople)};
         }
-    }
-    state.affinities=state.affinities.map(a=>{const n=current.get(a.cohortId),old=previous.get(a.cohortId);return n!==undefined && old && old>n ? {...a,people:Number(BigInt(a.people)*BigInt(n)/BigInt(old))}:a});
-    return {...input,marketState:state};
+        return cell;
+      });
+      return changed?{...t,cells}:t;
+    });
+    const affinities=state.affinities.map(a=>{const n=current.get(a.cohortId),old=previous.get(a.cohortId);return n!==undefined && old && old>n ? {...a,people:Number(BigInt(a.people)*BigInt(n)/BigInt(old))}:a});
+    return {...input,marketState:{...state,titles,affinities}};
 };
 const fingerprint = (value:unknown):string => {
-    const canonical=(v:unknown):unknown=>Array.isArray(v)?v.map(canonical).map(value=>({value,key:JSON.stringify(value)}))
-        .sort((a,b)=>a.value===undefined?(b.value===undefined?0:1):b.value===undefined?-1:a.key!.localeCompare(b.key!)).map(row=>row.value)
-        : v && typeof v==='object'?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>[k,canonical(x)])):v;
-    return `cinema-shadow-v1:${cinemaKey(0,0,JSON.stringify(canonical(value))).toString(16)}`;
+    // Produce the issued v2 canonical JSON directly. Rebuilding a parallel
+    // object tree serialized every nested array element again at each ancestor.
+    // Strings here live only for this invocation; no mutable-state hash cache.
+    const keysQuoted=new Map<string,string>();
+    const quoteKey=(key:string):string=>{
+        const hit=keysQuoted.get(key);if(hit!==undefined)return hit;
+        const text=JSON.stringify(key);if(key.length<=128 && keysQuoted.size<2048)keysQuoted.set(key,text);return text;
+    };
+    const isIndex=(key:string):boolean=>{const n=Number(key);return Number.isInteger(n)&&n>=0&&n<4294967295&&String(n)===key;};
+    const canonical=(v:unknown):string|undefined=>{
+        if(Array.isArray(v)) {
+            const rows=Array.from({length:v.length},(_,index)=>canonical(v[index]));
+            rows.sort((a,b)=>a===undefined?(b===undefined?0:1):b===undefined?-1:a.localeCompare(b));
+            return `[${rows.map(text=>text===undefined?'null':text).join(',')}]`;
+        }
+        if(v && typeof v==='object') {
+            const record=v as Record<string,unknown>,keys=Object.keys(record);
+            // JSON.stringify(Object.fromEntries(sortedEntries)) still emits
+            // integer-index keys first, in numeric order. Object.keys has that
+            // order already; only the following named keys use locale ordering.
+            let firstNamed=0;while(firstNamed<keys.length && isIndex(keys[firstNamed]))firstNamed++;
+            const ordered=firstNamed?keys.slice(0,firstNamed).concat(keys.slice(firstNamed).sort((a,b)=>a.localeCompare(b))):keys.sort((a,b)=>a.localeCompare(b));
+            const fields:string[]=[];
+            for(const key of ordered){const text=canonical(record[key]);if(text!==undefined)fields.push(`${quoteKey(key)}:${text}`)}
+            return `{${fields.join(',')}}`;
+        }
+        return JSON.stringify(v);
+    };
+    // sourceSignature is derived from these same facts. Including its full
+    // serialized copy again inflated both canonicalization and result issuance.
+    // v2 changes diagnostic identity only; exact source/issued checks stay intact.
+    const {live,...facts}=value as CinemaWeekInput;
+    const independentFacts={...facts,...(live?{live:{clockEpoch:live.clockEpoch}}:{})};
+    return `cinema-input-v2:${cinemaKey(0,0,canonical(independentFacts)!).toString(16)}`;
 };
 
-/** Pure complete-slate shadow calculation. All money is a proposal; nothing is persisted or paid. */
-export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
+const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     input=reconcilePopulation(input);
     validate(input);
     const supply=input.supply ? structuredClone(input.supply) : quoteCinemaSupply(input);
@@ -232,9 +269,9 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     for(const title of titles){
         const cells=snapshot.titles.find(t=>t.titleId===title.titleId)!.cells;
         const choices=snapshot.choices.filter(c=>c.titleId===title.titleId&&c.kind==='FIRST');
+        const cellsByCountry=group(cells,c=>inputCohortIndex.get(c.cohortId)?.countryId || '');
         const countries=[...inputCohortsByCountry.keys()].sort().map(countryId=>{
-            const ids=new Set(inputCohortsByCountry.get(countryId)!.map(c=>c.id));
-            const local=cells.filter(c=>ids.has(c.cohortId));
+            const local=cellsByCountry.get(countryId)||[];
             return {countryId,awarePeople:cinemaSum(local.map(c=>c.awarePeople)),deferredPeople:cinemaSum(local.map(c=>c.deferredPeople))};
         }).filter(c=>c.awarePeople>0||c.deferredPeople>0);
         Object.assign(title,{audienceSignals:{awarePeople:cinemaSum(cells.map(c=>c.awarePeople)),
@@ -251,8 +288,14 @@ export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         affinities:input.marketState?.affinities || [],runs},new Set([...snapshot.titles,...retained].map(t=>t.titleId)));
     cohorts.forEach(c=>{c.unspentCents=c.walletCents-c.spentCents;if(c.unspentCents<0||c.usedMinutes>c.leisureMinutes)throw new Error('Cinema resource conservation failed')});
     for(const s of supplyRows)if(s.admissions>s.seats||s.usedScreenMinutes>s.availableScreenMinutes)throw new Error('Cinema physical conservation failed');
-    return issueCinemaResult({absoluteWeek:input.absoluteWeek,tuningVersion:input.tuningVersion,mode:input.live?'LIVE':'SHADOW',...(input.live?{live:{...input.live}}:{}),inputFingerprint:fingerprint(input),titles,cohorts,supply:supplyRows.sort((a,b)=>a.poolId.localeCompare(b.poolId)),
+    return {absoluteWeek:input.absoluteWeek,tuningVersion:input.tuningVersion,mode:input.live?'LIVE':'SHADOW',...(input.live?{live:{...input.live}}:{}),inputFingerprint:fingerprint(input),titles,cohorts,supply:supplyRows.sort((a,b)=>a.poolId.localeCompare(b.poolId)),
         allocations:allocations.sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.cohortId.localeCompare(b.cohortId)||a.poolId.localeCompare(b.poolId)||a.kind.localeCompare(b.kind)),
         exhibition, costEvents:costEvents.sort((a,b)=>a.id.localeCompare(b.id)),nextState:{...compact,titles:[...compact.titles].sort((a,b)=>a.titleId.localeCompare(b.titleId)),
-            runs:[...compact.runs].sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.poolId.localeCompare(b.poolId))}});
+            runs:[...compact.runs].sort((a,b)=>a.titleId.localeCompare(b.titleId)||a.poolId.localeCompare(b.poolId))}};
 };
+
+/** Pure complete-slate proposal. Its mutation guard exists before it reaches a caller. */
+export const simulateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => issueCinemaResult(calculateCinemaWeek(input));
+
+/** Internal synchronous consumption only. This unissued proposal cannot pass public commit. */
+export const consumeUnexposedCinemaWeek = <T>(input:CinemaWeekInput, consume:(result:CinemaWeekResult)=>T):T => consume(calculateCinemaWeek(input));

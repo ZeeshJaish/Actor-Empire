@@ -13,7 +13,7 @@ import { initializeStocks } from '../services/stockLogic';
 import { CinemaMemorySaveStore } from './fixtures/cinemaSaveStore';
 import { careerActionHarness, normalizeCareerCommitmentsThroughApp } from './fixtures/actorCareerActions';
 
-const out = '/tmp/ae-career-compatibility';
+const out = process.env.CAREER_COMPATIBILITY_OUTPUT_DIR || '/tmp/ae-career-compatibility';
 mkdirSync(out, { recursive: true });
 let state = 78123, tick = 0;
 Math.random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);

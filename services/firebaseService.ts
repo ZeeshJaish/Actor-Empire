@@ -114,6 +114,7 @@ type WeekProcessingDebugSnapshot = {
   elapsed_ms?: number;
   save_size?: number;
   save_size_mb?: number;
+  save_size_basis?: 'SOURCE_AT_WEEK_START' | 'EXPLICIT' | 'LAST_RECORDED' | 'UNKNOWN';
   pending_events?: number;
   commitments?: number;
   active_releases?: number;
@@ -524,6 +525,7 @@ const getWeekProcessingDebugFields = (player?: Player | null) => {
       week_debug_elapsed_ms: snapshot.elapsed_ms,
       week_debug_save_size: snapshot.save_size,
       week_debug_save_mb: snapshot.save_size_mb,
+      week_debug_save_size_basis: snapshot.save_size_basis,
       week_debug_pending_events: snapshot.pending_events,
       week_debug_commitments: snapshot.commitments,
       week_debug_active_releases: snapshot.active_releases,
@@ -947,16 +949,21 @@ export const markWeekProcessingStage = (
     : Number.isFinite(startedAtMs)
       ? Math.max(0, Date.now() - startedAtMs)
       : undefined;
-  // Full serialization is expensive on long-running mobile saves. Capture it only
-  // at the start and after compaction, then reuse that size for every checkpoint.
+  // Optional diagnostics must not encode a complete retained career on every
+  // click. Explicit detailed traces can sample once at start; persistence still
+  // independently verifies the complete prepared/stored player in every mode.
+  const sampleSourceSize = safeStage === 'start' && context.measure_save_size === true;
   const shouldMeasureSaveSize = typeof context.save_size === 'number'
-    || safeStage === 'start'
-    || safeStage === 'persist_prepare_done';
+    || sampleSourceSize;
   const saveSize = typeof context.save_size === 'number'
     ? context.save_size
     : shouldMeasureSaveSize
       ? estimateSaveSize(player)
       : previous?.save_size || 0;
+  const saveSizeBasis: WeekProcessingDebugSnapshot['save_size_basis'] = typeof context.save_size === 'number'
+    ? 'EXPLICIT' : sampleSourceSize ? 'SOURCE_AT_WEEK_START'
+      : isNewRun ? (previous?.save_size ? 'LAST_RECORDED' : 'UNKNOWN')
+        : previous?.save_size_basis || (previous?.save_size ? 'LAST_RECORDED' : 'UNKNOWN');
   const playerSnapshot = getPlayerSnapshot(player);
   const productionSnapshot = getProductionHouseSnapshot(player);
   const status = String(context.status || (safeStage.includes('fail') ? 'failed' : safeStage === 'success' ? 'success' : 'running'));
@@ -995,6 +1002,7 @@ export const markWeekProcessingStage = (
     elapsed_ms: elapsedMs,
     save_size: saveSize,
     save_size_mb: saveSize ? Math.round((saveSize / 1000000) * 10) / 10 : 0,
+    save_size_basis: saveSizeBasis,
     pending_events: numericContext('pending_events', playerSnapshot.pending_events as number | undefined),
     commitments: numericContext('commitments', playerSnapshot.commitments as number | undefined),
     active_releases: numericContext('active_releases', playerSnapshot.active_releases as number | undefined),
@@ -1040,6 +1048,7 @@ export const markWeekProcessingStage = (
       week_run_id: runId,
       week_elapsed_ms: elapsedMs,
       week_save_size: saveSize,
+      week_save_size_basis: saveSizeBasis,
       week_error: error,
       week_slowest_stage: slowestStage,
       week_slowest_stage_ms: slowestStageMs,

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,mkdtempSync,rmSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {INITIAL_PLAYER,type Player,type Genre} from '../types';
 import {migratePlayerSave} from '../services/saveMigration';
@@ -14,7 +14,10 @@ import {commitCinemaWeek} from '../services/boxOffice/boxOfficeLiveSettlement';
 import {inspectCinemaSavedState} from '../services/boxOffice/boxOfficeMigration';
 import {CinemaMemorySaveStore} from './fixtures/cinemaSaveStore';
 import {cinemaAuditRandom,cinemaAuditClock,readCinemaAuditCheckpoint,writeCinemaAuditCheckpoint} from './fixtures/cinemaAuditCheckpoint';
+import {CinemaFileSaveStore} from './fixtures/cinemaFileSaveStore';
+import {createMatureAppCareerPolicy} from './fixtures/cinemaMatureAppPolicy';
 import {createNormalAppCareerPolicy} from './fixtures/cinemaNormalAppPolicy';
+import {assertMatureCastMigrationPreserved} from './fixtures/cinemaMatureMigrationAssertions';
 import {summarizeCareerFilms,type CareerFilmObservation} from './fixtures/cinemaCareerCohortMetrics';
 import type {CinemaWeekResult} from '../services/boxOffice/boxOfficeTypes';
 
@@ -22,8 +25,20 @@ const seed=Number(process.env.CAREER_SEED||0),horizon=Number(process.env.CAREER_
 const genre=(['DRAMA','COMEDY','ACTION','DRAMA'] as Genre[])[seed%4];
 const out=process.env.CAREER_OUTPUT!;assert.ok(out);mkdirSync(out,{recursive:true});
 const executable=createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex');
-const checkpointFile=`${out}/career-${seed}.json.gz`,prior=readCinemaAuditCheckpoint<any>(checkpointFile);
-if(prior){assert.equal(prior.executable,executable);assert.equal(prior.horizon,horizon);assert.equal(prior.genre,genre)}
+const checkpointFile=`${out}/career-${seed}.json.gz`,continued=readCinemaAuditCheckpoint<any>(checkpointFile);
+const parentFile=!continued?process.env.CAREER_PARENT_CHECKPOINT:undefined;
+const inherited=parentFile?readCinemaAuditCheckpoint<any>(parentFile):undefined;
+const prior=continued||inherited;
+if(prior){if(!inherited||process.env.CAREER_AUDIT_ASSERTION_UPDATE!=='1')assert.equal(prior.executable,executable);if(continued)assert.equal(prior.horizon,horizon);else assert.ok(prior.horizon<=horizon);assert.equal(prior.genre,genre);assert.equal(prior.seed??seed,seed);}
+if(inherited){const meta=JSON.parse(readFileSync(parentFile!.replace(/career-\d+\.json\.gz$/,'executable.json'),'utf8'));assert.equal(meta.kind,'normal-ui');assert.equal(meta.sha256,inherited.executable);
+ if(process.env.CAREER_AUDIT_ASSERTION_UPDATE==='1'){
+  const current=JSON.parse(readFileSync(out+'/executable.json','utf8'));
+  const assertionInputs=new Set(['scripts/audit-cinema-normal-cohort.ts','scripts/fixtures/cinemaMatureMigrationAssertions.ts']);
+  for(const[file,sha]of Object.entries(meta.sourceHashes))if(!assertionInputs.has(file))assert.equal(current.sourceHashes[file],sha,'Audit continuation cannot change product or action-policy source: '+file);
+  for(const[file,sha]of Object.entries(current.sourceHashes))if(!assertionInputs.has(file))assert.equal(meta.sourceHashes[file],sha,'Audit continuation cannot add product or action-policy source: '+file);
+ }else assert.equal(meta.sha256,executable);
+}
+const originCheckpointSha256=continued?.originCheckpointSha256|| (parentFile?createHash('sha256').update(readFileSync(parentFile)).digest('hex'):undefined);
 // The game mutates this runtime catalogue when NPCs earn music income. A cold
 // audit worker must resume those earned values instead of resetting founders'
 // wealth between batches. This belongs to the audit checkpoint, not user saves.
@@ -42,11 +57,14 @@ let weeks=prior?.weeks||0,saves=prior?.saves||0,reloads=prior?.reloads||0,replay
 let failedPromotionChecked=prior?.failedPromotionChecked||false,status='RUNNING',failure:string|undefined;
 const actions:any[]=prior?.actions||[],phases=new Set<string>(prior?.phases||[]),signed=new Map<string,number>(prior?.signed||[]);
 const ownIds=new Set<string>(prior?.ownIds||[]),metadata=new Map<string,any>(prior?.metadata||[]),weekly=new Map<string,any[]>(prior?.weekly||[]);
-const policy=createNormalAppCareerPolicy(genre,seed,actions,signed,phases);
-const store=new CinemaMemorySaveStore(),key='normal-cohort-'+seed;
+const uiGated=process.env.CAREER_AUDIT_KIND==='normal-ui',managed=prior?.managed||{pressedProjectIds:[]};
+const policy=uiGated?createMatureAppCareerPolicy(seed,actions,signed,phases,managed):createNormalAppCareerPolicy(genre,seed,actions,signed,phases);
+const generationDirectory=uiGated?mkdtempSync(out+'/verified-generations-'):null;
+const store=generationDirectory?new CinemaFileSaveStore(generationDirectory):new CinemaMemorySaveStore(),key='normal-cohort-'+seed;
 let peakRssBytes=prior?.peakRssBytes||0;const started=performance.now();
 const hash=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const protectedState=(p:Player)=>({cash:p.money,businesses:p.businesses.map(b=>[b.id,b.balance]),cinema:p.world.cinemaMarket,
+    team:{agent:p.team.agent,manager:p.team.manager,publicist:p.team.publicist,agentFeeWeek:p.team.lastAgentFeePaidWeek,managerFeeWeek:p.team.lastManagerFeePaidWeek},sponsorships:p.activeSponsorships,
     contracts:p.world.streamingRightsContracts,shares:p.portfolio,awards:p.awards,roles:p.commitments.map(c=>({id:c.id,pay:c.lumpSum,phase:c.projectPhase,
         cast:c.projectDetails?.castList?.map(m=>({id:m.id,actorId:m.actorId,npcId:m.npcId,role:m.role,roleType:m.roleType,salary:m.salary,characterId:m.characterId,recognition:m.cinemaRecognition})),
         launch:c.projectDetails?.offeredCinemaLaunch,marketing:c.projectDetails?.marketingBudgetSpent}))});
@@ -78,7 +96,7 @@ const films=():CareerFilmObservation[]=>Object.values(player.world.cinemaMarket!
 }));
 const report=()=>{
     collect();const observed=films(),summary=summarizeCareerFilms(observed);
-    writeFileSync(`${out}/career-${seed}.json`,JSON.stringify({kind:'ACTUAL_NORMAL_CAREER_COHORT',executable,seed,genre,horizon,status,failure,
+    writeFileSync(`${out}/career-${seed}.json`,JSON.stringify({kind:uiGated?'UI_GATED_FRESH_NORMAL_CAREER_COHORT':'ACTUAL_NORMAL_CAREER_COHORT',uiEligibilityVerified:uiGated,auditAssertionUpdate:process.env.CAREER_AUDIT_ASSERTION_UPDATE==='1',originCheckpointSha256,executable,seed,genre,horizon,status,failure,
         weeks,saves,reloads,replays,failedPromotionChecked,phases:[...phases],ownIds:[...ownIds],cash:player.money,alive:!player.flags.isDead,
         skill:getActorTalent(player.stats.skills),health:player.stats.health,peakRssBytes,elapsedMs:(prior?.elapsedMs||0)+Math.round(performance.now()-started),
         summary,films:observed,actions,limitations:['Fresh $2000 actor; exact current App action callbacks; no grants',
@@ -100,8 +118,7 @@ const persist=async(fault=false)=>{
     // A legacy generated co-star may receive missing AUTO story defaults. Existing story identities must still survive.
     for(const c of loaded.player!.commitments)for(const member of c.projectDetails?.castList||[]){
         const next=player.commitments.find(n=>n.id===c.id)?.projectDetails?.castList?.find(n=>n.id===member.id);
-        for(const key of ['storyFunction','storyRole','abilityType','nature','identitySource'] as const)
-            if(member[key]!==undefined)assert.deepEqual(next?.[key],member[key]);
+        assertMatureCastMigrationPreserved(member,next,c.projectDetails?.universeId);
     }
     reloads++;
 };
@@ -130,11 +147,12 @@ try{
         collect();peakRssBytes=Math.max(peakRssBytes,process.memoryUsage().rss,process.resourceUsage().maxRSS*1024);
         if(weeks%4===0)console.log(JSON.stringify({seed,weeks,cash:player.money,own:ownIds.size,titles:metadata.size,peakMiB:Math.round(peakRssBytes/1048576)}));
         if(player.money<0){status='UNFUNDED';break}
+        if(process.env.CAREER_STOP_AT_MATURE_OWNER==='1'&&player.money>=75e6&&getActorTalent(player.stats.skills)>=80&&player.stats.fame>=70&&player.stats.health>=60){status='OWNER_READY';break}
         (globalThis as any).gc?.();
     }
     if(status==='RUNNING')status=player.flags.isDead?'CAREER_ENDED':weeks>=horizon?'HORIZON_COMPLETE':'CHECKPOINT_READY';
-    writeCinemaAuditCheckpoint(checkpointFile,{executable,horizon,genre,player,npcDatabase:NPC_DATABASE,weeks,saves,reloads,replays,failedPromotionChecked,actions,
+    writeCinemaAuditCheckpoint(checkpointFile,{executable,horizon,genre,seed,originCheckpointSha256,managed,player,npcDatabase:NPC_DATABASE,weeks,saves,reloads,replays,failedPromotionChecked,actions,
         ownIds:[...ownIds],metadata:[...metadata],weekly:[...weekly],signed:[...signed],phases:[...phases],randomCalls:rng.calls(),clockNext:clock.next(),
         peakRssBytes,elapsedMs:(prior?.elapsedMs||0)+Math.round(performance.now()-started)});
-}catch(e){status='FAILURE';failure=(e as Error).stack;process.exitCode=1;}
+}catch(e){status='FAILURE';failure=(e as Error).stack;process.exitCode=1;}finally{if(generationDirectory)rmSync(generationDirectory,{recursive:true,force:true});}
 report();console.log(JSON.stringify({seed,status,weeks,own:ownIds.size,cash:player.money,failure}));

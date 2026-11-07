@@ -92,7 +92,8 @@ const oldWorldStates = [
     sourceFingerprint: 'sourceFingerprint' in state ? state.sourceFingerprint : undefined,
     global: state.global,
 } : null);
-const oldProtected = { ...manifest.protected, worldEconomy: legacyHash(oldWorldStates) };
+const {userCareerRecords:_v5Records,...issuedProtected}=manifest.protected;
+const oldProtected = { ...issuedProtected, worldEconomy: legacyHash(oldWorldStates) };
 const { digest: _currentDigest, createdAt: _createdAt, digestSchemaVersion: _oldSchema, ...oldDigestSource } = manifest;
 const oldManifest = { ...oldDigestSource, createdAt: manifest.createdAt, protected: oldProtected,
     digest: legacyHash({ ...oldDigestSource, protected: oldProtected }) };
@@ -114,6 +115,7 @@ preExpansionPlayer.world.legacyStreamingRightsHolds = {
 } as unknown as NonNullable<Player['world']['legacyStreamingRightsHolds']>;
 const expandedManifest = createSaveIntegrityManifest(preExpansionPlayer, 'PROCESS_WEEK', 123);
 const {
+    userCareerRecords: _oldCareerRecords,
     archiveRootDigest: _oldArchiveRoot,
     legacyStreamingRightsHolds: _oldHolds,
     historicalCatalogue: _oldCatalogue,
@@ -136,7 +138,9 @@ assert.equal(verifySaveIntegrity(tamperedPreExpansion, shippedV1Manifest).ok, fa
 
 // The rollout that introduced those fields also signed them as unversioned v1.
 // Its saves must stay valid alongside the older v1 projection.
-const { digest: _rolloutDigest, createdAt: _rolloutAt, digestSchemaVersion: _rolloutSchema, ...rolloutCore } = expandedManifest;
+const { digest: _rolloutDigest, createdAt: _rolloutAt, digestSchemaVersion: _rolloutSchema, ...rolloutCurrentCore } = expandedManifest;
+const {userCareerRecords:_rolloutV5,...rolloutProtected}=expandedManifest.protected;
+const rolloutCore={...rolloutCurrentCore,protected:rolloutProtected};
 const rolloutV1Manifest = {
     ...rolloutCore,
     createdAt: expandedManifest.createdAt,
@@ -149,7 +153,7 @@ const tamperedRollout = structuredClone(preExpansionPlayer) as Player;
 assert.equal(verifySaveIntegrity(tamperedRollout, rolloutV1Manifest).ok, false,
     'current-rollout v1 must still protect its historical catalogue');
 
-assert.equal(expandedManifest.digestSchemaVersion, 4,
+assert.equal(expandedManifest.digestSchemaVersion, 5,
     'new signatures must identify their projection so future fields cannot silently change it');
 const wrongSchema = { ...expandedManifest, digestSchemaVersion: 99 };
 assert.equal(verifySaveIntegrity(preExpansionPlayer, wrongSchema).ok, false,
@@ -171,7 +175,8 @@ const pinnedV2Player = {
 } as unknown as Player;
 const pinnedCurrentManifest = createSaveIntegrityManifest(pinnedV2Player, 'AUTOSAVE', 456);
 const {digest:_currentPinnedDigest,createdAt:_currentPinnedAt,...pinnedCurrentCore}=pinnedCurrentManifest;
-const pinnedV2Core={...pinnedCurrentCore,digestSchemaVersion:2};
+const {userCareerRecords:_pinnedV5,...pinnedOldProtected}=pinnedCurrentCore.protected;
+const pinnedV2Core={...pinnedCurrentCore,digestSchemaVersion:2,protected:pinnedOldProtected};
 const pinnedV2Manifest={...pinnedV2Core,createdAt:456,digest:legacyHash(pinnedV2Core)};
 assert.equal(verifySaveIntegrity(pinnedV2Player,pinnedV2Manifest).ok,true);
 assert.equal(pinnedV2Manifest.digest, 'a9c2c9234e13ad16',

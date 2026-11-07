@@ -1,3 +1,4 @@
+import { recordScriptDevelopmentPayment } from '../../../services/scriptDevelopmentFinance';
 import React, { useEffect, useRef, useState } from 'react';
 import { Player, Business, Script, ProjectType, Universe } from '../../../types';
 import { ArrowLeft, BookOpen, ShoppingCart, Sparkles, Layers, Globe } from 'lucide-react';
@@ -239,7 +240,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                             const updatedScripts = studioState.scripts.map(s => {
                                 if (s.id === scriptId) {
                                     return {
-                                        ...s,
+                                        ...recordScriptDevelopmentPayment(s, studio.id, cost),
                                         status: 'IN_DEVELOPMENT' as const,
                                         writerId,
                                         author: writer?.name || s.author,
@@ -247,7 +248,6 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                                         assignedSpeed: speed,
                                         weeksInDevelopment: 0,
                                         totalDevelopmentWeeks: Math.floor((Math.random() * 23 + 12) * speed), // 12-35 weeks modified by speed
-                                        developmentCost: (s.developmentCost || 0) + cost,
                                         attributes: writer?.stats ? {
                                             plot: writer.stats.creativity,
                                             characters: writer.stats.dialogue,
@@ -269,6 +269,11 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                         }
                     }}
                     onUpdateScript={(updatedScript, costType, costAmount) => {
+                        if (costType === 'MONEY' && costAmount && costAmount > 0) {
+                            const priorScript = studioState.scripts.find(script => script.id === updatedScript.id);
+                            updatedScript = recordScriptDevelopmentPayment({ ...updatedScript,
+                                developmentCost: priorScript?.developmentCost || 0, developmentPayment: priorScript?.developmentPayment }, studio.id, costAmount);
+                        }
                         const updatedScripts = studioState.scripts.map(s => s.id === updatedScript.id ? updatedScript : s);
                         const updatedStudio = { ...studio, studioState: { ...studioState, scripts: updatedScripts } };
                         
@@ -349,7 +354,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
                             const updatedPurchasedTitles = [...(studioState.purchasedIPTitles || []), script.title];
                             const updatedState = {
                                 ...studioState,
-                                scripts: [...studioState.scripts, { ...script, status: 'READY' as const, developmentCost: cost, createdAtWeek: player.currentWeek }],
+                                scripts: [...studioState.scripts, { ...recordScriptDevelopmentPayment({ ...script, developmentCost: 0, developmentPayment: undefined }, studio.id, cost), status: 'READY' as const, createdAtWeek: player.currentWeek }],
                                 ipMarket: studioState.ipMarket.filter(s => s.id !== script.id),
                                 purchasedIPTitles: updatedPurchasedTitles
                             };

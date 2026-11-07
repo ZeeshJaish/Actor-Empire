@@ -775,7 +775,7 @@ const launchSubsidiaryProductionFromProposal = (
             financeLedger: [
                 ledgerEntry,
                 ...(studioState.financeLedger || []),
-            ].slice(0, 200),
+            ],
             lastSubsidiaryOperationWeek: player.currentWeek,
             lastSubsidiaryOperationYear: player.age,
         },

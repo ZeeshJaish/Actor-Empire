@@ -234,7 +234,7 @@ const createVentureProject = (
     };
 };
 
-export const syncNpcVenturesToStudios = (world: WorldState, absoluteWeek = Math.max(0, world.npcVentureLastProcessedAbsoluteWeek || 0)): WorldState => {
+export const syncNpcVenturesToStudios = (world: WorldState, absoluteWeek = Math.max(0, world.npcVentureLastProcessedAbsoluteWeek || 0), options?: { applyLegacyProgress?: true }): WorldState => {
     const npcVentures = world.npcVentures || {};
     const studios = { ...(world.studios || {}) };
 
@@ -243,6 +243,7 @@ export const syncNpcVenturesToStudios = (world: WorldState, absoluteWeek = Math.
             venture,
             studios[venture.id],
             absoluteWeek,
+            options,
         );
     });
 
@@ -324,7 +325,7 @@ export const processNpcVentures = (player: Player, world: WorldState): { world: 
     }
 
     world.npcVentureLastProcessedAbsoluteWeek = currentAbs;
-    return { world: syncNpcVenturesToStudios(world, studioAbsWeek(player.age, player.currentWeek)), news, logs };
+    return { world: syncNpcVenturesToStudios(world, studioAbsWeek(player.age, player.currentWeek), { applyLegacyProgress: true }), news, logs };
 };
 
 export const generateNpcVentureRoleOffer = (player: Player): { opportunity: AuditionOpportunity; venture: NpcVentureState } | null => {

@@ -26,6 +26,14 @@ export interface StoredSaveGeneration {
 export interface PromoteSaveGenerationInput {
     keys: SaveGenerationKeys;
     retainPrevious: boolean;
+    expectedCandidateDigest?: string;
+}
+
+export interface WriteVerifiedGenerationInput {
+    keys: SaveGenerationKeys;
+    generation: StoredSaveGeneration;
+    retainPrevious: boolean;
+    expectedCandidateDigest: string;
 }
 
 export interface RecoverSaveGenerationInput {
@@ -34,6 +42,7 @@ export interface RecoverSaveGenerationInput {
 
 export interface PromoteSaveGenerationBatchInput {
     keys: SaveGenerationKeys[];
+    expectedCandidateDigests?: Record<string, string>;
 }
 
 export interface SaveGenerationStore {
@@ -41,6 +50,10 @@ export interface SaveGenerationStore {
     /** One consistent transaction snapshot, including across other tab writers. */
     readMany?(keys: readonly string[]): Promise<Array<unknown | null>>;
     write(key: string, value: unknown): Promise<void>;
+    /** Optional atomic backend: verify the actual stored current/header before
+     * committing either current or previous; reject a different requested digest.
+     * Older backends retain the independently staged/read-back/promoted path. */
+    writeVerifiedGeneration?(input: WriteVerifiedGenerationInput): Promise<void>;
     remove(key: string): Promise<void>;
     promoteGeneration(input: PromoteSaveGenerationInput): Promise<void>;
     recoverGeneration(input: RecoverSaveGenerationInput): Promise<void>;
@@ -55,6 +68,7 @@ export interface VerifiedSaveBatchEntry {
 
 export interface StagedSaveBatch {
     keys: SaveGenerationKeys[];
+    expectedCandidateDigests?: Record<string, string>;
 }
 
 export type VerifiedGameLoad =
@@ -151,6 +165,15 @@ export const saveVerifiedGameData = async (
         manifest,
         needsRecoveryCheckpoint: options.needsRecoveryCheckpoint === true,
     };
+    if (store.writeVerifiedGeneration) {
+        await store.writeVerifiedGeneration({
+            keys,
+            generation: candidate,
+            retainPrevious: options.retainPrevious !== false,
+            expectedCandidateDigest: manifest.digest,
+        });
+        return;
+    }
     await store.write(keys.candidate, candidate);
     const readBack = verifyGeneration(await store.read(keys.candidate));
     if (!readBack.ok) {
@@ -162,6 +185,7 @@ export const saveVerifiedGameData = async (
     await store.promoteGeneration({
         keys,
         retainPrevious: options.retainPrevious !== false,
+        expectedCandidateDigest: manifest.digest,
     });
 });
 
@@ -270,9 +294,10 @@ export const stageVerifiedGameDataBatch = async (
             await store.write(keys.candidate, generation);
             const readBack = verifyGeneration(await store.read(keys.candidate));
             if (!readBack.ok) throw new Error(`Import candidate read-back failed: ${readBack.violations.join('; ')}`);
+            if (readBack.generation.manifest.digest !== entry.manifest.digest) throw new Error('Import candidate read-back does not match the requested generation.');
             stagedKeys.push(keys);
         }
-        return { keys: stagedKeys };
+        return { keys: stagedKeys, expectedCandidateDigests: Object.fromEntries(entries.map(entry => [entry.currentKey, entry.manifest.digest])) };
     } catch (error) {
         const candidateKeys = new Set([
             ...stagedKeys.map(keys => keys.candidate),
@@ -288,7 +313,7 @@ export const promoteStagedGameDataBatch = async (
     batch: StagedSaveBatch,
 ): Promise<void> => {
     if (batch.keys.length === 0) throw new Error('Cannot promote an empty save batch.');
-    await store.promoteGenerationBatch({ keys: batch.keys });
+    await store.promoteGenerationBatch({ keys: batch.keys, expectedCandidateDigests: batch.expectedCandidateDigests });
 };
 
 export const deleteSaveGenerationFamily = async (

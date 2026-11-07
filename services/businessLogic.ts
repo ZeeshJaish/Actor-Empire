@@ -1265,7 +1265,7 @@ export const processBusinessWeek = (
             amount: -infrastructureOverhead,
             type: 'PRODUCTION_SPEND' as const,
             label: 'Facilities, equipment and department overhead',
-        }, ...(b.studioState.financeLedger || [])].slice(0, 80);
+        }, ...(b.studioState.financeLedger || [])];
     }
     
     b.balance += profit;

@@ -1,8 +1,7 @@
 import type { Player } from '../types';
 import { compactPlayerForPersistence } from './saveCompaction';
 import {
-    compareProtectedSaveState,
-    createSaveIntegrityManifest,
+    createCheckedSaveIntegrityManifest,
     type ProtectedSaveComparison,
     type SaveIntegrityManifest,
     type SaveIntegrityReason,
@@ -109,13 +108,10 @@ export const prepareVerifiedPlayerForPersistence = (
             ),
         },
     };
-    const comparison = compareProtectedSaveState(canonical, player);
-    if ('violations' in comparison) {
-        throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);
-    }
+    const { comparison, manifest } = createCheckedSaveIntegrityManifest(canonical, player, reason, Date.now(), oversizedLegacy);
     return {
         player,
-        manifest: createSaveIntegrityManifest(player, reason, Date.now(), oversizedLegacy),
+        manifest,
         comparison,
         estimatedSourceBytes,
         oversizedLegacy,

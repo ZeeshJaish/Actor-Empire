@@ -790,7 +790,7 @@ const creditSaleCorporateReceipts = (player: Player, receipts: Array<{ ownerStud
         return { ...captured, balance: business.balance + amount, studioState: captured.studioState ? { ...captured.studioState,
             financeLedger: [{ id: `studio_sale_corporate_${business.id}_${player.age}_${player.currentWeek}_${Date.now()}`, week: player.currentWeek, year: player.age,
                 amount, type: isRoyalty ? 'INVESTMENT_RETURN' as const : 'CAPITAL_INJECTION' as const,
-                label: isRoyalty ? 'Subsidiary sale royalty receipt' : 'Subsidiary sale proceeds' }, ...(captured.studioState.financeLedger || [])].slice(0, 200) } : undefined };
+                label: isRoyalty ? 'Subsidiary sale royalty receipt' : 'Subsidiary sale proceeds' }, ...(captured.studioState.financeLedger || [])] } : undefined };
     }),
 });
 

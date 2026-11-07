@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {makeCinemaFixture} from './fixtures/boxOfficeScenarios';
+import {createStreamingCatalogueReadContext} from '../services/streamingContentAvailability';
+import {getAiCataloguePositions} from '../services/worldEconomy/worldStreamingAiCatalogue';
+const player=makeCinemaFixture().player;
+let scans=0;const projects=player.world.projects;
+player.world.projects=new Proxy(projects,{get(target,key,receiver){if(key==='forEach')scans++;return Reflect.get(target,key,receiver)}});
+const legacy=[{platformId:'BATCH_A',titleId:'old-a',title:'Old A',contractId:'pos-a',countryIds:['US'],startsAtAbsoluteWeek:1,expiresAtAbsoluteWeek:99999,accessGrant:{schemaVersion:1,modes:['SUBSCRIPTION'],earlyWindowWeeks:0,purchaseFulfillment:'NONE',source:'LEGACY_SNAPSHOT'}},{platformId:'BATCH_B',titleId:'old-b',title:'Old B',contractId:'pos-b',countryIds:['CA'],startsAtAbsoluteWeek:1,expiresAtAbsoluteWeek:99999,accessGrant:{schemaVersion:1,modes:['SUBSCRIPTION'],earlyWindowWeeks:0,purchaseFulfillment:'NONE',source:'LEGACY_SNAPSHOT'}}] as any;
+const expectedA=getAiCataloguePositions(player,'BATCH_A',legacy),expectedB=getAiCataloguePositions(player,'BATCH_B',legacy);
+const context=createStreamingCatalogueReadContext(player);scans=0;
+const a=getAiCataloguePositions(player,'BATCH_A',legacy,context),b=getAiCataloguePositions(player,'BATCH_B',legacy,context);
+assert.deepEqual(a,expectedA);assert.deepEqual(b,expectedB);assert.equal(scans,1,'One immutable read batch must collect saved released history once across platforms');
+const next=createStreamingCatalogueReadContext(player);scans=0;assert.deepEqual(getAiCataloguePositions(player,'BATCH_B',legacy,next),expectedB);assert.equal(scans,1,'New batches must read fresh source facts');
+scans=0;getAiCataloguePositions(player,'BATCH_A',legacy);getAiCataloguePositions(player,'BATCH_B',legacy);assert.equal(scans,2,'Public unbatched reads must stay fresh');
+const other=makeCinemaFixture(24).player;let otherScans=0;other.world.projects=new Proxy(other.world.projects,{get(target,key,receiver){if(key==='forEach')otherScans++;return Reflect.get(target,key,receiver)}});getAiCataloguePositions(other,'BATCH_A',legacy,context);assert.equal(otherScans,1,'A different player cannot reuse another snapshot context');
+console.log(JSON.stringify({passed:4,firstBatchHistoryScans:1,parity:true}));

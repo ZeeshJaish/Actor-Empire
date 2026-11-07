@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {buildCinemaAudienceSnapshot} from '../services/boxOffice/boxOfficeAudience';
+import {makeCinemaMarketFixture} from './fixtures/boxOfficeScenarios';
+const input=makeCinemaMarketFixture();
+const actor={personId:'actor-one',name:'Actor One',roleWeight:1,roleType:'LEAD' as const,fame:90,isPlayer:false,characterIds:['hero']};
+input.titles[0].cast=[actor,{...actor,roleType:'CAMEO',roleWeight:.1,characterIds:['cameo']}];
+const before=JSON.stringify(input);(globalThis as any).__cinemaCastPasses=0;
+const snapshot=buildCinemaAudienceSnapshot(input),passes=(globalThis as any).__cinemaCastPasses;
+assert.deepEqual(snapshot.titles[0].cast,[{...actor,characterIds:['cameo','hero']}],'Duplicate credits preserve strongest role and united characters without inventing fans');
+assert.equal(JSON.stringify(input),before,'Reusing title facts must preserve the source');
+const normalized=structuredClone(input);normalized.titles[0].cast=[{...actor,characterIds:['cameo','hero']}];
+assert.deepEqual(buildCinemaAudienceSnapshot(normalized),snapshot,'Explicitly merged credits produce the same full audience choices and state');
+assert.equal(passes,input.titles.length,'A title cast must be normalized once, independently of cohort count or returning-character comparisons');
+console.log(JSON.stringify({passed:4,castPasses:passes,cohorts:input.cohorts.length,duplicateCreditsExact:true,sourceImmutable:true}));

@@ -323,7 +323,7 @@ export const settleStreamingContractRoyaltyForPlayer = (
                     type: 'STREAMING_ROYALTY' as const,
                     label: `${contract.titleAtSigning} adjusted-gross royalty`,
                     projectId: contract.sourceProjectId,
-                }, ...(business.studioState.financeLedger || [])].slice(0, 260) : business.studioState.financeLedger,
+                }, ...(business.studioState.financeLedger || [])] : business.studioState.financeLedger,
             } : business.studioState,
         };
     });
@@ -387,7 +387,7 @@ export const collectStreamingStudioRoyaltyReceipts=(source:Player,absoluteWeek:n
                 label:`${contract.titleAtSigning} signed-contract royalty`,projectId:contract.sourceProjectId},
                 ...(investor>0?[{id:`studio_ledger_investor_${key}`,week:player.currentWeek,year:player.age,amount:-investor,
                     type:'INVESTOR_PAYOUT' as const,label:`${contract.titleAtSigning} investor streaming payout`,projectId:contract.sourceProjectId}]:[]),
-                ...(studio.studioState.financeLedger || [])].slice(0,260)}};
+                ...(studio.studioState.financeLedger || [])]}};
             studio=applyInvestorPayoutMemory({studio,plan,payout:investor,projectId:project.id,projectTitle:contract.titleAtSigning,
                 week:player.currentWeek,year:player.age}) || studio;
             const talent=applyPlayerTalentReceipt({world:player.world,studio,projectId:project.id,projectTitle:contract.titleAtSigning,

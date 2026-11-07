@@ -1,15 +1,16 @@
+import {stableSaveHash} from './stableSaveHash';
 import { inspectCinemaSavedState } from './boxOffice/boxOfficeMigration';
 import type { Player } from '../types';
 import { compactIndustryIntelligenceState } from './industryIntelligence/industryIntelligenceState';
 import { getAbsoluteWeek } from './legacyLogic';
-import { normalizePlatformAiState } from './platformAi/platformAiState';
-import { normalizeStudioAiState } from './studioAi/studioAiState';
+import { readNormalizedPlatformAiIntelligence } from './platformAi/platformAiState';
+import { readNormalizedStudioAiIntelligence } from './studioAi/studioAiState';
 
 export const SAVE_INTEGRITY_FORMAT_VERSION = 1;
 // This versions the digest projection, not the IndexedDB generation envelope.
 // Never change an issued projection in place: add a new schema and retain its
 // exact verifier so careers can skip any number of app releases safely.
-export const SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION = 4;
+export const SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION = 5;
 
 export type SaveIntegrityReason = 'AUTOSAVE' | 'PROCESS_WEEK' | 'LIFE_EVENT_RESOLUTION' | 'MIGRATION' | 'IMPORT' | 'MANUAL';
 
@@ -20,6 +21,7 @@ export interface SaveIdentityFingerprint {
 
 export interface SaveProtectedState {
     archiveRootDigest?: string;
+    userCareerRecords?: string;
     money: number;
     stats: string;
     commitments: SaveIdentityFingerprint;
@@ -107,19 +109,7 @@ const stableSerialize = (value: unknown): string => {
     return 'null';
 };
 
-const stableHash = (value: unknown): string => {
-    const text = stableSerialize(value);
-    let first = 0x811c9dc5;
-    let second = 0x9e3779b9;
-    for (let index = 0; index < text.length; index += 1) {
-        const code = text.charCodeAt(index);
-        first ^= code;
-        first = Math.imul(first, 0x01000193);
-        second ^= code + index;
-        second = Math.imul(second, 0x85ebca6b);
-    }
-    return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`;
-};
+const stableHash = stableSaveHash;
 
 const identityToken = (value: unknown, index: number, fallbackPrefix: string): string => {
     if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -215,12 +205,12 @@ const industryIntelligenceState = (player: Player): string => {
     );
     const states = [
         ...Object.values(player.world?.studios || {}).map(studio => (
-            studio.ai ? normalizeStudioAiState(studio, { absoluteWeek }).intelligence : undefined
+            studio.ai ? readNormalizedStudioAiIntelligence(studio, { absoluteWeek }) : undefined
         )),
         ...Object.entries(player.world?.platforms || {}).map(([platformId, platform]) => {
             if (!platform.ai?.intelligence) return undefined;
             if (acquiredPlatformIds.has(platformId)) return platform.ai.intelligence;
-            return normalizePlatformAiState(platform, player.id, absoluteWeek).ai?.intelligence;
+            return readNormalizedPlatformAiIntelligence(platform, player.id, absoluteWeek);
         }),
     ];
     return stableHash(states
@@ -229,7 +219,21 @@ const industryIntelligenceState = (player: Player): string => {
         // Integrity must compare the same canonical representation that will be
         // written. Older/runtime states may omit newly introduced lane keys;
         // compaction safely supplies those defaults and must not look like loss.
-        const canonical = compactIndustryIntelligenceState(state!);
+        // This is a transient digest-only view, never the state written to the
+        // save. Keep the exact canonical core/content and material-ID pipeline,
+        // including validation and truncation before SHADOW filtering. The
+        // issued projection never reads comparison/evidence/key histories or
+        // proposal scores/reasons, so do not reconstruct those here.
+        const canonical = compactIndustryIntelligenceState({
+            ...state!,
+            proposals: (Array.isArray(state!.proposals) ? state!.proposals : []).map(proposal => {
+                const raw = proposal && typeof proposal === 'object' && !Array.isArray(proposal) ? proposal : {} as any;
+                return { id: raw.id, lane: raw.lane, status: raw.status };
+            }) as typeof state.proposals,
+            shadowComparisons: [],
+            processedKeys: [],
+            learning: { ...state!.learning, samples: [], processedEvidenceIds: [] },
+        });
         return {
             schemaVersion: canonical.schemaVersion,
             companyId: canonical.companyId,
@@ -344,6 +348,26 @@ const nonFiniteCanonicalMoneyPaths = (player: Player): string[] => {
     return paths;
 };
 
+/** Schema5 protects content, not merely record IDs. JSON semantics keep
+ * optional undefined fields and export/import compatible without rewriting old signatures. */
+const userCareerRecordsState = (player: Player): string => stableHash(JSON.parse(JSON.stringify({
+    commitments: player.commitments || [],
+    activeReleases: player.activeReleases || [],
+    pastProjects: player.pastProjects || [],
+    awards: player.awards || [],
+    personalFinanceHistory: player.finance?.history || [],
+    dynastyArchives: player.flags?.dynastyCareerArchives || {},
+    legacyArchive: player.flags?.legacyCareerArchive || null,
+    studioHistory: (player.businesses || []).map(business => ({
+        id: business.id,
+        history: business.history || [],
+        financeLedger: business.studioState?.financeLedger || [],
+    })),
+    instagramPosts: player.instagram?.posts || [],
+    xPosts: player.x?.posts || [],
+    youtubeVideos: player.youtube?.videos || [],
+})));
+
 const createProtectedState = (player: Player, schema = SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION): SaveProtectedState => {
     const platform = player.ownedStreamingPlatform as unknown as Record<string, unknown>;
     const licences = Array.isArray(platform?.catalogLicenses) ? platform.catalogLicenses : [];
@@ -351,6 +375,7 @@ const createProtectedState = (player: Player, schema = SAVE_INTEGRITY_DIGEST_SCH
     const stats = player.stats && typeof player.stats === 'object' ? player.stats as unknown as Record<string, unknown> : {};
 
     return {
+        ...(schema >= 5 ? { userCareerRecords: userCareerRecordsState(player) } : {}),
         ...(typeof player.flags?.careerArchiveRootDigest === 'string'
             ? { archiveRootDigest: player.flags.careerArchiveRootDigest }
             : {}),
@@ -418,11 +443,12 @@ const manifestDigestSource = (manifest: Omit<SaveIntegrityManifest, 'digest' | '
     protected: manifest.protected,
 });
 
-export const createSaveIntegrityManifest = (
+const manifestWithProtectedState = (
     player: Player,
     reason: SaveIntegrityReason,
-    createdAt = Date.now(),
-    needsRecoveryCheckpoint = false,
+    createdAt: number,
+    needsRecoveryCheckpoint: boolean,
+    protectedState: SaveProtectedState,
 ): SaveIntegrityManifest => {
     const core = {
         formatVersion: SAVE_INTEGRITY_FORMAT_VERSION,
@@ -434,7 +460,7 @@ export const createSaveIntegrityManifest = (
         week: finiteNumber(player.currentWeek),
         reason,
         needsRecoveryCheckpoint,
-        protected: createProtectedState(player),
+        protected: protectedState,
     } as const;
     return {
         ...core,
@@ -442,6 +468,15 @@ export const createSaveIntegrityManifest = (
         digest: stableHash(manifestDigestSource(core)),
     };
 };
+
+export const createSaveIntegrityManifest = (
+    player: Player,
+    reason: SaveIntegrityReason,
+    createdAt = Date.now(),
+    needsRecoveryCheckpoint = false,
+): SaveIntegrityManifest => manifestWithProtectedState(
+    player, reason, createdAt, needsRecoveryCheckpoint, createProtectedState(player),
+);
 
 const compareFingerprint = (
     label: string,
@@ -452,9 +487,7 @@ const compareFingerprint = (
     if (before.count !== after.count || before.digest !== after.digest) violations.push(`${label} identities changed`);
 };
 
-export const compareProtectedSaveState = (before: Player, after: Player): ProtectedSaveComparison => {
-    const left = createProtectedState(before);
-    const right = createProtectedState(after);
+const compareProtectedProjections = (left: SaveProtectedState, right: SaveProtectedState): ProtectedSaveComparison => {
     const violations: string[] = [];
     if (!Number.isFinite(right.money)) violations.push('player money is not finite');
     else if (left.money !== right.money) violations.push('player money changed');
@@ -472,6 +505,7 @@ export const compareProtectedSaveState = (before: Player, after: Player): Protec
     compareFingerprint('bloodline', left.bloodline, right.bloodline, violations);
     compareFingerprint('dynasty members', left.dynastyMembers, right.dynastyMembers, violations);
     compareFingerprint('dynasty archives', left.dynastyArchives, right.dynastyArchives, violations);
+    if (left.userCareerRecords !== right.userCareerRecords) violations.push('user career record contents changed');
     compareFingerprint('universes', left.universes, right.universes, violations);
     compareFingerprint('activeProductions', left.activeProductions, right.activeProductions, violations);
     compareFingerprint('activeRights', left.activeRights, right.activeRights, violations);
@@ -502,6 +536,23 @@ export const compareProtectedSaveState = (before: Player, after: Player): Protec
     return violations.length ? { ok: false, violations } : { ok: true };
 };
 
+export const compareProtectedSaveState = (before: Player, after: Player): ProtectedSaveComparison =>
+    compareProtectedProjections(createProtectedState(before), createProtectedState(after));
+
+/** One synchronous preparation owns both projections. No cached projection is
+ * accepted from callers, and candidate/read-back/promotion still verify afresh. */
+export const createCheckedSaveIntegrityManifest = (
+    before: Player, after: Player, reason: SaveIntegrityReason,
+    createdAt = Date.now(), needsRecoveryCheckpoint = false,
+) => {
+    const original = createProtectedState(before), prepared = createProtectedState(after);
+    const comparison = compareProtectedProjections(original, prepared);
+    if ('violations' in comparison) {
+        throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);
+    }
+    return { comparison, manifest: manifestWithProtectedState(after, reason, createdAt, needsRecoveryCheckpoint, prepared) };
+};
+
 export const verifySaveIntegrity = (
     player: Player,
     manifest: SaveIntegrityManifest,
@@ -516,24 +567,36 @@ export const verifySaveIntegrity = (
         .forEach(path => violations.push(`${path} is not finite`));
     inspectCinemaSavedState(player.world?.cinemaMarket).forEach(code=>violations.push(code));
     if (manifest.formatVersion !== SAVE_INTEGRITY_FORMAT_VERSION) violations.push('integrity format is unsupported');
-    const rebuilt = createSaveIntegrityManifest(player, manifest.reason, manifest.createdAt, manifest.needsRecoveryCheckpoint === true);
+    // Old careers verify their exact issued projection once. Constructing v5
+    // first needlessly walks all career content that v1-v4 did not include.
+    const projectionSchema = manifest.digestSchemaVersion === 4 ? 4
+        : manifest.digestSchemaVersion === 3 || manifest.digestSchemaVersion === 2 || manifest.digestSchemaVersion === undefined ? 3
+            : SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION;
+    const protectedState = createProtectedState(player, projectionSchema);
+    const rebuilt = manifestWithProtectedState(player, manifest.reason, manifest.createdAt, manifest.needsRecoveryCheckpoint === true, protectedState);
     if (manifest.digestSchemaVersion === SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION) {
         if (rebuilt.digest !== manifest.digest) violations.push('integrity digest does not match save payload');
+    } else if (manifest.digestSchemaVersion === 4) {
+        // Issued v4 remains exact; user-career content coverage starts at v5.
+        const { digest: _digest, createdAt: _createdAt, ...core } = rebuilt;
+        if (stableHash(manifestDigestSource({ ...core, digestSchemaVersion: 4, protected: protectedState })) !== manifest.digest) {
+            violations.push('integrity digest does not match save payload');
+        }
     } else if (manifest.digestSchemaVersion === 3) {
         const { digest: _digest, createdAt: _createdAt, ...core } = rebuilt;
-        if (stableHash(manifestDigestSource({ ...core, digestSchemaVersion: 3, protected: createProtectedState(player, 3) })) !== manifest.digest) {
+        if (stableHash(manifestDigestSource({ ...core, digestSchemaVersion: 3, protected: protectedState })) !== manifest.digest) {
             violations.push('integrity digest does not match save payload');
         }
     } else if (manifest.digestSchemaVersion === 2) {
         // Issued v2 protected projection remains exact; cinema did not exist in it.
-        const protectedV2=createProtectedState(player, 3);delete protectedV2.cinemaState;
+        const protectedV2={...protectedState};delete protectedV2.cinemaState;
         const {digest:_digest,createdAt:_createdAt,...core}=rebuilt;
         if(stableHash(manifestDigestSource({...core,digestSchemaVersion:2,protected:protectedV2}))!==manifest.digest)violations.push('integrity digest does not match save payload');
     } else if (manifest.digestSchemaVersion === undefined) {
         // Unversioned v1 was shipped with several protected-field projections.
         // Only the three known optional additions may be absent; derive every
         // protected value from the player, never from the stored manifest.
-        const legacyProtected = { ...createProtectedState(player, 3) } as Partial<SaveProtectedState>;
+        const legacyProtected = { ...protectedState } as Partial<SaveProtectedState>;
         delete legacyProtected.cinemaState;
         const storedProtected = manifest.protected && typeof manifest.protected === 'object'
             ? manifest.protected as Partial<SaveProtectedState>

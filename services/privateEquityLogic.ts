@@ -310,7 +310,7 @@ const routeEquityProceeds = (player: Player, position: CompanyEquityPosition, am
                 financeLedger: [{ id: `equity_proceeds_${position.studioId}_${business.id}_${player.age}_${player.currentWeek}_${Date.now()}`,
                     week: player.currentWeek, year: player.age, amount: credits.get(business.id)!,
                     type: isDividend ? 'INVESTMENT_RETURN' as const : 'CAPITAL_INJECTION' as const, label: `${position.studioName || position.studioId} investment ${isDividend ? 'dividend' : 'exit proceeds'}` },
-                    ...(business.studioState.financeLedger || [])].slice(0, 200) } : undefined } : business) }, personalProceeds: Math.max(0, amount - corporateProceeds) };
+                    ...(business.studioState.financeLedger || [])] } : undefined } : business) }, personalProceeds: Math.max(0, amount - corporateProceeds) };
 };
 
 export const processPrivateEquityWeek = (

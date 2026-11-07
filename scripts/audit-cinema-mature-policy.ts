@@ -3,12 +3,20 @@ import {readCinemaAuditCheckpoint} from './fixtures/cinemaAuditCheckpoint';
 import {matureCareerUi,createMatureAppCareerPolicy} from './fixtures/cinemaMatureAppPolicy';
 import * as maturePolicy from './fixtures/cinemaMatureAppPolicy';
 import {INSTAGRAM_POST_CONFIGS} from '../services/instagramLogic';
+import {getAbsoluteWeek} from '../services/legacyLogic';
 import type {Player,Message,AuditionOpportunity} from '../types';
 
 const origin=readCinemaAuditCheckpoint<any>(process.env.CAREER_ORIGIN_CHECKPOINT!);
 assert.ok(origin?.player,'Use the actual earned origin for these adapter checks');
 const fresh=()=>structuredClone(origin.player) as Player;
 let passed=0;
+{
+ const p=fresh();for(const c of p.commitments)if(c.type==='ACTING_GIG')c.projectPhase='PRE_PRODUCTION';
+ assert.throws(()=>matureCareerUi(p).post('BTS'),/UI post is locked/,'A direct callback must not bypass the normal composer lock');passed++;
+ const actor=p.commitments.find(c=>c.type==='ACTING_GIG')!;actor.projectPhase='PRODUCTION';p.energy.current=p.energy.max;
+ const filmed=matureCareerUi(p).post('BTS',actor.id);assert.equal(filmed.instagram.weeklyPostCount,p.instagram.weeklyPostCount+1);passed++;
+ const idle=fresh();idle.commitments=[];assert.throws(()=>matureCareerUi(idle).post('ANNOUNCEMENT'),/UI post is locked/);passed++;
+}
 {
  const p=fresh(),hire=(matureCareerUi(p) as any).hireAgent;
  assert.equal(typeof hire,'function','Mature verification must use the actual paid team action');
@@ -24,7 +32,7 @@ let passed=0;
 {
  const p=fresh(),role=p.commitments.find(c=>c.type==='ACTING_GIG')!;assert.ok(role);
  // Controlled UI-phase case only; not a completed film in career evidence.
- role.projectPhase='POST_PRODUCTION';p.energy.current=p.energy.max;
+ role.projectPhase='POST_PRODUCTION';role.lastPressAbsolute=getAbsoluteWeek(p.age,p.currentWeek)-10;p.energy.current=p.energy.max;
  const cash=p.money,energy=p.energy.current,fame=p.stats.fame,rep=p.stats.reputation;
  const tour=matureCareerUi(p).press(role.id);
  assert.equal(tour.answers.length,3);assert.equal(tour.player.money,cash);assert.equal(tour.player.energy.current,energy-25);

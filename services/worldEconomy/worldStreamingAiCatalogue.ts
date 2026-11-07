@@ -4,6 +4,7 @@ import type {
 } from '../../types';
 import { createDeterministicId, hashDeterministicSeed } from '../deterministicRandom';
 import { getHistoricalCatalogueTitles } from '../historicalCatalogue';
+import { readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from '../streamingContentAvailability';
 import { getAbsoluteWeek } from '../legacyLogic';
 import { resolveStreamingRightsCompatibility } from '../streamingRightsCompatibility';
 import { normalizeStreamingRightsAccessGrant } from '../streamingRightsAccessGrant';
@@ -205,11 +206,19 @@ export const seedLegacyAiCatalogue = (
         || left.titleId.localeCompare(right.titleId)), seededPlatformIds: [...seeded].sort() };
 };
 
+const historicalPositionsKey = {};
+
 export const getAiCataloguePositions = (
     player: Player, platformId: string, legacy: WorldStreamingAiCatalogueTitle[],
+    context?: StreamingCatalogueReadContext,
 ): AiCataloguePosition[] => {
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const historicalById = new Map(getHistoricalCatalogueTitles(player).map(title => [title.id, title]));
+    const readHistorical = () => new Map(getHistoricalCatalogueTitles(player).map(title => [title.id, title]));
+    // Only the caller's immutable read batch can reuse this index. Public reads
+    // without a context, and contexts for another player, always read fresh facts.
+    const historicalById = context?.player === player
+        ? readStreamingCatalogueDerivedView(context, historicalPositionsKey, readHistorical)
+        : readHistorical();
     const projected = legacy.filter(title => title.platformId === platformId).filter(title => {
         const source = historicalById.get(title.titleId);
         if (!source) return true; // Preserve old synthetic save entries without fabricating missing rights.
@@ -226,9 +235,10 @@ export const getAiCataloguePositions = (
 
 export const createAiTitleAccessResolver = (
     player: Player, offer: WorldStreamingPlatformOffer, legacy: WorldStreamingAiCatalogueTitle[],
+    context?: StreamingCatalogueReadContext,
 ): ((countryId: string, absoluteWeek: number, route: StreamingTitleAccessRoute, onlyTitleId?: string) => AiCataloguePosition[]) => {
     const projected = projectStreamingCommercialOffers(offer.commercialConfiguration);
-    const positions = getAiCataloguePositions(player, offer.platformId, legacy);
+    const positions = getAiCataloguePositions(player, offer.platformId, legacy, context);
     let byTitle: Map<string, AiCataloguePosition[]> | undefined;
     return (countryId, absoluteWeek, route, onlyTitleId) => {
         if (onlyTitleId !== undefined && !byTitle) {

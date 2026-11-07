@@ -521,7 +521,7 @@ export const finalizePlatformAiPlayerCommissionGreenlight = (input: {
                 type: 'STREAMING_DEAL' as const,
                 label: `${offer.platformName} producer fee - Greenlight milestone`,
                 projectId: input.commitmentId,
-            }, ...(current.studioState!.financeLedger || [])].slice(0, 200),
+            }, ...(current.studioState!.financeLedger || [])],
         },
     }));
     return { player, changed: true, offer: greenlit, studioId: studio.id };
@@ -640,7 +640,7 @@ export const settlePlatformAiPlayerCommissionDelivery = (input: {
                     type: 'STREAMING_DEAL' as const,
                     label: `${offer.platformName} producer fee - Delivery milestone`,
                     projectId: input.commitmentId,
-                }, ...(current.studioState!.financeLedger || [])].slice(0, 200),
+                }, ...(current.studioState!.financeLedger || [])],
             },
         };
     });

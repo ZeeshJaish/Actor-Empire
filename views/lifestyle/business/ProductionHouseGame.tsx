@@ -1,3 +1,4 @@
+import { recordScriptDevelopmentPayment } from '../../../services/scriptDevelopmentFinance';
 import { buildCinemaReleaseDashboardProject, buildCinemaArchiveDashboardProject } from '../../../services/boxOffice/boxOfficePresentation';
 import { calculateStudioPrestigeScore } from '../../../services/studioPrestige';
 import React, { useEffect, useState, useMemo } from 'react';
@@ -714,7 +715,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             lockedStreamingFunding
         };
 
-        updatedStudio.studioState.scripts = [...(updatedStudio.studioState.scripts || []), newScript];
+        updatedStudio.studioState.scripts = [...(updatedStudio.studioState.scripts || []), recordScriptDevelopmentPayment(newScript, studio.id, writer?.fee || 0)];
 
         // Create a ProjectConcept immediately for sequels so they appear in the Active Slate
         const newConcept: any = {

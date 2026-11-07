@@ -14,7 +14,7 @@ import { quoteCinemaRightsForBuyer, registerQuotedCinemaStreamingRights, settleQ
 import { CINEMA_ROLE_WEIGHTS } from './boxOffice/boxOfficeProfiles';
 import { creditSignedActorBackend } from './talentCareer';
 import { migrateCinemaState, CinemaMigrationError } from './boxOffice/boxOfficeMigration';
-import { processCinemaMarketWeek, findCinemaBusiness } from './boxOffice/boxOfficeWeek';
+import { processCinemaMarketWeek, processUnexposedOwnedCinemaMarketWeek, findCinemaBusiness } from './boxOffice/boxOfficeWeek';
 import { getProductionScale } from './studioProductionEconomy';
 import { completeOfferedCinemaCast, normalizeCinemaTitle } from './boxOffice/boxOfficeInputs';
 import { recordStudioSaleEarnings } from './studioSaleHistory';
@@ -245,7 +245,7 @@ const appendInvestorPayout = (
     const safePayout = Math.max(0, Math.round(Number(payout) || 0));
     return {
         lifetimeInvestorPayout: Math.max(0, Math.round(Number(summary?.lifetimeInvestorPayout) || 0)) + safePayout,
-        weeklyInvestorPayouts: [...(Array.isArray(summary?.weeklyInvestorPayouts) ? summary!.weeklyInvestorPayouts : []), safePayout].slice(-52)
+        weeklyInvestorPayouts: [...(Array.isArray(summary?.weeklyInvestorPayouts) ? summary!.weeklyInvestorPayouts : []), safePayout]
     };
 };
 
@@ -1233,7 +1233,7 @@ export const createYoutubeRivalryEvent = (player: Player, random: () => number =
 const appendStudioLedgerEntry = (business: Business, entry: any) => {
     if (!business.studioState) business.studioState = {} as any;
     const ledger = Array.isArray(business.studioState.financeLedger) ? business.studioState.financeLedger : [];
-    business.studioState.financeLedger = [entry, ...ledger].slice(0, 200);
+    business.studioState.financeLedger = [entry, ...ledger];
 };
 
 const getPlayerProjectRoleType = (roleType: string | undefined, castList?: any[]): RoleType => {
@@ -2496,7 +2496,7 @@ export const processGameWeek = async (
                     t(language, 'services.gameLoop.youtubeEarly.comment.smallFound'),
                     t(language, 'services.gameLoop.youtubeEarly.comment.deservesMore'),
                     ...(pickedVideo.comments || [])
-                ].slice(0, 5);
+                ];
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
                 nextPlayer.youtube.fanMood = Math.min(100, fanMood + 2);
@@ -2514,7 +2514,7 @@ export const processGameWeek = async (
                 pickedVideo.views = ensureFiniteNumber(pickedVideo.views, 0) + bonusViews;
                 pickedVideo.likes = ensureFiniteNumber(pickedVideo.likes, 0) + Math.max(1, Math.floor(bonusViews * 0.06));
                 pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
-                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.tinyRepost'), ...(pickedVideo.comments || [])].slice(0, 5);
+                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.tinyRepost'), ...(pickedVideo.comments || [])];
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
                 nextPlayer.youtube.audienceTrust = Math.min(100, audienceTrust + 1);
@@ -2555,7 +2555,7 @@ export const processGameWeek = async (
                     t(language, 'services.gameLoop.youtubeEarly.comment.clipBestPart'),
                     t(language, 'services.gameLoop.youtubeEarly.comment.shortVersion'),
                     ...(pickedVideo.comments || [])
-                ].slice(0, 5);
+                ];
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
                 nextPlayer.youtube.fanMood = Math.min(100, fanMood + 3);
@@ -2577,7 +2577,7 @@ export const processGameWeek = async (
                     t(language, 'services.gameLoop.youtubeEarly.comment.thumbnailClick'),
                     t(language, 'services.gameLoop.youtubeEarly.comment.thumbnailBetter'),
                     ...(pickedVideo.comments || [])
-                ].slice(0, 5);
+                ];
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
                 nextPlayer.youtube.audienceTrust = Math.min(100, audienceTrust + 2);
@@ -2595,7 +2595,7 @@ export const processGameWeek = async (
                 pickedVideo.views = ensureFiniteNumber(pickedVideo.views, 0) + bonusViews;
                 pickedVideo.likes = ensureFiniteNumber(pickedVideo.likes, 0) + Math.max(1, Math.floor(bonusViews * 0.05));
                 pickedVideo.weeklyHistory = [...(pickedVideo.weeklyHistory || []), bonusViews].slice(-104);
-                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.consistentUpload'), ...(pickedVideo.comments || [])].slice(0, 5);
+                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.consistentUpload'), ...(pickedVideo.comments || [])];
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
                 nextPlayer.youtube.fanMood = Math.min(100, fanMood + 1);
@@ -2612,7 +2612,7 @@ export const processGameWeek = async (
                 nextPlayer.youtube.subscribers = Math.max(0, nextPlayer.youtube.subscribers - lostSubs);
                 nextPlayer.youtube.audienceTrust = Math.max(0, audienceTrust - 1);
                 nextPlayer.youtube.fanMood = Math.max(0, fanMood - 1);
-                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.roughPacing'), ...(pickedVideo.comments || [])].slice(0, 5);
+                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeEarly.comment.roughPacing'), ...(pickedVideo.comments || [])];
                 logsToAdd.push({
                     msg: t(language, 'services.gameLoop.youtubeEarly.log.feedback', {
                         title,
@@ -2649,7 +2649,7 @@ export const processGameWeek = async (
                     t(language, 'services.gameLoop.youtubeAudience.comment.viralEverywhere'),
                     t(language, 'services.gameLoop.youtubeAudience.comment.algorithmFound'),
                     ...(pickedVideo.comments || [])
-                ].slice(0, 5);
+                ];
                 nextPlayer.youtube.subscribers += bonusSubs;
                 nextPlayer.youtube.totalChannelViews += bonusViews;
                 nextPlayer.youtube.fanMood = Math.min(100, fanMood + 4);
@@ -2706,7 +2706,7 @@ export const processGameWeek = async (
                     t(language, 'services.gameLoop.youtubeAudience.comment.backlashOldChannel'),
                     t(language, 'services.gameLoop.youtubeAudience.comment.backlashFighting'),
                     ...(pickedVideo.comments || [])
-                ].slice(0, 5);
+                ];
                 nextPlayer.stats.reputation = Math.max(0, nextPlayer.stats.reputation - 2);
                 if (subscriberBase >= 10000) {
                     nextPlayer.news.unshift({
@@ -2730,7 +2730,7 @@ export const processGameWeek = async (
                 const claim = Math.floor(Math.max(150, ensureFiniteNumber(pickedVideo.earnings, 0) * 0.3 + Math.random() * 500));
                 pickedVideo.earnings = Math.max(0, ensureFiniteNumber(pickedVideo.earnings, 0) - claim);
                 nextPlayer.youtube.audienceTrust = Math.max(0, audienceTrust - 2);
-                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeAudience.comment.claimed'), ...(pickedVideo.comments || [])].slice(0, 5);
+                pickedVideo.comments = [t(language, 'services.gameLoop.youtubeAudience.comment.claimed'), ...(pickedVideo.comments || [])];
                 nextPlayer.pendingEvents.push(createYoutubeCopyrightEvent(title, claim, 45 + Math.floor(Math.random() * 35), language));
                 logsToAdd.push({ msg: t(language, 'services.gameLoop.youtubeAudience.log.copyrightClaim', { title }), type: 'negative' });
             }
@@ -3255,7 +3255,7 @@ export const processGameWeek = async (
                 }
                 return contract;
             }).filter(contract => hasTalentUses(contract) || talentAmountOutstanding(contract) > 0);
-        if (ledger.length) business.studioState.financeLedger = [...ledger, ...(business.studioState.financeLedger || [])].slice(0, 200);
+        if (ledger.length) business.studioState.financeLedger = [...ledger, ...(business.studioState.financeLedger || [])];
     });
 
     // --- 2B. TEAM ROTATION ---
@@ -6559,16 +6559,24 @@ export const processGameWeek = async (
     });
 
     emitLoopStage('streaming_industry_start');
+    const industryPhases: Record<string, number> = {};
+    const industryWorldStarted = performance.now();
     const streamingIndustryResult = processIndustryWorldWeek(
         nextPlayer,
         nextPlayer.world,
         enteredStreamingAbsoluteWeek,
+        { onPhase: (name, ms) => { industryPhases[name] = ms; } },
     );
     nextPlayer = streamingIndustryResult.player;
     nextPlayer.world = streamingIndustryResult.world;
-    const cinemaWeek=processCinemaMarketWeek(nextPlayer,enteredStreamingAbsoluteWeek);
-    nextPlayer=cinemaWeek.player;
-    diagnostics.onCinemaResult?.(cinemaWeek.result);
+    const industryWorldMs = performance.now() - industryWorldStarted;
+    const cinemaStarted = performance.now();
+    const cinemaDiagnostics={onPhase:(name:string,ms:number)=>{industryPhases[name]=ms}};
+    const cinemaWeek=diagnostics.onCinemaResult ? processCinemaMarketWeek(nextPlayer,enteredStreamingAbsoluteWeek,cinemaDiagnostics,{reuseDetachedWeekCandidate:true}) : null;
+    nextPlayer=cinemaWeek ? cinemaWeek.player : processUnexposedOwnedCinemaMarketWeek(nextPlayer,enteredStreamingAbsoluteWeek,cinemaDiagnostics);
+    const cinemaMs = performance.now() - cinemaStarted;
+    const finalizationStarted = performance.now();
+    if(cinemaWeek)diagnostics.onCinemaResult?.(cinemaWeek.result);
     const exitedCinemaIds=new Set(nextPlayer.world.cinemaMarket!.weeks.at(-1)!.titles.filter(t=>t.closed).map(t=>t.titleId));
     const cinemaFinalizedReleases:ActiveRelease[]=[];
     for(const rel of nextPlayer.activeReleases){
@@ -6638,6 +6646,10 @@ export const processGameWeek = async (
         });
     }
     emitLoopStage('streaming_industry_done', {
+        industry_world_ms: industryWorldMs,
+        cinema_market_ms: cinemaMs,
+        film_finalization_ms: performance.now() - finalizationStarted,
+        ...industryPhases,
         absolute_week: enteredStreamingAbsoluteWeek,
         world_news: streamingIndustryResult.news.length,
     });
@@ -6831,13 +6843,7 @@ export const processGameWeek = async (
         console.error('Weekly social feed generation failed during week processing:', error);
     }
 
-    // Limit social history (User Posts) to prevent bloat (e.g. 200 posts)
-    if (nextPlayer.instagram?.posts && nextPlayer.instagram.posts.length > 200) {
-        nextPlayer.instagram.posts = nextPlayer.instagram.posts.slice(0, 200);
-    }
-    if (nextPlayer.x?.posts && nextPlayer.x.posts.length > 200) {
-        nextPlayer.x.posts = nextPlayer.x.posts.slice(0, 200);
-    }
+    // Authored posts are permanent career records; only generated feeds are bounded.
     emitLoopStage('weekly_social_done', { instagram_feed: nextPlayer.instagram?.feed?.length || 0 });
     await yieldWeekProcessingFrame();
 

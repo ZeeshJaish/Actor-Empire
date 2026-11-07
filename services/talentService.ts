@@ -153,6 +153,15 @@ export const calculateActorRoleSalary = (actor: Pick<NPCActor, 'tier' | 'stats'>
     return Math.floor(Math.floor((bases[actor.tier] || 100_000) * (0.5 + (actor.stats?.fame || 0) / 100) * roleMultiplier) * (1 - discount));
 };
 
+/** Default project quote, not a signed ask or a promise of backend income.
+ * Keep directors on the shared talent market's scale; an internal ID must not
+ * create a $150–300M upfront fee. Existing explicit/negotiated asks take priority
+ * in Greenlight and existing project commitments are never repriced here. */
+export const calculateDirectorProjectSalary = (director: Pick<NPCActor, 'tier' | 'stats'>): number => {
+    const craft = clamp(Number(director.stats?.talent ?? (director.stats as any)?.vision ?? 50), 0, 100);
+    return Math.max(100_000, Math.floor(calculateActorRoleSalary(director, 'LEAD') * .6 * (.8 + craft / 500)));
+};
+
 export const createContract = (
     npcId: string,
     type: ContractType,

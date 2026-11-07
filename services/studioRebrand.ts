@@ -234,7 +234,7 @@ export const renameAcquiredStudio = ({
                 amount: -quote.cost,
                 type: 'REBRAND' as const,
                 label: `Rebrand from ${oldName} to ${newName}`,
-            }, ...(studio.studioState.financeLedger || [])].slice(0, 200),
+            }, ...(studio.studioState.financeLedger || [])],
         },
     };
 

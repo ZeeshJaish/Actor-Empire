@@ -1,3 +1,4 @@
+import './services/runtimeCompatibility';
 import React from 'react';
 import './index.css';
 import './ui-layout/railInteractions.css';

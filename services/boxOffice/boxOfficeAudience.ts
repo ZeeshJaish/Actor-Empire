@@ -52,27 +52,42 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
         const local=affinitiesByCohort.get(affinity.cohortId)||[];local.push(affinity);affinitiesByCohort.set(affinity.cohortId,local);
     }
     const pools=new Map(input.supply?.pools.map(p=>[p.id,p]));
+    const sortedCohorts=[...input.cohorts].sort((a,b)=>a.id.localeCompare(b.id));
+    // Read-only language lists can be shared by many title/cohort comparisons.
+    // This cache belongs only to this snapshot; later calls see edits freshly.
+    const cohortLanguages=new Map<readonly string[],Set<string>>();
     for (const title of [...input.titles].sort((a,b)=>a.id.localeCompare(b.id))) {
         const facts = title.market;
+        let titleLanguages:string[]|undefined;
+        const cast = castUnique(title.cast);
         const prior = input.marketState?.titles.find(t=>t.titleId===title.id);
         const priorCells=new Map(prior?.cells.map(c=>[c.cohortId,c]));
         const titleOffers=(input.supply?.offers || []).filter(o=>o.titleId===title.id).map(o=>pools.get(o.poolId)!).filter(Boolean);
         const offersByCountry=new Map<string,typeof titleOffers>();
         for(const offer of titleOffers){const local=offersByCountry.get(offer.countryId)||[];local.push(offer);offersByCountry.set(offer.countryId,local)}
-        const exposure = buildCinemaExposure({titleId:title.id,absoluteWeek:input.absoluteWeek,cast:castUnique(title.cast),
+        const exposure = buildCinemaExposure({titleId:title.id,absoluteWeek:input.absoluteWeek,cast,
             studio:{releasedTitleCount:0,prestige:0},storyAttention:title.exposure?.storyAttention || 0,musicAttention:title.exposure?.musicAttention || 0,
             cohorts:input.cohorts.map(c=>({...c,priorAwarePeople:priorCells.get(c.id)?.awarePeople || 0})),
             events:title.exposure?.events || [],appliedEventIds:prior?.appliedExposureIds || []});
         const awarenessIndex=new Map(exposure.cohorts.map(c=>[c.cohortId,c.awarePeople]));
-        const next: CinemaTitleAudienceState = {titleId:title.id,ownerId:title.owner.id,cast:structuredClone(castUnique(title.cast)),universeId:facts?.universeId,
+        const next: CinemaTitleAudienceState = {titleId:title.id,ownerId:title.owner.id,cast:structuredClone(cast),universeId:facts?.universeId,
             releaseWeek:facts?.releaseWeek ?? input.absoluteWeek,appliedExposureIds:exposure.appliedEventIds,cells:[]};
-        for (const cohort of [...input.cohorts].sort((a,b)=>a.id.localeCompare(b.id))) {
+        for (const cohort of sortedCohorts) {
             const old = priorCells.get(cohort.id);
             const seenBands = structuredClone(old?.seenBands || []);
             const seen = Math.min(cohort.people,seenBands.reduce((n,b)=>n+b.people,0));
             let aware = Math.min(cohort.people,Math.max(seen,awarenessIndex.get(cohort.id) || 0));
             const m = cohort.market;
-            const localFit = facts && m ? facts.languages.some(l=>m.languages.map(normalizeStreamingLanguageId).includes(normalizeStreamingLanguageId(l))) ? 1 : .3 : 0;
+            let localFit=0;
+            if(facts && m) {
+                if(!titleLanguages)titleLanguages=facts.languages.map(normalizeStreamingLanguageId);
+                const matches=titleLanguages.some(language=>{
+                    let available=cohortLanguages.get(m.languages);
+                    if(!available){available=new Set(m.languages.map(normalizeStreamingLanguageId));cohortLanguages.set(m.languages,available)}
+                    return available.has(language);
+                });
+                localFit=matches?1:.3;
+            }
             const eligible = m ? Math.min(cohort.people,m.eligiblePeople) : 0;
             const pending=old?.pendingLocalFootfall;
             const applyLocal=pending && pending.absoluteWeek<input.absoluteWeek && pending.absoluteWeek>(old?.lastAppliedLocalFootfallWeek ?? -1);
@@ -110,10 +125,10 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
                 const reach=Math.max(0,...experienced.map(e=>e.people*e.weight));
                 return clamp(reach/Math.max(1,cohort.people))*fraction(Math.max(0,quality-50)*2);
             };
-            const attachment=clamp(Math.max(attachmentFor('STUDIO',title.owner.id,.35),...castUnique(title.cast).map(c=>attachmentFor('ACTOR',c.personId,c.roleWeight))));
+            const attachment=clamp(Math.max(attachmentFor('STUDIO',title.owner.id,.35),...cast.map(c=>attachmentFor('ACTOR',c.personId,c.roleWeight))));
             const returning = Math.max(.1,...matching.flatMap(h=>h.cast.flatMap(p=>{
                 const character=p.characterIds.filter(id=>facts.returningCharacterIds?.includes(id));
-                return castUnique(title.cast).filter(c=>c.characterIds.some(id=>character.includes(id))).map(c=>Math.min(c.roleWeight,p.roleWeight));
+                return cast.filter(c=>c.characterIds.some(id=>character.includes(id))).map(c=>Math.min(c.roleWeight,p.roleWeight));
             })));
             // An unviewed film's final payoff is not public opening knowledge.
             const expectedPayoff=seen ? facts.payoff : title.delivery.estimatedQuality ?? 55;

@@ -1,3 +1,4 @@
+import strictAssert from 'node:assert/strict';
 import {
   INITIAL_PLAYER,
   type OwnedStreamingCatalogLicense,
@@ -260,18 +261,20 @@ const compacted = compactPlayerForPersistence(bulkyPlayer) as any;
 assert(compacted.logs.length === 50, 'Compaction should keep bounded recent logs.');
 assert(compacted.news.length === 80, 'Compaction should keep bounded recent news.');
 assert(compacted.inbox.length === 120, 'Compaction should keep bounded inbox messages.');
-assert(compacted.instagram.posts.length === 200 && compacted.instagram.feed.length === 80, 'Compaction should bound Instagram payloads.');
-assert(compacted.x.posts.length === 200 && compacted.x.feed.length === 80, 'Compaction should bound X payloads.');
-assert(compacted.youtube.videos.length === 120, 'Compaction should bound YouTube videos.');
-assert(compacted.youtube.videos.every((video: any) => video.comments.length <= 12 && video.weeklyHistory.length <= 24), 'Compaction should bound YouTube nested payloads.');
+strictAssert.deepEqual(compacted.instagram.posts, bulkyPlayer.instagram.posts, 'Authored Instagram history must survive export.');
+assert(compacted.instagram.feed.length===80,'Disposable Instagram feed stays bounded.');
+strictAssert.deepEqual(compacted.x.posts, bulkyPlayer.x.posts, 'Authored X history must survive export.');
+assert(compacted.x.feed.length===80,'Disposable X feed stays bounded.');
+strictAssert.deepEqual(compacted.youtube.videos, bulkyPlayer.youtube.videos, 'All authored videos, comments and weekly history survive export.');
+
 assert(compacted.pastProjects.length === 14, 'Compaction should keep the full player filmography count.');
-assert(compacted.pastProjects.every((project: any) => project.weeklyGross.length <= 52 && project.reviews.length <= 12 && project.castList.length <= 28), 'Compaction should trim bulky old project display payloads.');
+strictAssert.deepEqual(compacted.pastProjects, bulkyPlayer.pastProjects, 'Historical films retain opening weeks, full credits and reviews.');
 assert(compacted.pastProjects.every((project: any) => project.episodeRatings?.[0]?.episodes?.length === 22), 'Compaction should preserve full season episode ratings.');
-assert(compacted.activeReleases[0].weeklyGross.length === 52, 'Compaction should keep bounded active-release weekly curves.');
-assert(compacted.activeReleases[0].projectDetails.castList.length === 28, 'Compaction should trim oversized active-release cast snapshots.');
-assert(compacted.commitments[0].projectDetails.castList.length === 28, 'Compaction should trim oversized commitment cast snapshots.');
-assert(compacted.businesses[0].history.length === 520, 'Compaction should keep bounded business operating history.');
-assert(compacted.businesses[0].studioState.financeLedger.length === 260, 'Compaction should keep bounded studio finance ledgers.');
+strictAssert.deepEqual(compacted.activeReleases[0].weeklyGross,bulkyPlayer.activeReleases[0].weeklyGross);
+strictAssert.deepEqual(compacted.activeReleases[0].projectDetails.castList,bulkyPlayer.activeReleases[0].projectDetails.castList);
+strictAssert.deepEqual(compacted.commitments[0].projectDetails.castList,bulkyPlayer.commitments[0].projectDetails.castList);
+strictAssert.deepEqual(compacted.businesses[0].history,bulkyPlayer.businesses[0].history);
+strictAssert.deepEqual(compacted.businesses[0].studioState.financeLedger,bulkyPlayer.businesses[0].studioState.financeLedger);
 assert(compacted.world.projects.length === 900, 'Compaction should keep bounded world release history.');
 assert(compacted.world.upcomingRivals.length === 0, 'Compaction must discard legacy rival cards that have no canonical B6 production schedule.');
 assert(compacted.flags.extraNPCs.some((npc: any) => npc.id === 'npc_keep_relationship'), 'Compaction should preserve referenced generated NPCs.');

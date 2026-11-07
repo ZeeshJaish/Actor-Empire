@@ -104,7 +104,7 @@ assert.equal(projected?.id, venture.id);
 assert.equal(projected?.history[0]?.title, 'A Quiet Crown');
 assert.equal(projected?.cashReserve, migrated.cashReserve, 'compatibility projection must read canonical studio cash');
 
-const closed = migrateNpcVentureToStudio({ ...venture, status: 'CLOSED', closureReason: 'Slate losses' }, migrated, 26 * 52 + 41);
+const closed = migrateNpcVentureToStudio({ ...venture, status: 'CLOSED', closureReason: 'Slate losses' }, migrated, 26 * 52 + 41, { applyLegacyProgress: true });
 assert.equal(closed.ai?.status, 'CLOSED');
 assert.equal(closed.ai?.legacyVenture?.closureReason, 'Slate losses');
 

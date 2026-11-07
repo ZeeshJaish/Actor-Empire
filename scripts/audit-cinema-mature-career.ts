@@ -15,6 +15,7 @@ import {inspectCinemaSavedState} from '../services/boxOffice/boxOfficeMigration'
 import {CinemaFileSaveStore} from './fixtures/cinemaFileSaveStore';
 import {cinemaAuditRandom,cinemaAuditClock,readCinemaAuditCheckpoint,writeCinemaAuditCheckpoint} from './fixtures/cinemaAuditCheckpoint';
 import {createMatureAppCareerPolicy} from './fixtures/cinemaMatureAppPolicy';
+import {assertMatureCastMigrationPreserved} from './fixtures/cinemaMatureMigrationAssertions';
 import {summarizeCareerFilms,type CareerFilmObservation} from './fixtures/cinemaCareerCohortMetrics';
 import type {CinemaWeekResult} from '../services/boxOffice/boxOfficeTypes';
 
@@ -29,11 +30,11 @@ const parentFile=!continued?process.env.CAREER_PARENT_CHECKPOINT:undefined;
 const parent=parentFile?readCinemaAuditCheckpoint<any>(parentFile):undefined;
 const prior=continued||parent||readCinemaAuditCheckpoint<any>(originFile);assert.ok(prior);
 if(continued){assert.equal(prior.executable,executable);assert.equal(prior.horizon,horizon);assert.equal(prior.genre,genre);assert.equal(prior.origin.checkpointSha256,originDigest)}
-else if(parent){assert.equal(parent.executable,'ca457caa7884d22e9a2ae255a38af2ca1ce25d1887a225d4e82ff6efb985d4d9');assert.equal(parent.weeks,932);assert.equal(parent.player.money,62610938);assert.equal(parent.origin.checkpointSha256,originDigest);assert.equal(createHash('sha256').update(readFileSync(parentFile!)).digest('hex'),'f57cdd680e3de85dd295e89c4bd087ec6d5288f349d8415b453c2c03c644bf11')}
+else if(parent){assert.equal(parent.executable,'26945ebf18fb1e64167d5af1b1b6256d7c2a059107ba9dbff23eb073fd396e23');assert.equal(parent.weeks,1000);assert.equal(parent.player.money,89974506);assert.equal(parent.origin.checkpointSha256,originDigest);assert.equal(createHash('sha256').update(readFileSync(parentFile!)).digest('hex'),'25fdd89da1dc6deabf0eb78a21a22c812971ce146a1728459718e4c11d103fd5')}
 else{assert.equal(prior.executable,'8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d');assert.equal(prior.weeks,156);assert.ok(!prior.player.flags.isDead);assert.equal(prior.player.businesses.length,0);assert.equal(prior.player.money,57643);assert.equal(seed,0)}
 const origin=continued?.origin||parent?.origin||{checkpoint:originFile,checkpointSha256:originDigest,executable:prior.executable,weeks:prior.weeks,cash:prior.player.money,sourceRef:'07fdfff',initialCash:2000,manualCapitalGrants:0};
 const lineage:any[]=continued?.lineage||parent?.lineage||[];
-if(parent)lineage.push({checkpoint:parentFile,checkpointSha256:createHash('sha256').update(readFileSync(parentFile!)).digest('hex'),executable:parent.executable,weeks:parent.weeks,cash:parent.player.money,playerSha256:createHash('sha256').update(JSON.stringify(parent.player)).digest('hex'),reason:'Replace only the audit memory save store with parity-verified immutable disk generations; retain the exact world, gameplay policy, payments, RNG and clock'});
+if(parent)lineage.push({checkpoint:parentFile,checkpointSha256:createHash('sha256').update(readFileSync(parentFile!)).digest('hex'),executable:parent.executable,weeks:parent.weeks,cash:parent.player.money,playerSha256:createHash('sha256').update(JSON.stringify(parent.player)).digest('hex'),reason:'Permit only verified AUTO-to-CANON provenance enrichment while preserving story meanings and paid facts; follow the organically offered universe contract through its last theatrical closure; no gameplay policy or player state changed'});
 // The game mutates this runtime catalogue when NPCs earn music income. A cold
 // audit worker must resume those earned values instead of resetting founders'
 // wealth between batches. This belongs to the audit checkpoint, not user saves.
@@ -55,6 +56,8 @@ const ownIds=new Set<string>(prior?.ownIds||[]),metadata=new Map<string,any>(pri
 const managed=prior?.managed||{pressedProjectIds:[]};
 const policy=createMatureAppCareerPolicy(seed,actions,signed,phases,managed);
 let ownerCapitalMilestone=prior?.ownerCapitalMilestone||null;
+let universeObservation:any=prior?.universeObservation||null;
+const universeClosed=()=>Boolean(universeObservation?.films.length&&universeObservation.films.every((f:any)=>player.world.cinemaMarket?.titles[f.id]?.closed));
 const curve:any[]=continued?.curve||parent?.curve||[],cashTrace:any[]=continued?.cashTrace||parent?.cashTrace||[];
 const point=()=>({weeks,age:player.age,week:player.currentWeek,cash:player.money,craft:getActorTalent(player.stats.skills),fame:player.stats.fame,reputation:player.stats.reputation,experience:player.stats.experience,health:player.stats.health,followers:player.stats.followers,credits:player.pastProjects.length,studios:player.businesses.filter(b=>b.type==='PRODUCTION_HOUSE').length,roles:player.commitments.filter(c=>c.type==='ACTING_GIG').map(c=>({id:c.id,role:c.roleType,phase:c.projectPhase,pay:c.lumpSum}))});
 if(!curve.length)curve.push(point());
@@ -97,12 +100,12 @@ const films=():CareerFilmObservation[]=>Object.values(player.world.cinemaMarket!
 }));
 const report=()=>{
     collect();const observed=films(),summary=summarizeCareerFilms(observed);
-    writeFileSync(`${out}/career-${seed}.json`,JSON.stringify({kind:'MATURE_NO_GRANT_ACTOR_CAREER',policyVersion:5,executable,seed,genre,horizon,status,failure,origin,lineage,curve,cashTrace,managed,ownerCapitalMilestone,manualCapitalGrants:0,authoredCompletedPackages:0,loansTaken:0,
+    writeFileSync(`${out}/career-${seed}.json`,JSON.stringify({kind:'MATURE_NO_GRANT_ACTOR_AND_UNIVERSE_CAREER',policyVersion:6,executable,seed,genre,horizon,status,failure,origin,lineage,curve,cashTrace,managed,ownerCapitalMilestone,universeObservation,manualCapitalGrants:0,authoredCompletedPackages:0,loansTaken:0,
         weeks,saves,reloads,replays,failedPromotionChecked,phases:[...phases],ownIds:[...ownIds],cash:player.money,alive:!player.flags.isDead,
         skill:getActorTalent(player.stats.skills),health:player.stats.health,peakRssBytes,elapsedMs:(prior?.elapsedMs||0)+Math.round(performance.now()-started),
         summary,films:observed,actions,limitations:['Continuation of verified fresh $2000 actor; no capital grants, premium rewards, authored quality, cast or completed packages',
             'Adaptive actor policy with current lead/famous/contract offers, paid team, press answers, sponsorship obligations and healthcare; some credits may be series/streaming',
-            'The cash financing milestone does not end observation or imply a studio was founded; this is an actor-career probe, not an owner-created crossover test',
+            'The actual offered universe roadmap is observed through its last theatrical closure or the stated horizon; no owner-created film or target gross is authored',
             'Only completed cinema titles with known production/campaign costs enter hit/loss denominators',
             'Shared studio identities can recur across careers; pooled film observations are not independent population probabilities',
             'Theatrical result excludes future media and investor ownership distributions; recorded backend is a cost']},null,2));
@@ -120,17 +123,22 @@ const persist=async(fault=false)=>{
     // A legacy generated co-star may receive missing AUTO story defaults. Existing story identities must still survive.
     for(const c of loaded.player!.commitments)for(const member of c.projectDetails?.castList||[]){
         const next=player.commitments.find(n=>n.id===c.id)?.projectDetails?.castList?.find(n=>n.id===member.id);
-        for(const key of ['storyFunction','storyRole','abilityType','nature','identitySource'] as const)
-            if(member[key]!==undefined)assert.deepEqual(next?.[key],member[key]);
+        assertMatureCastMigrationPreserved(member,next,c.projectDetails?.universeId);
     }
     reloads++;
 };
 try{
     // Re-create the in-memory test store, preserving the checkpoint's simulation clock.
     const next=clock.next();await saveVerifiedGameData(store,key,player,createSaveIntegrityManifest(player,'MIGRATION'));clock.restore(next);saves++;
-    const start=weeks;
-    while(weeks<horizon&&weeks-start<batch&&!player.flags.isDead){
+    const start=weeks;if(universeClosed())status='UNIVERSE_RUN_CLOSED';
+    while(status==='RUNNING'&&weeks<horizon&&weeks-start<batch&&!player.flags.isDead){
         const beforePolicyCash=player.money,actionStart=actions.length;player=policy(player,weeks);const afterPolicyCash=player.money;
+        if(!universeObservation&&player.activeUniverseContract){
+            const c=player.activeUniverseContract,names=new Set(c.films.map(f=>f.title));
+            universeObservation={universeId:c.universeId,characterName:c.characterName,signedAtCareerWeek:weeks,salaryTotal:c.salaryTotal,
+                roadmap:c.films,films:player.commitments.filter(p=>p.projectDetails?.universeId===c.universeId&&names.has(p.name)).map(p=>({id:p.id,name:p.name}))};
+            assert.equal(universeObservation.films.length,c.films.length,'Observe every actual contracted film, not only selected hits');
+        }
         for(const c of player.commitments)if(c.projectDetails?.type==='MOVIE')ownIds.add(c.id);
         const before=getAbsoluteWeek(player.age,player.currentWeek);let result:CinemaWeekResult|undefined;
         player=(await processGameWeek(player,{onCinemaResult:r=>result=r})).player;weeks++;
@@ -153,10 +161,11 @@ try{
         if(weeks%4===0)console.log(JSON.stringify({...point(),peakMiB:Math.round(peakRssBytes/1048576)}));
         if(player.money<0){status='UNFUNDED';break}
         if(player.money>=70000000&&!ownerCapitalMilestone)ownerCapitalMilestone={weeks,cash:player.money};
+        if(universeClosed()){status='UNIVERSE_RUN_CLOSED';break}
         (globalThis as any).gc?.();
     }
     if(status==='RUNNING')status=player.flags.isDead?'CAREER_ENDED':weeks>=horizon?'HORIZON_COMPLETE':'CHECKPOINT_READY';
-    writeCinemaAuditCheckpoint(checkpointFile,{executable,horizon,genre,origin,lineage,curve,cashTrace,managed,ownerCapitalMilestone,player,npcDatabase:NPC_DATABASE,weeks,saves,reloads,replays,failedPromotionChecked,actions,
+    writeCinemaAuditCheckpoint(checkpointFile,{executable,horizon,genre,origin,lineage,curve,cashTrace,managed,ownerCapitalMilestone,universeObservation,player,npcDatabase:NPC_DATABASE,weeks,saves,reloads,replays,failedPromotionChecked,actions,
         ownIds:[...ownIds],metadata:[...metadata],weekly:[...weekly],signed:[...signed],phases:[...phases],randomCalls:rng.calls(),clockNext:clock.next(),
         peakRssBytes,elapsedMs:(prior?.elapsedMs||0)+Math.round(performance.now()-started)});
 }catch(e){status='FAILURE';failure=(e as Error).stack;process.exitCode=1;}

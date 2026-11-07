@@ -31,7 +31,7 @@ expectIncludes(dashboard, 'CustomPosterImage', 'dashboard renders media-backed p
 expectIncludes(productionHouse, 'CustomPosterImage', 'production house cards render media-backed posters');
 expectIncludes(imdb, 'CustomPosterImage', 'IMDb renders media-backed posters');
 expectIncludes(app, 'externalizeCustomPostersInPlayer', 'app migrates legacy base64 posters on load');
-expectIncludes(saveCompaction, 'stripEmbeddedPosterImageDataForPersistence', 'save compaction prevents duplicate poster imageData from entering saves');
+expectExcludes(saveCompaction, 'stripEmbeddedPosterImageDataForPersistence(', 'compaction preserves supplied poster source and does not mutate shared records; explicit media externalization owns replacement');
 expectIncludes(app, 'compactPlayerForPersistence', 'app persists through shared save compaction');
 
 const failed = checks.filter(check => !check.pass);

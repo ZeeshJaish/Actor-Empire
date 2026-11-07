@@ -318,3 +318,29 @@ assert.equal(paidLive.businesses[0].studioState!.talentRoster![0].installmentsPa
 paidLive = migratePlayerSave(JSON.parse(JSON.stringify(paidLive)));
 assert.equal(paidLive.studio.talentRoster[0].installmentsPaid, 1);
 console.log('Full talent flow passed: immutable signing -> zero cast salary -> funded Greenlight -> last use -> verified save preparation -> EMI after exhaustion -> migration/reload.');
+
+// New, evidenced writing payments remain inside the full economic budget, but
+// cannot call for the same studio cash again or over-raise investor funding.
+const {recordScriptDevelopmentPayment,getPrepaidScriptDevelopmentCash}=await import('../services/scriptDevelopmentFinance');
+const paidScript=recordScriptDevelopmentPayment({...script,developmentCost:0},studio.id,500_000);
+const prepaidInput={...projectInput,selectedScript:paidScript,budgetBreakdown:{total:5_500_000},selectedInvestorPlan:{totalRaised:2_000_000,commitments:[]} as any};
+const prepaidProject=buildGreenlightProject(prepaidInput);
+assert.equal(prepaidProject.greenlightPackageBudget,6_500_000);
+assert.equal(prepaidProject.studioCashRequirement,4_000_000);
+assert.equal(prepaidProject.newCommitment.projectDetails?.hiddenStats?.prepaidDevelopmentCash,500_000);
+assert.equal(getPrepaidScriptDevelopmentCash(prepaidProject.updatedScripts[0],studio.id),0);
+const prepaidFundingInput={player,studio,studioCashRequirement:prepaidProject.studioCashRequirement,newCommitment:prepaidProject.newCommitment,finalInvestorRaised:2_000_000,greenlightPackageBudget:prepaidProject.greenlightPackageBudget,isCreatingNewUniverse:false,normalizedWorldUniverses:{},newUniverseName:'',randomUniverseColor:'#2563eb'};
+const prepaidFunded=prepareGreenlightFunding(prepaidFundingInput);
+assert.equal(prepaidFunded.fundingResult.productionFundApplied,1_000_000);
+assert.equal(prepaidFunded.fundingResult.studioSpend,3_000_000);
+assert.equal(prepaidFunded.fundedCommitment.projectDetails?.hiddenStats?.studioCashAtRisk,3_500_000);
+assert.equal(500_000+2_000_000+prepaidFunded.fundingResult.productionFundApplied+prepaidFunded.fundingResult.studioSpend,prepaidProject.greenlightPackageBudget);
+const locked={id:'existing-locked-funding',platformId:'NETFLIX',platformName:'Netflix',amount:3_000_000,sourceProjectId:'prior-season',sourceTitle:'Prior Season',projectType:'SERIES',createdWeek:1,createdYear:30} as any;
+const withLocked=prepareGreenlightFunding({...prepaidFundingInput,lockedStreamingFunding:locked,studio:{...studio,studioState:{...studio.studioState!,lockedStreamingFunds:[locked]}}});
+assert.equal(withLocked.lockedFundApplied,3_000_000);assert.equal(withLocked.fundingResult.productionFundApplied,1_000_000);assert.equal(withLocked.fundingResult.studioSpend,0);assert.equal(withLocked.fundedCommitment.projectDetails?.hiddenStats?.studioCashAtRisk,500_000);
+assert.equal(500_000+2_000_000+withLocked.lockedFundApplied+withLocked.fundingResult.productionFundApplied,prepaidProject.greenlightPackageBudget);
+assert.throws(()=>buildGreenlightProject({...prepaidInput,selectedInvestorPlan:{totalRaised:6_250_000,commitments:[]} as any}),/remaining unpaid/);
+const legacyScript={...script,developmentCost:500_000};
+assert.equal(buildGreenlightProject({...prepaidInput,selectedScript:legacyScript}).studioCashRequirement,4_500_000,'Legacy signed/paid history receives no inferred refund');
+assert.equal(paidScript.status,'READY');assert.equal(paidScript.developmentPayment?.allocatedProjectId,undefined,'Building an immutable candidate must not mutate its source script');
+console.log('Prepaid Greenlight funding passed: real studio/investor/production/locked-funding conservation, one allocation and conservative legacy handling.');

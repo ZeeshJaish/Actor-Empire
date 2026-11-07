@@ -155,7 +155,7 @@ const mapAiLedger = (
             label: entry.description,
         }];
     });
-    return [...inherited, ...(business.studioState?.financeLedger || [])].slice(0, 260);
+    return [...inherited, ...(business.studioState?.financeLedger || [])];
 };
 
 export interface StudioOwnershipMaterializationResult {

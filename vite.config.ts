@@ -6,6 +6,7 @@ import { lucideBuildImports } from './scripts/build/lucideImports.mjs';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      build: { target: ['safari15', 'chrome80'] },
       server: {
         port: 3000,
         host: '0.0.0.0',

@@ -13,6 +13,19 @@ const resolveUniverseProjectType = (...candidates: unknown[]): 'MOVIE' | 'SERIES
     candidates.some(candidate => candidate === 'SERIES') ? 'SERIES' : 'MOVIE'
 );
 
+/** Franchise media determines its route; the temporary package's studio does not.
+ * Older serialized roadmaps identify their series with the existing title marker. */
+export const buildUniverseContractProject = (
+    base: ProjectDetails,
+    film: Pick<ContractFilm, 'title' | 'type' | 'projectType'>
+): ProjectDetails => {
+    const type = film.projectType === 'MOVIE' || film.projectType === 'SERIES'
+        ? film.projectType : /\(Series\)\s*$/i.test(film.title) ? 'SERIES' : 'MOVIE';
+    return { ...base, title: film.title, subtype: film.type, type,
+        releaseStrategy: type === 'SERIES' ? 'STREAMING_ONLY' : 'THEATRICAL',
+        episodes: type === 'SERIES' ? base.episodes || 8 : undefined };
+};
+
 // --- CONFIGURATION ---
 
 interface CharacterArc {
@@ -22,6 +35,7 @@ interface CharacterArc {
         title: string;
         role: RoleType;
         type: ProjectSubtype;
+        projectType?: 'MOVIE' | 'SERIES';
         offset: number; // Week offset
     }[];
 }
@@ -131,7 +145,7 @@ const MCU_ARCS: CharacterArc[] = [
             { title: "Captain America: Civil War", role: "ENSEMBLE", type: "UNIVERSE_CROSSOVER", offset: 100 },
             { title: "Avengers: Infinity War", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 160 },
             { title: "Avengers: Endgame", role: "ENSEMBLE", type: "UNIVERSE_EVENT", offset: 220 },
-            { title: "WandaVision (Series)", role: "LEAD", type: "SPINOFF", offset: 260 },
+            { title: "WandaVision (Series)", role: "LEAD", type: "SPINOFF", projectType: 'SERIES', offset: 260 },
             { title: "Doctor Strange in the Multiverse of Madness", role: "LEAD", type: "UNIVERSE_CROSSOVER", offset: 320 }
         ]
     }
@@ -237,9 +251,9 @@ const SW_ARCS: CharacterArc[] = [
         name: "Mandalorian Warrior",
         gender: 'ALL',
         roadmap: [
-            { title: "The Mandalorian (Series)", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "The Mandalorian (Series)", role: "LEAD", type: "UNIVERSE_ENTRY", projectType: 'SERIES', offset: 0 },
             { title: "The Book of Boba Fett", role: "CAMEO", type: "UNIVERSE_CROSSOVER", offset: 50 },
-            { title: "Ahsoka (Series)", role: "SUPPORTING", type: "UNIVERSE_CROSSOVER", offset: 110 },
+            { title: "Ahsoka (Series)", role: "SUPPORTING", type: "UNIVERSE_CROSSOVER", projectType: 'SERIES', offset: 110 },
             { title: "The Mandalorian and Grogu", role: "LEAD", type: "UNIVERSE_EVENT", offset: 190 }
         ]
     },
@@ -304,7 +318,7 @@ const MONSTERVERSE_ARCS: CharacterArc[] = [
         name: "Monarch Operative",
         gender: 'ALL',
         roadmap: [
-            { title: "Monarch: Legacy of Monsters (Series)", role: "LEAD", type: "UNIVERSE_ENTRY", offset: 0 },
+            { title: "Monarch: Legacy of Monsters (Series)", role: "LEAD", type: "UNIVERSE_ENTRY", projectType: 'SERIES', offset: 0 },
             { title: "Godzilla x Kong: The New Empire", role: "SUPPORTING", type: "UNIVERSE_CROSSOVER", offset: 80 },
             { title: "Godzilla x Kong: Supernova", role: "LEAD", type: "SEQUEL", offset: 200 }
         ]
@@ -1546,6 +1560,7 @@ export const generateDirectEntryOffer = (player: Player, universeId: UniverseId)
         title: step.title,
         role: step.role,
         type: step.type,
+        projectType: step.projectType || 'MOVIE',
         weeksOffset: step.offset + 10 // +10 planning buffer
     }));
 
@@ -1607,6 +1622,7 @@ export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT
         title: step.title,
         role: step.role,
         type: step.type,
+        projectType: step.projectType || 'MOVIE',
         // Recalculate offset relative to now, preserving gaps
         weeksOffset: Math.max(10, step.offset - remainingRoadmap[0].offset + 10) 
     }));
@@ -1621,13 +1637,14 @@ export const generateRandomUniverseOpportunity = (player: Player, source: 'AGENT
     };
     
     // Construct fake project for the opportunity card
-    const project = generateProjectDetails('HIGH', 'MOVIE', [], player);
+    let project = generateProjectDetails('HIGH', 'MOVIE', [], player);
     project.title = filmDef.title;
     project.universeId = uniId;
     project.studioId = tmpl.studioId;
     project.genre = tmpl.genre;
     project.visibleHype = 'HIGH';
     project.isFamous = true; // Treats as famous for prestige
+    project = buildUniverseContractProject(project, films[0]);
     contract.salaryTotal = quoteActorFranchiseSalary(player, films, project.estimatedBudget);
     
     // Adjust visual label if it's a cameo

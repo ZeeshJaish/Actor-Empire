@@ -11,13 +11,17 @@ import {applyCrisisImpact} from '../../services/productionService';
 import {syncWeeklyEnergyForCommitments,spendPlayerEnergy} from '../../services/premiumLogic';
 import {LIFESTYLE_ACTIVITY_CATALOG,createDefaultLifestyleActivitySelections,resolveLifestyleActivity,buildLifestyleActivityQuote,getLifestyleActivityCooldownWeeks} from '../../services/lifestyleActivities';
 import {applyOpportunityIdentityToProject} from '../../services/characterIdentityLogic';
-import {normalizeUniverseMap} from '../../services/universeLogic';
+import {normalizeUniverseMap,buildUniverseContractProject} from '../../services/universeLogic';
 import {getAbsoluteWeek} from '../../services/legacyLogic';
 import {INSTAGRAM_POST_CONFIGS,calculateInstagramPostOutcome,clampInstagramStat} from '../../services/instagramLogic';
-import {applyProjectPromotionAttribution} from '../../services/projectPromotionAttribution';
+import {applyProjectPromotionAttribution,getEligiblePromotionProjects} from '../../services/projectPromotionAttribution';
 import {PHASE_ONE_ENERGY_COSTS} from '../../services/energyCosts';
+import {getMatureInstagramPostLocks} from './cinemaInstagramEligibility';
+import {buildCareerUiModel} from '../../services/careerUiAdapter';
+import {buildImproveUiModel} from '../../services/improveUiAdapter';
 
 const ts:typeof import('typescript')=createRequire(process.cwd()+'/package.json')('typescript');
+export const MATURE_UI_ELIGIBILITY_VERSION=1;
 // Only the real UI callbacks are extracted. DOM, toast and React state sinks
 // are replaced; pay, audition gates, followers, energy and outcomes are not.
 const callbacks=(()=>{
@@ -57,25 +61,34 @@ const callbacks=(()=>{
 export const matureCareerUi=(input:Player)=>{
  let current=input;
  const dependencies={props:{player:input},handleGenericUpdate:(fn:(p:Player)=>Player)=>{current=fn(current)},handleUpdatePlayer:(p:Player)=>{current=p},
-  setToastMessage:()=>{},showToast:()=>{},tr:(key:string)=>key,syncWeeklyEnergyForCommitments,getPhaseDuration,applyOpportunityIdentityToProject,normalizeUniverseMap,
+  setToastMessage:()=>{},showToast:()=>{},tr:(key:string)=>key,syncWeeklyEnergyForCommitments,getPhaseDuration,applyOpportunityIdentityToProject,normalizeUniverseMap,buildUniverseContractProject,
   INSTAGRAM_POST_CONFIGS,calculateInstagramPostOutcome,clampInstagramStat,spendPlayerEnergy,getAbsoluteWeek,applyProjectPromotionAttribution,
   player:input,setPlayer:(fn:(p:Player)=>Player)=>{current=fn(current)},generateReleasePressQuestions,collaborationSigningEnergyCost:PHASE_ONE_ENERGY_COSTS.COLLABORATION_SIGNING,
   onUpdatePlayer:(p:Player)=>{current=p},guardTeamChange:()=>!input.flags.teamChangeLocked,safeShowToast:()=>{},setSelectedMember:()=>{}};
  const ui=new Function(...Object.keys(dependencies),callbacks)(...Object.values(dependencies));
- return {quit:(id:string)=>{ui.quit(id);return current},post:(type:string,projectId?:string)=>{ui.post(type,'Work, preparation and a new week.',undefined,undefined,projectId);return current},accept:(message:Message)=>{
+ return {quit:(id:string)=>{ui.quit(id);return current},post:(type:string,projectId?:string)=>{
+  assert.ok(!(getMatureInstagramPostLocks(input) as any)[type],'UI post is locked: '+type);
+  if(projectId)assert.ok(getEligiblePromotionProjects(input).some(p=>p.id===projectId),'Only a visible promotion target can be selected');
+  ui.post(type,'Work, preparation and a new week.',undefined,undefined,projectId);return current},accept:(message:Message)=>{
   assert.ok(input.inbox.some(m=>m.id===message.id&&!m.isExpired),'Only an actual current offer can be accepted');
   assert.ok(['OFFER_ROLE','OFFER_AUDITION','OFFER_NEGOTIATION','OFFER_SPONSORSHIP'].includes(message.type));ui.accept(message);return current;
  },hireAgent:(id:string)=>{assert.ok(!input.flags.teamChangeLocked);const a=input.team.availableAgents.find(a=>a.id===id);assert.ok(a,'Only a current team listing');ui.hireAgent(a);return current},
  hireManager:(id:string)=>{assert.ok(!input.flags.teamChangeLocked);const m=input.team.availableManagers.find(m=>m.id===id);assert.ok(m,'Only a current team listing');ui.hireManager(m);return current},
  hirePublicist:(id:string)=>{const m=input.team.availablePublicists.find(m=>m.id===id);assert.ok(m,'Only a current publicist listing');ui.hireMember(m);return current},
  perform:(id:string)=>{const s=input.activeSponsorships.find(s=>s.id===id);assert.ok(s&&s.requirements.progress<s.requirements.totalRequired&&input.energy.current>=s.requirements.energyCost,'A payable current deliverable and enough energy are required');ui.perform(id,s.requirements.type);return current},
- press:(id:string)=>{assert.ok(input.commitments.some(c=>c.id===id&&c.projectPhase==='POST_PRODUCTION'),'Only a current post-production project can hold this tour');assert.ok(input.energy.current>=25,'Press requires 25 energy');ui.beginPress('PROMO_PRESS_'+id);const event=ui.event();assert.ok(event?.questions.length);
+ press:(id:string)=>{assert.ok(input.commitments.some(c=>c.id===id&&c.projectPhase==='POST_PRODUCTION'),'Only a current post-production project can hold this tour');const enabled=buildCareerUiModel(input).projects.find(p=>p.id===id)?.promo?.find(a=>a.id==='press');assert.ok(enabled&&!enabled.disabled,'The visible press action must be enabled');assert.ok(input.energy.current>=25,'Press requires 25 energy');ui.beginPress('PROMO_PRESS_'+id);const event=ui.event();assert.ok(event?.questions.length);
   const indices=event.questions.map((q:any)=>q.options.map((o:any,i:number)=>({i,score:(o.consequences.fame||0)*3+(o.consequences.reputation||0)+(o.consequences.buzz||0)*.1})).sort((a:any,b:any)=>b.score-a.score)[0].i);
   const result=ui.resolvePress(indices);return {player:current,result,answers:event.questions.map((q:any,i:number)=>({question:q.id||q.question,answer:q.options[indices[i]].text,consequences:q.options[indices[i]].consequences}))};
  }};
 };
 
 export interface MatureManagedState {pressedProjectIds:string[];agentHireWeek?:number;managerHireWeek?:number}
+
+const canEnroll=(p:Player,c:import('../../types').Commitment)=>{
+ const model=buildImproveUiModel(p),visible=model.courses.find(v=>v.catalogId===c.id);
+ return Boolean(visible&&!visible.activeCommitmentId&&model.capacityFree>=visible.energy&&model.money>=visible.cost);
+};
+const enrollVisibleCourse=(p:Player,c:import('../../types').Commitment)=>{assert.ok(canEnroll(p,c),'Workshop must be enabled in the actual Improve model');return enrollThroughApp(p,c)};
 
 /** Only information visible before accepting a job; no final quality or future gross. */
 export const selectMatureCareerOpportunity=(p:Player)=>{
@@ -107,7 +120,7 @@ export const createMatureAppCareerPolicy=(seed:number,actions:any[],signed:Map<s
  let p=input;
  const record=(type:string,before:Player,id?:string)=>actions.push({week,type,cost:before.money-p.money,energy:before.energy.current-p.energy.current,projectId:id});
  const update=(type:string,fn:(p:Player)=>Player,id?:string)=>{const before=p;p=fn(p);record(type,before,id)};
- const improve=(id:string)=>{for(const [category,groups] of Object.entries(IMPROVEMENT_CATALOG)){const a=groups.find(g=>g.options.some(o=>o.id===id)),o=a?.options.find(o=>o.id===id);if(a&&o)update('wellbeing:'+id,p=>careerActionHarness(p).improve(category,a.name,o));}};
+ const improve=(id:string)=>{for(const [category,groups] of Object.entries(IMPROVEMENT_CATALOG)){const a=groups.find(g=>g.options.some(o=>o.id===id)),o=a?.options.find(o=>o.id===id);if(a&&o&&p.money>=o.moneyCost&&p.energy.current>=o.energyCost)update('wellbeing:'+id,p=>careerActionHarness(p).improve(category,a.name,o));}};
  while(p.pendingEvents.length){
   const event=p.pendingEvents[0],queue=p.pendingEvents,before=p;
   if(event.data?.lifeEvent){const life=event.data.lifeEvent,index=life.options.findIndex((o:any)=>!o.isGolden);assert.ok(index>=0);const option=life.options[index];p=(typeof option.impact==='function'?option.impact(p):resolveLifeEventFallback(p,life,index,option)).updatedPlayer;}
@@ -135,7 +148,8 @@ export const createMatureAppCareerPolicy=(seed:number,actions:any[],signed:Map<s
   else if(m){update('hire-current-manager',p=>matureCareerUi(p).hireManager(m.id));managed.managerHireWeek=week;actions.at(-1).terms={...m};}
   else if(publicist){update('hire-current-publicist',p=>matureCareerUi(p).hirePublicist(publicist.id));actions.at(-1).terms={...publicist};}
  }
- const press=p.commitments.find(c=>c.type==='ACTING_GIG'&&c.projectPhase==='POST_PRODUCTION'&&!managed.pressedProjectIds.includes(c.id));
+ const pressUi=buildCareerUiModel(p);
+ const press=p.commitments.find(c=>c.type==='ACTING_GIG'&&c.projectPhase==='POST_PRODUCTION'&&!managed.pressedProjectIds.includes(c.id)&&pressUi.projects.find(v=>v.id===c.id)?.promo?.some(v=>v.id==='press'&&!v.disabled));
  if(press&&p.energy.current>=25){const before=p,result=matureCareerUi(p).press(press.id);p=result.player;managed.pressedProjectIds.push(press.id);record('actual-press-tour',before,press.id);actions.at(-1).answers=result.answers;actions.at(-1).earned=result.result;}
  if(p.team.manager&&p.activeSponsorships.length<1&&p.energy.current>=PHASE_ONE_ENERGY_COSTS.COLLABORATION_SIGNING+30){
   const offer=p.inbox.filter(m=>!m.isExpired&&m.type==='OFFER_SPONSORSHIP'&&m.data?.requirements?.type==='POST').sort((a,b)=>b.data.weeklyPay-a.data.weeklyPay)[0];
@@ -147,14 +161,14 @@ export const createMatureAppCareerPolicy=(seed:number,actions:any[],signed:Map<s
  const busy=()=>p.commitments.some(c=>c.type==='ACTING_GIG'&&['AUDITION','PRE_PRODUCTION','PRODUCTION','SCHEDULED'].includes(c.projectPhase||''));
  if(busy()&&p.money>5000)for(const job of p.commitments.filter(c=>c.type==='JOB'&&!c.projectDetails))update('quit-part-time-for-film',p=>matureCareerUi(p).quit(job.id));
  if(!busy()&&p.money<20000&&!p.commitments.some(c=>c.type==='JOB'&&!c.projectDetails)){
-  const job=p.weeklyOpportunities.jobs.filter(j=>j.energyCost<=25).sort((a,b)=>b.income/Math.max(1,b.energyCost)-a.income/Math.max(1,a.energyCost))[0];if(job)update('accept-paid-job',p=>acceptCareerPartTimeJob(p,job));
+  const job=p.weeklyOpportunities.jobs.filter(j=>j.energyCost<=25&&p.energy.current>=j.energyCost).sort((a,b)=>b.income/Math.max(1,b.energyCost)-a.income/Math.max(1,a.energyCost))[0];if(job)update('accept-paid-job',p=>acceptCareerPartTimeJob(p,job));
  }
  // Train a pronounced weak craft before another booking rather than spending
  // an entire career accepting whichever inbox offer arrives first.
  const needsCraft=Math.min(...(['delivery','memorization','expression','improvisation','discipline','presence','charisma'] as const).map(k=>p.stats.skills[k]))<55;
  if(!busy()&&!p.commitments.some(c=>c.type==='COURSE')&&needsCraft){
-  const course=WORKSHOP_CATALOG.filter(c=>c.skillGains&&(c.upfrontCost||0)+5000<=p.money&&c.energyCost<=30).map(c=>({c,score:Object.entries(c.skillGains!).reduce((n,[k,g])=>n+Math.max(0,65-(p.stats.skills as any)[k])*Number(g),0)/Math.max(1,c.energyCost)})).sort((a,b)=>b.score-a.score)[0]?.c;
-  if(course&&p.energy.current>=course.energyCost)update('paid-foundation-course:'+course.id,p=>enrollThroughApp(p,course));
+  const course=WORKSHOP_CATALOG.filter(c=>c.skillGains&&(c.upfrontCost||0)+5000<=p.money&&c.energyCost<=30&&canEnroll(p,c)).map(c=>({c,score:Object.entries(c.skillGains!).reduce((n,[k,g])=>n+Math.max(0,65-(p.stats.skills as any)[k])*Number(g),0)/Math.max(1,c.energyCost)})).sort((a,b)=>b.score-a.score)[0]?.c;
+  if(course&&p.energy.current>=course.energyCost)update('paid-foundation-course:'+course.id,p=>enrollVisibleCourse(p,course));
  }
  if(!busy()&&!p.applications.length&&!(needsCraft&&p.commitments.some(c=>c.type==='COURSE'))){
   const selected=selectMatureCareerOpportunity(p);
@@ -169,16 +183,18 @@ export const createMatureAppCareerPolicy=(seed:number,actions:any[],signed:Map<s
  if(paidTraining&&p.money>=paidTraining.cost+5000&&p.energy.current>=paidTraining.energy+40)update('genre:'+paidTraining.genre,p=>careerActionHarness(p).improve('GENRE',paidTraining.genre,{id:'genre',label:paidTraining.label,energyCost:paidTraining.energy,moneyCost:paidTraining.cost,gains:{},risk:0,description:paidTraining.desc}));
  for(const c of [...p.commitments])if(c.type==='ACTING_GIG'){
   signed.set(c.id,signed.get(c.id)??c.lumpSum??0);assert.equal(c.lumpSum||0,signed.get(c.id));phases.add(c.projectPhase||'');
-  if(['AUDITION','PRE_PRODUCTION','PRODUCTION'].includes(c.projectPhase||'')){let n=0;while(p.energy.current>=(c.projectPhase==='PRE_PRODUCTION'?10:20)&&n++<10){const before=p;update('project-rehearsal',p=>careerActionHarness(p).rehearse(c.id),c.id);if(p===before)break;}}
+  if(['AUDITION','PRE_PRODUCTION','PRODUCTION'].includes(c.projectPhase||'')){let n=0;while(n++<10){const action=buildCareerUiModel(p).projects.find(v=>v.id===c.id)?.primaryAction;if(!action||action.disabled||p.energy.current<action.energy)break;const before=p;update('project-rehearsal',p=>careerActionHarness(p).rehearse(action.handlerId),c.id);if(p===before)break;}}
  }
  if(!busy()&&!p.commitments.some(c=>c.type==='COURSE')&&getActorTalent(p.stats.skills)<90){
-  const course=WORKSHOP_CATALOG.filter(c=>c.skillGains&&(c.upfrontCost||0)+5000<=p.money&&c.energyCost<=30)
+  const course=WORKSHOP_CATALOG.filter(c=>c.skillGains&&(c.upfrontCost||0)+5000<=p.money&&c.energyCost<=30&&canEnroll(p,c))
    .map(c=>({c,score:Object.entries(c.skillGains!).reduce((n,[k,g])=>n+Math.max(0,90-(p.stats.skills as any)[k])*Number(g),0)/Math.max(1,c.energyCost)})).sort((a,b)=>b.score-a.score)[0]?.c;
-  if(course&&p.energy.current>=course.energyCost)update('paid-course:'+course.id,p=>enrollThroughApp(p,course));
+  if(course&&p.energy.current>=course.energyCost)update('paid-course:'+course.id,p=>enrollVisibleCourse(p,course));
  }
  const project=p.commitments.find(c=>c.type==='ACTING_GIG'),genre:Genre=project?.projectDetails?.genre||'DRAMA',training=GENRE_TRAINING_CATALOG.find(g=>g.genre===genre);
  if(!busy()&&training&&p.stats.genreXP[genre]<85&&p.money>=training.cost+5000&&p.energy.current>=training.energy+15)update('genre:'+genre,p=>careerActionHarness(p).improve('GENRE',genre,{id:'genre',label:training.label,energyCost:training.energy,moneyCost:training.cost,gains:{},risk:0,description:training.desc}));
- const postType=project?(project.projectPhase==='POST_PRODUCTION'?'ANNOUNCEMENT':'BTS'):'REEL';
- if(p.energy.current>=INSTAGRAM_POST_CONFIGS[postType].energy)update('actual-weekly-instagram:'+postType,p=>matureCareerUi(p).post(postType,project?.id),project?.id);
+ const filming=p.commitments.find(c=>c.type==='ACTING_GIG'&&c.projectPhase==='PRODUCTION');
+ const promo=p.commitments.find(c=>c.type==='ACTING_GIG'&&c.projectPhase==='POST_PRODUCTION');
+ const postType=filming?'BTS':promo?'ANNOUNCEMENT':'REEL',target=filming||promo;
+ if(p.energy.current>=INSTAGRAM_POST_CONFIGS[postType].energy){update('actual-weekly-instagram:'+postType,p=>matureCareerUi(p).post(postType,target?.id),target?.id);actions.at(-1).uiEligibility={postType,targetPhase:target?.projectPhase,normalPickerUnlocked:!(getMatureInstagramPostLocks(p) as any)[postType]};}
  return p;
 };

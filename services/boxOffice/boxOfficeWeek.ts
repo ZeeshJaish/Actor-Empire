@@ -11,7 +11,7 @@ import { normalizeCinemaTitle, preserveCinemaCastRecognition } from './boxOffice
 import { simulateCinemaWeek } from './boxOfficeMarket';
 import { migrateCinemaState, CinemaMigrationError } from './boxOfficeMigration';
 import { CINEMA_MARKET_TUNING_VERSION } from './boxOfficeProfiles';
-import { commitCinemaWeek } from './boxOfficeLiveSettlement';
+import { processAndCommitCinemaWeek, processUnexposedOwnedCinemaWeek } from './boxOfficeLiveSettlement';
 import type { CinemaTitleInput, CinemaWeekInput, CinemaWeekResult } from './boxOfficeTypes';
 export { serializeCinemaFacts } from './boxOfficeIdentity';
 import { serializeCinemaFacts } from './boxOfficeIdentity';
@@ -75,7 +75,7 @@ export const normalizeLiveTitle = (player: Player, id: string, project: ProjectD
         ...(windows.length ? {streamingWindows:windows} : {}) };
     return title;
 };
-export const buildCinemaWeekInput = (player: Player, absoluteWeek: number): CinemaWeekInput => {
+const buildCinemaInput = (player: Player, absoluteWeek: number, captureSource: boolean): CinemaWeekInput => {
     const state = player.world.cinemaMarket;
     if (!state)
         throw new Error('Migrate cinema before building live week');
@@ -105,6 +105,13 @@ export const buildCinemaWeekInput = (player: Player, absoluteWeek: number): Cine
         byId.set(project.id, normalizeLiveTitle(prepared, project.id, details, paid?.activationWeek ?? project.cinema.activationWeek, findCinemaBusiness(player, project.studioId) ? 'PLAYER_STUDIO' : 'NPC_STUDIO', world));
     }
     const input: CinemaWeekInput = { ...world, absoluteWeek, seed: 20261022, tuningVersion: CINEMA_MARKET_TUNING_VERSION, knowledge: 'OBSERVED', titles: [...byId.values()].sort((a, b) => a.id.localeCompare(b.id)), marketState: state.market };
+    if (!captureSource) {
+        // Only the synchronous player-only consumer uses this transient input.
+        // It never issues/exposes a result. Public commit rebuilds a full source
+        // signature and rejects any proposal made from this empty marker.
+        input.live = { clockEpoch: state.clockEpoch, sourceSignature: '' };
+        return input;
+    }
     const financeBasis = input.titles.map(t => {
         const r = player.activeReleases.find(r => r.id === t.id), p = Object.values(player.world.industryProductions || {}).find(p => p.canonicalProjectId === t.id), o = player.outsideProductions?.find(o => o.projectId === t.id);
         return { id: t.id, ledger: state.titles[t.id], gross: r?.totalGross, receipts: r?.totalStudioReceipts, releaseBudget: r?.budget, releaseWeekNum: r?.weekNum, royalty: r?.royaltyPercentage, actorPayee: r?.actorRoyaltyPayeeId, music: r?.projectDetails.musicPlan, destinationBusinessId: findCinemaBusiness(player, t.owner.id)?.id, investor: r?.investorPlan || r?.projectDetails.investorPlan, talent: r?.projectDetails.talentParticipation || p?.studioAiExecution?.talent?.talentParticipation, stake: o ? { id: o.id, stake: o.stakePercent, paid: o.playerPayout } : undefined };
@@ -112,6 +119,9 @@ export const buildCinemaWeekInput = (player: Player, absoluteWeek: number): Cine
     input.live = { clockEpoch: state.clockEpoch, sourceSignature: serializeCinemaFacts({ input, financeBasis, careerClock: { age: player.age, week: player.currentWeek } }) };
     return input;
 };
+export const buildCinemaWeekInput = (player: Player, absoluteWeek: number): CinemaWeekInput => buildCinemaInput(player, absoluteWeek, true);
+/** Internal bridge to the player-only synchronous close; not a detachable proposal. */
+export const buildUnexposedOwnedCinemaWeekInput = (player: Player, absoluteWeek: number): CinemaWeekInput => buildCinemaInput(player, absoluteWeek, false);
 export const admitOutsideCinemaTitles = (player: Player, absoluteWeek: number): Player => {
     const projects = [...player.world.projects];
     for (const item of player.outsideProductions || []) {
@@ -125,10 +135,8 @@ export const admitOutsideCinemaTitles = (player: Player, absoluteWeek: number): 
     }
     return projects.length === player.world.projects.length ? player : { ...player, world: { ...player.world, projects } };
 };
-export const processCinemaMarketWeek = (player: Player, absoluteWeek: number): {
-    player: Player;
-    result: CinemaWeekResult;
-} => {
+const prepareCinemaWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}): Player => {
+    let phaseStarted = performance.now();
     const migration = migrateCinemaState(player, absoluteWeek - 1);
     if (migration.status === 'REJECTED')
         throw new CinemaMigrationError(migration.diagnostics.map(d => d.code));
@@ -141,6 +149,13 @@ export const processCinemaMarketWeek = (player: Player, absoluteWeek: number): {
         return { ...project, cinemaCast: details.castList || [] };
     });
     if (changed) prepared = { ...prepared, world: { ...prepared.world, projects } };
-    const result = simulateCinemaWeek(buildCinemaWeekInput(prepared, absoluteWeek));
-    return { player: commitCinemaWeek(prepared, result).player, result };
+    diagnostics?.onPhase('cinema_prepare_ms',performance.now()-phaseStarted);
+    return prepared;
 };
+export const processCinemaMarketWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}, options?: { reuseDetachedWeekCandidate?: true }): {player:Player;result:CinemaWeekResult} =>
+    processAndCommitCinemaWeek(prepareCinemaWeek(player,absoluteWeek,diagnostics),absoluteWeek,diagnostics,options);
+
+/** The caller owns a detached weekly candidate and discards it on failure.
+ * No proposal/input can escape this call; persistence remains the publish barrier. */
+export const processUnexposedOwnedCinemaMarketWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}): Player =>
+    processUnexposedOwnedCinemaWeek(prepareCinemaWeek(player,absoluteWeek,diagnostics),absoluteWeek,diagnostics);

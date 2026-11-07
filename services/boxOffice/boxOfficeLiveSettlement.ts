@@ -1,7 +1,8 @@
 import { STUDIO_AI_LEDGER_LIMIT } from '../studioAi/studioAiState';
 import { cinemaAudienceReport, cinemaDistributionReport } from './boxOfficeLiveReports';
+import {consumeUnexposedCinemaWeek, simulateCinemaWeek} from './boxOfficeMarket';
 import { quoteCinemaSupply } from './boxOfficeSupply';
-import { assertIssuedCinemaResult } from './boxOfficeIdentity';
+import { assertIssuedCinemaResult, issueCinemaResult } from './boxOfficeIdentity';
 import type { Player, StudioFinanceEntry } from '../../types';
 import { appendIndustryEventFacts, createIndustryEventFact } from '../industryWorld/industryEventLedger';
 import { clonePlayerForWeekProcessing } from '../gameLoopClone';
@@ -9,11 +10,11 @@ import { creditSignedActorBackend, settleTalentReceipt } from '../talentCareer';
 import { applyStudioProjectOutcome } from '../studioEcosystem';
 import { calculateInvestorPayout } from '../projectInvestors';
 import { calculateWeeklySoundtrackRevenue, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns } from '../musicIndustry';
-import { buildCinemaWeekInput, findCinemaBusiness, serializeCinemaFacts } from './boxOfficeWeek';
+import { buildCinemaWeekInput, buildUnexposedOwnedCinemaWeekInput, findCinemaBusiness, serializeCinemaFacts } from './boxOfficeWeek';
 import { makeCinemaSettledTitle } from './boxOfficeMigration';
 import { compactCinemaMarketState } from './boxOfficeHistory';
 import { dollarsToCinemaCents, classifyCinemaProfit } from './boxOfficeSettlement';
-import type { CinemaWeekResult, CinemaCommitResult, CinemaCommittedTitle } from './boxOfficeTypes';
+import type { CinemaWeekInput, CinemaWeekResult, CinemaCommitResult, CinemaCommittedTitle } from './boxOfficeTypes';
 const sum = (ns: number[]) => ns.reduce((a, b) => { const n = a + b; if (!Number.isSafeInteger(n))
     throw new RangeError('Cinema money overflow'); return n; }, 0);
 const amount = (n: number) => { if (!Number.isSafeInteger(n) || n < 0)
@@ -21,7 +22,7 @@ const amount = (n: number) => { if (!Number.isSafeInteger(n) || n < 0)
 const receiptSignature = (r: CinemaWeekResult) => serializeCinemaFacts({ week: r.absoluteWeek, epoch: r.live?.clockEpoch, tuning: r.tuningVersion, fingerprint: r.inputFingerprint,
     titles: [...r.titles].sort((a, b) => a.titleId.localeCompare(b.titleId)).map(({ countries, ...t }) => t), costs: [...new Set(r.costEvents.map(c => c.titleId))].sort().map(id => ({ titleId: id, total: sum(r.costEvents.filter(c => c.titleId === id).map(c => c.amountCents)) })) });
 /** One atomic candidate mutation. Caller persists it through existing verified save generations. */
-export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): CinemaCommitResult => {
+const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, readInput: () => CinemaWeekInput, reuseDetachedWeekCandidate = false, unexposedFreshResult = false, consumePrivateMarket = false): CinemaCommitResult => {
     const previous = player.world.cinemaMarket;
     if (!previous || result.mode !== 'LIVE' || !result.live || result.tuningVersion !== previous.tuningVersion)
         throw new Error('Live cinema result requires migrated source');
@@ -34,10 +35,12 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
             throw new Error('Cinema committed receipt conflict');
         return { player, applied: false, receipt: old };
     }
-    assertIssuedCinemaResult(result);
+    // Only the private consumer below has an allocator result that no caller has
+    // observed. All public/detached proposals retain the complete mutation guard.
+    if (!unexposedFreshResult) assertIssuedCinemaResult(result);
     if (result.absoluteWeek !== previous.lastProcessedAbsoluteWeek + 1 || result.absoluteWeek < previous.activationWeek)
         throw new Error('Cinema stale or out-of-order result');
-    const input = buildCinemaWeekInput(player, result.absoluteWeek);
+    const input = readInput();
     if (input.live!.sourceSignature !== result.live.sourceSignature)
         throw new Error('Cinema source or ownership changed before settlement');
     const ids = new Set(input.titles.map(t => t.id));
@@ -58,7 +61,11 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
             throw new Error('Cinema cost source conflict');
         costIds.add(c.id);
     }
-    const copied = clonePlayerForWeekProcessing({ world: player.world, businesses: player.businesses, activeReleases: player.activeReleases, outsideProductions: player.outsideProductions } as Player);
+    const settlementFields = { world: player.world, businesses: player.businesses, activeReleases: player.activeReleases, outsideProductions: player.outsideProductions };
+    // processGameWeek already owns a detached complete candidate. Its caller only
+    // publishes after verified persistence, and discards this candidate on failure.
+    // Public/detached proposals retain the independent copy and source recheck.
+    const copied = reuseDetachedWeekCandidate ? settlementFields : clonePlayerForWeekProcessing(settlementFields as Player);
     const next: Player = { ...player, ...copied, stats: { ...player.stats }, finance: { ...player.finance, history: [...player.finance.history] } };
     const state = next.world.cinemaMarket!;
     const committed: CinemaCommittedTitle[] = [];
@@ -113,7 +120,7 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
             business.stats.lifetimeRevenue += (receipts + musicCents - investor) / 100;
             business.stats.weeklyProfit += net / 100;
             if (business.studioState)
-                business.studioState.financeLedger = [...ledger, ...(business.studioState.financeLedger || [])].slice(0, 200);
+                business.studioState.financeLedger = [...ledger, ...(business.studioState.financeLedger || [])];
         }
         else if (next.world.studios?.[title.owner.id]) {
             const studio = next.world.studios[title.owner.id];
@@ -134,27 +141,27 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
         if (actor && actorPayee === 'PLAYER_SELF' || outside && investor) {
             const cash = (actorPayee === 'PLAYER_SELF' ? actor : 0) + (outside ? investor : 0);
             next.money = (Math.round(next.money * 100) + cash) / 100;
-            next.finance.history = [{ id: sourceId, category: 'ROYALTY' as const, amount: cash / 100, description: `Cinema settlement: ${title.id}`, week, year }, ...(next.finance.history || [])].slice(0, 120);
+            next.finance.history = [{ id: sourceId, category: 'ROYALTY' as const, amount: cash / 100, description: `Cinema settlement: ${title.id}`, week, year }, ...(next.finance.history || [])];
         }
         if (release) {
             release.cinema = cinemaMarker;
             release.totalGross = (prior.legacyGrossCents + prior.grossCents + row.grossCents) / 100;
-            release.weeklyGross = [...release.weeklyGross, row.grossCents / 100].slice(-104);
+            release.weeklyGross = [...release.weeklyGross, row.grossCents / 100];
             release.totalStudioReceipts = ((release.totalStudioReceipts || 0) * 100 + receipts) / 100;
             release.totalExhibitorReceipts = ((release.totalExhibitorReceipts || 0) * 100 + row.exhibitorReceiptsCents) / 100;
-            release.weeklyStudioReceipts = [...(release.weeklyStudioReceipts || []), receipts / 100].slice(-104);
-            release.weeklyExhibitorReceipts = [...(release.weeklyExhibitorReceipts || []), row.exhibitorReceiptsCents / 100].slice(-104);
+            release.weeklyStudioReceipts = [...(release.weeklyStudioReceipts || []), receipts / 100];
+            release.weeklyExhibitorReceipts = [...(release.weeklyExhibitorReceipts || []), row.exhibitorReceiptsCents / 100];
             release.weeksInTheaters = (release.weeksInTheaters || release.weekNum - 1) + 1;
             release.weekNum++;
             release.bookingCostPaid = (release.bookingCostPaid || 0) + cost / 100;
             release.talentBackendPaid = (release.talentBackendPaid || 0) + (talent + actor) / 100;
             if (investorPlan)
-                release.investorPayouts = { lifetimeInvestorPayout: (release.investorPayouts?.lifetimeInvestorPayout || 0) + investor / 100, weeklyInvestorPayouts: [...(release.investorPayouts?.weeklyInvestorPayouts || []), investor / 100].slice(-104) };
+                release.investorPayouts = { lifetimeInvestorPayout: (release.investorPayouts?.lifetimeInvestorPayout || 0) + investor / 100, weeklyInvestorPayouts: [...(release.investorPayouts?.weeklyInvestorPayouts || []), investor / 100] };
             if (music) {
                 release.soundtrackRevenue = (release.soundtrackRevenue || 0) + musicCents / 100;
-                release.weeklySoundtrackRevenue = [...(release.weeklySoundtrackRevenue || []), musicCents / 100].slice(-104);
+                release.weeklySoundtrackRevenue = [...(release.weeklySoundtrackRevenue || []), musicCents / 100];
                 release.soundtrackRevenueBreakdown = mergeSoundtrackRevenueBreakdowns(release.soundtrackRevenueBreakdown, music);
-                release.weeklySoundtrackBreakdowns = [...(release.weeklySoundtrackBreakdowns || []), music].slice(-24);
+                release.weeklySoundtrackBreakdowns = [...(release.weeklySoundtrackBreakdowns || []), music];
             }
         }
         if (project) {
@@ -182,7 +189,7 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
             firstAdmissions: prior.firstAdmissions + row.firstAdmissions, repeatAdmissions: prior.repeatAdmissions + row.repeatAdmissions, lastSettledWeek: result.absoluteWeek, closed };
         state.bookingContracts={...state.bookingContracts,[row.titleId]:title.market!.bookingContract || 'REVENUE_SHARE'};
         if (release) {
-            release.weeklyDistributionBreakdowns = [...(release.weeklyDistributionBreakdowns || []), cinemaDistributionReport(input, result, physicalSupply, row.titleId, release.weekNum - 1)].slice(-104);
+            release.weeklyDistributionBreakdowns = [...(release.weeklyDistributionBreakdowns || []), cinemaDistributionReport(input, result, physicalSupply, row.titleId, release.weekNum - 1)];
             release.audienceReception = cinemaAudienceReport(state.titles[row.titleId], release.audienceReception, week, year);
             release.projectDetails.audienceReception = release.audienceReception;
         }
@@ -206,8 +213,69 @@ export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): Cine
     }
     const receipt = { id: `cinema:${state.clockEpoch}:${result.absoluteWeek}`, absoluteWeek: result.absoluteWeek, clockEpoch: state.clockEpoch, inputFingerprint: result.inputFingerprint, receiptSignature: signature, titles: committed };
     state.lastProcessedAbsoluteWeek = result.absoluteWeek;
-    state.market = compactCinemaMarketState(structuredClone(result.nextState), new Set(Object.values(state.titles).filter(t => !t.closed).map(t => t.titleId)));
+    // Only the player-only owner can consume this already-detached market. The
+    // diagnostic getter and public proposals can escape, so their independent
+    // copy remains mandatory even when settlement reused the weekly candidate.
+    const market = consumePrivateMarket ? result.nextState : structuredClone(result.nextState);
+    state.market = compactCinemaMarketState(market, new Set(Object.values(state.titles).filter(t => !t.closed).map(t => t.titleId)));
     state.weeks = [...state.weeks, receipt].slice(-52);
     next.world.cinemaMarket = state;
     return { player: next, applied: true, receipt };
+};
+
+/** Detached public proposals always recheck current authority, ownership and terms. */
+export const commitCinemaWeek = (player: Player, result: CinemaWeekResult): CinemaCommitResult =>
+    commitCinemaWeekWithInput(player, result, () => buildCinemaWeekInput(player, result.absoluteWeek));
+
+/** A single synchronous owner returns only the settled player, never a proposal.
+ * Keep all authority/clock/receipt/conservation/replay checks. A full detachable
+ * source string cannot protect against an intervening caller here: none exists. */
+export const processUnexposedOwnedCinemaWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}): Player => {
+    let started=performance.now();
+    const input=buildUnexposedOwnedCinemaWeekInput(player,absoluteWeek),inputMs=performance.now()-started;
+    started=performance.now();
+    return consumeUnexposedCinemaWeek(input,result=>{
+        const simulationMs=performance.now()-started;
+        started=performance.now();
+        const committed=commitCinemaWeekWithInput(player,result,()=>input,true,true,true),commitMs=performance.now()-started;
+        diagnostics?.onPhase('cinema_input_ms',inputMs);
+        diagnostics?.onPhase('cinema_simulate_ms',simulationMs);
+        diagnostics?.onPhase('cinema_commit_ms',commitMs);
+        return committed.player;
+    });
+};
+
+/** One synchronous owner builds, simulates and settles from the same fresh snapshot.
+ * No caller callbacks run between snapshot creation and settlement. This reuses
+ * only this invocation's input; detached/public results keep the full recheck. */
+export const processAndCommitCinemaWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}, options?: { reuseDetachedWeekCandidate?: true }): {player:Player;result:CinemaWeekResult} => {
+    let started=performance.now();
+    const input=buildCinemaWeekInput(player,absoluteWeek),inputMs=performance.now()-started;
+    started=performance.now();
+    if(options?.reuseDetachedWeekCandidate) {
+        return consumeUnexposedCinemaWeek(input,result=>{
+            const simulationMs=performance.now()-started;
+            started=performance.now();
+            // No callbacks or exposed result references exist before settlement.
+            // Source authority, money conservation, ledgers and replay checks all run.
+            const committed=commitCinemaWeekWithInput(player,result,()=>input,true,true),commitMs=performance.now()-started;
+            diagnostics?.onPhase('cinema_input_ms',inputMs);
+            diagnostics?.onPhase('cinema_simulate_ms',simulationMs);
+            diagnostics?.onPhase('cinema_commit_ms',commitMs);
+            let exposed=false;
+            return {player:committed.player,get result(){
+                // Issue exactly once before exposure. Re-reading after a mutation
+                // must never replace the original mirror or bless altered money.
+                if(!exposed){issueCinemaResult(result);exposed=true;}
+                return result;
+            }};
+        });
+    }
+    const result=simulateCinemaWeek(input),simulationMs=performance.now()-started;
+    started=performance.now();
+    const committed=commitCinemaWeekWithInput(player,result,()=>input,options?.reuseDetachedWeekCandidate),commitMs=performance.now()-started;
+    diagnostics?.onPhase('cinema_input_ms',inputMs);
+    diagnostics?.onPhase('cinema_simulate_ms',simulationMs);
+    diagnostics?.onPhase('cinema_commit_ms',commitMs);
+    return {player:committed.player,result};
 };

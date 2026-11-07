@@ -7,12 +7,30 @@ import {allocateStreamingStoreUnits} from './worldStreamingCommercialEconomy';
 import {streamingTitleFreshness, streamingTitleQuality} from './worldStreamingContentValue';
 
 type Receipts = NonNullable<WorldStreamingViewingState['royaltyReceipts']>;
+
+/** Stable insertion order, local to one close; arbitrary IDs remain separate keys. */
+const indexPlatformCountries = <T extends {platformId: string; countryId: string}>(rows: readonly T[]) => {
+    const index = new Map<string, Map<string, T[]>>();
+    for (const row of rows) {
+        const platformId = row.platformId, countryId = row.countryId;
+        let countries = index.get(platformId);
+        if (!countries) index.set(platformId, countries = new Map());
+        let local = countries.get(countryId);
+        if (!local) countries.set(countryId, local = []);
+        local.push(row);
+    }
+    return index;
+};
 /** Conserved contribution attribution; this does not create customer revenue or measure causal profit. */
 export const attachStreamingRoyaltyReceipts = (
     player: Player, state: WorldStreamingViewingState, offers: WorldStreamingPlatformOffer[],
 ): WorldStreamingViewingState => {
     const week = state.lastProcessedAbsoluteWeek;
     const receipts: Receipts = [];
+    // Preserve source order, including zero-value rows: source ordinals form
+    // part of the issued receipt IDs. Index only this immutable close's inputs.
+    const sourcesByPlatform = indexPlatformCountries(state.royaltySourceReceipts || []);
+    const aiEntitlements = indexPlatformCountries(state.aiStoreEntitlements || []);
     const titleFacts=createStreamingCatalogueReadContext(player);
     // Facts are immutable within this close; reuse them across countries/plans.
     const qualityCache = new Map<string, number>();
@@ -29,7 +47,13 @@ export const attachStreamingRoyaltyReceipts = (
     for (const offer of offers) {
         const summary = state.platforms[offer.platformId];
         if (!summary) continue;
-        const aiResolve = offer.isPlayer ? null : createAiTitleAccessResolver(player, offer, state.aiCatalogue || []);
+        const aiResolve = offer.isPlayer ? null : createAiTitleAccessResolver(player, offer, state.aiCatalogue || [], titleFacts);
+        const entitlementsByPlatform = offer.isPlayer
+            ? indexPlatformCountries([
+                ...(player.world.worldStreamingAudienceChoice?.entitlements || []),
+                ...(state.commercialTransactions || []).map(row => ({...row, platformId: 'PLAYER',
+                    expiresAtAbsoluteWeek: row.kind === 'PURCHASE' ? null : week + offer.commercialConfiguration.rentals.windowWeeks})),
+            ]) : aiEntitlements;
         const titleMap = new Map(summary.titlePerformance.map(row => [row.projectId, row]));
         // Free/ad and store-only services legitimately have no subscription customer row.
         const countries = [...new Set([...Object.keys(state.countries),
@@ -115,6 +139,9 @@ export const attachStreamingRoyaltyReceipts = (
             let sourceIndex = 0;
             const appendSource = (sourceKind: StreamingRoyaltyRevenueSource, gross: number, routes: Array<{route: StreamingTitleAccessRoute; weight: number}>, projectId?: string) => {
                 const index = sourceIndex++;
+                // Zero rows still consume their issued ordinal, but cannot fund
+                // any title. Preserve receipt IDs without rebuilding zero routes.
+                if (gross === 0) return;
                 const routePools = allocateStreamingStoreUnits(gross, routes.map(row => row.weight));
                 routes.forEach(({route}, routeIndex) => {
                     const positions = eligible(countryId, route).filter(row => !projectId || row.projectId === projectId);
@@ -127,21 +154,15 @@ export const attachStreamingRoyaltyReceipts = (
                     });
                 });
             };
-            for (const source of state.royaltySourceReceipts || []) {
-                if (source.platformId !== offer.platformId || source.countryId !== countryId) continue;
+            for (const source of sourcesByPlatform.get(offer.platformId)?.get(countryId) || []) {
                 if (source.sourceKind === 'SUBSCRIPTION') appendSource('ANCILLARY', source.grossReceipts,
                     [{route: {kind: 'SUBSCRIPTION', planId: source.planId || ''}, weight: 1}], source.projectId);
                 else if (source.sourceKind === 'FREE_AD') appendSource('ANCILLARY', source.grossReceipts,
                     [{route: {kind: 'AD_SUPPORTED'}, weight: 1}], source.projectId);
                 else {
                     // A store customer can fund extras only against their actually delivered store title/mode.
-                    const entitlements = offer.isPlayer
-                        ? [...(player.world.worldStreamingAudienceChoice?.entitlements || []),
-                            ...(state.commercialTransactions || []).map(row => ({...row, platformId: 'PLAYER',
-                                expiresAtAbsoluteWeek: row.kind === 'PURCHASE' ? null : week + offer.commercialConfiguration.rentals.windowWeeks}))]
-                        : state.aiStoreEntitlements || [];
-                    const weights = (['RENTAL', 'PURCHASE'] as const).map(kind => entitlements.filter(row => row.countryId === countryId
-                        && row.platformId === offer.platformId && (!source.projectId || row.titleId === source.projectId)
+                    const entitlements = entitlementsByPlatform.get(offer.platformId)?.get(countryId) || [];
+                    const weights = (['RENTAL', 'PURCHASE'] as const).map(kind => entitlements.filter(row => (!source.projectId || row.titleId === source.projectId)
                         && row.kind === kind && (row.expiresAtAbsoluteWeek === null || row.expiresAtAbsoluteWeek > week))
                         .reduce((sum, row) => sum + row.households, 0));
                     appendSource('ANCILLARY', source.grossReceipts, [{route: {kind: 'RENTAL'}, weight: weights[0]},

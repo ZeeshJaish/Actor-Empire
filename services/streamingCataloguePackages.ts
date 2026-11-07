@@ -1245,7 +1245,7 @@ export const acceptStreamingCataloguePackageOffer = (
                     }] : [];
                 }),
                 ...(seller.studioState.financeLedger || []),
-            ].slice(0, 260),
+            ],
         } : seller.studioState,
     };
     offer.componentTerms.forEach(row => {

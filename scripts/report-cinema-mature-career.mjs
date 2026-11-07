@@ -3,9 +3,11 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 
 // Reads only the audit report, never the user's game-save store or full world.
-const [input,output]=process.argv.slice(2);
+const [input,output,profileFile]=process.argv.slice(2);
 assert.ok(input&&output,'Provide the retained career report and output JSON path');
 const bytes=readFileSync(input),r=JSON.parse(bytes);
+const exactProfile=profileFile?JSON.parse(readFileSync(profileFile,'utf8')):null;
+if(exactProfile){assert.equal(exactProfile.executable,r.executable);assert.equal(exactProfile.weeks,r.weeks);assert.equal(exactProfile.finalProfile.cash,r.cash)}
 assert.equal(r.manualCapitalGrants,0);assert.equal(r.authoredCompletedPackages,0);assert.equal(r.loansTaken,0);
 assert.equal(r.failure,undefined);assert.equal(r.origin.initialCash,2000);
 assert.equal(r.replays,r.weeks);
@@ -25,9 +27,14 @@ const top=xs=>xs.toSorted((a,b)=>b.grossCents-a.grossCents).slice(0,5).map(film)
 const count=xs=>[1,2,3].map(b=>({grossBillions:b,observed:xs.length,attained:xs.filter(f=>f.grossCents>=b*1e11).length,closedAttained:xs.filter(f=>f.closed&&f.grossCents>=b*1e11).length}));
 const tours=r.actions.filter(a=>a.type==='actual-press-tour');
 assert.equal(new Set(tours.map(a=>a.projectId)).size,tours.length,'No repeated policy press tour');
-const result={status:r.status,completeObservation:r.status==='HORIZON_COMPLETE'||r.status==='CAREER_ENDED',
- sourceRef:r.origin.sourceRef,executable:r.executable,inputReport:input,inputSha256:createHash('sha256').update(bytes).digest('hex'),
- weeks:r.weeks,origin:r.origin,lineage:r.lineage,ownerCapitalMilestone:r.ownerCapitalMilestone,finalCashDollars:r.cash,finalProfile:r.curve.at(-1),firstObservedStarProfileWeek:matureAt,
+if(r.uiEligibilityVerified===true)for(const a of r.actions.filter(a=>a.type.startsWith('actual-weekly-instagram'))){
+ assert.equal(a.uiEligibility?.normalPickerUnlocked,true,'Every actual regular post must pass its live picker lock');
+ if(a.uiEligibility.postType==='BTS')assert.equal(a.uiEligibility.targetPhase,'PRODUCTION');
+ if(a.uiEligibility.postType==='ANNOUNCEMENT')assert.equal(a.uiEligibility.targetPhase,'POST_PRODUCTION');
+}
+const result={status:r.status,completeObservation:['HORIZON_COMPLETE','CAREER_ENDED','UNIVERSE_RUN_CLOSED'].includes(r.status),
+ sourceRef:r.gameplaySourceRef||r.origin.sourceRef,gameplayVariant:r.gameplayVariant||'BASELINE_UI_V7',uiEligibilityVerified:r.uiEligibilityVerified===true,executable:r.executable,inputReport:input,inputSha256:createHash('sha256').update(bytes).digest('hex'),
+ weeks:r.weeks,origin:r.origin,lineage:r.lineage,ownerCapitalMilestone:r.ownerCapitalMilestone,finalCashDollars:r.cash,finalProfile:exactProfile?.finalProfile||null,latestPeriodicProfile:r.curve.at(-1),firstObservedStarProfileWeek:matureAt,
  safeguards:{manualCapitalGrants:0,authoredCompletedPackages:0,loans:0,saves:r.saves,reloads:r.reloads,duplicateWeeksRejected:r.replays,failedPromotionRecovery:r.failedPromotionChecked},
  filmCounts:{released:films.length,closed:r.summary.completed,open:r.summary.open,playerCredits:own.length,playerClosed:own.filter(f=>f.closed).length},
  attainment:{player:count(own),world:count(films)},
@@ -35,8 +42,10 @@ const result={status:r.status,completeObservation:r.status==='HORIZON_COMPLETE'|
  topPlayer:top(own),topWorld:top(films),
  management:r.actions.filter(a=>a.type.startsWith('hire-current')).map(a=>({week:a.week,type:a.type,cost:a.cost,terms:a.terms})),
  actualPressTours:tours.length,actualSponsorsSigned:r.actions.filter(a=>a.type==='sign-current-sponsorship').length,
+ largestSignedSponsorshipWeeklyQuoteDollars:Math.max(0,...r.actions.filter(a=>a.type==='sign-current-sponsorship').map(a=>a.terms?.weeklyPay||0)),
+ universe:r.universeObservation?{...r.universeObservation,films:r.universeObservation.films.map(f=>{const observed=films.find(o=>o.id===f.id);return observed?film(observed):{...f,cinemaUnobserved:true}})}:null,
  positiveLifeChoiceCash:r.actions.filter(a=>a.type.startsWith('actual-life-choice')&&a.cost<0).map(a=>({week:a.week,type:a.type,dollars:-a.cost})),
- conclusion:own.some(f=>f.grossCents>=2e11)?'ORGANIC_PLAYER_2B_ATTAINMENT_OBSERVED':'ORGANIC_PLAYER_2B_NOT_VERIFIED',
+ conclusion:r.uiEligibilityVerified!==true?'CONDITIONAL_CALLBACK_CASE_NOT_NORMAL_UI_PROOF':own.some(f=>f.grossCents>=2e11)?'UI_GATED_ORGANIC_PLAYER_2B_ATTAINMENT_OBSERVED':'UI_GATED_ORGANIC_PLAYER_2B_NOT_VERIFIED',
  limitations:['One adaptive longitudinal career is a capability probe, not a hit-rate or rarity estimate',
  'World NPC film gross and player-credited film gross are reported separately',
  'No owned studio or self-financed production is claimed unless actually founded through paid gameplay',

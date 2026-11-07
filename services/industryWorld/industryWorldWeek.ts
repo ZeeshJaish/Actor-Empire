@@ -42,6 +42,7 @@ export const processIndustryWorldWeek = (
     player: Player,
     world: WorldState,
     absoluteWeek: number,
+    diagnostics?: { onPhase?: (name: string, elapsedMs: number) => void },
 ): IndustryWorldWeekResult => {
     const ledger = normalizeIndustryEventLedger(world.industryEvents);
     if (ledger.lastProcessedAbsoluteWeek >= absoluteWeek) {
@@ -58,17 +59,24 @@ export const processIndustryWorldWeek = (
     }
 
     const executionOrder: IndustryWorldExecutionStage[] = ['PLATFORM_AI', 'STREAMING_ECOSYSTEM'];
+    let phaseStarted = performance.now();
     const streaming = processStreamingIndustryWorldWeek(player, world, absoluteWeek);
+    diagnostics?.onPhase?.('industry_platforms_ms', performance.now() - phaseStarted);
+    phaseStarted = performance.now();
     executionOrder.push('STUDIO_AI');
     const studio = processStudioAiWeek(
         { ...player, world: streaming.world },
         streaming.world,
         absoluteWeek,
     );
+    diagnostics?.onPhase?.('industry_studios_ms', performance.now() - phaseStarted);
+    phaseStarted = performance.now();
     const upcomingRights = processStreamingUpcomingRightsWeek(
         { ...player, world: studio.world },
         absoluteWeek,
     );
+    diagnostics?.onPhase?.('industry_upcoming_rights_ms', performance.now() - phaseStarted);
+    phaseStarted = performance.now();
     executionOrder.push('PRESENTATION');
     const facts = collectIndustryEventFacts(world, upcomingRights.player.world, absoluteWeek);
     const collectedWorld: WorldState = {
@@ -104,6 +112,7 @@ export const processIndustryWorldWeek = (
         claimCreation.claim,
         claimResolution.resolvedClaims,
     );
+    diagnostics?.onPhase?.('industry_media_ms', performance.now() - phaseStarted);
     const resolvedWorld = claimPublication.player.world;
     return {
         player: claimPublication.player,

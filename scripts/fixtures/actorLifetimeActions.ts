@@ -5,7 +5,7 @@ import type {Player,Message,InstaPostType} from '../../types';
 import {getAbsoluteWeek} from '../../services/legacyLogic';
 import {getPhaseDuration} from '../../services/roleLogic';
 import {applyOpportunityIdentityToProject} from '../../services/characterIdentityLogic';
-import {normalizeUniverseMap} from '../../services/universeLogic';
+import {normalizeUniverseMap,buildUniverseContractProject} from '../../services/universeLogic';
 const ts:typeof import('typescript')=createRequire(process.cwd()+'/package.json')('typescript');
 import {INSTAGRAM_POST_CONFIGS,calculateInstagramPostOutcome,clampInstagramStat} from '../../services/instagramLogic';
 import {spendPlayerEnergy,syncWeeklyEnergyForCommitments} from '../../services/premiumLogic';
@@ -16,7 +16,7 @@ function extract(source:string,file:string,name:string){const ast=ts.createSourc
 const accept=extract(mobile,'MobilePage.tsx','handleAcceptMessage'),agent=extract(mobile,'MobilePage.tsx','handleHireAgent'),member=extract(team,'TeamApp.tsx','handleHireMember');
 export const lifetimeAccept=(initial:Player,msg:Message):Player=>{
  assert(['OFFER_ROLE','OFFER_NEGOTIATION','OFFER_AUDITION'].includes(msg.type));let player=initial;
- const deps={props:{player:initial},handleUpdatePlayer:(p:Player)=>player=p,showToast:()=>{},tr:()=>'',getPhaseDuration,applyOpportunityIdentityToProject,normalizeUniverseMap};
+ const deps={props:{player:initial},handleUpdatePlayer:(p:Player)=>player=p,showToast:()=>{},tr:()=>'',getPhaseDuration,applyOpportunityIdentityToProject,normalizeUniverseMap,buildUniverseContractProject};
  new Function(...Object.keys(deps),accept)(...Object.values(deps))(msg);return player;
 };
 export const lifetimeHire=(initial:Player,kind:'agent'|'member',candidate:any):Player=>{

@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {CinemaFileSaveStore} from './fixtures/cinemaFileSaveStore';
 import {migratePlayerSave} from '../services/saveMigration';
 import type {Player} from '../types';
+import {assertMatureCastMigrationPreserved} from './fixtures/cinemaMatureMigrationAssertions';
 
 const path=process.env.CINEMA_DIAGNOSTIC_STORE!;assert.ok(path);
 const p=await new CinemaFileSaveStore(path).read('normal-cohort-0') as Player;assert.ok(p);
@@ -14,5 +15,10 @@ const before=facts(p),financial=financialFacts(p),fingerprint=hash(financial),ne
 const financialDifferences:any[]=[];
 const diff=(a:any,b:any,path='')=>{if(financialDifferences.length>=8||a===b)return;if(a&&b&&typeof a==='object'&&typeof b==='object'){for(const k of new Set([...Object.keys(a),...Object.keys(b)]))diff(a[k],b[k],path+'.'+k)}else financialDifferences.push({path,before:a,after:b})};diff(financial,financialAfter);
 const differences=before.flatMap(b=>{const a=after.find(a=>a.projectId===b.projectId&&a.memberId===b.memberId)!;return fields.filter(k=>a.profile[k]!==b.profile[k]).map(k=>({project:b.projectName,memberId:b.memberId,universeId:b.universeId,compass:b.compass,field:k,before:b.profile[k],after:a.profile[k],profile:b.profile}))});
-console.log(JSON.stringify({differences,financialsUnchanged:hash(financialAfter)===fingerprint,financialDifferences}));
+for(const c of p.commitments)for(const member of c.projectDetails?.castList||[])assertMatureCastMigrationPreserved(member,next.commitments.find(n=>n.id===c.id)?.projectDetails?.castList?.find(m=>m.id===member.id),c.projectDetails?.universeId);
+assert.deepEqual(facts(migratePlayerSave(next)),after,'Canonical normalization must be idempotent');
+const sample=p.commitments.flatMap(c=>c.projectDetails?.castList||[]).find(m=>m.identitySource==='AUTO')!;assert.ok(sample);
+assert.throws(()=>assertMatureCastMigrationPreserved(sample,{...sample,identitySource:'CANON'}),/deep.equal|equal|CANON/);
+assert.throws(()=>assertMatureCastMigrationPreserved({...sample,storyRole:'HERO'},{...sample,storyRole:'VILLAIN',identitySource:'CANON'},'MCU'),/deep.equal|equal|VILLAIN/);
+console.log(JSON.stringify({differencesByField:Object.fromEntries(fields.map(k=>[k,differences.filter(d=>d.field===k).length])),existingValueChanges:differences.filter(d=>d.before!==undefined).map(d=>({project:d.project,field:d.field,before:d.before,after:d.after})),financialsUnchanged:hash(financialAfter)===fingerprint,financialDifferences,provenanceAndMeaningGuardsPassed:true,contract:p.activeUniverseContract,scheduled:p.commitments.filter(c=>c.projectDetails?.universeId).map(c=>({name:c.name,phase:c.projectPhase,schedule:Object.fromEntries(Object.entries(c).filter(([k])=>/start|end|duration|remaining|calendar/i.test(k)))}))}));
 assert.equal(hash(financialAfter),fingerprint,'Canonical tagging must not alter any protected payment or recognition');

@@ -12,7 +12,9 @@
     "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-mature-career.ts",
     "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-mature-policy.ts",
     "/Users/zeesh/Vibe code/Actor empire/scripts/fixtures/cinemaMatureAppPolicy.ts",
-    "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-file-save-store.ts"
+    "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-file-save-store.ts",
+    "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-canonical-migration.ts",
+    "/Users/zeesh/Vibe code/Actor empire/scripts/audit-cinema-mature-final-save.ts"
   ],
   "include": [],
   "exclude": []

@@ -39,8 +39,13 @@ const requiredSnippets = [
   },
   {
     source: firebaseSource,
-    label: 'Week diagnostics only measure full save size at bounded checkpoints',
-    snippet: "safeStage === 'persist_prepare_done'",
+    label: 'Week diagnostics measure source size at the start of a run',
+    snippet: "safeStage === 'start'",
+  },
+  {
+    source: firebaseSource,
+    label: 'Diagnostic source-size basis remains visible in support reports',
+    snippet: 'week_debug_save_size_basis',
   },
   {
     source: firebaseSource,

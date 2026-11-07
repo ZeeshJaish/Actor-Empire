@@ -348,8 +348,16 @@ const projectRivalViewing = (
         if(!qualityByTitle.has(id))qualityByTitle.set(id,streamingTitleQuality(player,id,titleFacts));
         return qualityByTitle.get(id)!;
     };
+    // The player snapshot is unchanged throughout this synchronous projection.
+    // Readiness has no country/route dimension; do not rescan the same production
+    // for every country. Keep the cache local so later gameplay changes re-read.
+    const readinessByTitle=new Map<string,boolean>();
+    const productionReady=(id:string):boolean=>{
+        if(!readinessByTitle.has(id))readinessByTitle.set(id,resolveStreamingProductionReadiness(player,id,undefined,titleFacts.productionIndex).ready);
+        return readinessByTitle.get(id)!;
+    };
     const titleResolvers = new Map([...offers.values()].filter(offer => !offer.isPlayer).map(offer => [
-        offer.platformId, createAiTitleAccessResolver(player, offer, aiCatalogue),
+        offer.platformId, createAiTitleAccessResolver(player, offer, aiCatalogue, titleFacts),
     ]));
     priorEntitlements.filter(item => item.kind === 'PURCHASE' || (item.expiresAtAbsoluteWeek || 0) > absoluteWeek)
         .forEach(item => entitlementMap.set(`${item.platformId}:${item.countryId}:${item.titleId}:${item.kind}`, { ...item }));
@@ -364,7 +372,7 @@ const projectRivalViewing = (
             if (!customer && !choice.freeAd && !choice.store && !choice.secondaryStore) return;
             const rawLookup=createCinemaViewingRouteLookup(titleResolvers.get(offer.platformId)!);
             const playableLookup=createCinemaViewingRouteLookup((countryId:string,week:number,route:StreamingTitleAccessRoute)=>rawLookup.titles(countryId,week,route).filter(title=>
-                !player.world.cinemaMarket?.titles[title.titleId] || (resolveStreamingProductionReadiness(player,title.titleId).ready
+                !player.world.cinemaMarket?.titles[title.titleId] || (productionReady(title.titleId)
                     && cinemaStreamingLanguageReady(player,title.titleId,countryId,offer.platformId,week))));
             const playable=playableLookup.titles;
 
@@ -390,8 +398,8 @@ const projectRivalViewing = (
             const piracyViewingAccounts = Math.min(customer?.piracyReach || 0, Math.round((customer?.piracyReach || 0) * clamp(.18 + offer.catalogueStrengthIndex / 250, .15, .58)));
             const totalViewingAccounts = paidViewingAccounts + freeViewingAccounts + sharedViewingAccounts;
             // Resolver plus the cinema delivery/language filter above enforce the real date, country, production and route access.
-            const paidEvidence=allocateCinemaStreamingEvidence(player,country.countryId,offer.platformId,absoluteWeek,subscriptionTitles.map(t=>t.titleId),paidViewingAccounts);
-            const freeEvidence=allocateCinemaStreamingEvidence(player,country.countryId,offer.platformId,absoluteWeek,freeTitles.map(t=>t.titleId),freeViewingAccounts);
+            const paidEvidence=allocateCinemaStreamingEvidence(player,country.countryId,offer.platformId,absoluteWeek,subscriptionTitles.map(t=>t.titleId),paidViewingAccounts,productionReady);
+            const freeEvidence=allocateCinemaStreamingEvidence(player,country.countryId,offer.platformId,absoluteWeek,freeTitles.map(t=>t.titleId),freeViewingAccounts,productionReady);
             const merged=new Map(paidEvidence.map(r=>[r.titleId,r]));
             for(const row of freeEvidence){const old=merged.get(row.titleId);if(!old||row.viewingAccounts>old.viewingAccounts)merged.set(row.titleId,row)}
             cinemaAudienceEvidence.push(...merged.values());

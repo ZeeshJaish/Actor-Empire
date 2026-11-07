@@ -1,0 +1,157 @@
+{
+  "player": {
+    "id": "archive-issued-v4",
+    "name": "Archived Career",
+    "age": 82,
+    "currentWeek": 41,
+    "money": 123456,
+    "stats": {
+      "fame": 91
+    },
+    "flags": {
+      "saveMigrationVersion": 3,
+      "dynastyCareerArchives": {
+        "ancestor": {
+          "id": "ancestor",
+          "awards": [
+            {
+              "id": "first-award",
+              "name": "First Award"
+            }
+          ],
+          "pastProjects": [
+            {
+              "id": "first-film",
+              "name": "First Film",
+              "castList": [
+                {
+                  "id": "credit-one",
+                  "characterName": "Original Character"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "pastProjects": [
+      {
+        "id": "current-film",
+        "name": "Current Film"
+      }
+    ],
+    "world": {
+      "studios": {},
+      "platforms": {},
+      "universes": {},
+      "industryProductions": {},
+      "streamingRightsContracts": {}
+    }
+  },
+  "manifest": {
+    "formatVersion": 1,
+    "digestSchemaVersion": 4,
+    "saveMigrationVersion": 3,
+    "playerId": "archive-issued-v4",
+    "playerName": "Archived Career",
+    "age": 82,
+    "week": 41,
+    "reason": "AUTOSAVE",
+    "needsRecoveryCheckpoint": false,
+    "protected": {
+      "money": 123456,
+      "stats": "3104d5e813d4f8bd",
+      "commitments": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "activeReleases": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "pastProjects": {
+        "count": 1,
+        "digest": "ee22131bb9bd7c01"
+      },
+      "businesses": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "businessFinances": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "portfolio": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "activeLoans": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "studioTalent": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "awards": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "relationships": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "bloodline": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "dynastyMembers": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "dynastyArchives": {
+        "count": 1,
+        "digest": "e352b3dc23ebc998"
+      },
+      "universes": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "activeProductions": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "activeRights": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "studioCompanies": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "studioCompanyState": "741638a5d72c77b8",
+      "industryIntelligenceState": "741638a5d72c77b8",
+      "streamingLicences": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "assets": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "customItems": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "premiumEntitlements": {
+        "count": 0,
+        "digest": "741638a5d72c77b8"
+      },
+      "ownedStreamingIdentity": "{\"id\":\"\",\"lifecycle\":\"\",\"name\":\"\"}",
+      "ownedStreamingTreasury": 0,
+      "worldEconomy": "ba14099567ec4759"
+    },
+    "createdAt": 456,
+    "digest": "c3077591174fb513"
+  }
+}

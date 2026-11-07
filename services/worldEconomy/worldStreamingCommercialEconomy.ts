@@ -35,9 +35,11 @@ export const allocateStreamingStoreUnits = (total:number,weights:number[]):numbe
     const safe=weights.map(weight=>clamp(weight,0,Number.MAX_SAFE_INTEGER));
     const sum=safe.reduce((value,weight)=>value+weight,0);
     if(!sum) return safe.map(()=>0);
-    const exact=safe.map(weight=>whole(total)*weight/sum);
+    const units=whole(total);
+    if(!units) return safe.map(()=>0);
+    const exact=safe.map(weight=>units*weight/sum);
     const counts=exact.map(Math.floor);
-    let remainder=whole(total)-counts.reduce((value,count)=>value+count,0);
+    let remainder=units-counts.reduce((value,count)=>value+count,0);
     exact.map((value,index)=>({index,fraction:value-counts[index]}))
         .sort((a,b)=>b.fraction-a.fraction || a.index-b.index)
         .forEach(row=>{if(remainder>0){counts[row.index]++;remainder--;}});

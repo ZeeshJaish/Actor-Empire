@@ -20,12 +20,12 @@ export const createCinemaAlternativeAccess=(player:Player,offer:WorldStreamingPl
         ...(platform.starterCatalog?.ownedProjectIds||[]),...(platform.starterCatalog?.licensedProjectIds||[]),
         ...platform.catalogLicenses.map(l=>l.sourceProjectId),...entries.map(e=>e.projectId)])]:[];
     const playerRoute=offer.isPlayer?createStreamingTitleRouteReadBatch(player,week,platform,owned,context):undefined;
-    const aiRoute=offer.isPlayer?undefined:createAiTitleAccessResolver(player,offer,player.world.worldStreamingViewing?.aiCatalogue||[]);
+    const aiRoute=offer.isPlayer?undefined:createAiTitleAccessResolver(player,offer,player.world.worldStreamingViewing?.aiCatalogue||[],context);
     let aiPositionsByTitle:Map<string,ReturnType<typeof getAiCataloguePositions>>|undefined;
     const aiPositionsFor=(id:string)=>{
         if(!aiPositionsByTitle){
             aiPositionsByTitle=new Map();
-            for(const position of getAiCataloguePositions(player,offer.platformId,player.world.worldStreamingViewing?.aiCatalogue||[])){
+            for(const position of getAiCataloguePositions(player,offer.platformId,player.world.worldStreamingViewing?.aiCatalogue||[],context)){
                 const rows=aiPositionsByTitle.get(position.titleId)||[];rows.push(position);aiPositionsByTitle.set(position.titleId,rows);
             }
         }

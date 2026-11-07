@@ -105,7 +105,7 @@ export const negotiateTalentContract = (
             ...b, balance: b.balance - (isParent ? 0 : upfront),
             studioState: { ...b.studioState!, talentRoster: roster,
                 financeLedger: !isParent && upfront > 0 ? [{ id: `studio_talent_upfront_${contract.id}`, week: player.currentWeek, year: player.age,
-                    amount: -upfront, type: 'PRODUCTION_SPEND' as const, label: `${npc.name} talent contract` }, ...(b.studioState?.financeLedger || [])].slice(0, 200) : b.studioState?.financeLedger },
+                    amount: -upfront, type: 'PRODUCTION_SPEND' as const, label: `${npc.name} talent contract` }, ...(b.studioState?.financeLedger || [])] : b.studioState?.financeLedger },
         }),
     };
     return { player: next, result };

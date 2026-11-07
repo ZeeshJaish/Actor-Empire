@@ -2509,6 +2509,34 @@ const isCanonicalPlatformAiState = (
         && activeMarketCountryIds.every((countryId, index) => countryId === candidate.capabilities.activeCountryIds[index]);
 };
 
+const buildNormalizedPlatformAiIntelligence = (
+    platform: PlatformState,
+    existing: Record<string, any> | undefined,
+    playerId: string,
+    absoluteWeek: number,
+) => ({
+    ...normalizeIndustryIntelligenceState(existing?.intelligence, createInitialIndustryIntelligenceState(
+        platform.id, 'STREAMING_PLATFORM',
+        createDeterministicId('platform_intelligence_seed', platform.id, playerId), absoluteWeek,
+    )),
+    platformMigration: normalizePlatformIntelligenceMigrationState(
+        existing?.intelligence?.platformMigration ?? existing?.intelligenceMigration, absoluteWeek,
+    ),
+});
+
+/** Mirrors the complete normalizer's canonical branches, including absent
+ * optional keys. Legacy intelligence uses the same builder as a full rebuild;
+ * every invocation still reads fresh data rather than caching protected hashes. */
+export const readNormalizedPlatformAiIntelligence = (
+    platform: PlatformState, playerId: string, absoluteWeek: number,
+) => {
+    const marker = canonicalTurnStates.get(platform);
+    if (marker && marker.absoluteWeek <= absoluteWeek) return platform.ai?.intelligence;
+    const existing = platform.ai as unknown as (Record<string, any> | undefined);
+    if (isCanonicalPlatformAiState(existing, platform.id, absoluteWeek)) return platform.ai?.intelligence;
+    return buildNormalizedPlatformAiIntelligence(platform, existing, playerId, absoluteWeek);
+};
+
 export const normalizePlatformAiState = (
     platform: PlatformState,
     playerId: string,
@@ -2778,21 +2806,7 @@ export const normalizePlatformAiState = (
             : 5.2,
         outstandingApprovedContentMillions: finiteNonNegative(existing?.outstandingApprovedContentMillions),
         outstandingApprovedResearchMillions: finiteNonNegative(existing?.outstandingApprovedResearchMillions),
-        intelligence: {
-            ...normalizeIndustryIntelligenceState(
-                existing?.intelligence,
-                createInitialIndustryIntelligenceState(
-                platform.id,
-                'STREAMING_PLATFORM',
-                createDeterministicId('platform_intelligence_seed', platform.id, playerId),
-                absoluteWeek,
-                ),
-            ),
-            platformMigration: normalizePlatformIntelligenceMigrationState(
-                existing?.intelligence?.platformMigration ?? (existing as PlatformAiRuntimeState & { intelligenceMigration?: unknown } | undefined)?.intelligenceMigration,
-                absoluteWeek,
-            ),
-        },
+        intelligence: buildNormalizedPlatformAiIntelligence(platform, existing, playerId, absoluteWeek),
     };
     return { ...platform, ai };
 };

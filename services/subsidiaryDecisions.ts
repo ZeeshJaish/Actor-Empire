@@ -635,7 +635,7 @@ const addFinanceEntry = (
         ...entry,
         week: player.currentWeek,
         year: player.age,
-    }, ...(studioState.financeLedger || [])].slice(0, 200),
+    }, ...(studioState.financeLedger || [])],
 });
 
 const resolveDecisionOnStudio = (

@@ -34,7 +34,7 @@ export const applyPlayerTalentReceipt = (input: PlayerTalentReceiptInput): {
                 id: ledgerId, week: input.week, year: input.year, amount: -settled.totalPaid,
                 type: 'TALENT_BACKEND' as const, label: `${input.projectTitle} talent backend on collected studio receipts`,
                 projectId: input.projectId,
-            }, ...(input.studio.studioState.financeLedger || []).filter(entry => entry.id !== ledgerId)].slice(0, 200),
+            }, ...(input.studio.studioState.financeLedger || []).filter(entry => entry.id !== ledgerId)],
         } : input.studio.studioState,
     };
     return { ...settled, studio };

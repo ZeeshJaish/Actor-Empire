@@ -1,3 +1,4 @@
+import { getPrepaidScriptDevelopmentCash, allocateScriptDevelopmentPayment } from '../../../services/scriptDevelopmentFinance';
 import { consumeTalentUses } from '../../../services/talentRoster';
 import { isMissingMovieActorProfile } from './greenlightUtils';
 import { preserveCinemaCastRecognition } from '../../../services/boxOffice/boxOfficeInputs';
@@ -186,7 +187,11 @@ export const buildGreenlightProject = ({
         const greenlightPackageBudget = productionBudgetWithMusic + marketingReserve;
         const finalInvestorPlan = selectedInvestorPlan;
         const finalInvestorRaised = finalInvestorPlan?.totalRaised || 0;
-        const studioCashRequirement = Math.max(0, greenlightPackageBudget - finalInvestorRaised);
+        const prepaidDevelopmentCash = getPrepaidScriptDevelopmentCash(selectedScript, studio.id);
+        if (prepaidDevelopmentCash > 0 && finalInvestorRaised > greenlightPackageBudget - prepaidDevelopmentCash) {
+            throw new Error('Investor funding exceeds the remaining unpaid project cost.');
+        }
+        const studioCashRequirement = Math.max(0, greenlightPackageBudget - prepaidDevelopmentCash - finalInvestorRaised);
 
         // Location Cost & Stats
         let locationQualityBonus = 0;
@@ -528,7 +533,10 @@ export const buildGreenlightProject = ({
                     : selectedScript.universePhaseName || ((selectedUniverseId && selectedUniverseId !== 'NEW') ? String(normalizedWorldUniverses[selectedUniverseId]?.currentPhaseName || normalizedWorldUniverses[selectedUniverseId]?.currentPhase || 'Phase 1') : undefined),
                 newUniverseName: isCreatingNewUniverse ? newUniverseName.trim() : undefined,
                 franchiseId: selectedFranchiseId === 'NEW' ? `fran_${now()}` : (selectedFranchiseId || undefined),
-                installmentNumber: (selectedFranchiseId && selectedFranchiseId !== 'NEW') ? (studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment || 0) + 1 : 1,
+                installmentNumber: (selectedFranchiseId && selectedFranchiseId !== 'NEW')
+                    ? (studioFranchises.find(f => f.id === selectedFranchiseId)?.lastInstallment
+                        || (previousFranchiseInstallments[0]?.projectDetails || previousFranchiseInstallments[0])?.installmentNumber
+                        || 1) + 1 : 1,
                 genre: selectedScript.genres[0],
                 subjectName: selectedScript.subjectName,
                 subjectType: selectedScript.subjectType,
@@ -543,6 +551,7 @@ export const buildGreenlightProject = ({
                 visibleHype: 'LOW',
                 playerProductionFocus: initialPlayerProductionFocus,
                 hiddenStats: {
+                    prepaidDevelopmentCash,
                     scriptQuality: selectedScript.quality,
                     directorQuality: directorData.quality,
                     castingStrength: currentCastingStrength,
@@ -632,7 +641,7 @@ export const buildGreenlightProject = ({
         }
 
         const updatedScripts = studio.studioState!.scripts.map(s =>
-            s.id === selectedScriptId ? { ...s, status: 'PRODUCED' as const, producedAtWeek: player.currentWeek } : s
+            s.id === selectedScriptId ? { ...allocateScriptDevelopmentPayment(s, studio.id, newCommitmentId), status: 'PRODUCED' as const, producedAtWeek: player.currentWeek } : s
         );
 
         // Remove the concept from the studio state to prevent duplicates in Active Slate
@@ -725,7 +734,7 @@ export const prepareGreenlightFunding = ({
                 ...newCommitment.projectDetails.hiddenStats,
                 platformProductionFundingApplied: lockedFundApplied,
                 productionFundApplied: fundingResult.productionFundApplied,
-                studioCashAtRisk: fundingResult.studioSpend,
+                studioCashAtRisk: fundingResult.studioSpend + Math.max(0, Number(newCommitment.projectDetails?.hiddenStats?.prepaidDevelopmentCash) || 0),
                 investorFundingApplied: finalInvestorRaised,
                 greenlightPackageBudget,
                 platformFundedPremiere: lockedFundApplied > 0,

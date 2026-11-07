@@ -87,7 +87,7 @@ export const creditCorporateStockReceipt = (player: Player, ownerStudioId: strin
                     week: player.currentWeek, year: player.age, amount,
                     type: kind === 'DIVIDEND' ? 'INVESTMENT_RETURN' as const : 'CAPITAL_INJECTION' as const,
                     label: kind === 'DIVIDEND' ? `${stockId} company dividend` : `${stockId} company investment sale`,
-                }, ...(captured.studioState?.financeLedger || [])].slice(0, 200) },
+                }, ...(captured.studioState?.financeLedger || [])] },
             };
         }),
     };

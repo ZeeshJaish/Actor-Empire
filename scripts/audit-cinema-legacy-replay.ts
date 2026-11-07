@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {INITIAL_PLAYER,type Player} from '../types';
+import {commitCinemaWeek} from '../services/boxOffice/boxOfficeLiveSettlement';
+import frozen from './fixtures/cinemaLegacyCommittedReceipt.json';
+import type {CinemaWeekResult} from '../services/boxOffice/boxOfficeTypes';
+const signature=JSON.parse(frozen.receipt.receiptSignature),p=structuredClone(INITIAL_PLAYER) as Player;p.money=12345;
+p.world.cinemaMarket={clockEpoch:frozen.clockEpoch,tuningVersion:frozen.tuningVersion,weeks:[frozen.receipt]} as any;
+const result={absoluteWeek:signature.week,tuningVersion:signature.tuning,mode:'LIVE',live:{clockEpoch:signature.epoch,sourceSignature:'issued-v1-replay'},inputFingerprint:signature.fingerprint,titles:signature.titles.map((t:any)=>({...t,countries:[]})),costEvents:signature.costs.map((c:any)=>({id:'replay:'+c.titleId,titleId:c.titleId,amountCents:c.total}))} as CinemaWeekResult;
+const replay=commitCinemaWeek(p,result);assert.equal(replay.applied,false);assert.equal(replay.player,p);assert.equal(p.money,12345);
+const changed=structuredClone(result);changed.titles[0].grossCents+=1;assert.throws(()=>commitCinemaWeek(p,changed),/receipt conflict/);
+console.log(JSON.stringify({passed:2,actualOldCommittedReceiptRetained:true,newMoneyPaid:0}));
