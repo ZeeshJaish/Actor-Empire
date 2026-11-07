@@ -96,6 +96,12 @@
 .pk-sue-back svg{width:15px;height:12px;display:block;flex:none}
 .pk-sue-chip{display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:99px;background:#fff;color:#b50e29;font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1.5px rgba(200,16,46,.55),3px 4px 0 rgba(70,88,128,.3)}
 .pk-sue-chip svg{width:10px;height:13px;display:block;flex:none}
+/* the sound switch: one icon, in the page's own look */
+.pk-sue-snd{display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:99px;pointer-events:auto;background:#fff;color:#12234a;box-shadow:0 0 0 1px rgba(18,35,74,.1),3px 4px 0 rgba(70,88,128,.3);cursor:pointer;transition:transform .12s ease}
+.pk-sue-snd:active{transform:scale(.92)}
+.pk-sue-snd.is-off{color:rgba(18,35,74,.38)}
+.pk-sue-snd svg{display:block;flex:none}
+.pk-sue-root.pk-sue-is-final .pk-sue-snd{box-shadow:3px 4px 0 rgba(84,4,20,.55)}
 /* narrow phones: the chip keeps clear of the stamp's knob, which is centred under it there */
 @media (max-width:374px){.pk-sue-chip{gap:5px;padding:0 9px;letter-spacing:.08em}}
 @media (max-width:339px){.pk-sue-chip{gap:4px;padding:0 8px;letter-spacing:.05em}}

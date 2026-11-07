@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { packName, packShortName } from './packName';
 import { useMergedState } from './useMergedState';
+import { usePackSounds, type PackMusic, type PackSoundFiles } from './packAudio';
+import PackSoundToggle from './PackSoundToggle';
 import '../../styles/packs/pack-cinema.css';
 
 const PK_FEATS = [
@@ -36,6 +38,20 @@ const fitCards = (cards: string[]) => {
   return { '--fit': size, '--track': track.toFixed(3) + 'em' } as React.CSSProperties;
 };
 
+/* rendered by scripts/audio/render-pack-sounds.mjs from scripts/audio/packs/cinema.mjs. final.m4a holds the eighth tear's rip, the marquee's breakers and the brass, against the page's clock */
+const CINEMA_SOUNDS: PackSoundFiles = {
+  tap: () => new URL('../../assets/audio/packs/cinema/tap.m4a', import.meta.url).href,
+  final: () => new URL('../../assets/audio/packs/cinema/final.m4a', import.meta.url).href,
+  notify: () => new URL('../../assets/audio/packs/cinema/notify.m4a', import.meta.url).href,
+  click: () => new URL('../../assets/audio/packs/cinema/click.m4a', import.meta.url).href,
+};
+/* the loop points are printed by the render: one period apart, inside the part of the file that repeats */
+const CINEMA_MUSIC: PackMusic = {
+  url: () => new URL('../../assets/audio/packs/cinema/music.m4a', import.meta.url).href,
+  loopStart: 8.912222,
+  loopEnd: 32.912222,
+};
+
 interface CinemaChainPackScreenProps {
   playerName: string;
   onBack: () => void;
@@ -47,6 +63,7 @@ export default function CinemaChainPackScreen({ playerName, onBack }: CinemaChai
   const bornAt = useRef(0);
   const newestTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const idleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { play, soundOn, toggleSound, duckMusic, restoreMusic } = usePackSounds(CINEMA_SOUNDS, CINEMA_MUSIC);
 
   useEffect(() => {
     bornAt.current = Date.now();
@@ -67,6 +84,9 @@ export default function CinemaChainPackScreen({ playerName, onBack }: CinemaChai
   const tear = () => {
     const { step, tears, castSync } = latest.current;
     const next = Math.min(8, step + 1);
+    /* the eighth tear brings the marquee up with its own sound, and the theme steps back for it; every other tear, encores too, rips a little higher */
+    if (step === 7) { play('final'); duckMusic(); }
+    else play('tap', { rate: 1 + next * .016 + (Math.random() - .5) * .03 });
     set({
       step: next,
       tears: tears + 1,
@@ -79,11 +99,12 @@ export default function CinemaChainPackScreen({ playerName, onBack }: CinemaChai
     newestTimer.current = setTimeout(() => set({ newest: -1 }), 1150);
     clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(() => set({ idle: true }), 4500);
-    if (step === 7) later(() => set({ settled: true }), 2500);
+    if (step === 7) later(() => { set({ settled: true }); restoreMusic(); }, 2500);
   };
 
   const notify = () => {
     if (latest.current.notified) return;
+    play('notify');
     set({ notified: true });
     later(() => set({ doneShown: true }), 190);
   };
@@ -325,7 +346,8 @@ export default function CinemaChainPackScreen({ playerName, onBack }: CinemaChai
       </div>
       <div className="pk-cine-page">
         <div className="pk-cine-topbar">
-          <button type="button" className="pk-cine-backbtn" onClick={onBack}> <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5 M11 5.5 4.5 12l6.5 6.5" fill="none" stroke="#e8b64c" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"></path></svg> Back </button>
+          <button type="button" className="pk-cine-backbtn" onClick={() => { play('click'); onBack(); }}> <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5 M11 5.5 4.5 12l6.5 6.5" fill="none" stroke="#e8b64c" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"></path></svg> Back </button>
+          <PackSoundToggle on={soundOn} onToggle={toggleSound} className={`pk-cine-snd ${soundOn ? '' : 'is-off'}`} />
           <div className="pk-cine-chip"> <svg viewBox="0 0 12 14" aria-hidden="true"><path d="M3 6V4a3 3 0 0 1 6 0v2" fill="none" stroke="#ffdf8e" strokeWidth="1.5"></path><rect x="1" y="6" width="10" height="7.5" rx="1.6" fill="#ffdf8e"></rect></svg> Future Update </div>
         </div>
         <div className="pk-cine-upper" style={{ '--lit': v.behind } as React.CSSProperties}>

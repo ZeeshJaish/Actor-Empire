@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 
 /* The Upcoming Packs flow is a set of teasers: four pack pages, no save, no price, nothing that loads on a tap. */
 const read = file => readFileSync(file, 'utf8');
@@ -48,7 +48,20 @@ for (const file of screens) {
 const audio = read('components/packs/packAudio.ts');
 assert.ok(!/\b(sessionStorage|indexedDB|XMLHttpRequest|trackGameEvent|onUpdatePlayer|import\(|lazy\()/.test(audio), 'packAudio.ts: no save, no code loading');
 for (const file of screens) assert.ok(!/\b(AudioContext|new Audio\b|decodeAudioData)/.test(read(`components/packs/${file}`)), `${file}: sound goes through packAudio.ts`);
-for (const name of ['music', 'tap', 'final', 'notify', 'click']) assert.ok(existsSync(`assets/audio/packs/blackout/${name}.m4a`), `blackout has ${name}.m4a`);
+/* every pack page has its theme and its four effects, and the game grows by little: the owner asked that it should not */
+for (const pack of PACKS) {
+  let bytes = 0;
+  for (const name of ['music', 'tap', 'final', 'notify', 'click']) {
+    const file = `assets/audio/packs/${pack}/${name}.m4a`;
+    assert.ok(existsSync(file), `${pack} has ${name}.m4a`);
+    bytes += statSync(file).size;
+  }
+  assert.ok(bytes <= 450 * 1024, `${pack} ships ${Math.round(bytes / 1024)} KB of sound, over its 450 KB`);
+}
+/* the recordings the themes are made from are never shipped, only the finished mixes */
+assert.ok(!readdirSync('assets/audio/packs', { recursive: true }).some(file => /\.(wav|aiff?|flac)$/i.test(String(file))), 'no recording is shipped');
+for (const file of screens.filter(f => /PackScreen\.tsx$/.test(f))) assert.ok(read(`components/packs/${file}`).includes('usePackSounds('), `${file} plays its theme`);
+for (const pack of PACKS) assert.ok(flow.includes(`assets/audio/packs/${pack}/music.m4a`), `the list fetches ${pack}'s theme ahead`);
 assert.ok(flow.includes('unlockPackAudio()'), 'the tap that opens a pack opens the sound');
 
 for (const file of sheets) {

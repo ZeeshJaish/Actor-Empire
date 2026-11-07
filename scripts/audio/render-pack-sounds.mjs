@@ -16,13 +16,16 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import makeInstruments from './pack-instruments.mjs';
 
 const SR = 44100;
 const TAU = Math.PI * 2;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const WORK = process.env.PACK_AUDIO_WORK || '/private/tmp/claude-502/-Users-zeesh-Vibe-code-ae-marketing/211fd2fc-177a-45c9-bb94-65a84923da9f/scratchpad/packs/audio-work';
 const PREVIEWS = path.join(WORK, '..', 'audio-preview');
+/* PACK_AUDIO_ASSETS moves where the finished files go, to try something without touching the game's */
+const ASSETS = process.env.PACK_AUDIO_ASSETS || path.join(ROOT, 'assets/audio/packs');
 
 const N = seconds => Math.max(1, Math.round(seconds * SR));
 const db = value => 10 ** (value / 20);
@@ -1041,17 +1044,199 @@ const blackoutPreview = rendered => {
   console.log(`preview ${(fs.statSync(out).size / 1024).toFixed(0)} KB, ${S} s, peak ${toDb(top).toFixed(1)} dB (${top >= 1 ? 'CLIPS' : 'no clip'}), seams heard at ${[0, 1, 2].map(k => (0.35 + (seamAt.to + k * (seamAt.to - seamAt.from)) / SR).toFixed(1)).join(', ')} s, ${out}`);
 };
 
-/* ── main ── */
+/* ── what a pack's own file works with: scripts/audio/packs/<pack>.mjs exports default kit => ({ sounds, preview }) ── */
+/* a bus compressor. warm: samples of the end of the buffer to run through first, so that a periodic buffer starts in the state it ends in */
+const compress = ({ L, R }, { threshold = -16, ratio = 2.5, attack = 0.012, release = 0.18, warm = 0 } = {}) => {
+  const a = Math.exp(-1 / (attack * SR)); const r = Math.exp(-1 / (release * SR));
+  const t = db(threshold); const exponent = 1 / ratio - 1;
+  const n = L.length;
+  let env = 0;
+  const follow = i => { const level = Math.max(Math.abs(L[i]), Math.abs(R[i])); env = level > env ? a * env + (1 - a) * level : r * env + (1 - r) * level; };
+  for (let i = Math.max(0, n - warm); i < n; i += 1) follow(i);
+  for (let i = 0; i < n; i += 1) {
+    follow(i);
+    const g = env > t ? (env / t) ** exponent : 1;
+    L[i] *= g; R[i] *= g;
+  }
+  return { L, R };
+};
+/* the last stage of anything mastered: compression, soft saturation, the level */
+const master = (rendered, { peak = -3, soften = 0, comp = null } = {}) => {
+  if (comp) compress(rendered, comp);
+  let { L, R } = rendered;
+  if (soften > 0) {
+    const top = Math.max(peakOf(L), peakOf(R)) || 1;
+    gainOf(L, 1 / top); gainOf(R, 1 / top);
+    L = drive(L, soften); R = drive(R, soften);
+  }
+  const scale = db(peak) / (Math.max(peakOf(L), peakOf(R)) || 1);
+  return { L: gainOf(L, scale), R: gainOf(R, scale) };
+};
+/* a Mix through its rooms and into master(): what an intro or an effect uses when it wants compression */
+const masterMix = (mix, { peak = -3, soften = 0, comp = null, fadeIn = 0, fadeFrom, fadeTo } = {}) => master(mix.render({ peak: 0, fadeIn, fadeFrom, fadeTo }), { peak, soften, comp });
+/* The loop of a theme. Everything is written at a place in the period, reverb tails run past its end, and all of it folds back onto one period: so it comes round exactly, tails included.
+ * A period must be a whole number of samples at both 44.1 and 48 kHz (a multiple of 1/300 s), so that a phone that resamples on decoding still loops on the sample. */
+class LoopMix {
+  constructor(period, tail = 9) {
+    if (Math.abs(period * 300 - Math.round(period * 300)) > 1e-6) throw new Error(`a period of ${period} s is not a whole number of samples at both 44.1 and 48 kHz: 80 BPM gives 3 s a bar, 75 gives 3.2, 90 gives 8/3, 100 gives 2.4, 120 gives 2`);
+    this.period = period; this.tail = tail;
+    this.mix = new Mix(period + tail);
+  }
+  add(x, at, gain = 1, pan = 0, send = {}) {
+    const P = this.period;
+    this.mix.add(x, ((at % P) + P) % P, gain, pan, send);
+  }
+  fold({ peak = -13, soften = 1.15, comp = null } = {}) {
+    const S = this.period + this.tail;
+    const wet = this.mix.render({ peak: 0, fadeFrom: S - 0.6, fadeTo: S - 0.05 });
+    const P = N(this.period);
+    const L = new Float32Array(P); const R = new Float32Array(P);
+    for (let i = 0; i < wet.L.length; i += 1) { L[i % P] += wet.L[i]; R[i % P] += wet.R[i]; }
+    return master({ L, R }, { peak, soften, comp: comp ? { ...comp, warm: P } : null });
+  }
+}
+/*
+ * A theme: one file holding the intro and then the loop.
+ *   intro(rand) returns { L, R }, silent by `earliest`; loop(rand) returns one period from LoopMix.fold().
+ *   entry: where in the file the loop's time 0 falls. loopIn: [from, to], where the loop fades in under the intro. earliest: the first place a loop point may go (past the intro and the fade).
+ */
+const theme = ({ pack, intro, loop, period, entry, earliest, loopIn = [5, 6.5], bitrate = 80000 }) => ({
+  bitrate,
+  compose() {
+    if (earliest < loopIn[1]) throw new Error('earliest must come after the loop has faded in');
+    const head = intro(seeded(`${pack}/theme/intro`));
+    const round = loop(seeded(`${pack}/theme/loop`));
+    const P = N(period);
+    if (round.L.length !== P) throw new Error(`loop() returned ${round.L.length} samples, a period is ${P}`);
+    const entryAt = N(entry);
+    const phase = i => (((i - entryAt) % P) + P) % P;
+    /* the seam goes in the quietest moment available. The two sides are the same music; only AAC's noise differs, and that is smallest where the music is smallest */
+    const start = N(earliest);
+    const reach = N(0.012);
+    let from = start + reach; let least = Infinity;
+    for (let at = start + reach; at < start + N(0.9); at += N(0.005)) {
+      let e = 0;
+      for (let k = -reach; k <= reach; k += 4) { const p = phase(at + k); e += round.L[p] * round.L[p] + round.R[p] * round.R[p]; }
+      if (e < least) { least = e; from = at; }
+    }
+    seamAt.from = from; seamAt.to = from + P;
+    const total = seamAt.to + N(0.3) + N(0.02);
+    const fade = ramp([[loopIn[0], 0], [loopIn[1], 1]]);
+    const L = new Float32Array(total); const R = new Float32Array(total);
+    let late = 0;
+    for (let i = 0; i < total; i += 1) {
+      const g = fade(i / SR);
+      const p = phase(i);
+      const a = head.L[i] ?? 0; const b = head.R[i] ?? 0;
+      if (i >= from) late = Math.max(late, Math.abs(a), Math.abs(b));
+      L[i] = a + round.L[p] * g;
+      R[i] = b + round.R[p] * g;
+    }
+    if (late > 0) throw new Error(`the intro still sounds at the loop point (${toDb(late).toFixed(1)} dB): end its fade before earliest`);
+    fs.mkdirSync(WORK, { recursive: true });
+    fs.writeFileSync(path.join(WORK, `${pack}-loop.json`), JSON.stringify({ from, to: seamAt.to }));
+    return { L, R };
+  },
+  after(rendered, file) {
+    const { L, R } = rendered;
+    const part = (from, to) => ({ L: L.subarray(from, to), R: R.subarray(from, to) });
+    const stat = ({ L: l, R: r }) => {
+      const mono = monoOf({ L: l, R: r });
+      return `peak ${toDb(Math.max(peakOf(l), peakOf(r))).toFixed(1)} dB, rms ${toDb(rmsOf(mono)).toFixed(1)} dB, phone rms (above 150 Hz) ${toDb(rmsOf(hp(hp(mono, 150), 150))).toFixed(1)} dB`;
+    };
+    const whole = Math.max(peakOf(L), peakOf(R));
+    console.log(`LOOP POINTS loopStart: ${(seamAt.from / SR).toFixed(6)}, loopEnd: ${(seamAt.to / SR).toFixed(6)} (period ${seamAt.to - seamAt.from} samples); file ${(L.length / SR).toFixed(2)} s, ${(fs.statSync(file).size / 1024).toFixed(0)} KB; whole peak ${toDb(whole).toFixed(1)} dB (${whole >= 1 ? 'CLIPS' : 'no clip'})`);
+    console.log(`intro 0-${earliest} s: ${stat(part(0, N(earliest)))}`);
+    console.log(`first second: ${stat(part(0, N(1)))}`);
+    console.log(`loop: ${stat(part(seamAt.from, seamAt.to))}`);
+    seamReport('rendered', rendered);
+    seamReport('after AAC', decodedOf(`${pack}-seam`, file));
+    console.log('level whole / above 150 Hz / above 1.5 kHz, dB per 2 s:');
+    timeline(rendered, 2);
+  },
+});
+/*
+ * What a player hears, from the shipped files and with the player's own numbers (packAudio.ts). Not shipped.
+ * taps: [{ at, sound?, rate?, delay? }]. final: { at, sound?, delay?, restoreAfter } (the theme ducks at `at`, as duckMusic does, and restoreAfter later comes back as restoreMusic does). notifyAt, clickAt: seconds.
+ */
+const themePreview = ({ pack, rendered = {}, seconds = 70, taps = [], final = null, notifyAt = null, clickAt = null }) => {
+  const total = N(seconds);
+  const sound = name => rendered[name] ?? decodedOf(`${pack}-${name}-preview`, path.join(ASSETS, pack, `${name}.m4a`));
+  const { from, to } = JSON.parse(fs.readFileSync(path.join(WORK, `${pack}-loop.json`), 'utf8'));
+  const music = decodedOf(`${pack}-music-preview`, path.join(ASSETS, pack, 'music.m4a'));
+  const M = { L: new Float32Array(total), R: new Float32Array(total) };
+  let read = 0;
+  for (let i = N(0.2); i < total; i += 1) {
+    M.L[i] = music.L[read]; M.R[i] = music.R[read];
+    read += 1;
+    if (read >= to) read = from;
+  }
+  const DUCK = 0.05; const CUT = 220; const OPEN = 20000; const BACK = 2.5;
+  const level = t => {
+    if (!final || t < final.at) return 1;
+    const back = final.at + final.restoreAfter;
+    if (t < back) return DUCK + (1 - DUCK) * Math.exp(-(t - final.at) / 0.07);
+    return t < back + BACK ? DUCK + (1 - DUCK) * (t - back) / BACK : 1;
+  };
+  const cutoff = t => {
+    if (!final || t < final.at) return OPEN;
+    const back = final.at + final.restoreAfter;
+    if (t < back) return CUT + (OPEN - CUT) * Math.exp(-(t - final.at) / 0.09);
+    return t < back + BACK ? CUT * (OPEN / CUT) ** ((t - back) / BACK) : OPEN;
+  };
+  const L = lp(M.L, cutoff, 0.7); const R = lp(M.R, cutoff, 0.7);
+  for (let i = 0; i < total; i += 1) { const g = level(i / SR); L[i] *= g; R[i] *= g; }
+  const over = (source, at) => {
+    const start = N(at);
+    for (let i = 0; i < source.L.length && start + i < total; i += 1) { L[start + i] += source.L[i]; R[start + i] += source.R[i]; }
+  };
+  taps.forEach(({ at, sound: name = 'tap', rate = 1, delay = 0 }) => over(atRate(sound(name), rate), at + delay));
+  if (final) over(sound(final.sound ?? 'final'), final.at + (final.delay ?? 0));
+  if (notifyAt !== null) over(sound('notify'), notifyAt);
+  if (clickAt !== null) over(sound('click'), clickAt);
+  for (let i = N(seconds - 3); i < total; i += 1) { const g = Math.cos(((i / SR - (seconds - 3)) / 3) * Math.PI / 2) ** 2; L[i] *= g; R[i] *= g; }
+  const wav = path.join(WORK, `${pack}-preview.wav`);
+  writeWav(wav, L, R);
+  const out = path.join(PREVIEWS, `${pack}-preview.m4a`);
+  encode(wav, out, 128000);
+  const top = Math.max(peakOf(L), peakOf(R));
+  console.log(`preview ${(fs.statSync(out).size / 1024).toFixed(0)} KB, ${seconds} s, peak ${toDb(top).toFixed(1)} dB (${top >= 1 ? 'CLIPS' : 'no clip'}), first seam at ${((to + 0.2 * SR) / SR).toFixed(1)} s, ${out}`);
+};
+/* what one pack adds to the game */
+const sizeReport = pack => {
+  const dir = path.join(ASSETS, pack);
+  if (!fs.existsSync(dir)) return;
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.m4a'));
+  const bytes = files.map(f => fs.statSync(path.join(dir, f)).size);
+  console.log(`size of ${pack}: ${files.map((f, i) => `${f} ${(bytes[i] / 1024).toFixed(0)} KB`).join(', ')}; total ${(bytes.reduce((a, b) => a + b, 0) / 1024).toFixed(0)} KB`);
+};
+const kit = {
+  SR, TAU, ROOT, WORK, PREVIEWS, ASSETS, N, db, toDb, clamp, seeded, gauss, coef, filter, lp, hp, bp, white, pink, brown, saw, shape, decay, gainOf, peakOf, norm, drive, sum, pad, wander, ramp, bezierTimeAt,
+  fft, convolve, ROOM_SPECS, room, Mix, LoopMix, compress, master, masterMix, theme, themePreview, resonate, ring, burst, impact, slide, stickSlip, relay, hz, rmsOf, monoOf, atRate, timeline, writeWav, encode,
+};
+kit.I = makeInstruments(kit);
+
+/* ── main. `render-pack-sounds.mjs <pack> [sound…] [preview]` renders only what it names; with no names, all of it. `--scan-samples` indexes the recordings ── */
 const packId = process.argv[2];
+const only = process.argv.slice(3);
+if (packId === '--scan-samples') {
+  kit.I.scan();
+  process.exit(0);
+}
+if (packId && !PACKS[packId]) {
+  const moduleFile = path.join(process.env.PACK_MODULE_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), 'packs'), `${packId}.mjs`);
+  if (fs.existsSync(moduleFile)) PACKS[packId] = (await import(pathToFileURL(moduleFile).href)).default(kit);
+}
 const pack = PACKS[packId];
 if (!pack) {
-  console.error(`usage: node scripts/audio/render-pack-sounds.mjs <${Object.keys(PACKS).join('|')}>`);
+  console.error(`usage: node scripts/audio/render-pack-sounds.mjs <${Object.keys(PACKS).join('|')}|a file in scripts/audio/packs> [sound…] [preview]`);
   process.exit(2);
 }
 fs.mkdirSync(WORK, { recursive: true });
 fs.mkdirSync(PREVIEWS, { recursive: true });
 const rendered = {};
 for (const [name, recipe] of Object.entries(pack.sounds)) {
+  if (only.length && !only.includes(name)) continue;
   if (recipe.compose) {
     rendered[name] = recipe.compose();
   } else {
@@ -1061,10 +1246,11 @@ for (const [name, recipe] of Object.entries(pack.sounds)) {
   }
   const wav = path.join(WORK, `${packId}-${name}.wav`);
   writeWav(wav, rendered[name].L, rendered[name].R);
-  const out = path.join(ROOT, 'assets/audio/packs', packId, `${name}.m4a`);
+  const out = path.join(ASSETS, packId, `${name}.m4a`);
   encode(wav, out, recipe.bitrate);
   meter(name, rendered[name], out);
   if (recipe.marks) marks(rendered[name], recipe.marks);
   if (recipe.after) recipe.after(rendered[name], out);
 }
-pack.preview(rendered);
+if (!only.length || only.includes('preview')) pack.preview(rendered);
+sizeReport(packId);

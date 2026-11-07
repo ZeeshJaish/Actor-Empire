@@ -7,6 +7,15 @@ import FollyPackScreen from './FollyPackScreen';
 import BlackoutJobPackScreen from './BlackoutJobPackScreen';
 import { preparePackAudio, prefetchPackBytes, unlockPackAudio } from './packAudio';
 
+/* each pack page's theme, about 310 KB each: fetched when the list is idle, so that a tap only has to decode */
+const PACK_THEMES = [
+  () => new URL('../../assets/audio/packs/cinema/music.m4a', import.meta.url).href,
+  () => new URL('../../assets/audio/packs/sue/music.m4a', import.meta.url).href,
+  () => new URL('../../assets/audio/packs/nine/music.m4a', import.meta.url).href,
+  () => new URL('../../assets/audio/packs/folly/music.m4a', import.meta.url).href,
+  () => new URL('../../assets/audio/packs/blackout/music.m4a', import.meta.url).href,
+];
+
 interface UpcomingPacksFlowProps {
   playerName: string;
   onBack: () => void;
@@ -18,8 +27,11 @@ export default function UpcomingPacksFlow({ playerName, onBack }: UpcomingPacksF
   const backToList = () => setPack(null);
   /* the sound's context is made while the list sits idle, and a browser opens it only from a tap: this one */
   useEffect(() => preparePackAudio(), []);
-  /* the bytes only: decoding happens after the tap, off it */
-  useEffect(() => prefetchPackBytes(() => new URL('../../assets/audio/packs/blackout/music.m4a', import.meta.url).href), []);
+  /* the bytes only, every theme's: decoding happens after the tap, off it */
+  useEffect(() => {
+    const cancels = PACK_THEMES.map(url => prefetchPackBytes(url));
+    return () => cancels.forEach(cancel => cancel());
+  }, []);
   const openPack = (id: PackId) => {
     unlockPackAudio();
     setPack(id);

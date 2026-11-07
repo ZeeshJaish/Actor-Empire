@@ -110,6 +110,13 @@
 .pk-cine-backbtn svg{width:14px;height:14px;flex:none;display:block}
 .pk-cine-chip{display:flex;align-items:center;gap:8px;min-height:38px;padding:0 15px;border-radius:99px;background:rgba(36,24,12,.72);color:var(--gold);font-size:10px;font-weight:800;letter-spacing:.26em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 0 0 1px rgba(232,182,76,.35)}
 .pk-cine-chip svg{width:11px;height:13px;flex:none;display:block}
+/* the sound switch: one icon, in the page's own look */
+.pk-cine-snd{display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:99px;background:rgba(22,14,14,.82);color:var(--gold);box-shadow:inset 0 0 0 1px rgba(232,182,76,.35);cursor:pointer;transition:transform .12s ease}
+.pk-cine-snd:active{transform:scale(.92)}
+.pk-cine-snd.is-off{color:rgba(232,182,76,.42)}
+.pk-cine-snd svg{display:block;flex:none}
+/* with the sound switch, Back and the chip get closer on narrow phones */
+@media (max-width:374px){.pk-cine-topbar{gap:6px}.pk-cine-backbtn{gap:6px;padding:0 12px 0 10px;letter-spacing:.14em}.pk-cine-chip{gap:6px;padding:0 10px;letter-spacing:.12em}}
 
 .pk-cine-upper{position:relative;z-index:6;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 26px;transition:transform .95s cubic-bezier(.3,1.28,.5,1) .72s}
 .pk-cine-is-final .pk-cine-upper{transform:translateY(var(--S))}

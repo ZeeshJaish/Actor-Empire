@@ -1,5 +1,7 @@
 import React, { Fragment, useEffect, useRef } from 'react';
 import { useMergedState } from './useMergedState';
+import { usePackSounds, type PackMusic, type PackSoundFiles } from './packAudio';
+import PackSoundToggle from './PackSoundToggle';
 import '../../styles/packs/pack-folly.css';
 
 const PK_SEG: Record<string, string> = {
@@ -32,6 +34,20 @@ const PK_LINES = [
   'Wait decades for a cult revival',
 ];
 
+/* rendered by scripts/audio/render-pack-sounds.mjs from scripts/audio/packs/folly.mjs. tap.m4a cracks at 125 ms, where the arm lands; final.m4a floods at 545 ms, with the LED */
+const FOLLY_SOUNDS: PackSoundFiles = {
+  tap: () => new URL('../../assets/audio/packs/folly/tap.m4a', import.meta.url).href,
+  final: () => new URL('../../assets/audio/packs/folly/final.m4a', import.meta.url).href,
+  notify: () => new URL('../../assets/audio/packs/folly/notify.m4a', import.meta.url).href,
+  click: () => new URL('../../assets/audio/packs/folly/click.m4a', import.meta.url).href,
+};
+/* the loop points are printed by the render: one period apart, inside the part of the file that repeats */
+const FOLLY_MUSIC: PackMusic = {
+  url: () => new URL('../../assets/audio/packs/folly/music.m4a', import.meta.url).href,
+  loopStart: 9.498095,
+  loopEnd: 30.831429,
+};
+
 interface FollyPackScreenProps {
   onBack: () => void;
 }
@@ -44,6 +60,7 @@ export default function FollyPackScreen({ onBack }: FollyPackScreenProps) {
   const finalAt = useRef(0);
   const racing = useRef(false);
   const race = useRef<ReturnType<typeof setInterval>>(undefined);
+  const { play, soundOn, toggleSound, duckMusic, restoreMusic } = usePackSounds(FOLLY_SOUNDS, FOLLY_MUSIC);
 
   useEffect(() => {
     teaseAt.current = Date.now() - 2800;
@@ -101,12 +118,18 @@ export default function FollyPackScreen({ onBack }: FollyPackScreenProps) {
     if (latest.current.step >= 8 && now - finalAt.current < 700) return;
     last.current = now;
     if (navigator.vibrate) navigator.vibrate(12);
+    /* the crack sits at 125 ms in tap.m4a, on the arm's landing, and the delay keeps it there at any rate; an encore's slam lands at 212 ms */
+    const step = latest.current.step;
+    if (step >= 8) { const r = 1 + 8 * .016; play('tap', { rate: r, delay: .212 - .125 / r }); }
+    else if (step === 7) { play('final'); duckMusic(); later(restoreMusic, 2200); }
+    else { const r = 1 + (step + 1) * .016; play('tap', { rate: r, delay: .125 - .125 / r }); }
     set({ slam: latest.current.slam + 1, hinted: true, pressed: false, settled: latest.current.step >= 8 });
     later(() => impact(), latest.current.step >= 8 ? 212 : 125);
   };
   const notify = () => {
     if (latest.current.notified) return;
     if (navigator.vibrate) navigator.vibrate(20);
+    play('notify');
     set({ notified: true, ctaDown: false });
     // press, burst, then the done words
     later(() => set({ listed: true }), 160);
@@ -778,12 +801,13 @@ export default function FollyPackScreen({ onBack }: FollyPackScreenProps) {
           </svg>
           <div className="pk-folly-col">
             <div className="pk-folly-top pk-folly-rise" style={{ '--d': '.08s' } as React.CSSProperties}>
-              <button type="button" className="pk-folly-back" onClick={onBack}>
+              <button type="button" className="pk-folly-back" onClick={() => { play('click'); onBack(); }}>
                 <svg viewBox="0 0 16 16" aria-hidden="true">
                   <path d="M14 8H3M7.5 3.2L2.6 8l4.9 4.8" fill="none" stroke="#e39a6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
                 </svg>
                 <span>Back</span>
               </button>
+              <PackSoundToggle on={soundOn} onToggle={toggleSound} className={`pk-folly-snd ${soundOn ? '' : 'is-off'}`} />
               <div className="pk-folly-chip">
                 <svg viewBox="0 0 11 12" aria-hidden="true">
                   <path d="M3 5.4V3.6a2.5 2.5 0 015 0v1.8" fill="none" stroke="#ecbf9b" strokeWidth="1.3"></path>

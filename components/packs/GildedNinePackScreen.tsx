@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useMergedState } from './useMergedState';
+import { usePackSounds, type PackMusic, type PackSoundFiles } from './packAudio';
+import PackSoundToggle from './PackSoundToggle';
 import '../../styles/packs/pack-nine.css';
 
 const PK_NINE_FEATS = [
@@ -36,6 +38,20 @@ const where = (el: Element) => {
 };
 const buzz = (pattern: number | number[]) => { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} };
 
+/* rendered by scripts/audio/render-pack-sounds.mjs from scripts/audio/packs/nine.mjs. final.m4a follows the eye's clock: the mechanism at 74 ms, the slots from 920 ms, the spark's fall, the plate at 1340 ms */
+const NINE_SOUNDS: PackSoundFiles = {
+  tap: () => new URL('../../assets/audio/packs/nine/tap.m4a', import.meta.url).href,
+  final: () => new URL('../../assets/audio/packs/nine/final.m4a', import.meta.url).href,
+  notify: () => new URL('../../assets/audio/packs/nine/notify.m4a', import.meta.url).href,
+  click: () => new URL('../../assets/audio/packs/nine/click.m4a', import.meta.url).href,
+};
+/* the loop points are printed by the render: one period apart, inside the part of the file that repeats */
+const NINE_MUSIC: PackMusic = {
+  url: () => new URL('../../assets/audio/packs/nine/music.m4a', import.meta.url).href,
+  loopStart: 8.908118,
+  loopEnd: 34.508118,
+};
+
 interface GildedNinePackScreenProps {
   onBack: () => void;
 }
@@ -57,16 +73,22 @@ export default function GildedNinePackScreen({ onBack }: GildedNinePackScreenPro
   const acceptTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const blinkTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const scrollTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => { [sendTimer, acceptTimer, blinkTimer, scrollTimer].forEach(timer => clearTimeout(timer.current)); }, []);
+  const restoreTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { play, soundOn, toggleSound, duckMusic, restoreMusic } = usePackSounds(NINE_SOUNDS, NINE_MUSIC);
+  useEffect(() => () => { [sendTimer, acceptTimer, blinkTimer, scrollTimer, restoreTimer].forEach(timer => clearTimeout(timer.current)); }, []);
 
   const turn = (e: React.MouseEvent<HTMLElement>) => {
     const s = latest.current;
     if (s.step >= 8) {
       buzz(10);
+      play('click');
       set({ tick: s.tick + 1, react: s.react + 1 });
       return;
     }
     buzz(s.step === 7 ? [14, 60, 30] : 12);
+    /* each turn lands its knock with the ring, at 478 ms; the eighth opens the eye, and the theme steps back for it */
+    if (s.step === 7) { play('final'); duckMusic(); clearTimeout(restoreTimer.current); restoreTimer.current = setTimeout(restoreMusic, 2200); }
+    else play('tap', { rate: 1 + (s.step + 1) * .016 });
     // The eye stares until 1050 ms and glances down by 1350 ms. The slots light top to bottom from 920 ms,
     // one spark leaves the lowest at 1060 ms and lands on the plate at 1340 ms, then the plate answers.
     const up: Partial<GildedNineState> = { step: s.step + 1, tick: s.tick + 1 };
@@ -90,6 +112,7 @@ export default function GildedNinePackScreen({ onBack }: GildedNinePackScreenPro
   const notify = (e: React.MouseEvent<HTMLElement>) => {
     if (latest.current.pressed) return;
     buzz(20);
+    play('notify');
     const up: Partial<GildedNineState> = { pressed: true };
     if (latest.current.step >= 8) {
       // One spark goes from the plate to the empty chair and lands at 560 ms. The silhouette and the pulse arrive with it, then the eye blinks.
@@ -596,12 +619,13 @@ export default function GildedNinePackScreen({ onBack }: GildedNinePackScreenPro
       <div className={`pk-nine-stage ${v.hitClass}`}>
         <div className="pk-nine-page">
           <div className="pk-nine-top">
-            <button type="button" className="pk-nine-back" onClick={onBack} aria-label="Back">
+            <button type="button" className="pk-nine-back" onClick={() => { play('click'); onBack(); }} aria-label="Back">
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <path d="M14 8H3M7.5 3.2L2.6 8l4.9 4.8" fill="none" stroke="#c2a566" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
               </svg>
               <span>BACK</span>
             </button>
+            <PackSoundToggle on={soundOn} onToggle={toggleSound} className={`pk-nine-snd ${soundOn ? '' : 'is-off'}`} />
             <div className="pk-nine-chip">
               <svg viewBox="0 0 12 12" aria-hidden="true">
                 <path d="M3.4 5.2V3.8a2.6 2.6 0 0 1 5.2 0v1.4" fill="none" stroke="#c2a566" strokeWidth="1.3"></path>

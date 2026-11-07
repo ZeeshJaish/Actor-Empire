@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { nameFit, packName, packShortName } from './packName';
 import { useMergedState } from './useMergedState';
+import { usePackSounds, type PackMusic, type PackSoundFiles } from './packAudio';
+import PackSoundToggle from './PackSoundToggle';
 import '../../styles/packs/pack-sue.css';
 
 const TO = ['YOUR EX', 'YOUR MOTHER', 'A CRITIC', 'THE STUDIO', 'YOUR NEIGHBOUR', 'YOUR AGENT', 'YOUR RIVAL', 'EVERYONE'];
@@ -35,6 +37,20 @@ const cutToCols = (text: string, room: number) => {
 // nameFit counts characters, so it gets the line in columns.
 const colFit = (line: string, room: number) => nameFit('x'.repeat(cols(line)), room);
 
+/* rendered by scripts/audio/render-pack-sounds.mjs from scripts/audio/packs/sue.mjs. final.m4a lands the giant stamp at 440 ms, with the page's print */
+const SUE_SOUNDS: PackSoundFiles = {
+  tap: () => new URL('../../assets/audio/packs/sue/tap.m4a', import.meta.url).href,
+  final: () => new URL('../../assets/audio/packs/sue/final.m4a', import.meta.url).href,
+  notify: () => new URL('../../assets/audio/packs/sue/notify.m4a', import.meta.url).href,
+  click: () => new URL('../../assets/audio/packs/sue/click.m4a', import.meta.url).href,
+};
+/* the loop points are printed by the render: one period apart, inside the part of the file that repeats */
+const SUE_MUSIC: PackMusic = {
+  url: () => new URL('../../assets/audio/packs/sue/music.m4a', import.meta.url).href,
+  loopStart: 9.572925,
+  loopEnd: 33.572925,
+};
+
 interface SueEveryonePackScreenProps {
   playerName: string;
   onBack: () => void;
@@ -47,7 +63,9 @@ export default function SueEveryonePackScreen({ playerName, onBack }: SueEveryon
   const flyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const finalTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const burstTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => { [flyTimer, finalTimer, burstTimer].forEach(timer => clearTimeout(timer.current)); }, []);
+  const restoreTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { play, soundOn, toggleSound, duckMusic, restoreMusic } = usePackSounds(SUE_SOUNDS, SUE_MUSIC);
+  useEffect(() => () => { [flyTimer, finalTimer, burstTimer, restoreTimer].forEach(timer => clearTimeout(timer.current)); }, []);
 
   const lift = () => {
     const now = Date.now();
@@ -59,13 +77,16 @@ export default function SueEveryonePackScreen({ playerName, onBack }: SueEveryon
   const stamp = (e: React.MouseEvent<HTMLElement>) => {
     const { step, settle } = latest.current;
     clearTimeout(flyTimer.current);
-    if (step >= 8) { if (Date.now() < finaleEnd.current) return; set({ settle: settle + 1, birdGo: lift() }); return; }
+    if (step >= 8) { if (Date.now() < finaleEnd.current) return; play('tap', { rate: 1.12 }); set({ settle: settle + 1, birdGo: lift() }); return; }
     const next = step + 1;
     if (next < 8) {
+      /* the stamp's blow is baked in at 156 ms, where it lands on the sheet */
+      play('tap', { rate: 1 + next * .016 });
       set({ step: next, flown: step, filled: step, newest: step - 1, birdGo: lift() });
       flyTimer.current = setTimeout(() => set({ flown: next, filled: next, newest: next - 1 }), 620);
     } else {
       finaleEnd.current = Date.now() + 1800;
+      play('final'); duckMusic(); clearTimeout(restoreTimer.current); restoreTimer.current = setTimeout(restoreMusic, 2000);
       // Short phones scroll: the giant print has to land on the sheet where the sheet is right now.
       const root = e.currentTarget.closest('.pk-sue-root');
       set({ step: 8, flown: 7, filled: 7, newest: 6, finale: true, birdGo: lift(), scrollY: root ? root.scrollTop : 0 });
@@ -74,6 +95,7 @@ export default function SueEveryonePackScreen({ playerName, onBack }: SueEveryon
   };
   const notify = () => {
     if (latest.current.notified || latest.current.burst) return;
+    play('notify');
     set({ burst: true, birdGo: lift() });
     burstTimer.current = setTimeout(() => set({ notified: true }), 170);
   };
@@ -313,7 +335,8 @@ export default function SueEveryonePackScreen({ playerName, onBack }: SueEveryon
         <div className="pk-sue-hot" aria-hidden="true"></div>
         <div className="pk-sue-col">
           <div className="pk-sue-top">
-            <button type="button" className="pk-sue-back" onClick={onBack}> <svg viewBox="0 0 15 12" aria-hidden="true"><path d="M6 1L1.2 6L6 11M1.6 6H14" fill="none" stroke="#c8102e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg> Back </button>
+            <button type="button" className="pk-sue-back" onClick={() => { play('click'); onBack(); }}> <svg viewBox="0 0 15 12" aria-hidden="true"><path d="M6 1L1.2 6L6 11M1.6 6H14" fill="none" stroke="#c8102e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg> Back </button>
+            <PackSoundToggle on={soundOn} onToggle={toggleSound} className={`pk-sue-snd ${soundOn ? '' : 'is-off'}`} />
             <div className="pk-sue-chip"> <svg viewBox="0 0 10 13" aria-hidden="true"><path d="M2 5.6V3.8a3 3 0 0 1 6 0v1.8" fill="none" stroke="#b50e29" strokeWidth="1.5"></path><rect x=".6" y="5.4" width="8.8" height="7" rx="1.4" fill="#b50e29"></rect></svg> Future update </div>
           </div>
           <button className="pk-sue-hero" type="button" data-reveal="1" aria-label={v.heroLabel} onClick={v.stamp} onPointerDown={v.press} onPointerUp={v.release} onPointerCancel={v.release} onPointerLeave={v.release}>

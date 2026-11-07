@@ -159,6 +159,13 @@
 .pk-folly-back svg{width:15px;height:15px;flex:none}
 .pk-folly-chip{display:flex;align-items:center;gap:8px;min-height:38px;padding:0 15px;border-radius:99px;background:rgba(36,20,11,.78);box-shadow:inset 0 0 0 1px rgba(214,133,84,.46);color:#efc4a1;font-size:10px;font-weight:800;letter-spacing:.24em;text-transform:uppercase;white-space:nowrap}
 .pk-folly-chip svg{width:11px;height:12px;flex:none}
+/* the sound switch: one icon, in the page's own look */
+.pk-folly-snd{display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:99px;background:rgba(12,17,15,.8);color:#efc4a1;box-shadow:inset 0 0 0 1px rgba(214,133,84,.46);cursor:pointer;transition:transform .12s ease}
+.pk-folly-snd:active{transform:scale(.92)}
+.pk-folly-snd.is-off{color:rgba(239,196,161,.42)}
+.pk-folly-snd svg{display:block;flex:none}
+/* with the sound switch, Back and the chip get closer on narrow phones */
+@media (max-width:374px){.pk-folly-top{gap:6px}.pk-folly-back{gap:6px;padding:0 12px 0 10px;letter-spacing:.14em}.pk-folly-chip{gap:6px;padding:0 10px;letter-spacing:.12em}}
 
 /* ---------- the clapperboard ---------- */
 .pk-folly-hero{position:relative;z-index:11;margin-top:calc(var(--u)*58);width:calc(var(--u)*322);height:calc(var(--u)*258);flex:none}
