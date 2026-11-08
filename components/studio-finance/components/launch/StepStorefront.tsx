@@ -1,3 +1,5 @@
+import { StreamingPlusChip } from '../../../streamingPlus/StreamingPlusParts';
+import { openStreamingPlusSheet } from '../../../../services/streamingPlusEvents';
 /* ==========================================================================
    4 · THE STOREFRONT DESIGNER
 
@@ -30,6 +32,8 @@ export function StepStorefront({ data, draft, patch, handlers, operations }: Ste
   const previewLock = preview ? data.capabilityLocks[`storefront:${preview.id}`] : undefined;
   /* #109: the Tech step a locked layout needs, so the way to unlock it opens that step */
   const previewTech = preview ? data.capabilityLockTech?.[`storefront:${preview.id}`] : undefined;
+  const previewPlus = Boolean(preview && data.capabilityLockPlus?.[`storefront:${preview.id}`]);
+  const openPlus = () => openStreamingPlusSheet({ source: 'launch-front-page', focus: 'brand', line: `${preview?.name || 'This front page'} is one of the Streaming+ Pack's 13 front pages.` });
   const applied = Boolean(preview && (operations ? data.offer.storefrontId : draft.storefrontId) === preview.id);
   const brand = useMemo(() => wizardBrand(data.company), [data.company]);
   const appTitles = useMemo(() => wizardTitles(data.storefrontTitles), [data.storefrontTitles]);
@@ -89,7 +93,7 @@ export function StepStorefront({ data, draft, patch, handlers, operations }: Ste
             <h2 id="st-preview-title">{preview.name}</h2>
           </div>
           <span className={`st-preview-state${previewLock ? ' is-research' : applied ? ' is-applied' : ''}`}>
-            {previewLock ? 'Preview · unlock in Tech' : applied ? 'Applied' : operations ? 'Unsaved preview' : 'Ready'}
+            {previewPlus ? 'Preview · Streaming+' : previewLock ? 'Preview · unlock in Tech' : applied ? 'Applied' : operations ? 'Unsaved preview' : 'Ready'}
           </span>
         </header>
 
@@ -104,7 +108,11 @@ export function StepStorefront({ data, draft, patch, handlers, operations }: Ste
               </li>
             ))}
           </ul>
-          {previewLock ? (
+          {previewPlus ? (
+            <button type="button" className="st-research-link" onClick={openPlus} aria-label="Part of the Streaming+ Pack">
+              <StreamingPlusChip /><i aria-hidden="true">›</i>
+            </button>
+          ) : previewLock ? (
             <button type="button" className="st-research-link" onClick={() => handlers.onOpenTechnology?.(previewTech?.techId)} aria-label={previewLock}>
               <TechLockMark tech={previewTech?.tech} /><i aria-hidden="true">›</i>
             </button>
@@ -141,7 +149,9 @@ export function StepStorefront({ data, draft, patch, handlers, operations }: Ste
                         "Product Experience 24" is noise, and the requirement is
                         named once on the preview panel above. The tile only has
                         to say the option is not available yet. */}
-                    {lock
+                    {data.capabilityLockPlus?.[`storefront:${option.id}`]
+                      ? <StreamingPlusChip />
+                      : lock
                       ? <TechLockMark tech={data.capabilityLockTech?.[`storefront:${option.id}`]?.tech} compact />
                       : <em>{isApplied ? 'Applied' : 'Base layout'}</em>}
                   </span>
@@ -158,7 +168,11 @@ export function StepStorefront({ data, draft, patch, handlers, operations }: Ste
           confirm a choice they had already made — and until they did, the stage
           reported that no storefront had been selected. What a locked layout
           still needs is the way to unlock it. */}
-      {previewLock ? (
+      {previewPlus ? (
+        <button type="button" className="sf-btn sf-btn--research" onClick={openPlus}>
+          Use {preview.name} with Streaming+ ›
+        </button>
+      ) : previewLock ? (
         <button type="button" className="sf-btn sf-btn--research" onClick={() => handlers.onOpenTechnology?.(previewTech?.techId)}>
           Unlock {preview.name}{previewTech ? `: ${previewTech.tech}` : ''} ›
         </button>

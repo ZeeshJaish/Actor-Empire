@@ -1,3 +1,4 @@
+import { streamingPlusLocks } from './streamingPlusPack';
 /**
  * #173 (plan §21.17): the Boardroom's MARKETS, read from the public markets' own state.
  *
@@ -60,6 +61,8 @@ export interface StreamingListingDeskView {
     ready: boolean;
     /** a listing already under way: the bell resumes it, for no energy */
     resume: boolean;
+    /** Streaming+: listing is the pack's; the road is shown whole, the bell opens the pack's sheet */
+    streamingPlus: boolean;
     bellEnergy: number;
     valuation: number;
     ticker: string;
@@ -138,6 +141,7 @@ export const getStreamingListingDesk = (player: Player): StreamingListingDeskVie
         cleared: gates.filter(gate => gate.passed).length,
         ready: markets.canStartRoadshow || platform.publicCompany.ipoJourney?.status === 'ACTIVE',
         resume: platform.publicCompany.ipoJourney?.status === 'ACTIVE',
+        streamingPlus: platform.publicCompany.ipoJourney?.status !== 'ACTIVE' && streamingPlusLocks(player, { kind: 'IPO' }),
         bellEnergy: STREAMING_IPO_BELL_ENERGY,
         valuation: markets.valuation,
         /* a listing under way shows the ticker chosen in it */

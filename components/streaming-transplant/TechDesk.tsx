@@ -21,6 +21,8 @@ import { cx } from './presentation/cx';
 import { AdsWorld, AppsWorld, FamilyWorld, OptimisationWorld, PlaybackWorld, SharingWorld, SmartAiWorld, TrustWorld } from './TechScenes';
 import type { StreamingTechGroupId, StreamingTechId } from '../../types';
 import { streamingTechUnlocks } from '../../services/streamingLaunchUnlocks';
+import { StreamingPlusChip } from '../streamingPlus/StreamingPlusParts';
+import { openStreamingPlusSheet } from '../../services/streamingPlusEvents';
 import type {
   StreamingTechDeskFeature,
   StreamingTechDeskGroup,
@@ -960,7 +962,7 @@ const StepAction: React.FC<{
   if (step.state === 'LOCKED') {
     return (
       <div className={t.action}>
-        <p className={t.actionTitle}><b>{step.name}</b>{step.futuristic && <i className={t.future}>✦ FUTURE</i>}</p>
+        <p className={t.actionTitle}><b>{step.name}</b>{step.futuristic && <i className={t.future}>✦ FUTURE</i>}{step.streamingPlus && <StreamingPlusChip />}</p>
         <p className={t.actionLine}>{step.detail}.</p>
         {unlocksLine && <p className={t.actionLine}>{unlocksLine}.</p>}
         <p className={t.needs}>Needs {step.needs.join(' and ')} first.</p>
@@ -972,7 +974,7 @@ const StepAction: React.FC<{
   if (step.state === 'OPEN') {
     return (
       <div className={t.action}>
-        <p className={t.actionTitle}><b>Unlock {step.name}</b>{step.futuristic && <i className={t.future}>✦ FUTURE</i>}</p>
+        <p className={t.actionTitle}><b>Unlock {step.name}</b>{step.futuristic && <i className={t.future}>✦ FUTURE</i>}{step.streamingPlus && <StreamingPlusChip />}</p>
         <p className={t.actionLine}>{step.detail}.</p>
         <ul className={t.facts}>
           <li>Arrives at version 1 · {step.versionNames[0]}</li>
@@ -981,11 +983,19 @@ const StepAction: React.FC<{
           {unlocksLine && <li className={t.feeds}>{unlocksLine}</li>}
           <EffectFacts step={step} deliveryCost={deliveryCost} />
         </ul>
+        {step.streamingPlus ? (
+          <button type="button" className={t.primary}
+            onClick={() => openStreamingPlusSheet({ source: 'tech-step', focus: 'tech', line: `${step.name} is one of the Streaming+ Pack's 10 future Tech steps.` })}>
+            <span>Unlock {step.name} with Streaming+</span>
+            <small>With the pack it costs {money(step.unlockCost)} once from the treasury</small>
+          </button>
+        ) : (
         <button type="button" className={cx(t.primary, unlocking && t.busy)} disabled={!founded || !step.affordable || unlocking}
           onClick={() => onUnlock(step)}>
           <span>{unlocking ? `Unlocking ${step.name}…` : !founded ? 'Found your platform first' : step.affordable ? `Unlock ${step.name}` : `Needs ${money(step.unlockCost)} in the treasury`}</span>
           <small>{money(step.unlockCost)} once from the treasury</small>
         </button>
+        )}
       </div>
     );
   }
@@ -1112,7 +1122,7 @@ const Ladder: React.FC<{
     const sub = step.state === 'OWNED'
       ? `${step.versionNames[version - 1]} · version ${version} of 3`
       : step.state === 'OPEN'
-        ? `${money(step.unlockCost)} · ${money(step.weeklyUpkeep)} a week`
+        ? step.streamingPlus ? `Streaming+ · ${money(step.unlockCost)}` : `${money(step.unlockCost)} · ${money(step.weeklyUpkeep)} a week`
         : `Needs ${step.needs.join(' and ')}`;
     return (
       <li key={step.id}>
@@ -1128,7 +1138,7 @@ const Ladder: React.FC<{
           </span>
           {step.state === 'OWNED'
             ? <span className={t.pips} aria-hidden="true">{[1, 2, 3].map(pip => <i key={pip} className={pip <= version ? t.pipOn : ''} />)}</span>
-            : step.state === 'OPEN' ? <span className={t.openTag}>UNLOCK</span> : null}
+            : step.streamingPlus ? <StreamingPlusChip /> : step.state === 'OPEN' ? <span className={t.openTag}>UNLOCK</span> : null}
         </button>
       </li>
     );

@@ -1,3 +1,4 @@
+import { StreamingPlusLaterLine } from '../streamingPlus/StreamingPlusParts';
 /**
  * The Platform room's PRODUCT tab (#126; plan §19.13): what the service will launch beyond its shows, every product
  * coming in a future update, each a card like a video's — a thumbnail playing a few seconds of the product, its name
@@ -135,6 +136,7 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({ yours, onPause
         <span>{PRODUCT_SHOWCASE.length} ON THE WAY</span>
       </div>
       <p className={css.sub}>What your service will launch beyond its shows. Every one is coming in a future update.</p>
+      <StreamingPlusLaterLine what="they" className={css.sub} />
 
       {yours.length > 0 && (
         <section className={css.yours}>

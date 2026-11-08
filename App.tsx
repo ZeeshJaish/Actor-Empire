@@ -44,6 +44,12 @@ import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Brie
 import { useGameActions } from './hooks/useGameActions';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
 import { showAd, initAds } from './services/adLogic';
+import { careerStartFlag, forcedAdCareerWeek, isForcedAdTrouble, noteAdClosed, noteForcedAdWeekPassed, noteRealPurchase, setForcedAdContext, showForcedAd } from './services/forcedAds';
+import { rewardedCashAmount } from './services/rewardedCash';
+import { announceStreamingPlusUnlocked, setStreamingPlusOwnedNow } from './services/streamingPlusEvents';
+import { hasStreamingPlus } from './services/streamingPlusPack';
+import StreamingPlusHost from './components/streamingPlus/StreamingPlusHost';
+import { formatMoney } from './services/formatUtils';
 import {
   beginPendingRewardAd,
   clearPendingRewardAd,
@@ -56,8 +62,8 @@ import { ensureTrackingPermission } from './services/trackingService';
 import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { getStreamingEstate, handoffOwnedStreamingPlatformToHeir, type StreamingHandoffChoice } from './services/streamingLegacy';
-import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
-import { purchasePremiumProduct, restorePremiumPurchases, startIOSPurchaseUpdatesListener, type IOSPurchaseUpdate } from './services/iapService';
+import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, hasPremiumProduct, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
+import { finishAndroidConsumable, isAndroidStore, purchasePremiumProduct, restorePremiumPurchases, startIOSPurchaseUpdatesListener, type IOSPurchaseUpdate } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
 import { applyParenthoodAbandonment, getPregnancyFeedbackCopy } from './services/familyLogic';
@@ -993,6 +999,9 @@ export const App: React.FC = () => {
       if (isNonConsumablePremiumProduct(update.premiumProductId)) {
           void syncPermanentPremiumEntitlementsToSavedSlots([update.premiumProductId]);
       }
+      /* Ask to Buy approved later, or a purchase finished while the app was away */
+      if (update.premiumProductId === 'streaming_plus') announceStreamingPlusUnlocked();
+      noteRealPurchase();
     };
   }, [handleGenericUpdate, language]);
 
@@ -2027,6 +2036,23 @@ export const App: React.FC = () => {
     }
   };
 
+  // Screens far from the player read whether the pack is owned.
+  useEffect(() => { setStreamingPlusOwnedNow(hasStreamingPlus(player)); }, [player]);
+
+  // Forced ads read the live state: No Ads, a new career, an open popup, debt or a crisis, the Store.
+  useEffect(() => {
+      setForcedAdContext({
+          noAds: gameStatus !== 'PLAYING' || hasNoAds(player),
+          careerWeek: forcedAdCareerWeek(player),
+          decisionOpen: Boolean(
+              player.pendingEvents?.length || player.pendingEvent || showDebtModal || pendingMedicalPrompt
+              || pendingBabyNaming || activeSocialEvent || activePressEvent || showProtectionPrompt,
+          ),
+          inTrouble: isForcedAdTrouble(player),
+          storeOpen: activePage === Page.STORE,
+      });
+  }, [gameStatus, player, showDebtModal, pendingMedicalPrompt, pendingBabyNaming, activeSocialEvent, activePressEvent, showProtectionPrompt, activePage]);
+
   const handleNextWeek = async () => {
     const now = Date.now();
     if (weekProcessingLockRef.current || isProcessing) {
@@ -2269,11 +2295,15 @@ export const App: React.FC = () => {
             setShowDebtModal(true);
         }
 
-        // INTERSTITIAL AD TRIGGER (Every 12 Weeks)
+        // The week's break (every 12th week): the week is saved; the ad, if loaded and allowed,
+        // shows while "Processing week" is still up, so it lands before the new week's screen and popups.
+        noteForcedAdWeekPassed();
         if (triggerAd && !hasNoAds(syncedPlayerState)) {
-            setTimeout(async () => {
-                await showAd('INTERSTITIAL');
-            }, 800);
+            await showForcedAd('WEEK', {
+                noAds: false,
+                careerWeek: forcedAdCareerWeek(syncedPlayerState),
+                inTrouble: isForcedAdTrouble(syncedPlayerState),
+            });
         }
         addBreadcrumb('process_week:success', {
             age: syncedPlayerState.age,
@@ -2499,6 +2529,8 @@ export const App: React.FC = () => {
       } finally {
           // CRITICAL FIX: This ensures the overlay ALWAYS closes, even if code crashes or hangs
           setIsShowingAd(false);
+          // a rewarded ad restarts the forced ads' minutes, so none lands right after it
+          noteAdClosed();
       }
 
       if (successCount === steps) {
@@ -2534,8 +2566,10 @@ export const App: React.FC = () => {
           }
 
           if (type === 'REWARDED_CASH') {
-              p.money += 5000;
-              toastSub = tr('app.rewards.cashSubtext');
+              // grows with the player: 0.1% of net worth, $5,000 to $250,000, personal wallet only
+              const cash = rewardedCashAmount(p);
+              p.money += cash;
+              toastSub = `+${formatMoney(cash)}`;
           }
           else if (type === 'REWARDED_BAILOUT') {
               const bailoutAdsUsedThisWeek = p.flags?.bailoutAdsUsedThisWeek || 0;
@@ -2624,21 +2658,33 @@ export const App: React.FC = () => {
       const result = await purchasePremiumProduct(productId);
       if (!result.success) {
           setToastMessage({
-              title: result.cancelled ? tr('app.purchases.cancelledTitle') : tr('app.purchases.failedTitle'),
+              title: result.cancelled
+                  ? tr('app.purchases.cancelledTitle')
+                  : result.pending ? tr('app.purchases.pendingTitle') : tr('app.purchases.failedTitle'),
               subtext: result.message
           });
           return;
       }
 
+      noteRealPurchase();
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
-          if (hasProcessedStoreTransaction(p, result.transactionId)) {
-              setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: result.message });
-              return p;
-          }
-          markProcessedStoreTransaction(p, result.transactionId);
-          const message = applyPremiumPurchase(p, productId, getPlayerLanguage(p));
+          const alreadyGranted = hasProcessedStoreTransaction(p, result.transactionId);
+          if (!alreadyGranted) markProcessedStoreTransaction(p, result.transactionId);
+          const message = alreadyGranted ? result.message : applyPremiumPurchase(p, productId, getPlayerLanguage(p));
           setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
+          /* Android consumable: saved first, then finished with Play, so an interrupted app loses nothing */
+          if (result.purchaseToken) {
+              const token = result.purchaseToken;
+              const saving = currentSlot ? persistSlotSave(currentSlot, p, { rethrow: true }) : Promise.resolve(p);
+              void saving
+                  .then(savedPlayer => {
+                      if (currentSlot) setSaveSlots(previous => ({ ...previous, [currentSlot]: savedPlayer }));
+                      return finishAndroidConsumable(token);
+                  })
+                  .catch(error => recordNonFatal(error, 'premium_consumable_persist_failed', { product_id: productId }));
+          }
+          if (productId === 'streaming_plus' && !alreadyGranted) announceStreamingPlusUnlocked();
           return p;
       });
 
@@ -2775,31 +2821,72 @@ export const App: React.FC = () => {
 
 	  const handleRestorePurchases = async () => {
       const result = await restorePremiumPurchases();
+      applyRestoredPurchases(result, false);
+  };
+
+  /* quiet: the Android launch check, which only speaks when it delivered something */
+  const applyRestoredPurchases = (result: Awaited<ReturnType<typeof restorePremiumPurchases>>, quiet: boolean) => {
       if (!result.success) {
-          setToastMessage({ title: tr('app.purchases.restoreFailedTitle'), subtext: result.message });
+          if (!quiet) setToastMessage({ title: tr('app.purchases.restoreFailedTitle'), subtext: result.message });
           return;
       }
 
       const restoredPermanentProductIds = uniquePermanentPremiumIds(result.restoredProductIds);
-      if (restoredPermanentProductIds.length === 0) {
-          setToastMessage({ title: tr('app.purchases.nothingToRestoreTitle'), subtext: result.message });
+      const unclaimed = result.unclaimedConsumables || [];
+      if (restoredPermanentProductIds.length === 0 && unclaimed.length === 0) {
+          if (!quiet) setToastMessage({ title: tr('app.purchases.nothingToRestoreTitle'), subtext: result.message });
           return;
       }
+      const newPermanent = restoredPermanentProductIds.filter(productId => !hasPremiumProduct(player, productId));
       const entitlementProductIds = rememberPremiumEntitlements(restoredPermanentProductIds);
+      const hadStreamingPlus = hasPremiumProduct(player, 'streaming_plus');
 
       handleGenericUpdate(prev => {
           const p = JSON.parse(JSON.stringify(prev)) as Player;
           entitlementProductIds.forEach(productId => {
               applyPremiumPurchase(p, productId, getPlayerLanguage(p));
           });
-          setToastMessage({
+          /* paid items the game never received: delivered once (by their order id), saved, then finished with Play */
+          let delivered = 0;
+          unclaimed.forEach(item => {
+              if (hasProcessedStoreTransaction(p, item.transactionId)) return;
+              markProcessedStoreTransaction(p, item.transactionId);
+              applyPremiumPurchase(p, item.productId, getPlayerLanguage(p));
+              delivered += 1;
+          });
+          if (unclaimed.length) {
+              const saving = currentSlot ? persistSlotSave(currentSlot, p, { rethrow: true }) : Promise.resolve(p);
+              void saving
+                  .then(savedPlayer => {
+                      if (currentSlot) setSaveSlots(previous => ({ ...previous, [currentSlot]: savedPlayer }));
+                      return Promise.all(unclaimed.map(item => finishAndroidConsumable(item.purchaseToken)));
+                  })
+                  .catch(error => recordNonFatal(error, 'premium_recovery_persist_failed'));
+          }
+          if (!quiet || delivered > 0 || newPermanent.length > 0) setToastMessage({
               title: tr('app.purchases.restoredTitle'),
-              subtext: tr('app.purchases.restoredSubtext', { count: restoredPermanentProductIds.length.toString() })
+              subtext: restoredPermanentProductIds.length
+                  ? tr('app.purchases.restoredSubtext', { count: restoredPermanentProductIds.length.toString() })
+                  : tr('app.purchases.recoveredSubtext', { count: String(delivered) }),
           });
           return p;
       });
-      void syncPermanentPremiumEntitlementsToSavedSlots(entitlementProductIds);
+      if (!hadStreamingPlus && entitlementProductIds.includes('streaming_plus')) announceStreamingPlusUnlocked();
+      if (entitlementProductIds.length) void syncPermanentPremiumEntitlementsToSavedSlots(entitlementProductIds);
   };
+
+  // Play: purchases are checked again at launch, so a paid item interrupted mid-purchase still arrives.
+  const androidPurchaseCheckDoneRef = useRef(false);
+  useEffect(() => {
+      if (gameStatus !== 'PLAYING' || !currentSlot || androidPurchaseCheckDoneRef.current || !isAndroidStore()) return;
+      const timer = window.setTimeout(() => {
+          androidPurchaseCheckDoneRef.current = true;
+          void restorePremiumPurchases()
+              .then(result => applyRestoredPurchases(result, true))
+              .catch(error => recordNonFatal(error, 'android_purchase_launch_check_failed'));
+      }, 4000);
+      return () => window.clearTimeout(timer);
+  }, [gameStatus, currentSlot]);
 
   // --- HANDLERS ---
   const handleStartGame = (name: string, age: number, gender: any, avatar: string, handle: string, slotOverride?: number) => {
@@ -2815,6 +2902,7 @@ export const App: React.FC = () => {
           avatar,
 	          flags: {
 	              ...(INITIAL_PLAYER.flags || {}),
+	              ...careerStartFlag(age, INITIAL_PLAYER.currentWeek || 1),
 	              newPlayerTutorial: buildAvailableNewPlayerTutorialState(),
 	          },
 	          logs: INITIAL_PLAYER.logs.map(log => ({ ...log, year: age })),
@@ -3335,6 +3423,12 @@ export const App: React.FC = () => {
           </div>
       )}
 
+	      {/* Streaming+ Pack: the one sheet every chip opens, and the moment after buying */}
+	      <StreamingPlusHost
+	          owned={hasStreamingPlus(player)}
+	          onBuy={() => handlePremiumPurchase('streaming_plus')}
+	          onRestore={handleRestorePurchases}
+	      />
 	      {toastMessage && (
 	          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
 	              <div className="bg-emerald-500 rounded-full p-1"><CheckCircle size={20} className="text-black" strokeWidth={3}/></div>

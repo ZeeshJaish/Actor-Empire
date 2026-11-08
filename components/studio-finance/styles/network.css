@@ -1457,3 +1457,14 @@
 .sf .bw-room-repairs > div { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 1px solid var(--sf-line); }
 .sf .bw-room-repairs > div > span { flex: 1 1 180px; }
 .sf .bw-room-repairs button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--sf-line); border-radius: var(--sf-r-chip); background: var(--sf-raised); color: var(--sf-fg-max); }
+
+/* Streaming+ (2026-11-08): the 30 pack cities, gold with a halo, until the pack is owned */
+.sf .bw-atlas-pin.is-plus .bw-atlas-pin-dot { fill: #f8c020; }
+.sf .bw-atlas-pin-plus { fill: none; stroke: rgba(248, 192, 32, .55); stroke-width: 1.1; stroke-dasharray: 2 2; pointer-events: none; }
+.sf .bw-rg-plus-note { display: flex; align-items: center; gap: 8px; margin: 8px 2px 0; font-size: 11px; font-weight: 650; line-height: 1.35; color: rgba(249, 246, 239, .62); }
+.sf .bw-rg-plus-note > span:nth-child(2) { flex: 1; min-width: 0; }
+.sf .bw-rg-plus-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #f8c020; box-shadow: 0 0 0 3px rgba(248, 192, 32, .2); }
+.sf .bw-net-duty.is-plus { background-image: linear-gradient(135deg, rgba(248, 168, 16, .09), transparent 60%); box-shadow: inset 0 0 0 1px rgba(248, 168, 16, .32); }
+.sf .bw-net-duty.is-plus b { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.sf .bw-rg-prov-btn.is-plus { background-image: linear-gradient(135deg, rgba(248, 168, 16, .1), transparent 62%); box-shadow: inset 0 0 0 1px rgba(248, 168, 16, .36); }
+.sf .bw-rg-prov-plus { display: flex; margin: 2px 0 1px; }

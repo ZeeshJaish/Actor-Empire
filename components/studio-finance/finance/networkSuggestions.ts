@@ -3,7 +3,7 @@ import {
   assertCanonicalBuildData, buildTotals, CLOUD_PROVIDERS, CLOUD_PROVIDER_IDS, cloudProviderServes, countryServiceCoverageValid,
   fitsPlan, moneyPlan, serviceForecast, tiersOf,
 } from './build';
-import { emptySetup, openingRegions, placeRegion, type RegionSetup } from './placer';
+import { emptySetup, openingRegions, placeRegion, type RegionSetup, packLockedProvider, packLockedTier } from './placer';
 import { STREAMING_SERVED_COVERAGE_SHARE } from '../../../services/streamingNetworkCoverage';
 import type { StreamingNetworkQuote } from '../../../services/streamingNetworkQuote';
 
@@ -217,6 +217,8 @@ export async function createNetworkSuggestion(data: BuildData, draft: BuildDraft
           setup.servers.WORKHORSE = Math.ceil(size / 2);
           setup.servers.TITAN = Math.ceil(size / 4);
         }
+        /* Streaming+: Suggest never proposes a Titan or Meridian Edge without the pack (its cities are skipped by the placer) */
+        if ((setup.servers.TITAN > 0 && packLockedTier(scoped, 'TITAN')) || packLockedProvider(scoped, setup.cloud.provider)) { evaluated += 1; continue; }
         const placement = placeRegion(scoped, { ...draft, facilities: [], rehearsal: null }, region.id, setup);
         const usedIds = new Set(others.map(room => room.id));
         const rooms = placement.draft.facilities.map((room, index) => {

@@ -40,6 +40,7 @@ import { getCanonicalScheduledRivals } from '../../../services/industryWorld/pub
 import { getForbesStreamingCompanies } from '../../../services/streamingPlatformEcosystem';
 import { buildReleaseStreamingBidderMarket } from '../../../services/releaseStreamingAuction';
 import { getReleaseWizardEntryStep } from '../../../services/releasePlanningCommitment';
+import { runTaskAd } from '../../../services/forcedAds';
 import {
     CalendarStep,
     CampaignStep,
@@ -1630,7 +1631,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         spendPlayerEnergy(lockedPlayer, releaseStrategyEnergyCost, `Release strategy: ${project.name}`);
         releaseDraftClearedRef.current = true;
         onUpdatePlayer(lockedPlayer);
-        onComplete();
+        // the release is saved; the break (if loaded and allowed) comes before the wizard hands back
+        void runTaskAd('RELEASE').finally(() => onComplete());
     };
 
     const nextStep = () => setStep(step + 1);

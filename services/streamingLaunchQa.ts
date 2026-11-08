@@ -1,3 +1,4 @@
+import { grantStreamingPlusForTesting } from './streamingPlusPack';
 /** Explicit developer-menu actions. Never called by normal streaming progression. */
 import type {IndustryProject, OwnedStreamingCatalogLicense, OwnedStreamingLaunchRehearsalSnapshot, Player} from '../types';
 import {getAbsoluteWeek} from './legacyLogic';
@@ -26,7 +27,7 @@ export function prepareStreamingCommissionQa(source:Player):Player {
  if(source.ownedStreamingPlatform.launchCommit || source.ownedStreamingPlatform.infrastructureSetup)
   throw Error('This company is already commissioned. Use Fast-forward commissioned build, or use a pre-launch test save.');
  // Work on a detached candidate. A failed gate never leaks half-prepared state.
- let player=structuredClone(source);
+ let player=grantStreamingPlusForTesting(structuredClone(source));
  let platform=normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform,player.id);
  const week=getAbsoluteWeek(player.age,player.currentWeek);
  if(!platform.identity || !platform.foundingProfile) {

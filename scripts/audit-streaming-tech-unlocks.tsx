@@ -24,9 +24,9 @@ assert.deepEqual(Object.fromEntries(Object.entries(STREAMING_LAUNCH_UNLOCKS).map
     'storefront:marquee': 'APPS_TV', 'storefront:split-hero': 'APPS_TV', 'storefront:mosaic': 'AI_ARTWORK',
     'storefront:vertical-feed': 'APPS_PHONE', 'storefront:freeform-canvas': 'APPS_HOLO',
     'ident:genre': 'AI_BECAUSE', 'ident:adaptive': 'AI_ARTWORK', 'ident:living': 'AI_TASTE',
-    /* #122: the new front pages that need a step */
-    'storefront:coverflow': 'APPS_TV', 'storefront:bento': 'AI_ARTWORK', 'storefront:orbit': 'APPS_HOLO', 'storefront:the-deck': 'APPS_PHONE',
-}, 'The approved map (plan §18.5, and #122\'s four)');
+    /* #122: the new front pages that need a step; Coverflow, Bento and The Deck are the Streaming+ Pack's alone (2026-11-08) */
+    'storefront:orbit': 'APPS_HOLO',
+}, 'The approved map (plan §18.5, #122, and the Streaming+ Pack)');
 assert.deepEqual(['APPS_TV', 'AI_ARTWORK', 'APPS_HOLO', 'AI_BECAUSE', 'AI_TASTE'].map(id => getStreamingTechDefinition(id as 'APPS_TV')?.unlockCost),
     [12_000_000, 25_000_000, 250_000_000, 8_000_000, 150_000_000], 'Tech prices unchanged');
 assert.ok(!JSON.stringify(STREAMING_STOREFRONT_LAYOUTS).includes('requirements'), 'No front page carries a Product Experience level');
@@ -46,8 +46,8 @@ assert.equal(getStreamingStorefrontLock({ techTree: fresh }, 'freeform-canvas')?
 console.log('PASS locks: a new service is told "Unlock Smart TV apps in Tech"; Vertical Feed is open; with the step, the page opens');
 
 /* ── steps list what they unlock ── */
-assert.deepEqual(streamingTechUnlocks('APPS_TV'), ['the Marquee front page', 'the Split Hero front page', 'the Coverflow front page']);
-assert.deepEqual(streamingTechUnlocks('AI_ARTWORK'), ['the Mosaic front page', 'the Bento front page', 'the Adaptive ident']);
+assert.deepEqual(streamingTechUnlocks('APPS_TV'), ['the Marquee front page', 'the Split Hero front page']);
+assert.deepEqual(streamingTechUnlocks('AI_ARTWORK'), ['the Mosaic front page', 'the Adaptive ident']);
 assert.deepEqual(streamingTechUnlocks('APPS_HOLO'), ['the Freeform Canvas front page', 'the Orbit front page'], '#122: VR and holo screens open Orbit too');
 assert.deepEqual(streamingTechUnlocks('PICTURE_4K'), [], 'A step that unlocks none says nothing');
 const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -57,7 +57,7 @@ assert.ok(desk.includes('const unlocks = streamingTechUnlocks(step.id);') && des
 // #116: the front pages moved from the Offer tab to the brand studio, which names and opens the step
 const studio = source('components/streaming-transplant/StreamingBrandStudio.tsx');
 /* #120 put the lock under a padlock with its step in amber (the tile's line is the step's name; aloud "locked: unlock … in Tech") */
-assert.ok(studio.includes("`, locked: unlock ${item.locked} in Tech`") && studio.includes('{item.locked ? item.locked :') && studio.includes('onGoToTech(layoutDef.lockTech!)'),
+assert.ok(studio.includes("`, locked: unlock ${item.locked} in Tech`") && studio.includes('item.locked ? item.locked :') && studio.includes('onGoToTech(layoutDef.lockTech!)'),
     'The brand studio\'s locked front pages name and open their step');
 console.log('PASS steps: Smart TV apps unlocks Marquee and Split Hero, Personal artwork Mosaic and the Adaptive ident; the Tech tab and the brand studio say so');
 

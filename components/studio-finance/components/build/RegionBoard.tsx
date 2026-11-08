@@ -22,9 +22,11 @@ import {
   cloudWeeklyCost, computeRacks, facilityRacks, listingFor, rackBuildCost, tierCapacity, tiersOf,
 } from '../../finance/build';
 import {
-  canAddServer, cloudCeilingOf, coverWithCloud, emptySetup, facilitiesIn, openingRegions, placeRegion, regionReport,
+  canAddServer, cloudCeilingOf, coverWithCloud, emptySetup, facilitiesIn, openingRegions, packLockedProvider, packLockedTier, placeRegion, regionReport,
   regionsOf, regionalCloudMaximum, serverCeilingOf, whatIfsFor, type RegionReport, type RegionSetup, type WhatIf,
 } from '../../finance/placer';
+import { StreamingPlusChip, StreamingPlusChipButton } from '../../../streamingPlus/StreamingPlusParts';
+import { openStreamingPlusSheet } from '../../../../services/streamingPlusEvents';
 import { compactCount, money, pct } from '../../finance/format';
 import type { StageProps } from './BuildWizard';
 import { NetworkMapBox } from './NetworkMapBox';
@@ -132,6 +134,13 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver,
         onShowRegion={showRegion}
         live={live}
       />
+      {data.streamingPlus && !data.streamingPlus.owned && (
+        <p className="bw-rg-plus-note">
+          <span className="bw-rg-plus-dot" aria-hidden="true" />
+          <span>Gold pins are the 30 Streaming+ cities. New rooms go to the other 164.</span>
+          <StreamingPlusChipButton request={{ source: 'network-cities', focus: 'cities', line: 'New York, Frankfurt, Shanghai, São Paulo and 26 more cities are part of the Streaming+ Pack.' }} />
+        </p>
+      )}
       {!live && <button type="button" className="bw-suggest-entry" onClick={() => setSuggesting(true)}><span><b>Suggest network</b><small>Find a setup for your budget</small></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></button>}
       {!live && suggesting && <NetworkSuggestionSheet data={data} draft={draft} onApply={patch} onClose={() => setSuggesting(false)} />}
       {live ? (
@@ -449,16 +458,22 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                 const count = setup.servers[tier];
                 const addable = servers < serverCeiling && canAddServer(data, draft, region.id, tier);
                 const delta = standing ? count - standing.servers[tier] : 0;
+                /* Streaming+: the Titan stays on show; its + opens the pack's sheet */
+                const tierPlus = packLockedTier(data, tier);
                 return (
-                  <li key={tier} className={count > 0 ? `bw-net-duty is-on is-${tier.toLowerCase()}` : `bw-net-duty is-${tier.toLowerCase()}`}>
+                  <li key={tier} className={`${count > 0 ? `bw-net-duty is-on is-${tier.toLowerCase()}` : `bw-net-duty is-${tier.toLowerCase()}`}${tierPlus ? ' is-plus' : ''}`}>
                     <ServerMark tier={tier} />
-                    <b>{spec.name}</b>
+                    <b>{spec.name}{tierPlus && <> <StreamingPlusChip compact /></>}</b>
                     <s className="bw-rg-tier-reach">{compactCount(tierCapacity(tier, 1))}<small>viewers per rack</small></s>
                     <span className="bw-rg-tier-coverage">{SERVER_COVERAGE[tier]} coverage</span>
                     <span className="bw-net-duty-set">
                       <button type="button" disabled={locked || count === 0} onClick={() => setTier(tier, count - 1)} aria-label={`One fewer ${spec.name} in ${region.name}`}>−</button>
                       <b key={count} aria-live="polite">{count}</b>
-                      <button type="button" disabled={locked || !addable} onClick={() => setTier(tier, count + 1)} aria-label={`One more ${spec.name} in ${region.name}`}>+</button>
+                      <button type="button" disabled={locked || (!tierPlus && !addable)}
+                        onClick={() => (tierPlus
+                          ? openStreamingPlusSheet({ source: 'network-titan', focus: 'servers', line: `The ${spec.name} server is part of the Streaming+ Pack.` })
+                          : setTier(tier, count + 1))}
+                        aria-label={tierPlus ? `${spec.name} is part of the Streaming+ Pack` : `One more ${spec.name} in ${region.name}`}>+</button>
                     </span>
                     <s className="bw-net-duty-price">{standing && count < standing.servers[tier] ? `sells at ${resale}%` : `${money(rackBuildCost(tier))} each`}</s>
                     {standing ? (
@@ -490,18 +505,23 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               {CLOUD_PROVIDER_IDS.map(id => {
                 const candidate = CLOUD_PROVIDERS[id];
                 const here = cloudProviderServes(candidate, region.id);
+                /* Streaming+: Meridian Edge stays on show as a gold card; picking it opens the pack's sheet */
+                const providerPlus = packLockedProvider(data, id) && id !== providerId;
                 return (
                   <button
                     key={id}
                     type="button"
-                    className={id === providerId ? `bw-rg-prov-btn is-on is-${id.toLowerCase()}` : `bw-rg-prov-btn is-${id.toLowerCase()}`}
+                    className={`${id === providerId ? `bw-rg-prov-btn is-on is-${id.toLowerCase()}` : `bw-rg-prov-btn is-${id.toLowerCase()}`}${providerPlus ? ' is-plus' : ''}`}
                     data-cloud-provider-card={id}
                     disabled={locked || !here}
                     aria-pressed={id === providerId}
-                    onClick={() => pickProvider(id)}
+                    onClick={() => (providerPlus
+                      ? openStreamingPlusSheet({ source: 'network-meridian', focus: 'servers', line: `${candidate.name} cloud is part of the Streaming+ Pack.` })
+                      : pickProvider(id))}
                   >
                     <span className="bw-rg-prov-crest"><CloudMark provider={id} /><em>{CLOUD_POSITION[id]}</em></span>
                     <b>{candidate.name}</b>
+                    {providerPlus && <span className="bw-rg-prov-plus"><StreamingPlusChip compact /></span>}
                     <strong>{here ? `${candidate.reach.toFixed(1)}×` : '—'}<small>reach</small></strong>
                     <span className="bw-rg-prov-ceiling">{here ? `${cloudCeilingOf(data, region, id)} plan ceiling` : 'No plan'}</span>
                     <span className="bw-rg-prov-rate">{here ? `${money(Math.round(CLOUD_WEEKLY_PER_RACK * candidate.rate))}/wk` : 'Not sold here'}</span>

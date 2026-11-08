@@ -28,6 +28,7 @@ import {
 } from '../../services/rightsRoom';
 import { OriginalPoster } from '../originals/OriginalsDesk';
 import { StreamingWarRoomStep } from '../../views/lifestyle/business/release-strategy-transplant/StreamingWarRoomStep';
+import { runTaskAd } from '../../services/forcedAds';
 
 const GOLD = '#e7b64a';
 const MOST_IN_A_PACKAGE = 12;
@@ -347,7 +348,8 @@ export default function RightsRoom({ player, studioId, onUpdatePlayer, onClose, 
         setPicked([]);
         setStack([{ name: 'ROOM' }]);
         setNote('');
-        showMoment({ stamp: 'SOLD', title: `${signed.titles} titles`, amount: signed.total, line: `${offer.platformName} · ${offer.exclusivity === 'EXCLUSIVE' ? 'exclusive' : 'shared'} · ${offer.durationWeeks} weeks`, color: resolveStreamingPlatformBrandById(offer.platformId, offer.platformName).primaryColor });
+        // the sale is saved; the break (if loaded and allowed) comes before the SOLD moment
+        void runTaskAd('RIGHTS_SOLD').finally(() => showMoment({ stamp: 'SOLD', title: `${signed.titles} titles`, amount: signed.total, line: `${offer.platformName} · ${offer.exclusivity === 'EXCLUSIVE' ? 'exclusive' : 'shared'} · ${offer.durationWeeks} weeks`, color: resolveStreamingPlatformBrandById(offer.platformId, offer.platformName).primaryColor }));
     };
 
     if (room) return (

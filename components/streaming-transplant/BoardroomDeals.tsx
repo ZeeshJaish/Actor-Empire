@@ -1,3 +1,4 @@
+import { StreamingPlusLaterLine } from '../streamingPlus/StreamingPlusParts';
 /*
  * #177 (plan §22.7): the Boardroom's M&A tab as a teaser for the feature coming in a future update (Zeesh, 2026-11-03:
  * "M&a wala section apge me content dalna hoga jo hype create karega game ka upcoming feature ki like in future kar ke").
@@ -100,6 +101,7 @@ export const BoardroomDeals: React.FC<{ companyName: string; rivals: string[] }>
                 <em className={css.eyebrow}>M&amp;A · COMING IN A FUTURE UPDATE</em>
                 <h2 className={css.title}>THE DEAL ROOM</h2>
                 <p className={css.pitch}>Buy a rival, a library or a way into a market. Your rivals will be shopping too.</p>
+                <StreamingPlusLaterLine what="it" className={css.pitch} />
                 <div className={css.ticker} aria-label="Rumours">
                     <div className={css.tape}>
                         {[0, 1].map(copy => (

@@ -1,3 +1,4 @@
+import { grantStreamingPlusForTesting } from '../services/streamingPlusPack';
 /**
  * #112 Define the Launch: Ident and Store; the ident charged at launch and refunded when switched before it (plan §18.11;
  * §18.2 9: "A paid ident kit is charged the moment it is tapped, though its copy says 'payable at launch', and switching
@@ -28,13 +29,13 @@ import { shellData, shellDraft } from './fixtures/streaming-launch-shell-data';
 
 /* ── a founded company with $30M ── */
 const founded = (): Player => {
-    const base: Player = {
+    const base: Player = grantStreamingPlusForTesting({
         ...structuredClone(INITIAL_PLAYER), id: 'ident-at-launch', name: 'Ident Audit', money: 200_000_000,
         ownedStreamingPlatform: {
             ...structuredClone(INITIAL_PLAYER.ownedStreamingPlatform), lifecycle: 'ELIGIBLE',
             simulationSeed: 'owned-streaming:ident-at-launch', milestoneKeys: ['streaming-launch-clearance'],
         },
-    };
+    });
     const incorporated = incorporateOwnedStreamingPlatform(saveStreamingFoundingDraft(base, { ...createDefaultStreamingFoundingDraft(100), currentStep: 2, name: 'Ident House+' })).player;
     return { ...incorporated, ownedStreamingPlatform: { ...incorporated.ownedStreamingPlatform, treasuryCash: 30_000_000 } };
 };

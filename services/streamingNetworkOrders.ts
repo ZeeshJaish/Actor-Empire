@@ -36,6 +36,7 @@ import { spendPlayerEnergy } from './premiumLogic';
 import { aggregateStreamingFacilities } from './streamingFacilities';
 import { deriveStreamingNetworkSetupValues, getInfrastructureTechnologyFloor } from './streamingInfrastructure';
 import { getStreamingServerSite } from './streamingServerSites';
+import { streamingPlusLocks, streamingPlusNetworkBlock, streamingPlusRefusal, type StreamingPlusItem } from './streamingPlusPack';
 import { STREAMING_RACK_BUILD_COST, STREAMING_SERVER_TIERS, STREAMING_SERVER_TIER_ORDER } from './streamingServerTiers';
 
 /** Weeks to put each kind of capacity into service (cloud is rented, so it is the fastest) */
@@ -70,9 +71,11 @@ export type StreamingNetworkOrderRefusal =
     | 'UNKNOWN_ORDER'
     | 'NOT_BUILDING'
     | 'AT_ONE_WEEK'
-    | 'INSUFFICIENT_ENERGY';
+    | 'INSUFFICIENT_ENERGY'
+    | 'STREAMING_PLUS';
 
 export const STREAMING_NETWORK_ORDER_MESSAGES: Record<StreamingNetworkOrderRefusal, string> = {
+    STREAMING_PLUS: 'This is part of the Streaming+ Pack.',
     NOT_LIVE: 'The network is changed here once the service is live.',
     CHANGE_IN_PROGRESS: 'A network change from Build is still under way. It finishes first.',
     REGION_BUSY: 'This region is already building. One order a region at a time.',
@@ -123,6 +126,8 @@ export interface StreamingNetworkOrderPreview {
     ok: boolean;
     reason?: StreamingNetworkOrderRefusal;
     message: string;
+    /** set when the change reaches a Streaming+ item without the pack: the screen opens the pack's sheet */
+    streamingPlusItem?: StreamingPlusItem;
     regionId: string;
     /** net change by maker (added − sold) */
     racksDelta: Record<StreamingServerTier, number>;
@@ -214,6 +219,9 @@ export const previewStreamingNetworkOrder = (player: Player, input: StreamingNet
     };
     const changed = TIERS.some(tier => racksAdded[tier] > 0 || racksSold[tier] > 0) || cloudAdded > 0 || cloudDropped > 0 || newRoomIds.length > 0;
     if (!changed) return refuse('NO_CHANGE', preview);
+    /* Streaming+ (2026-11-08): a pack city, a Titan or Meridian Edge, added without the pack, is refused here, whoever asks */
+    const packBlock = streamingPlusNetworkBlock(player, current, input.facilities, cityId => getStreamingServerSite(cityId)?.name || cityId);
+    if (packBlock) return { ...refuse('STREAMING_PLUS', preview), message: packBlock.message, streamingPlusItem: packBlock.item };
     if (platform.treasuryCash + refund < capitalCost) return refuse('INSUFFICIENT_TREASURY', preview);
     return { ...preview, ok: true, message: describeStreamingNetworkChange(regionId, preview) };
 };
@@ -254,6 +262,10 @@ export const orderStreamingNetworkRegion = (
 ): StreamingNetworkOrderResult => {
     const preview = previewStreamingNetworkOrder(player, input);
     if (!preview.ok) return { changed: false, reason: preview.reason, message: preview.message, player, preview };
+    if (preview.cloudAdded > 0 && input.regionPlan.cloudProvider
+        && streamingPlusLocks(player, { kind: 'CLOUD', id: input.regionPlan.cloudProvider })) {
+        return { changed: false, reason: 'STREAMING_PLUS', message: streamingPlusRefusal('Meridian Edge cloud'), player, preview: { ...preview, ok: false, streamingPlusItem: { kind: 'CLOUD', id: input.regionPlan.cloudProvider } } };
+    }
     if (input.regionPlan.regionId !== input.regionId) {
         return { changed: false, reason: 'WRONG_REGION', message: STREAMING_NETWORK_ORDER_MESSAGES.WRONG_REGION, player, preview };
     }

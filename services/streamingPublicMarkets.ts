@@ -1,3 +1,4 @@
+import { streamingPlusLocks, streamingPlusRefusal } from './streamingPlusPack';
 import type { OwnedStreamingExecutiveAppointment } from '../types';
 import { streamingExitPriceMove } from './team/teamExits';
 import { streamingDirectorExitPriceMove } from './streamingBoard';
@@ -218,6 +219,8 @@ export const startStreamingCinematicIpoJourney = (
     if (platform.publicCompany.ipoJourney?.status === 'ACTIVE') {
         return { changed: false, player: { ...player, ownedStreamingPlatform: platform }, reason: 'The saved listing process is ready to resume.' };
     }
+    /* Streaming+ (2026-11-08): listing is the pack's; a listing already under way resumes above, a listed company keeps everything */
+    if (streamingPlusLocks(player, { kind: 'IPO' })) return { changed: false, player, reason: streamingPlusRefusal('The IPO') };
     const view = getStreamingPublicMarkets({ ...player, ownedStreamingPlatform: platform });
     if (!view.canStartRoadshow) return { changed: false, player, reason: 'IPO readiness requirements are not complete.' };
     /* #173: ringing the bell takes 25 energy; resuming a saved listing takes none */

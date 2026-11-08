@@ -13,6 +13,7 @@
  * a new player and nothing here saves. Energy is spent with `spendPlayerEnergy` (this
  * week's first, then the bank). The plan is codex-handoff/plans/platform-tech-plan.md.
  */
+import { streamingPlusLocks } from './streamingPlusPack';
 import type {
     OwnedStreamingCostCommitment,
     OwnedStreamingLedgerEntry,
@@ -51,9 +52,11 @@ export type StreamingTechRefusal =
     | 'MAX_VERSION'
     | 'INSUFFICIENT_ENERGY'
     | 'ENERGY_FULL'
-    | 'ENERGY_NOT_FULL';
+    | 'ENERGY_NOT_FULL'
+    | 'STREAMING_PLUS';
 
 export const STREAMING_TECH_REFUSAL_COPY: Record<StreamingTechRefusal, string> = {
+    STREAMING_PLUS: 'This Tech step is part of the Streaming+ Pack.',
     NOT_FOUNDED: 'Found your platform first.',
     UNKNOWN_TECH: 'That tech is not available.',
     ALREADY_UNLOCKED: 'That tech is already unlocked.',
@@ -117,6 +120,8 @@ export const unlockStreamingTech = (player: Player, techId: StreamingTechId): St
     if (!definition) return refuse(player, 'UNKNOWN_TECH');
     const tree = resolveStreamingTechTree(platform);
     if (streamingTechVersion(tree, techId) >= 1) return refuse(player, 'ALREADY_UNLOCKED');
+    /* Streaming+ (2026-11-08): the pack's 10 steps unlock only with the pack; a step a save already has keeps growing */
+    if (streamingPlusLocks(player, { kind: 'TECH', id: techId })) return refuse(player, 'STREAMING_PLUS');
     const missing = getStreamingTechMissingRequirements(tree, definition);
     if (missing.length) return refuse(player, 'NEEDS_EARLIER_TECH', missing.map(item => item.name).join(' and '));
     if (platform.treasuryCash < definition.unlockCost) return refuse(player, 'INSUFFICIENT_TREASURY');

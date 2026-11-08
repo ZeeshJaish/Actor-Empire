@@ -1,3 +1,4 @@
+import { grantStreamingPlusForTesting } from '../services/streamingPlusPack';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -106,7 +107,7 @@ const createReview = (
 });
 
 const createFixture = (): Player => {
-    const player = structuredClone(INITIAL_PLAYER) as Player;
+    const player = grantStreamingPlusForTesting(structuredClone(INITIAL_PLAYER) as Player);
     const initial = createInitialOwnedStreamingPlatformState('phase22-player');
     const absoluteWeek = getAbsoluteWeek(50, 20);
     const weeklyHistory = Array.from({ length: 12 }, (_, index) => makeSnapshot(absoluteWeek - 12 + index, 3_000_000 + index * 80_000));

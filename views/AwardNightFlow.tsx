@@ -15,6 +15,7 @@
 import React, {
   useCallback, useEffect, useMemo, useRef, useState
 } from 'react';
+import { runTaskAd } from '../services/forcedAds';
 
 /* ============================================================
    TYPES & CONFIG
@@ -1318,6 +1319,8 @@ export const AwardNightFlow: React.FC<AwardNightFlowProps> = ({ config, onComple
       pressResult
     });
     setPhase('DRESS'); // demo loops; the game unmounts on onComplete
+    /* the night is over and saved: its break (if loaded and allowed) comes as the player leaves, never mid show */
+    window.setTimeout(() => { void runTaskAd('AWARD_NIGHT'); }, 700);
   }, [onComplete, cfg.playerWins, cfg.playerCategories, equipped, pressResult]);
 
   return (

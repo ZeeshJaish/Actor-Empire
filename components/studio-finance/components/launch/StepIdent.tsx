@@ -1,3 +1,5 @@
+import { StreamingPlusChip } from '../../../streamingPlus/StreamingPlusParts';
+import { openStreamingPlusSheet } from '../../../../services/streamingPlusEvents';
 /* ============================================================================
    3 · Service identity — the motion and sound played before every stream.
 
@@ -57,6 +59,7 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
   const previewLock = previewPack ? data.capabilityLocks[`ident:${previewPack.id}`] : undefined;
   /* #109: the Tech step (Smart AI) a locked kit needs */
   const previewTech = previewPack ? data.capabilityLockTech?.[`ident:${previewPack.id}`] : undefined;
+  const previewPlus = Boolean(previewPack && data.capabilityLockPlus?.[`ident:${previewPack.id}`]);
   const full = Boolean(previewPack && !previewPack.included);
   const cost = pack && !pack.included ? pack.cost : 0;
   const packagePurchased = Boolean(pack && data.ident.purchasedPackageIds.includes(pack.id));
@@ -174,7 +177,7 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
             />
           </span>
           <span className="id-word">{data.company.name}</span>
-          {previewLock && <span className="id-research-stamp">Preview · unlock in Tech</span>}
+          {previewLock && <span className="id-research-stamp">{previewPlus ? 'Preview · Streaming+' : 'Preview · unlock in Tech'}</span>}
           <span className="id-sweep" aria-hidden="true" />
           {rhythm.beats.map((at, i) => (
             <span key={i} className="id-beat" style={{ ['--at' as string]: `${at}` }} aria-hidden="true" />
@@ -263,7 +266,12 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
         <p className="sf-eyebrow lw-block-head">What gets made</p>
         {/* The single way to open research on this screen, at the top of the kit
             it refers to rather than below the fold. */}
-        {previewLock && previewPack ? (
+        {previewPlus && previewPack ? (
+          <button type="button" className="sf-btn sf-btn--research"
+            onClick={() => openStreamingPlusSheet({ source: 'launch-ident', focus: 'brand', line: `The ${previewPack.name} is one of the Streaming+ Pack's 2 idents.` })}>
+            Use the {previewPack.name} with Streaming+ ›
+          </button>
+        ) : previewLock && previewPack ? (
           <button type="button" className="sf-btn sf-btn--research" onClick={() => handlers.onOpenTechnology?.(previewTech?.techId)}>
             Unlock {previewPack.name}{previewTech ? `: ${previewTech.tech}` : ''} ›
           </button>
@@ -288,7 +296,9 @@ export function StepIdent({ data, draft, patch, handlers }: StepProps) {
               >
                 <b>{option.name}</b>
                 <em>{option.included ? 'Included' : money(option.cost)}</em>
-                {lock
+                {data.capabilityLockPlus?.[`ident:${option.id}`]
+                  ? <StreamingPlusChip />
+                  : lock
                   ? <TechLockMark tech={data.capabilityLockTech?.[`ident:${option.id}`]?.tech} />
                   : <s>{option.frames.length} surface{option.frames.length > 1 ? 's' : ''}</s>}
                 {/* #112: the kit in use is equipped; a kit already paid for says so (switching before launch refunds it) */}

@@ -1,3 +1,5 @@
+import { hasStreamingPlus } from '../services/streamingPlusPack';
+import { runTaskAd } from '../services/forcedAds';
 import { getStreamingTitleOpening } from '../services/streamingEarlyAccess';
 import { getTitleRating } from '../services/titleRating';
 import { payOffStreamingEstate } from '../services/streamingEstatePlan';
@@ -1818,6 +1820,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     const committedPlayer = committed.player;
     buildCommittedPlayerRef.current = committedPlayer;
     persist(committedPlayer);
+    /* the opening network is commissioned (once) and saved: its break, if loaded and allowed, lands before the result is read */
+    if (committed.changed) void runTaskAd('BUILD');
     const setup = committedPlayer.ownedStreamingPlatform.infrastructureSetup;
     const absoluteWeek = getAbsoluteWeek(committedPlayer.age, committedPlayer.currentWeek);
     const weeksRemaining = Math.max(0, (setup?.readyAtAbsoluteWeek || absoluteWeek) - absoluteWeek);
@@ -2533,6 +2537,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             } : base;
             return (
               <StreamingBuildExperience
+                streamingPlusOwned={hasStreamingPlus(player)}
                 brand={commandDeckBrand()}
                 signatoryName={player.name}
                 inputs={inputs}
@@ -2827,6 +2832,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   if (showCinematicBuild && !showFinanceRoom && !platform.launchCommit) {
     return (
       <StreamingBuildExperience
+                streamingPlusOwned={hasStreamingPlus(player)}
         brand={commandDeckBrand()}
         signatoryName={player.name}
         inputs={marketingBuildInputs()}
@@ -3052,6 +3058,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         view={getStreamingBrandStudioView(readPlayer)}
         ident={{ soundIdentKey: readPlatform.serviceConfiguration.soundIdentKey, packageId: readPlatform.serviceConfiguration.identPackageId }}
         identLocks={identLocks}
+        identPlus={hasStreamingPlus(player) ? [] : (['CINEMATIC', 'LIVING'] as const).filter(id => id !== readPlatform.serviceConfiguration.identPackageId)}
         frontPage={platformOfferView().storefront}
         onApplyLook={look => {
           const result = applyStreamingBrandLook(player, look);

@@ -1,4 +1,4 @@
-import { AdMob } from '@capacitor-community/admob';
+import { AdMob, InterstitialAdPluginEvents, MaxAdContentRating } from '@capacitor-community/admob';
 import { AdType } from '../types';
 
 const ADMOB_IDS = {
@@ -35,6 +35,9 @@ let initialized = false;
 
 export const isRewardedType = (type: AdType) => type !== 'INTERSTITIAL';
 
+const isNativeAds = () => Boolean(window.Capacitor?.isNativePlatform?.());
+const adPlatform = (): 'ios' | 'android' => (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android');
+
 const requestConsent = async () => {
     if (!AdMob?.requestConsentInfo) return;
 
@@ -52,9 +55,7 @@ const requestConsent = async () => {
 };
 
 export const initAds = async () => {
-    const isNative = window.Capacitor?.isNativePlatform?.();
-
-    if (!isNative) {
+    if (!isNativeAds()) {
         if (window.adConfig) {
             window.adConfig({
                 preloadAdBreaks: 'on',
@@ -74,35 +75,104 @@ export const initAds = async () => {
     await requestConsent();
 
     try {
-        await AdMob.initialize();
+        /* Ads must fit the store's age rating (Apple 2.5.18): the App Store lists
+           the game 4+, Google Play lists it Teen. */
+        await AdMob.initialize({
+            maxAdContentRating: adPlatform() === 'ios' ? MaxAdContentRating.General : MaxAdContentRating.Teen,
+        });
         initialized = true;
         console.log('AdMob initialized after consent');
+        preloadInterstitial();
     } catch (err) {
         console.error('AdMob init failed:', err);
     }
 };
 
+/* ---- the interstitial, loaded ahead of time ----
+   AdMob disallows an interstitial that opens late because it was not loaded,
+   so one is prepared in the background and shown only when it is ready. */
+type InterstitialState = 'IDLE' | 'LOADING' | 'READY' | 'SHOWING';
+let interstitialState: InterstitialState = 'IDLE';
+let lastLoadFailedAt = 0;
+const LOAD_RETRY_MS = 45_000;
+const SHOW_SAFETY_MS = 120_000;
+
+export const preloadInterstitial = () => {
+    if (!isNativeAds() || !initialized || !AdMob?.prepareInterstitial) return;
+    if (interstitialState !== 'IDLE') return;
+    if (Date.now() - lastLoadFailedAt < LOAD_RETRY_MS) return;
+    interstitialState = 'LOADING';
+    AdMob.prepareInterstitial({ adId: ADMOB_IDS[adPlatform()].interstitial })
+        .then(() => { interstitialState = 'READY'; })
+        .catch(error => {
+            interstitialState = 'IDLE';
+            lastLoadFailedAt = Date.now();
+            console.warn('Interstitial preload failed:', error);
+        });
+};
+
+/** In development and on the web there is nothing to preload: the break is simulated or handled by the web ad API. */
+export const isInterstitialReady = (): boolean => (isNativeAds() ? interstitialState === 'READY' : true);
+
+/** Shows the preloaded interstitial and resolves when it closes (true) or could not show (false). Never loads on demand. */
+export const showPreloadedInterstitial = async (label = 'break'): Promise<boolean> => {
+    if (!isNativeAds()) {
+        if (typeof window.adBreak === 'function') {
+            return new Promise(resolve => {
+                window.adBreak({
+                    type: 'next',
+                    name: label,
+                    adBreakDone: (placementInfo: any) => resolve(placementInfo?.breakStatus === 'viewed'),
+                });
+            });
+        }
+        console.log(`[DEV SIMULATION] Forced ad: ${label}`);
+        return true;
+    }
+    if (interstitialState !== 'READY' || !AdMob?.showInterstitial) {
+        preloadInterstitial();
+        return false;
+    }
+    interstitialState = 'SHOWING';
+    return new Promise<boolean>(resolve => {
+        let settled = false;
+        let handles: Array<{ remove: () => Promise<void> | void }> = [];
+        const finish = (shown: boolean) => {
+            if (settled) return;
+            settled = true;
+            handles.forEach(handle => { void handle.remove(); });
+            interstitialState = 'IDLE';
+            window.setTimeout(preloadInterstitial, 1500);
+            resolve(shown);
+        };
+        Promise.all([
+            AdMob.addListener(InterstitialAdPluginEvents.Dismissed, () => finish(true)),
+            AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, () => finish(false)),
+        ]).then(registered => {
+            handles = registered;
+            if (settled) { registered.forEach(handle => { void handle.remove(); }); return; }
+            AdMob.showInterstitial().catch(() => finish(false));
+        }).catch(() => finish(false));
+        window.setTimeout(() => finish(true), SHOW_SAFETY_MS);
+    });
+};
+
 export const showAd = async (type: AdType): Promise<AdResult> => {
-    const isNative = window.Capacitor?.isNativePlatform?.();
     const wantsReward = isRewardedType(type);
 
-    if (isNative) {
+    if (!wantsReward) {
+        const shown = await showPreloadedInterstitial(type);
+        return shown ? { success: true } : { success: false, reason: 'UNAVAILABLE' };
+    }
+
+    if (isNativeAds()) {
         await initAds();
 
         if (!AdMob) return { success: false, reason: 'UNAVAILABLE' };
 
-        const platform = (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android') as 'ios' | 'android';
-        const ids = ADMOB_IDS[platform];
+        const ids = ADMOB_IDS[adPlatform()];
 
         try {
-            if (!wantsReward) {
-                await AdMob.prepareInterstitial({
-                    adId: ids.interstitial,
-                });
-                await AdMob.showInterstitial();
-                return { success: true };
-            }
-
             for (let attempt = 0; attempt < 2; attempt += 1) {
                 try {
                     await AdMob.prepareRewardVideoAd({
@@ -131,7 +201,7 @@ export const showAd = async (type: AdType): Promise<AdResult> => {
     if (typeof window.adBreak === 'function') {
         return new Promise(resolve => {
             window.adBreak({
-                type: wantsReward ? 'reward' : 'next',
+                type: 'reward',
                 name: type,
                 beforeAd: () => console.log('Web ad starting...'),
                 afterAd: () => console.log('Web ad finished.'),

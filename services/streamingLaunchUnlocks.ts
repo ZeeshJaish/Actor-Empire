@@ -29,11 +29,9 @@ export const STREAMING_LAUNCH_UNLOCKS: Readonly<Record<string, { techId: Streami
     'storefront:mosaic': { techId: 'AI_ARTWORK', label: 'the Mosaic front page' },
     'storefront:vertical-feed': { techId: 'APPS_PHONE', label: 'the Vertical Feed front page' },
     'storefront:freeform-canvas': { techId: 'APPS_HOLO', label: 'the Freeform Canvas front page' },
-    /* #122: the new front pages that need a Tech step */
-    'storefront:coverflow': { techId: 'APPS_TV', label: 'the Coverflow front page' },
-    'storefront:bento': { techId: 'AI_ARTWORK', label: 'the Bento front page' },
+    /* #122: the new front pages that need a Tech step. Coverflow, Bento and The Deck are opened by the Streaming+ Pack
+       alone (2026-11-08), so no page carries two locks; their steps keep their other unlocks */
     'storefront:orbit': { techId: 'APPS_HOLO', label: 'the Orbit front page' },
-    'storefront:the-deck': { techId: 'APPS_PHONE', label: 'The Deck front page' },
     'ident:genre': { techId: 'AI_BECAUSE', label: 'the Genre worlds ident' },
     'ident:adaptive': { techId: 'AI_ARTWORK', label: 'the Adaptive ident' },
     'ident:living': { techId: 'AI_TASTE', label: 'the Living ident' },

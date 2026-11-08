@@ -1,3 +1,4 @@
+import { streamingPlusLocks } from './streamingPlusPack';
 import type {
     OwnedStreamingCustomIdentAudio,
     OwnedStreamingCostCommitment,
@@ -362,6 +363,11 @@ export const saveStreamingServiceIdent = (
         && streamingLaunchUnlockLock(resolveStreamingTechTree(platform), `ident:${input.identPackageId.toLowerCase()}`)) {
         return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
     }
+    /* Streaming+: the Cinematic and Living idents need the pack; the ident a save already has stays */
+    if (input.identPackageId !== platform.serviceConfiguration.identPackageId
+        && streamingPlusLocks(player, { kind: 'IDENT', id: input.identPackageId })) {
+        return { player, changed: false, reason: 'LOCKED_OPTION', shortfall: 0 };
+    }
     const targetCost = STREAMING_IDENT_PACKAGE_COSTS[input.identPackageId];
     const purchases = getStreamingIdentPurchaseView(player);
     const packagePurchased = purchases.purchasedPackageIds.includes(input.identPackageId);
@@ -595,6 +601,11 @@ export const saveStreamingStorefrontPlan = (
     /* #109: a front page is unlocked by its Tech step; the one already in use stays usable */
     if (storefrontId !== platform.serviceConfiguration.storefrontLayoutId && getStreamingStorefrontLockReason(platform, storefrontId)) {
         return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0 };
+    }
+    /* Streaming+: 13 front pages need the pack; the one already in use stays */
+    if (storefrontId !== platform.serviceConfiguration.storefrontLayoutId
+        && streamingPlusLocks(player, { kind: 'STOREFRONT', id: storefrontId })) {
+        return { player, changed: false, reason: 'LOCKED_OPTION', shortfall: 0 };
     }
     if (platform.serviceConfiguration.storefrontLayoutId === storefrontId
         && (!input.pricingApproach || input.pricingApproach === platform.serviceConfiguration.pricingApproach)) {

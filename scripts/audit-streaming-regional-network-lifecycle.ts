@@ -1,3 +1,4 @@
+import { grantStreamingPlusForTesting } from '../services/streamingPlusPack';
 import assert from 'node:assert/strict';
 
 import {
@@ -123,7 +124,7 @@ const facilities: OwnedStreamingFacility[] = [
 const createReadyPlayer = (): { player: Player; draft: OwnedStreamingInfrastructureSetupDraft; marketing: StreamingLaunchMarketingForecastSnapshot } => {
   const playerId = 'phase6-regional-network-lifecycle';
   const initial = createInitialOwnedStreamingPlatformState(playerId);
-  const base = clone(INITIAL_PLAYER) as Player;
+  const base = grantStreamingPlusForTesting(clone(INITIAL_PLAYER) as Player);
   const countryIds = ['US', 'GB', 'IN'];
   const eligible: Player = {
     ...base, id: playerId, name: 'Phase Six Founder', age: 40, currentWeek: 1,

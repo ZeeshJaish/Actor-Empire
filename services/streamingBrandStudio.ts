@@ -12,6 +12,7 @@
  * Each change writes a ledger line (SERVICE_CONFIGURATION_COMMITTED, metadata.brandChange LOOK or IDENT), which the
  * world reads (#117).
  */
+import { streamingPlusLocks, streamingPlusRefusal } from './streamingPlusPack';
 import { getStreamingOpeningLock } from './streamingOpeningLock';
 import type {
     OwnedStreamingCostCommitment, OwnedStreamingCustomIdentAudio, OwnedStreamingLedgerEntry, OwnedStreamingPlatformIdentity, Player,
@@ -167,6 +168,9 @@ export const rebrandStreamingIdent = (player: Player, input: {
     }
     const lock = streamingLaunchUnlockLock(resolveStreamingTechTree(platform), `ident:${input.identPackageId.toLowerCase()}`);
     if (lock) return { player, changed: false, reason: 'LOCKED', message: lock.needs };
+    if (streamingPlusLocks(player, { kind: 'IDENT', id: input.identPackageId })) {
+        return { player, changed: false, reason: 'LOCKED', message: streamingPlusRefusal('This ident') };
+    }
     const week = getAbsoluteWeek(player.age, player.currentWeek);
     const wait = waitWeeks(platform.identity.identChangedAtAbsoluteWeek, week);
     if (wait > 0) return { player, changed: false, reason: 'WAIT', message: `The last new ident is still being rolled out. The next can come in ${wait} week${wait === 1 ? '' : 's'}.` };

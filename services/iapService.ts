@@ -16,6 +16,7 @@ export const IOS_PRODUCT_IDS: Record<PremiumProductId, string> = {
     bundle_elite_vehicles: 'com.zeeshapps.actorempire.vehiclesbundle',
     bundle_sky_sea: 'com.zeeshapps.actorempire.skyseabundle',
     bundle_ultimate_lifestyle: 'com.zeeshapps.actorempire.ultimatelifestyle',
+    streaming_plus: 'com.zeeshapps.actorempire.streamingplus',
 };
 
 export const ANDROID_PRODUCT_IDS: Record<PremiumProductId, string> = {
@@ -33,30 +34,51 @@ export const ANDROID_PRODUCT_IDS: Record<PremiumProductId, string> = {
     bundle_elite_vehicles: 'bundle_elite_vehicles',
     bundle_sky_sea: 'bundle_sky_sea',
     bundle_ultimate_lifestyle: 'bundle_ultimate_lifestyle',
+    streaming_plus: 'streaming_plus',
 };
 
 interface PurchaseResult {
     success: boolean;
     cancelled?: boolean;
+    /** paid later (Ask to Buy, cash at a shop): nothing is granted until the store says it is paid */
+    pending?: boolean;
     message: string;
     storeProductId?: string;
     transactionId?: string;
+    /** Android consumable: finish it with finishAndroidConsumable once the grant is saved */
+    purchaseToken?: string;
 }
 
 interface RestoreResult {
     success: boolean;
     restoredProductIds: PremiumProductId[];
+    /** Android: paid consumables the game never received (an interrupted purchase). Grant each, then finish it. */
+    unclaimedConsumables?: UnclaimedConsumable[];
     message: string;
+}
+
+export interface UnclaimedConsumable {
+    productId: PremiumProductId;
+    transactionId: string;
+    purchaseToken: string;
 }
 
 interface NativeStoreProduct {
     productId: string;
     title: string;
     description: string;
-    price: number;
+    /** iOS: the price as a number */
+    price?: number;
+    /** Android: the price in millionths */
+    priceMicros?: number;
+    currencyCode?: string;
     priceLabel: string;
     type: string;
 }
+
+/* Play Billing purchase states (Purchase.PurchaseState) */
+const ANDROID_PURCHASED = 1;
+const ANDROID_PENDING = 2;
 
 interface AndroidPurchaseToken {
     productIds?: string[];
@@ -97,8 +119,18 @@ export interface PremiumCatalogProduct {
     storeProductId: string;
     title: string;
     description: string;
+    /** the store's own localized price: the only price the game shows on a device */
     priceLabel: string;
+    /** the same price as a number, for value comparisons in the store's currency */
+    priceAmount?: number;
 }
+
+const priceAmountOf = (product?: NativeStoreProduct): number | undefined => {
+    if (!product) return undefined;
+    if (typeof product.price === 'number' && Number.isFinite(product.price) && product.price > 0) return product.price;
+    if (typeof product.priceMicros === 'number' && product.priceMicros > 0) return product.priceMicros / 1_000_000;
+    return undefined;
+};
 
 const isCapacitorIOS = () => {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
@@ -166,6 +198,19 @@ const finishAndroidPurchase = async (
     }
 };
 
+/** After an unclaimed consumable has been granted and saved, tell Play it was delivered. */
+export const finishAndroidConsumable = async (purchaseToken: string): Promise<void> => {
+    const purchases = getAndroidPurchasesPlugin();
+    if (!purchases?.consumePurchase || !purchaseToken) return;
+    try {
+        await purchases.consumePurchase({ purchaseToken });
+    } catch (error) {
+        console.warn('[IAP] Could not finish an unclaimed Android purchase', error);
+    }
+};
+
+export const isAndroidStore = () => isCapacitorAndroid();
+
 export const startIOSPurchaseUpdatesListener = async (
     onPurchase: (update: IOSPurchaseUpdate) => void
 ): Promise<PluginListenerHandle | null> => {
@@ -220,7 +265,8 @@ export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct
                     storeProductId,
                     title: match?.title || '',
                     description: match?.description || '',
-                    priceLabel: match?.priceLabel || ''
+                    priceLabel: match?.priceLabel || '',
+                    priceAmount: priceAmountOf(match),
                 };
             }).filter(product => !!product.priceLabel);
         } catch {
@@ -243,7 +289,8 @@ export const getPremiumCatalogProducts = async (): Promise<PremiumCatalogProduct
                 storeProductId,
                 title: match?.title || '',
                 description: match?.description || '',
-                priceLabel: match?.priceLabel || ''
+                priceLabel: match?.priceLabel || '',
+                priceAmount: priceAmountOf(match),
             };
         }).filter(product => !!product.priceLabel);
     } catch {
@@ -274,11 +321,22 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
             if (!purchaseToken) {
                 return { success: false, message: 'Purchase did not return a verification token.' };
             }
+            /* Play: grant nothing until the payment completes; a pending purchase is collected by Restore or the next launch */
+            if (purchase?.purchaseState === ANDROID_PENDING) {
+                return { success: false, pending: true, message: 'Your payment is pending. The item unlocks when Google Play confirms it.' };
+            }
 
+            const transactionId = purchase?.orderId || purchaseToken;
+            if (getPremiumProduct(productId)?.kind === 'consumable') {
+                /* granted and saved by the game first, then finished (finishAndroidConsumable), so a crash between the two loses nothing */
+                return { success: true, message: 'Android purchase confirmed.', storeProductId, transactionId, purchaseToken };
+            }
             await finishAndroidPurchase(purchases, productId, purchase);
             return {
                 success: true,
-                message: 'Android purchase confirmed.'
+                message: 'Android purchase confirmed.',
+                storeProductId,
+                transactionId,
             };
         } catch (error: any) {
             const message = formatAndroidBillingError(error);
@@ -332,17 +390,28 @@ export const restorePremiumPurchases = async (): Promise<RestoreResult> => {
         try {
             const result = await purchases.restorePurchases();
             const restoredProductIds: PremiumProductId[] = [];
+            const unclaimedConsumables: UnclaimedConsumable[] = [];
             for (const [premiumProductId, storeProductId] of Object.entries(ANDROID_PRODUCT_IDS)) {
                 const purchase = getAndroidPurchaseForStoreProduct(result?.purchases, storeProductId);
                 if (!purchase?.purchaseToken) continue;
-                restoredProductIds.push(premiumProductId as PremiumProductId);
-                await finishAndroidPurchase(purchases, premiumProductId as PremiumProductId, purchase);
+                /* a pending payment is not yours yet; it shows up here again once it is paid */
+                if (typeof purchase.purchaseState === 'number' && purchase.purchaseState !== ANDROID_PURCHASED) continue;
+                const productId = premiumProductId as PremiumProductId;
+                if (getPremiumProduct(productId)?.kind === 'consumable') {
+                    /* paid but never consumed: the game never received it. Granted first, finished after (finishAndroidConsumable). */
+                    unclaimedConsumables.push({ productId, transactionId: purchase.orderId || purchase.purchaseToken, purchaseToken: purchase.purchaseToken });
+                    continue;
+                }
+                restoredProductIds.push(productId);
+                await finishAndroidPurchase(purchases, productId, purchase);
             }
 
+            const found = restoredProductIds.length + unclaimedConsumables.length;
             return {
-                success: restoredProductIds.length > 0,
+                success: found > 0,
                 restoredProductIds,
-                message: restoredProductIds.length > 0 ? 'Android purchases restored.' : 'No Android purchases found to restore.'
+                unclaimedConsumables,
+                message: found > 0 ? 'Android purchases restored.' : 'No Android purchases found to restore.'
             };
         } catch (error: any) {
             return {

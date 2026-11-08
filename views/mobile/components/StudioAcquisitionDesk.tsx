@@ -51,8 +51,7 @@ import { formatMoney } from '../../../services/formatUtils';
 import { getOperatingModels } from '../../../services/studioGroup';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
-import { showAd } from '../../../services/adLogic';
-import { hasNoAds } from '../../../services/premiumLogic';
+import { runTaskAd } from '../../../services/forcedAds';
 import { getRegulatorAcquisitionControls } from '../../../services/regulatorPressure';
 import { StudioAcquisitionDealRoom, type StudioAcqConfig } from './StudioAcquisitionDealRoom';
 
@@ -2293,10 +2292,8 @@ const LegacyStudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                                                                         setFeedback('The operating model could not be saved.');
                                                                         return;
                                                                     }
-                                                                    setFeedback('Operating model saved. Showing interstitial...');
-                                                                    if (!hasNoAds(player)) {
-                                                                        await showAd('INTERSTITIAL');
-                                                                    }
+                                                                    // saved first; then the break, if loaded and allowed, before the next step shows
+                                                                    await runTaskAd('STUDIO_PURCHASE');
                                                                     setFeedback('Operating model saved. Choose next studio action.');
                                                                 }}
                                                                 className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-[22px] bg-[#d8ab3c] px-4 text-[9px] font-black uppercase tracking-[0.18em] text-black shadow-[0_9px_0_#7a4a0a] transition-transform active:translate-y-1 active:shadow-[0_4px_0_#7a4a0a] disabled:cursor-not-allowed disabled:opacity-40"

@@ -25,6 +25,7 @@ const ANDROID_PRODUCT_IDS = {
   bundle_elite_vehicles: { storeProductId: 'bundle_elite_vehicles', kind: 'non_consumable' },
   bundle_sky_sea: { storeProductId: 'bundle_sky_sea', kind: 'non_consumable' },
   bundle_ultimate_lifestyle: { storeProductId: 'bundle_ultimate_lifestyle', kind: 'non_consumable' },
+  streaming_plus: { storeProductId: 'streaming_plus', kind: 'non_consumable' },
 } as const;
 
 type PremiumProductId = keyof typeof ANDROID_PRODUCT_IDS;

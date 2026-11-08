@@ -1,3 +1,4 @@
+import { STREAMING_PLUS_CITY_IDS } from '../../services/streamingPlusPack';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { BuildWizard } from '../studio-finance/components/build/BuildWizard';
 import type {
@@ -93,6 +94,8 @@ import {
 import { countCompletedBudgetSteps, createLaunchBudgetSummary } from '../studio-finance/finance/budgetLinks';
 
 export interface StreamingBuildWizardExperienceProps {
+  /** Whether the player owns the Streaming+ Pack; absent (fixtures) reads as owned. */
+  streamingPlusOwned?: boolean;
   brand: Brand;
   signatoryName?: string;
   inputs: BuildInputs;
@@ -652,6 +655,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         coord: { lat: site.latitude, lng: site.longitude },
         plot: plotFor(index, siblings),
         recommended: recommended.has(site.id),
+        streamingPlus: STREAMING_PLUS_CITY_IDS.has(site.id),
         note: site.tier === 1
           ? `A carrier hotel. Deep fibre, ${site.powerPricePerKwh}c power, and regional reach.`
           : site.tier === 2
@@ -1076,6 +1080,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       existing: (builtFacilities || []).map(facility => facilityToBuild(facility, true)),
       commissioned: Boolean(built),
       operationalRevision: Boolean(props.isLive),
+      streamingPlus: { owned: props.streamingPlusOwned !== false },
       canonicalMode: canonicalSource === 'CAREER' ? 'CAREER' : 'FIXTURE',
       construction: props.construction ? {
         committedAtWeek: props.construction.committedAtAbsoluteWeek,
@@ -1083,7 +1088,7 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
       } : undefined,
       canonical,
     };
-  }, [absoluteWeek, baseFacilities, brand, built, builtFacilities, canonicalFor, canonicalSource, cities, countries, initialDraft, inputs, listings, marketing, pricing, props.construction, props.revisionQuote, props.isLive, props.signatoryName, regions, sel.managementPolicy]);
+  }, [absoluteWeek, baseFacilities, brand, built, builtFacilities, canonicalFor, canonicalSource, cities, countries, initialDraft, inputs, listings, marketing, pricing, props.construction, props.revisionQuote, props.isLive, props.signatoryName, props.streamingPlusOwned, regions, sel.managementPolicy]);
 
   const draftWithResult = useMemo<BuildDraft>(() => {
     if (!result && !savedRehearsal) return initialDraft;

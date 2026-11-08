@@ -17,6 +17,7 @@
  *
  * What the team did carries who did it: "Fixed by Marcus" on STATUS, "by Marcus" on a Network order.
  */
+import { streamingPlusCityOpen, streamingPlusTierOrFallback } from '../streamingPlusPack';
 import type {
     OwnedStreamingCrisis,
     OwnedStreamingFacility,
@@ -140,12 +141,15 @@ export const runCapacity: StreamingTeamJobRunner = (context) => {
     /* the rooms there with free positions where more racks add capacity, each with the order that fits */
     const sharp = executive.skill >= 80;
     const options = (platform.infrastructureSetup.facilities || [])
-        .filter(facility => streamingNetworkRegionOf(facility.cityId) === region.regionId && !isStreamingCloudFacility(facility))
+        /* Streaming+: the CTO grows no room in a pack city and buys no Titan without the pack */
+        .filter(facility => streamingNetworkRegionOf(facility.cityId) === region.regionId && !isStreamingCloudFacility(facility)
+            && streamingPlusCityOpen(player, facility.cityId))
         .flatMap(facility => {
             const positions = facility.lease?.rackPositions ?? 0;
             const free = Math.min(MAX_RACKS, positions - racksIn(facility));
             if (free <= 0) return [];
-            const tier: StreamingServerTier = executive.preferredStrategy === 'TECHNOLOGY_FIRST' && positions >= STREAMING_SERVER_TIERS.TITAN.minimumRoomPositions ? 'TITAN' : 'WORKHORSE';
+            const wanted: StreamingServerTier = executive.preferredStrategy === 'TECHNOLOGY_FIRST' && positions >= STREAMING_SERVER_TIERS.TITAN.minimumRoomPositions ? 'TITAN' : 'WORKHORSE';
+            const tier: StreamingServerTier = streamingPlusTierOrFallback(player, wanted, 'WORKHORSE');
             const before = steadyOf(facility);
             const gainOf = (count: number) => steadyOf(streamingRoomWithRacks(facility, tier, count)) - before;
             let count = 1;

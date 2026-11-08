@@ -17,7 +17,7 @@
  * Launch is the only thing that saves (the HQ's persist); nothing loads on a tap. A launched campaign's picture for the
  * news is drawn after the launch is on screen.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import css from './CampaignStudio.module.css';
 import type { Campaign, CampaignBudget, CampaignFormatId, Player } from '../../../types';
 import { Poster } from '../../../content-market-exact/Poster';
@@ -56,6 +56,10 @@ import { CampaignPage } from './CampaignPage';
 import { FormatGlyph } from './formatGlyphs';
 import { STRENGTH_WORDS } from './campaignWords';
 import creativeCss from '../creatives/Creatives.module.css';
+import { runTaskAd } from '../../../services/forcedAds';
+import { streamingPlusLocks } from '../../../services/streamingPlusPack';
+import { openStreamingPlusSheet } from '../../../services/streamingPlusEvents';
+import { StreamingPlusChip } from '../../streamingPlus/StreamingPlusParts';
 
 export type Step = 'WHAT' | 'WHERE' | 'HOW' | 'CREATIVE' | 'BUDGET' | 'REVIEW';
 const STEPS: Step[] = ['WHAT', 'WHERE', 'HOW', 'CREATIVE', 'BUDGET', 'REVIEW'];
@@ -75,6 +79,7 @@ const PROBLEM_WORDS: Record<StreamingCampaignProblem, string> = {
     TOO_SMALL: 'Nothing you picked runs in these countries.',
     TREASURY: 'The treasury cannot pay for it in full, and a campaign is paid when it starts.',
     ENERGY: 'Not enough energy to commission it.',
+    STREAMING_PLUS: 'A format you picked is part of the Streaming+ Pack.',
 };
 
 /* #151: the launch campaign's push, in the launch builder's words */
@@ -388,8 +393,9 @@ export const CampaignBuilder: React.FC<{
     };
     const next = () => setStep(STEPS[Math.min(STEPS.length - 1, at + 1)]);
     const back = () => (at === 0 ? onCancel() : setStep(STEPS[at - 1]));
+    const launchingRef = useRef(false);
     const launch = () => {
-        if (!draft) return;
+        if (!draft || launchingRef.current) return;
         /* its picture for the news: #156: its big moment's scene where it happens, else its scene where it runs, else its
            widest creative (16:9 first); a drone show draws the name, with any creative in hand */
         const placed = quote?.places ?? {};
@@ -407,9 +413,15 @@ export const CampaignBuilder: React.FC<{
             ...(pictureMediaId ? { pictureMediaId } : {}),
         });
         if (result.ok && result.campaignId) {
-            onLaunch(result.player, result.campaignId);
-            /* drawn once the launch is on screen, never on the tap */
-            if (pictureMediaId && pictureSource) window.setTimeout(() => { keepCampaignPicture(pictureMediaId, pictureScene, pictureSource, subject?.name ?? brand.name, brand.hue).catch(() => undefined); }, 160);
+            const campaignId = result.campaignId;
+            launchingRef.current = true;
+            /* the campaign is made; the break (if loaded and allowed) comes before its launch moment */
+            void runTaskAd('CAMPAIGN').finally(() => {
+                launchingRef.current = false;
+                onLaunch(result.player, campaignId);
+                /* drawn once the launch is on screen, never on the tap */
+                if (pictureMediaId && pictureSource) window.setTimeout(() => { keepCampaignPicture(pictureMediaId, pictureScene, pictureSource, subject?.name ?? brand.name, brand.hue).catch(() => undefined); }, 160);
+            });
         }
     };
     const toggleFormat = (id: CampaignFormatId) => setFormats(current => (current.includes(id) ? current.filter(item => item !== id) : [...current, id]));
@@ -523,11 +535,17 @@ export const CampaignBuilder: React.FC<{
                                 /* #155: a week in these countries, or one night at its place */
                                 /* #156: where its picture is set: a big moment's place, a famous screen's first site */
                                 const pictured = rate.show?.countryId ?? (format.sites ? where[0] ?? null : null);
+                                /* Streaming+: a pack format keeps its picture; picking it opens the pack's sheet */
+                                const plus = !on && streamingPlusLocks(player, { kind: 'CAMPAIGN', id });
                                 return (
-                                    <button key={id} type="button" className={cx(css.format, css.pictured, on && css.picked, nowhere && css.off)} disabled={nowhere && !on} aria-pressed={on} onClick={() => toggleFormat(id)}>
+                                    <button key={id} type="button" className={cx(css.format, css.pictured, on && css.picked, nowhere && css.off)} disabled={nowhere && !on} aria-pressed={on}
+                                        onClick={() => (plus
+                                            ? openStreamingPlusSheet({ source: 'campaign-format', focus: 'campaigns', line: `${format.name} is one of the Streaming+ Pack's 7 big campaign moments.` })
+                                            : toggleFormat(id))}>
                                         <span className={css.formatPicture}>
                                             <FormatPicture formatId={id} countryId={pictured} creative={creativeOf(id)} subjectName={subject?.name ?? brand.name} brandName={brand.name} hue={brand.hue} />
                                             <span className={css.formatBadge}><FormatGlyph id={id} /></span>
+                                            {plus && <span className={css.formatPlus}><StreamingPlusChip /></span>}
                                             {on && <i className={css.formatCheck} aria-hidden="true">✓</i>}
                                         </span>
                                         <b>{format.name}</b>

@@ -29,7 +29,22 @@ assertIncludes(
 assertIncludes(
   'Direct AdMob plugin import',
   'services/adLogic.ts',
-  "import { AdMob } from '@capacitor-community/admob';"
+  "import { AdMob, InterstitialAdPluginEvents, MaxAdContentRating } from '@capacitor-community/admob';"
+);
+assertIncludes(
+  'Ads fit the age rating (Apple 2.5.18)',
+  'services/adLogic.ts',
+  "maxAdContentRating: adPlatform() === 'ios' ? MaxAdContentRating.General : MaxAdContentRating.Teen"
+);
+assertIncludes(
+  'Interstitials are loaded ahead and never on demand',
+  'services/adLogic.ts',
+  'export const preloadInterstitial'
+);
+assertIncludes(
+  'One shared cooldown for forced ads',
+  'services/forcedAds.ts',
+  'cooldownMs: 4 * 60_000'
 );
 assertIncludes(
   'Rewarded ad retry',

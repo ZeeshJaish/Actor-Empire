@@ -1,3 +1,4 @@
+import { hasStreamingPlus, isStreamingPlusItem } from './streamingPlusPack';
 import { gameWeekText } from './gameWeek';
 import type {
     OwnedStreamingInfrastructureSetupDraft,
@@ -129,6 +130,23 @@ const openingOperations = (player: Player) => normalizeOwnedStreamingPlatformSta
     operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED'
 ));
 
+const streamingPlusOpeningBlockers = (player: Player, platform: ReturnType<typeof normalizeOwnedStreamingPlatformState>): string[] => {
+    if (hasStreamingPlus(player)) return [];
+    const out: string[] = [];
+    const config = platform.serviceConfiguration;
+    if (config?.storefrontLayoutId && isStreamingPlusItem({ kind: 'STOREFRONT', id: config.storefrontLayoutId })) {
+        out.push('The front page you chose is part of the Streaming+ Pack. Pick another in Define the Launch, or get the pack.');
+    }
+    if (config?.identPackageId && isStreamingPlusItem({ kind: 'IDENT', id: config.identPackageId })) {
+        out.push('The ident you chose is part of the Streaming+ Pack. Pick another in Define the Launch, or get the pack.');
+    }
+    const formats = platform.launchMarketingDraft?.formatIds || [];
+    if (formats.some(id => isStreamingPlusItem({ kind: 'CAMPAIGN', id }))) {
+        out.push('A launch campaign format you picked is part of the Streaming+ Pack. Pick another, or get the pack.');
+    }
+    return out;
+};
+
 export const getStreamingOpeningCommissionQuote = (
     player: Player,
     draft: OwnedStreamingInfrastructureSetupDraft,
@@ -161,6 +179,9 @@ export const getStreamingOpeningCommissionQuote = (
     if (!rehearsal || rehearsal.configurationSignature !== forecast.configurationSignature || rehearsal.verdict === 'BROKE') {
         blockers.push('The exact infrastructure configuration has not passed rehearsal.');
     }
+    /* Streaming+ (2026-11-08): the opening may not carry a pack item the player does not own: its front page, its ident,
+       its launch campaign's big moments (the network's pack cities and Titans are refused by the Build's validation) */
+    blockers.push(...streamingPlusOpeningBlockers(player, platform));
     const marketFilingDueNow = unfiled.reduce((sum, operation) => sum + operation.plannedCosts.total, 0);
     const marketingReservation = Math.max(0, Math.round(platform.launchMarketingDraft?.budgetCeiling || 0));
     const identDueNow = getStreamingIdentDueAtLaunch(player);

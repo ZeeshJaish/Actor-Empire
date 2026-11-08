@@ -19,6 +19,7 @@
  * The effects themselves live in streamingCampaignEffects.ts, which the world's simulation reads.
  * The old pushes (the War Room's growth actions) stay as they were and remain the history before the engine.
  */
+import { streamingPlusLocks } from '../streamingPlusPack';
 import type { Campaign, CampaignBook, CampaignBudget, CampaignFormatId, CampaignSubjectKind, OwnedStreamingPlatformState, Player } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import { getAbsoluteWeek } from '../legacyLogic';
@@ -139,7 +140,7 @@ export interface StreamingCampaignDraft {
 
 export type StreamingCampaignProblem =
     | 'NOT_LIVE' | 'NO_SUBJECT' | 'NO_COUNTRIES' | 'NO_FORMATS' | 'BUDGET_NOT_ALLOWED' | 'FORMAT_NOWHERE'
-    | 'TOO_SMALL' | 'TREASURY' | 'ENERGY';
+    | 'TOO_SMALL' | 'TREASURY' | 'ENERGY' | 'STREAMING_PLUS';
 
 export interface StreamingCampaignQuote {
     subject: StreamingCampaignSubject | null;
@@ -206,6 +207,8 @@ export const quoteStreamingCampaign = (player: Player, draft: StreamingCampaignD
     if (!formats.length) problems.push('NO_FORMATS');
     if (formats.some(id => !CAMPAIGN_FORMATS[id].budgets.includes(draft.budget.kind))) problems.push('BUDGET_NOT_ALLOWED');
     if (formats.some(id => !markets.some(market => campaignFormatIn(CAMPAIGN_FORMATS[id], market.countryId)))) problems.push('FORMAT_NOWHERE');
+    /* Streaming+: the 5 big moments, City screens and Metro wraps need the pack */
+    if (formats.some(id => streamingPlusLocks(player, { kind: 'CAMPAIGN', id }))) problems.push('STREAMING_PLUS');
     /* #154: every new campaign's big moments happen at one place each */
     const places = Object.fromEntries(formats.filter(id => CAMPAIGN_FORMATS[id].group === 'BIG_MOMENT')
         .map(id => [id, campaignMomentPlace(CAMPAIGN_FORMATS[id], markets, draft.places?.[id])?.countryId] as const)
@@ -370,6 +373,8 @@ export const extendStreamingCampaign = (player: Player, campaignId: string, week
     const book = streamingCampaignBook(platform);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const campaign = book.campaigns.find(item => item.id === campaignId);
+    /* a pack campaign runs to its end; more weeks of it are a new buy */
+    if (campaign && campaign.formats.some(id => streamingPlusLocks(player, { kind: 'CAMPAIGN', id }))) return { player, ok: false, problems: ['STREAMING_PLUS'] };
     if (!campaign || campaign.budget.kind !== 'WEEKS' || weeks <= 0 || (campaign.status !== 'RUNNING' && campaign.status !== 'PAUSED')
         || campaign.budget.weeks >= CAMPAIGN_EXTENDED_WEEKS) return { player, ok: false, problems: [] };
     const added = Math.min(CAMPAIGN_EXTENDED_WEEKS, campaign.budget.weeks + Math.round(weeks)) - campaign.budget.weeks;
@@ -384,6 +389,7 @@ export const extendStreamingCampaign = (player: Player, campaignId: string, week
 /** Adds money to a pot; a finished pot starts again from the next week. */
 export const topUpStreamingCampaign = (player: Player, campaignId: string, amount: number): StreamingCampaignResult => updateCampaign(player, campaignId, campaign => (
     campaign.budget.kind === 'POT' && amount > 0 && campaign.status !== 'STOPPED'
+        && !campaign.formats.some(id => streamingPlusLocks(player, { kind: 'CAMPAIGN', id }))
         ? { ...campaign, toppedUp: campaign.toppedUp + Math.round(amount), status: 'RUNNING', endedAtAbsoluteWeek: null, endReason: undefined } : null
 ));
 

@@ -6,6 +6,7 @@
  * tech debt it adds or pays down, and the energy and cash to hand. Pure: nothing here saves.
  * The actions are in streamingTechTree.ts.
  */
+import { streamingPlusLocks } from './streamingPlusPack';
 import type { OwnedStreamingTechTreeState, Player, StreamingTechGroupId, StreamingTechId, StreamingTechVersion } from '../types';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { streamingTechRowAppeal } from './streamingPlanOffer';
@@ -117,6 +118,8 @@ export interface StreamingTechDeskStep {
     affordable: boolean;
     starter: boolean;
     futuristic: boolean;
+    /** one of the Streaming+ Pack's 10 steps, not yet unlocked, and the player has no pack: shown whole, with a chip */
+    streamingPlus: boolean;
     sideLine: boolean;
     /** the plan features this step is part of ("4K HDR") */
     feeds: string[];
@@ -411,6 +414,7 @@ export const getStreamingTechDesk = (player: Player): StreamingTechDeskView => {
                 affordable: treasury >= definition.unlockCost,
                 starter: Boolean(definition.starter),
                 futuristic: Boolean(definition.futuristic),
+                streamingPlus: streamingTechVersion(tree, definition.id) < 1 && streamingPlusLocks(player, { kind: 'TECH', id: definition.id }),
                 sideLine: Boolean(definition.sideLine),
                 feeds: feedsOf(definition.id),
                 debtNext: version >= 3 ? 0 : streamingTechDebtFor(definition, Math.min(3, version + 1) as StreamingTechVersion),

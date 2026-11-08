@@ -99,6 +99,8 @@ export interface City {
   plot: { x: number; y: number };
   /** The team's shortlist for this footprint. */
   recommended?: boolean;
+  /** One of the 30 Streaming+ cities (services/streamingPlusPack.ts). */
+  streamingPlus?: boolean;
   /** Free text the marketplace shows: power prices, politics, weather. */
   note: string;
 }
@@ -589,6 +591,9 @@ export interface RehearsalResult {
 export interface BuildData {
   /** Operational region cards show full asset value; approval uses the delta quote. */
   operationalRevision?: boolean;
+  /** Whether the player owns the Streaming+ Pack. Absent (fixtures, labs) reads as owned, so nothing is locked there;
+      the game always sets it, and the engine refuses a pack item without the pack either way. */
+  streamingPlus?: { owned: boolean };
   company: { name: string; week: number; brandHex?: string; logoSrc?: string; signatoryName?: string };
   treasury: { available: number; committedLaunch: number };
   /** True only when the player explicitly confirmed at least one Day-One market. */

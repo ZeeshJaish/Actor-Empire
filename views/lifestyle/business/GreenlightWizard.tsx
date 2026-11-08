@@ -10,8 +10,8 @@ import { NPC_DATABASE, getAvailableTalent, isCastableActor } from '../../../serv
 import { getConnectedDirectorCandidates, getDirectorConnectionDiscount } from '../../../services/directorConnectionLogic';
 import { getActorTalent, getDirectorTalent } from '../../../services/roleLogic';
 import { getDefaultCharacterStoryRole, getFallbackCharacterName, getUniverseCharacterKeyAliases, getUniverseCharacterSelectionOptions, isUniverseRetired, normalizeCharacterAbilityType, normalizeCharacterStoryRole, normalizeUniverseCharacterKey, normalizeUniverseMap } from '../../../services/universeLogic';
-import { showAd } from '../../../services/adLogic';
-import { hasNoAds, spendPlayerEnergy } from '../../../services/premiumLogic';
+import { runTaskAd, taskAdWouldShow } from '../../../services/forcedAds';
+import { spendPlayerEnergy } from '../../../services/premiumLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../../services/energyCosts';
 import { getPlayerLanguage, t } from '../../../services/i18n';
 import { calculateGreenlightCounterChance, normalizeTalentBackendDraft, participationKey, setTalentBackendPoints, suggestReturningBackendDemand } from '../../../services/talentParticipation';
@@ -2677,18 +2677,6 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             genre: selectedScript?.genre || 'unknown',
         });
 
-        // --- SHOW INTERSTITIAL AD BEFORE GREENLIGHT ---
-        if (!hasNoAds(player)) {
-            setIsProcessingAd(true);
-            try {
-                await showAd('INTERSTITIAL');
-            } catch (e) {
-                console.error("Ad failed", e);
-            } finally {
-                setIsProcessingAd(false);
-            }
-        }
-
         const {
             directorData,
             estimatedBudget,
@@ -2914,7 +2902,6 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             setStep('CONFIRM');
             return;
         }
-        if (commissioned) setCommissionMoment(commissioned.moment);
         const finalizedOwnedOriginal = commissioned ? commissioned.player : finalizeOwnedStreamingOriginalGreenlight(updatedPlayerAfterGreenlight);
         if (platformCommissionOffer && newCommitment.productionCalendar && selectedScript) {
             const finalizedCommission = finalizePlatformAiPlayerCommissionGreenlight({
@@ -2969,6 +2956,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             crew_count: Object.values(selectedCrew).filter(Boolean).length,
         });
         stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
+        // The work is done and saved; the break (if loaded and allowed) comes before the result page.
+        const adMoment = commissioned ? 'COMMISSION' : 'GREENLIGHT';
+        if (taskAdWouldShow(adMoment)) {
+            setIsProcessingAd(true);
+            try {
+                await runTaskAd(adMoment);
+            } finally {
+                setIsProcessingAd(false);
+            }
+        }
+        if (commissioned) setCommissionMoment(commissioned.moment);
         setStep('BUZZ');
     };
 

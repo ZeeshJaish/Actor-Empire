@@ -1,3 +1,4 @@
+import { grantStreamingPlusForTesting } from '../services/streamingPlusPack';
 /**
  * #116 The brand studio, from the HQ logo (plan §18.6; Zeesh, 2026-11-01: "एचक्यू के लोगों को टैग करो तो चेंज हो जाए" …
  * "लोगो और इंटेंट बदलने का पैसा और हफ्ता लगेगा, और ठीक है करो"):
@@ -28,10 +29,10 @@ import type { Brand } from '../components/streaming-transplant/StreamingBrandVis
 
 /* ── a live company with 10M subscribers and $40M ── */
 const founded = (): Player => {
-    const base: Player = {
+    const base: Player = grantStreamingPlusForTesting({
         ...structuredClone(INITIAL_PLAYER), id: 'brand-studio', name: 'Brand Audit', money: 200_000_000,
         ownedStreamingPlatform: { ...structuredClone(INITIAL_PLAYER.ownedStreamingPlatform), lifecycle: 'ELIGIBLE', simulationSeed: 'owned-streaming:brand-studio', milestoneKeys: ['streaming-launch-clearance'] },
-    };
+    });
     const incorporated = incorporateOwnedStreamingPlatform(saveStreamingFoundingDraft(base, { ...createDefaultStreamingFoundingDraft(100), currentStep: 2, name: 'Brand House+' })).player;
     const platform = incorporated.ownedStreamingPlatform;
     return { ...incorporated, ownedStreamingPlatform: { ...platform, treasuryCash: 40_000_000, metrics: { ...platform.metrics, subscribers: 10_000_000 } } };

@@ -461,6 +461,8 @@ export interface LaunchData {
   capabilityLocks: Record<string, string>;
   /** #109 (plan §18.5): the Tech step each lock needs, by the same keys, and its name, so "Unlock: Smart TV apps ›" opens it */
   capabilityLockTech?: Record<string, { techId: StreamingTechId; tech: string }>;
+  /** Streaming+: the front pages and idents that need the pack (keys as capabilityLocks); the sheet, not Tech, unlocks them */
+  capabilityLockPlus?: Record<string, boolean>;
   /** The plan builder's rows, locks and starter plans, from the tech the service owns (Phase 2 #45). */
   planBuilder?: StreamingPlanBuilderView;
 }

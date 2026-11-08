@@ -1,3 +1,5 @@
+import type { StreamingTechId } from '../types';
+import { streamingPlusLocks } from './streamingPlusPack';
 import type {
     OwnedStreamingPricingConfiguration,
     Player,
@@ -33,7 +35,7 @@ export interface StreamingPlatformOfferView {
     earnings: { subscription: number; ads: number; store: number; settled: boolean };
     storefront: {
         currentId: string | null;
-        layouts: Array<{ id: string; name: string; line: string; composition: string; category: string; locked: string | null }>;
+        layouts: Array<{ id: string; name: string; line: string; composition: string; category: string; locked: string | null; lockTech?: StreamingTechId | null; plus?: boolean }>;
     };
     ident: { label: string; detail: string };
     sharing: { settled: StreamingSharingPolicyFigures; available: boolean; control: StreamingSharingControl };
@@ -85,14 +87,17 @@ export const getStreamingPlatformOfferView = (player: Player): StreamingPlatform
             layouts: STREAMING_STOREFRONT_LAYOUTS.map(layout => {
                 // #109: a locked layout names its Tech step, and the tab opens it
                 const lock = getStreamingStorefrontLock(platform, layout.id);
+                /* Streaming+: 13 front pages need the pack (before any Tech step); the one in use stays */
+                const plus = layout.id !== currentId && streamingPlusLocks(player, { kind: 'STOREFRONT', id: layout.id });
                 return {
                     id: layout.id,
                     name: layout.name,
                     line: layout.line,
                     composition: layout.composition,
                     category: layout.category,
-                    locked: lock ? lock.tech : null,
-                    lockTech: lock ? lock.techId : null,
+                    locked: plus ? 'Streaming+' : lock ? lock.tech : null,
+                    lockTech: plus ? null : lock ? lock.techId : null,
+                    plus,
                 };
             }),
         },

@@ -35,7 +35,7 @@ has(board, `    if (liveDesk) {
 has(board, "delta > 0 ? `+${delta} new` : delta < 0 ? `−${-delta} sold`", 'standing, new or sold on each maker');
 has(board, "`sells at ${resale}%`", 'below what stands, the region\'s rate');
 has(board, 'disabled={locked || count === 0}', 'a building region rests its −');
-has(board, 'disabled={locked || !addable}', 'and its +');
+has(board, 'disabled={locked || (!tierPlus && !addable)}', 'and its + (a Streaming+ tier opens the pack instead)');
 has(desk, 'const writeRegion = (regionId: string, setup: RegionSetup): string | null => {', 'the desk\'s write');
 has(desk, 'const sell = Math.max(0, stand[tier] - setup.servers[tier]);', 'below what stands sells back');
 has(desk, 'rooms = sellStreamingNetworkRacks(rooms, regionId, tier, sell);', 'from the standing rooms');

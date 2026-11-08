@@ -49,6 +49,7 @@ import { normalizeStreamingInfrastructureManagementPolicy } from './streamingInf
 import { normalizeStreamingRegionPlans } from './streamingCanonicalState';
 import { quoteStreamingNetworkPlan } from './streamingNetworkQuote';
 import { STREAMING_SERVER_SITES } from './streamingServerSites';
+import { streamingPlusNetworkBlock } from './streamingPlusPack';
 import { STREAMING_SERVER_TIERS } from './streamingServerTiers';
 import {
     getStreamingFacilityPhysicalView,
@@ -467,7 +468,7 @@ export interface StreamingInfrastructureForecast {
 
 export interface StreamingInfrastructureValidationIssue {
     step: number;
-    code: 'PRICE_RANGE' | 'PRICE_ORDER' | 'LOAD_TEST_REQUIRED' | 'INSUFFICIENT_TREASURY' | 'INVALID_STATE' | 'CHANGE_IN_PROGRESS' | 'PRICING_IN_AUDIENCE';
+    code: 'PRICE_RANGE' | 'PRICE_ORDER' | 'LOAD_TEST_REQUIRED' | 'INSUFFICIENT_TREASURY' | 'INVALID_STATE' | 'CHANGE_IN_PROGRESS' | 'PRICING_IN_AUDIENCE' | 'STREAMING_PLUS';
     message: string;
 }
 
@@ -1039,6 +1040,15 @@ export const validateStreamingInfrastructureDraft = (
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle) || !platform.identity || !platform.foundingProfile) {
         issues.push({ step: 0, code: 'INVALID_STATE', message: 'Infrastructure setup is available after incorporation.' });
     }
+    /* Streaming+ (2026-11-08): a pack city, Titan or Meridian Edge that the change would add, refused the same way for the
+       opening Build, a revision, Suggest and auto-fill; what the company already has stays */
+    const packBlock = streamingPlusNetworkBlock(
+        player,
+        (platform.pendingInfrastructureSetup || platform.infrastructureSetup)?.facilities || [],
+        draft.facilities || [],
+        cityId => STREAMING_SERVER_SITES.find(site => site.id === cityId)?.name || cityId,
+    );
+    if (packBlock) issues.push({ step: 1, code: 'STREAMING_PLUS', message: packBlock.message });
     if (platform.launchCommit && platform.pendingInfrastructureSetup) {
         issues.push({
             step: 0,

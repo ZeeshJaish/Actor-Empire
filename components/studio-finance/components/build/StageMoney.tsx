@@ -514,6 +514,7 @@ export function StageMoney({ data, draft: build, totals, plan, handlers, campaig
       )}
       {buildingCampaign && marketing?.forecastFor && draft && forecast && (
         <LaunchCampaignBuilder
+          streamingPlusOwned={data.streamingPlus ? data.streamingPlus.owned : true}
           draft={draft}
           channels={marketing.channels}
           forecastFor={marketing.forecastFor}

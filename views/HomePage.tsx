@@ -1,3 +1,5 @@
+import { hasStreamingPlus } from '../services/streamingPlusPack';
+import { announceStreamingPlusUnlocked } from '../services/streamingPlusEvents';
 
 import { inActivityOrder, inFeedOrder, isOldWorldLine } from '../services/activityLog';
 import React, { useRef, useEffect, useState, useMemo } from 'react';
@@ -388,6 +390,21 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       if (!onUpdatePlayer) return;
       const newGenreXP = { ...player.stats.genreXP, [genre]: value };
       onUpdatePlayer({ ...player, stats: { ...player.stats, genreXP: newGenreXP } });
+  };
+
+  /* dev: give or take the Streaming+ Pack on this account, to test both sides of every lock */
+  const toggleStreamingPlusForTest = () => {
+      if (!onUpdatePlayer) return;
+      const owned = hasStreamingPlus(player);
+      const purchases = Array.isArray(player.flags?.premiumPurchases) ? player.flags.premiumPurchases as string[] : [];
+      try {
+          const key = 'actorEmpirePremiumEntitlements';
+          const saved = JSON.parse(localStorage.getItem(key) || '{}');
+          const ids = (Array.isArray(saved.productIds) ? saved.productIds : []).filter((id: string) => id !== 'streaming_plus');
+          localStorage.setItem(key, JSON.stringify({ ...saved, productIds: owned ? ids : [...ids, 'streaming_plus'], updatedAt: Date.now() }));
+      } catch { /* the save still changes */ }
+      onUpdatePlayer({ ...player, flags: { ...player.flags, premiumPurchases: owned ? purchases.filter(id => id !== 'streaming_plus') : [...purchases, 'streaming_plus'] } });
+      if (!owned) announceStreamingPlusUnlocked();
   };
 
   const updateMoney = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3959,6 +3976,13 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
                                   <button type="button" onClick={()=>playNight('DEGRADED_OPENING')} className="rounded-lg border border-red-400/40 bg-red-500/10 px-1 py-3 text-xs font-black text-red-100">It buckled</button>
                                 </div>
                                 <p className="text-xs text-zinc-400">Plays the whole night, any time, as often as you like. Changes nothing in your save.</p>
+                              </section>
+                              <section className="rounded-xl border border-amber-400/30 bg-amber-950/20 p-3 space-y-2" aria-label="Streaming+ Pack test">
+                                <p className="text-xs font-bold text-amber-200">Streaming+ Pack (test)</p>
+                                <button type="button" disabled={!onUpdatePlayer} onClick={toggleStreamingPlusForTest} className="w-full rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-3 text-xs font-black text-amber-100">
+                                  {hasStreamingPlus(player) ? 'Remove the pack (test)' : 'Give the pack (test)'}
+                                </button>
+                                <p className="text-xs text-zinc-400">For testing the locks: no store and no money. Real players get it from the store.</p>
                               </section>
                               {onStreamingLaunchQa && <section className="rounded-xl border border-cyan-400/30 bg-cyan-950/20 p-3 space-y-2" aria-label="Streaming launch test shortcuts">
                                 <p className="text-xs font-bold text-cyan-200">Streaming launch testing</p>

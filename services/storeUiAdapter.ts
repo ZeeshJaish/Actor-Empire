@@ -1,6 +1,7 @@
 import type { GameLanguage, Player } from '../types';
 import type { IconName } from '../components/ui-overhaul/ui';
 import {
+  getPremiumCollectionSizes,
   getLocalizedPremiumProducts,
   hasPremiumProduct,
   type PremiumProduct,
@@ -20,6 +21,10 @@ export interface StoreUiProduct {
   color: string;
   owned: boolean;
   bestValue: boolean;
+  /** false on a device whose store has not given this item's price: it is shown, never sold at a guessed price */
+  available: boolean;
+  /** what a collection unlocks, counted from the game's own catalogue */
+  unlocks?: number;
 }
 
 export interface StoreUiGroup {
@@ -66,23 +71,34 @@ const numericPrice = (price: string) => {
   return Number.parseFloat(normalized) || 0;
 };
 
+export interface StoreUiPriceOptions {
+  /** the store's prices as numbers (same currency), for a truthful Best value */
+  amounts?: Partial<Record<PremiumProductId, number>>;
+  /** on a device only the store's own prices are shown; without one an item cannot be bought */
+  requireStorePrices?: boolean;
+}
+
 export const buildStoreUiModel = (
   player: Player,
   language: GameLanguage = 'en',
   prices: Partial<Record<PremiumProductId, string>> = {},
+  options: StoreUiPriceOptions = {},
 ): StoreUiModel => {
   const products = getLocalizedPremiumProducts(language);
+  const amountOf = (id: PremiumProductId, fallback: string) => options.amounts?.[id] ?? numericPrice(prices[id] || fallback);
+  const unlockCounts = getPremiumCollectionSizes();
 
   return {
     bonusBank: Math.max(0, Number(player.flags?.bonusEnergyBank) || 0),
     readyEnergy: Math.max(0, Number(player.energy.current) || 0),
     groups: GROUPS.map(group => {
       const sourceItems = products.filter(product => product.category === group.id);
-      const rated = sourceItems.filter(product => typeof product.amount === 'number' && numericPrice(prices[product.id] || product.priceLabel) > 0);
+      const sellable = (product: typeof sourceItems[number]) => !options.requireStorePrices || Boolean(prices[product.id]);
+      const rated = sourceItems.filter(product => typeof product.amount === 'number' && sellable(product) && amountOf(product.id, product.priceLabel) > 0);
       const bestId = rated.length > 1
         ? rated.reduce((best, product) => (
-          (product.amount || 0) / numericPrice(prices[product.id] || product.priceLabel)
-            > (best.amount || 0) / numericPrice(prices[best.id] || best.priceLabel)
+          (product.amount || 0) / amountOf(product.id, product.priceLabel)
+            > (best.amount || 0) / amountOf(best.id, best.priceLabel)
             ? product
             : best
         )).id
@@ -94,13 +110,15 @@ export const buildStoreUiModel = (
           id: product.id,
           name: product.title,
           note: product.description,
-          price: prices[product.id] || product.priceLabel,
+          price: prices[product.id] || (options.requireStorePrices ? '—' : product.priceLabel),
           amount: product.amount,
           kind: product.kind,
           icon: iconFor(product.id),
           color: colorFor(product.id),
           owned: product.kind === 'non_consumable' && hasPremiumProduct(player, product.id),
           bestValue: product.id === bestId,
+          available: sellable(product),
+          ...(unlockCounts[product.id] ? { unlocks: unlockCounts[product.id] } : {}),
         })),
       };
     }),

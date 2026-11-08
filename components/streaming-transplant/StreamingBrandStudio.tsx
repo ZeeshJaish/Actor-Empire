@@ -1,3 +1,5 @@
+import { StreamingPlusChip } from '../streamingPlus/StreamingPlusParts';
+import { openStreamingPlusSheet } from '../../services/streamingPlusEvents';
 /**
  * THE BRAND STUDIO (#116; plan §18.6; Zeesh, 2026-11-01: "एचक्यू के लोगों को टैग करो तो चेंज हो जाए" … "लोगो और इंटेंट बदलने
  * का पैसा और हफ्ता लगेगा, और ठीक है करो").
@@ -67,9 +69,11 @@ export interface StreamingBrandStudioProps {
   ident: { soundIdentKey: StreamingSoundIdentKey | null; packageId: StreamingIdentPackageId | null };
   /** a kit's Tech lock (#109), by kit */
   identLocks: Partial<Record<StreamingIdentPackageId, { techId: StreamingTechId; tech: string }>>;
+  /** Streaming+: the kits that need the pack (not the one in use) */
+  identPlus?: StreamingIdentPackageId[];
   frontPage: {
     currentId: string | null;
-    layouts: Array<{ id: string; name: string; line: string; composition: string; category: string; locked: string | null; lockTech?: StreamingTechId | null }>;
+    layouts: Array<{ id: string; name: string; line: string; composition: string; category: string; locked: string | null; lockTech?: StreamingTechId | null; plus?: boolean }>;
   };
   onApplyLook: (look: StreamingBrandLook) => Result;
   onApplyIdent: (input: { soundIdentKey: StreamingSoundIdentKey; identPackageId: StreamingIdentPackageId }) => Result;
@@ -83,7 +87,7 @@ export interface StreamingBrandStudioProps {
 }
 
 export const StreamingBrandStudio: React.FC<StreamingBrandStudioProps> = ({
-  brand, view, ident, identLocks, frontPage, onApplyLook, onApplyIdent, onApplyFrontPage, onGoToTech, onOpenDefineLaunch, onClose, initialTab = 'LOOK',
+  brand, view, ident, identLocks, identPlus = [], frontPage, onApplyLook, onApplyIdent, onApplyFrontPage, onGoToTech, onOpenDefineLaunch, onClose, initialTab = 'LOOK',
 }) => {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [draft, setDraft] = useState<Brand>(brand);
@@ -182,6 +186,7 @@ export const StreamingBrandStudio: React.FC<StreamingBrandStudioProps> = ({
       if (!view.live) return { what: 'BEFORE LAUNCH', line: 'The ident is set in Define the Launch, paid at launch', action: onOpenDefineLaunch ? { label: 'Define the Launch ›', disabled: false, go: onOpenDefineLaunch } : null };
       if (view.identWaitWeeks > 0) return { what: 'THE LAST NEW IDENT IS ROLLING OUT', line: `Next new ident in ${weeks(view.identWaitWeeks)}`, action: null };
       if (!identChanged) return { what: 'YOUR IDENT', line: 'Pick a sound or a kit above', action: null };
+      if (identPlus.includes(kit)) return { what: `${KITS.find(item => item.id === kit)?.name.toUpperCase()} IS STREAMING+`, line: "One of the Streaming+ Pack's 2 idents", action: { label: 'Streaming+ ›', disabled: false, go: () => openStreamingPlusSheet({ source: 'brand-ident', focus: 'brand', line: `The ${KITS.find(item => item.id === kit)?.name} is one of the Streaming+ Pack's 2 idents.` }) } };
       const lock = identLocks[kit];
       if (lock) return { what: `${KITS.find(item => item.id === kit)?.name.toUpperCase()} IS LOCKED`, line: `Unlock ${lock.tech} in Tech`, action: onGoToTech ? { label: `${lock.tech} ›`, disabled: false, go: () => onGoToTech(lock.techId) } : null };
       const cost = getStreamingIdentChangeCost(kit);
@@ -195,6 +200,7 @@ export const StreamingBrandStudio: React.FC<StreamingBrandStudioProps> = ({
     }
     if (!view.live) return { what: 'BEFORE LAUNCH', line: 'The front page is chosen in Define the Launch', action: onOpenDefineLaunch ? { label: 'Define the Launch ›', disabled: false, go: onOpenDefineLaunch } : null };
     if (!frontChanged) return { what: 'YOUR FRONT PAGE', line: `${layoutDef?.name ?? 'Cinema'} · the app opens on it`, action: null };
+    if (layoutDef?.plus) return { what: `${layoutDef.name.toUpperCase()} IS STREAMING+`, line: "One of the Streaming+ Pack's 13 front pages", action: { label: 'Streaming+ ›', disabled: false, go: () => openStreamingPlusSheet({ source: 'brand-front-page', focus: 'brand', line: `${layoutDef.name} is one of the Streaming+ Pack's 13 front pages.` }) } };
     if (layoutDef?.locked) return { what: `${layoutDef.name.toUpperCase()} IS LOCKED`, line: `Unlock ${layoutDef.locked} in Tech`, action: layoutDef.lockTech && onGoToTech ? { label: `${layoutDef.locked} ›`, disabled: false, go: () => onGoToTech(layoutDef.lockTech!) } : null };
     return {
       what: `NEW FRONT PAGE · ${layoutDef?.name.toUpperCase()}`,
@@ -358,7 +364,9 @@ export const StreamingBrandStudio: React.FC<StreamingBrandStudioProps> = ({
                     className={cx(css.kit, kit === item.id && css.on, lock && css.kitLocked)} onClick={() => pickKit(item.id)}>
                     <span className={css.kthumb}>
                       <StreamingIdentPlayer still brand={draft} kit={item.id} sound={sound.toLowerCase()} seconds={item.seconds} next={sampleNext(draft.hue)} />
-                      {lock && <i className={css.klock} aria-hidden="true"><LockGlyph /><small>Unlock in Tech<br />{lock.tech}</small></i>}
+                      {identPlus.includes(item.id)
+                        ? <i aria-hidden="true" style={{ position: 'absolute', top: 6, right: 6, display: 'flex', zIndex: 2 }}><StreamingPlusChip compact /></i>
+                        : lock && <i className={css.klock} aria-hidden="true"><LockGlyph /><small>Unlock in Tech<br />{lock.tech}</small></i>}
                     </span>
                     <b>{item.name}</b>
                     <small>{item.line}</small>
@@ -404,15 +412,17 @@ export const StreamingBrandStudio: React.FC<StreamingBrandStudioProps> = ({
             const inUse = item.id === frontPage.currentId;
             return (
               <button key={item.id} type="button" aria-pressed={layout === item.id}
-                aria-label={`${item.name}${inUse ? ', in use' : item.locked ? `, locked: unlock ${item.locked} in Tech` : ', ready'}. Tap to preview`}
+                aria-label={`${item.name}${inUse ? ', in use' : item.plus ? ', part of the Streaming+ Pack' : item.locked ? `, locked: unlock ${item.locked} in Tech` : ', ready'}. Tap to preview`}
                 className={cx(css.front, layout === item.id && css.on, item.locked && css.frontLocked)} onClick={() => { setLayout(item.id); setFeedback(null); }}>
                 <span className={css.fthumb} data-front-thumb={index === 0 ? '' : undefined}>
                   {tilesReady && <span className={css.fthumbIn}><StreamingViewerHomePreview layoutId={item.id} brand={draft} /></span>}
-                  {item.locked && <i className={css.flock} aria-hidden="true"><LockGlyph /></i>}
+                  {item.plus
+                    ? <i aria-hidden="true" style={{ position: 'absolute', top: 6, right: 6, display: 'flex', zIndex: 2 }}><StreamingPlusChip compact /></i>
+                    : item.locked && <i className={css.flock} aria-hidden="true"><LockGlyph /></i>}
                   {inUse && <i className={css.fuse}>✓ In use</i>}
                 </span>
                 <b>{item.name}</b>
-                <small>{item.locked ? item.locked : inUse ? 'Your front page' : 'Ready'}</small>
+                <small>{item.plus ? 'Streaming+ Pack' : item.locked ? item.locked : inUse ? 'Your front page' : 'Ready'}</small>
               </button>
             );
           };

@@ -1,3 +1,4 @@
+import { hasStreamingPlus, STREAMING_PLUS_IDENT_IDS, STREAMING_PLUS_STOREFRONT_IDS } from '../services/streamingPlusPack';
 import React, { useEffect, useMemo, useRef } from 'react';
 import type {
   OwnedStreamingCustomIdentAudio,
@@ -282,17 +283,34 @@ const buildCatalogue = (player: Player, context: StreamingCatalogueReadContext):
 
 /* #109 (plan §18.5): a locked front page or ident kit names the Tech step that unlocks it (they read Product Experience
    and Recommendations levels the Tech tab never showed). The stream: and feature: locks nobody read are gone. */
-const buildCapabilityLocks = (player: Player): Pick<LaunchData, 'capabilityLocks' | 'capabilityLockTech'> => {
+const buildCapabilityLocks = (player: Player): Pick<LaunchData, 'capabilityLocks' | 'capabilityLockTech' | 'capabilityLockPlus'> => {
   const tree = resolveStreamingTechTree(player.ownedStreamingPlatform);
   const capabilityLocks: Record<string, string> = {};
   const capabilityLockTech: NonNullable<LaunchData['capabilityLockTech']> = {};
+  const capabilityLockPlus: Record<string, boolean> = {};
   Object.keys(STREAMING_LAUNCH_UNLOCKS).forEach(key => {
     const lock = streamingLaunchUnlockLock(tree, key);
     if (!lock) return;
     capabilityLocks[key] = lock.needs;
     capabilityLockTech[key] = { techId: lock.techId, tech: lock.tech };
   });
-  return { capabilityLocks, capabilityLockTech };
+  /* Streaming+ (2026-11-08): 13 front pages and 2 idents need the pack (it comes before any Tech step they also need);
+     the front page and ident a save already uses stay its own */
+  if (!hasStreamingPlus(player)) {
+    const config = player.ownedStreamingPlatform?.serviceConfiguration;
+    const inUse = new Set([
+      config?.storefrontLayoutId ? `storefront:${String(config.storefrontLayoutId).toLowerCase()}` : '',
+      config?.identPackageId ? `ident:${String(config.identPackageId).toLowerCase()}` : '',
+    ]);
+    [...STREAMING_PLUS_STOREFRONT_IDS].map(id => `storefront:${id}`)
+      .concat([...STREAMING_PLUS_IDENT_IDS].map(id => `ident:${id}`))
+      .filter(key => !inUse.has(key))
+      .forEach(key => {
+        capabilityLocks[key] = 'Part of the Streaming+ Pack';
+        capabilityLockPlus[key] = true;
+      });
+  }
+  return { capabilityLocks, capabilityLockTech, capabilityLockPlus };
 };
 
 export const buildLaunchData = (player: Player, preparedContext?: StreamingCatalogueReadContext, operations = false): LaunchData => {

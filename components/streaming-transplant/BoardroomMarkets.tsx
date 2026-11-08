@@ -1,3 +1,5 @@
+import { StreamingPlusChipButton } from '../streamingPlus/StreamingPlusParts';
+import { openStreamingPlusSheet } from '../../services/streamingPlusEvents';
 /*
  * #173 (plan §21.17): MARKETS, the IPO in this update.
  *
@@ -165,7 +167,7 @@ export const BoardroomMarkets = ({ view, actions }: { view: StreamingListingDesk
         return (
             <div className={css.markets}>
                 <section className={css.sec}>
-                    <div className={css.head}><h2>The road to the bell</h2><span>{view.cleared} of {view.gates.length} cleared</span></div>
+                    <div className={css.head}><h2>The road to the bell{view.streamingPlus && <> <StreamingPlusChipButton request={{ source: 'ipo-road', focus: 'company', line: 'The IPO, the bell, earnings calls and buybacks are part of the Streaming+ Pack.' }} /></>}</h2><span>{view.cleared} of {view.gates.length} cleared</span></div>
                     <p className={css.lead}>Going public is optional. The bell needs the {musts.length} musts and four steps in all; each step names the room that clears it.</p>
                     <ol className={css.rail}>
                         {view.gates.map((gate, index) => (
@@ -197,13 +199,17 @@ export const BoardroomMarkets = ({ view, actions }: { view: StreamingListingDesk
                         </div>
                         <p className={css.fine}>In the listing you choose what we are worth and how much to sell. New shares sell a little under what we are worth. Under 51% the board can outvote you.</p>
                     </div>
-                    <button type="button" className={cx(css.bell, !view.ready && css.bellLocked)} disabled={!view.ready} onClick={() => {
+                    <button type="button" className={cx(css.bell, !view.ready && !view.streamingPlus && css.bellLocked)} disabled={!view.ready && !view.streamingPlus} onClick={() => {
+                        if (view.streamingPlus) {
+                            openStreamingPlusSheet({ source: 'ipo-bell', focus: 'company', line: 'Listing your company is part of the Streaming+ Pack. The road and its steps stay yours to clear.' });
+                            return;
+                        }
                         const result = actions.ringBell();
                         if (!result.ok) setNote(result.message || 'The listing could not begin.');
                     }}>
                         <span className={css.bellIcon}><Bell /></span>
                         <span className={css.bellText}>
-                            <b>{view.resume ? 'Back to the listing' : 'Ring the bell'}</b>
+                            <b>{view.resume ? 'Back to the listing' : view.streamingPlus ? 'Ring the bell with Streaming+' : 'Ring the bell'}</b>
                             <small>{view.ready ? view.resume ? 'Your listing is under way' : 'Opens the listing: the ask, scrutiny, the offer, the market, public life' : `Clear ${needed} more step${needed === 1 ? '' : 's'} first`}</small>
                         </span>
                         {!view.resume && <span className={css.bellCost}>⚡{view.bellEnergy}</span>}

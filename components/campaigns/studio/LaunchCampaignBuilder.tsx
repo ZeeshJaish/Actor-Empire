@@ -1,3 +1,6 @@
+import { isStreamingPlusItem } from '../../../services/streamingPlusPack';
+import { openStreamingPlusSheet } from '../../../services/streamingPlusEvents';
+import { StreamingPlusChip } from '../../streamingPlus/StreamingPlusParts';
 /**
  * The launch campaign, built like every later campaign (#151; plan §20.12, Zeesh: "विजार्ड पेज में … कुछ कुछ चेंजेस हो
  * जाएंगे, जैसे कि उस टाइम हमारे पास शायद कोई सीरीज ना हो … प्लेटफॉर्म पुश करना है या क्या करना है"). The Campaign
@@ -110,6 +113,8 @@ const WARNING_WORDS: Record<string, string> = {
 };
 
 export interface LaunchCampaignBuilderProps {
+  /** Whether the player owns the Streaming+ Pack; absent reads as owned (labs). */
+  streamingPlusOwned?: boolean;
   draft: OwnedStreamingLaunchMarketingDraft;
   channels: Array<{ id: StreamingLaunchMarketingChannelId; label: string; line: string; available: boolean; reason?: string }>;
   forecastFor: (draft: OwnedStreamingLaunchMarketingDraft) => StreamingLaunchMarketingForecastSnapshot;
@@ -341,11 +346,17 @@ export const LaunchCampaignBuilder: React.FC<LaunchCampaignBuilderProps> = props
                       const rate = card.formats[id];
                       /* #158: where its picture is set: a big moment's place, a famous screen's first site */
                       const pictured = rate.show?.countryId ?? (format.sites ? where[0] ?? null : null);
+                      /* Streaming+: a pack format keeps its picture; picking it opens the pack's sheet */
+                      const plus = !on && props.streamingPlusOwned === false && isStreamingPlusItem({ kind: 'CAMPAIGN', id });
                       return (
-                        <button key={id} type="button" className={cx(css.format, css.pictured, on && css.picked, (locked || nowhere) && css.off)} disabled={(Boolean(locked) || nowhere) && !on} aria-pressed={on} onClick={() => toggle(id)}>
+                        <button key={id} type="button" className={cx(css.format, css.pictured, on && css.picked, (locked || nowhere) && css.off)} disabled={(Boolean(locked) || nowhere) && !on} aria-pressed={on}
+                          onClick={() => (plus
+                            ? openStreamingPlusSheet({ source: 'launch-campaign-format', focus: 'campaigns', line: `${format.name} is one of the Streaming+ Pack's 7 big campaign moments.` })
+                            : toggle(id))}>
                           <span className={css.formatPicture}>
                             <FormatPicture formatId={id} countryId={pictured} creative={creativeOf(id)} subjectName={subject.title} brandName={serviceName} hue={brandHue} />
                             <span className={css.formatBadge}><FormatGlyph id={id} /></span>
+                            {plus && <span className={css.formatPlus}><StreamingPlusChip /></span>}
                             {on && <i className={css.formatCheck} aria-hidden="true">✓</i>}
                           </span>
                           <b>{format.name}</b>

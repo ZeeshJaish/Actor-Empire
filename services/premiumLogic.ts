@@ -15,14 +15,15 @@ export type PremiumProductId =
     | 'bundle_luxury_homes'
     | 'bundle_elite_vehicles'
     | 'bundle_sky_sea'
-    | 'bundle_ultimate_lifestyle';
+    | 'bundle_ultimate_lifestyle'
+    | 'streaming_plus';
 
 export interface PremiumProduct {
     id: PremiumProductId;
     title: string;
     priceLabel: string;
     kind: 'consumable' | 'non_consumable';
-    category: 'ad_free' | 'energy' | 'cash' | 'collection';
+    category: 'ad_free' | 'energy' | 'cash' | 'collection' | 'expansion';
     description: string;
     amount?: number;
 }
@@ -60,7 +61,9 @@ const PREMIUM_PRODUCT_CONFIGS: PremiumProductConfig[] = [
     { id: 'bundle_luxury_homes', titleKey: 'premium.product.bundle_luxury_homes.title', priceLabel: '$4.99', kind: 'non_consumable', category: 'collection', descriptionKey: 'premium.product.bundle_luxury_homes.description' },
     { id: 'bundle_elite_vehicles', titleKey: 'premium.product.bundle_elite_vehicles.title', priceLabel: '$4.99', kind: 'non_consumable', category: 'collection', descriptionKey: 'premium.product.bundle_elite_vehicles.description' },
     { id: 'bundle_sky_sea', titleKey: 'premium.product.bundle_sky_sea.title', priceLabel: '$6.99', kind: 'non_consumable', category: 'collection', descriptionKey: 'premium.product.bundle_sky_sea.description' },
-    { id: 'bundle_ultimate_lifestyle', titleKey: 'premium.product.bundle_ultimate_lifestyle.title', priceLabel: '$12.99', kind: 'non_consumable', category: 'collection', descriptionKey: 'premium.product.bundle_ultimate_lifestyle.description' }
+    { id: 'bundle_ultimate_lifestyle', titleKey: 'premium.product.bundle_ultimate_lifestyle.title', priceLabel: '$12.99', kind: 'non_consumable', category: 'collection', descriptionKey: 'premium.product.bundle_ultimate_lifestyle.description' },
+    /* the streaming expansion (2026-11-08): what it holds lives in services/streamingPlusPack.ts */
+    { id: 'streaming_plus', titleKey: 'premium.product.streaming_plus.title', priceLabel: '$7.99', kind: 'non_consumable', category: 'expansion', descriptionKey: 'premium.product.streaming_plus.description' }
 ];
 
 const localizePremiumProduct = (product: PremiumProductConfig, language: GameLanguage): PremiumProduct => ({
@@ -148,6 +151,7 @@ const PREMIUM_COLLECTION_COPY: Record<PremiumProductId, PremiumCollectionGateCon
     bundle_elite_vehicles: { productId: 'bundle_elite_vehicles', titleKey: 'premium.product.bundle_elite_vehicles.title', teaserKey: 'premium.gate.bundle_elite_vehicles.teaser' },
     bundle_sky_sea: { productId: 'bundle_sky_sea', titleKey: 'premium.product.bundle_sky_sea.title', teaserKey: 'premium.gate.bundle_sky_sea.teaser' },
     bundle_ultimate_lifestyle: { productId: 'bundle_ultimate_lifestyle', titleKey: 'premium.product.bundle_ultimate_lifestyle.title', teaserKey: 'premium.gate.bundle_ultimate_lifestyle.teaser' },
+    streaming_plus: { productId: 'streaming_plus', titleKey: 'premium.product.streaming_plus.title', teaserKey: 'premium.gate.streaming_plus.teaser' },
 };
 
 const getOwnedPurchases = (player: Player): PremiumProductId[] => {
@@ -329,6 +333,14 @@ export const hasPremiumAccessForAsset = (player: Player, assetId: string): boole
     return hasPremiumProduct(player, requiredProduct);
 };
 
+/** How many catalogue items each collection unlocks (the Ultimate one holds every collection). */
+export const getPremiumCollectionSizes = (): Partial<Record<PremiumProductId, number>> => {
+    const sizes: Partial<Record<PremiumProductId, number>> = {};
+    Object.values(PREMIUM_ASSET_COLLECTIONS).forEach(productId => { sizes[productId] = (sizes[productId] || 0) + 1; });
+    sizes.bundle_ultimate_lifestyle = Object.keys(PREMIUM_ASSET_COLLECTIONS).length;
+    return sizes;
+};
+
 export const getOwnedPremiumAssetsForCollection = (player: Player, productId: PremiumProductId): string[] =>
     (player.assets || []).filter(assetId => PREMIUM_ASSET_COLLECTIONS[assetId] === productId);
 
@@ -359,6 +371,9 @@ export const applyPremiumPurchase = (player: Player, productId: PremiumProductId
         case 'no_ads':
             ownedPurchases.push(productId);
             return t(language, 'premium.purchase.noAdsApplied');
+        case 'streaming_plus':
+            ownedPurchases.push(productId);
+            return t(language, 'premium.purchase.streamingPlusApplied');
         case 'energy_100':
         case 'energy_250':
         case 'energy_500':

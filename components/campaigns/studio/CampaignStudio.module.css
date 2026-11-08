@@ -243,3 +243,6 @@
   .weekCard > b{font-size:31px}
 }
 @media (prefers-reduced-motion:reduce){.studio,.studio *{animation:none !important;transition:none !important}}
+
+/* Streaming+ (2026-11-08): a pack format keeps its picture, with the chip on top */
+.formatPlus{position:absolute;right:6px;top:6px;display:flex;pointer-events:none}

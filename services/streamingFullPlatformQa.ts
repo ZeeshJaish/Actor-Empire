@@ -1,3 +1,4 @@
+import { grantStreamingPlusForTesting } from './streamingPlusPack';
 /** Explicit developer-menu action: a launched, operating streaming company with a
  * full catalogue, Originals, a hybrid offer, a leadership team, outside investors
  * and weeks of history, built through the game's own services so every screen
@@ -244,7 +245,7 @@ const signLaunchLicences=(source:Player):{player:Player;signed:number}=>{
 export function prepareStreamingFullPlatformQa(source:Player):Player {
  const state=getStreamingFullPlatformQaState(source);
  if(state.stage!=='PREPARE') throw Error(state.reason||'This company is past preparation.');
- let player=structuredClone(source);
+ let player=grantStreamingPlusForTesting(structuredClone(source));
  let platform=normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform,player.id);
  const week=getAbsoluteWeek(player.age,player.currentWeek);
  if(!platform.identity||!platform.foundingProfile) {
@@ -362,6 +363,7 @@ export function prepareStreamingFullPlatformQa(source:Player):Player {
 
 /** The real Opening Programme commission, against the same campaign forecast the launch uses. */
 export function commissionStreamingFullPlatformQa(player:Player):Player {
+ player=grantStreamingPlusForTesting(player);
  const platform=player.ownedStreamingPlatform;
  const draft=platform.infrastructureSetupDraft;
  if(!draft) throw Error('The test network drawing is missing. No changes were saved.');
@@ -435,7 +437,7 @@ const scheduleOriginals=(player:Player):Player=>{
 
 /** Runs every remaining stage, saving after preparation, each processed week and the launch. */
 export async function buildStreamingFullPlatformQa(source:Player,hooks:StreamingFullPlatformQaHooks):Promise<Player> {
- let player=source;
+ let player=grantStreamingPlusForTesting(source);
  const say=(message:string)=>hooks.onProgress?.(message);
  const advance=async(label:string)=>{
   if(player.flags?.isDead) throw Error('The career ended. Completed weeks were saved.');
