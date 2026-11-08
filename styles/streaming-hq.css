@@ -630,7 +630,7 @@
 .hq-welcome-mark { width: 54px; height: 54px; margin-bottom: 22px; display: grid; place-items: center; border-radius: 17px; color: #fff; background: var(--hq-accent); box-shadow: 0 12px 35px color-mix(in srgb, var(--hq-accent) 25%, transparent); }
 .hq-welcome h1 { margin: 7px 0 7px; font-size: 1.7rem; letter-spacing: -.045em; }
 .hq-welcome > p { margin: 0; color: #9999a4; font-size: .82rem; line-height: 1.5; }
-.hq-welcome-map { margin: 20px 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.hq-welcome-map { margin: 20px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .hq-welcome-map span { min-width: 0; padding: 9px 2px; display: flex; flex-direction: column; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.07); border-radius: 11px; color: #b5b5bf; background: rgba(255,255,255,.025); font-size: .52rem; }
 .hq-welcome .hq-primary-button { width: 100%; }
 .hq-welcome > .hq-text-button { width: 100%; margin-top: 5px; }
@@ -1648,4 +1648,34 @@
     min-width: 174px;
     min-height: 48px;
   }
+}
+
+/* ---------- the Streaming Hall tour (2026-11-08): a spotlight on the real card, a coach card on the free half ---------- */
+.hq-tour-layer { position: fixed; z-index: 96; inset: 0; pointer-events: auto; }
+.hq-tour-dim { position: absolute; inset: 0; background: rgba(3,3,7,.74); animation: hq-tour-fade .3s ease both; }
+.hq-tour-spot {
+  position: fixed; border-radius: 20px; pointer-events: none;
+  box-shadow: 0 0 0 200vmax rgba(3,3,7,.74), 0 0 0 1.5px color-mix(in srgb, var(--hq-accent) 80%, white), 0 0 34px color-mix(in srgb, var(--hq-accent) 45%, transparent);
+  transition: top .38s cubic-bezier(.22,.9,.28,1), left .38s cubic-bezier(.22,.9,.28,1), width .38s cubic-bezier(.22,.9,.28,1), height .38s cubic-bezier(.22,.9,.28,1);
+}
+.hq-tour-card {
+  position: fixed; left: 50%; width: min(calc(100% - 28px), 460px); transform: translateX(-50%);
+  padding: 17px 17px 12px; border: 1px solid color-mix(in srgb, var(--hq-accent) 38%, rgba(255,255,255,.12)); border-radius: 22px;
+  color: #f4f4f7; background: linear-gradient(150deg, color-mix(in srgb, var(--hq-accent) 12%, #17171f), #0e0e13 70%);
+  box-shadow: 0 24px 70px rgba(0,0,0,.6);
+}
+.hq-tour-card.is-bottom { bottom: max(14px, calc(10px + env(safe-area-inset-bottom))); }
+.hq-tour-card.is-top { top: max(14px, calc(10px + env(safe-area-inset-top))); }
+.hq-tour-card.is-centre { top: 50%; bottom: auto; transform: translate(-50%, -50%); }
+.hq-tour-card .hq-tour-track { margin-bottom: 14px; }
+.hq-tour-card h2 { margin: 6px 0; font-size: 1.12rem; line-height: 1.2; letter-spacing: -.02em; }
+.hq-tour-card p { margin: 0; color: #a3a3ae; font-size: .78rem; line-height: 1.5; }
+.hq-tour-body { animation: hq-tour-in .32s cubic-bezier(.22,.9,.28,1) both; }
+.hq-tour-moves { display: inline-flex; align-items: center; gap: 8px; }
+.hq-tour-back { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.12); border-radius: 13px; color: #c9c9d2; background: rgba(255,255,255,.04); }
+@keyframes hq-tour-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes hq-tour-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .hq-tour-spot { transition: none; }
+  .hq-tour-body, .hq-tour-dim { animation: none; }
 }

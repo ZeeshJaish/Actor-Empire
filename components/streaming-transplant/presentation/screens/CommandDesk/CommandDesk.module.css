@@ -60,6 +60,11 @@
 .hq .hqback{grid-column:1;margin-top:3px;width:34px;height:34px;border-radius:11px;font-size:17px;color:#aeb6c4;
   display:flex;align-items:center;justify-content:center}
 .hq .hqback:active{background:rgba(255,255,255,.07)}
+/* the Streaming Hall tour's replay (2026-11-08) takes the free right column, level with the back button */
+.hq .hqhelp{grid-column:3;grid-row:1;justify-self:end;margin-top:3px;width:34px;height:34px;border-radius:11px;font-size:15px;font-weight:800;
+  color:#aeb6c4;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03)}
+.hq .hqhelp:active{background:rgba(255,255,255,.08)}
+.hq .hqwords .hqhelp{margin-top:-4px}
 /* the service's name is never cut (#77): a very long name wraps; since #127 the level badge always sits under the
    lockup, on its centre */
 /* #116: the real logo beside the name; a tap opens the brand studio (the pencil says so) */

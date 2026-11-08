@@ -34,6 +34,7 @@ import { resolveStreamingPlatformBrandById } from '../services/streamingPlatform
 import { StreamingCountryFlagArt } from './streaming-transplant/StreamingCountryFlagArt';
 import StreamingPlatformBrand from './StreamingPlatformBrand';
 import AccessibleDialog from './AccessibleDialog';
+import { STREAMING_INCORPORATION_LABEL } from '../services/streamingEconomy';
 import '../styles/streaming-define-launch.css';
 
 interface Props {
@@ -171,7 +172,7 @@ export default function StreamingDefineLaunchWizard({ player, onUpdatePlayer, on
   const renderStep = () => {
     if (step === 'FUND') return <>
       <div className="dlw-hero-icon"><WalletCards size={28} /></div><span className="dlw-kicker">MISSION 01 · CAPITAL</span>
-      <h2>Give the company an operating treasury.</h2><p>The $85M incorporation payment created the company; it did not fund operations. Move founder money here before committing rights, service identity or infrastructure.</p>
+      <h2>Give the company an operating treasury.</h2><p>The {STREAMING_INCORPORATION_LABEL} incorporation payment created the company; it did not fund operations. Move founder money here before committing rights, service identity or infrastructure.</p>
       <div className="dlw-balance"><span>AVAILABLE TREASURY</span><strong>{money(platform.treasuryCash)}</strong><small>Founder-owned · no company debt</small></div>
       <button className="dlw-primary" onClick={onOpenFinance}>OPEN STUDIO FINANCE <ChevronRight size={18} /></button>
       <button className="dlw-text" onClick={next}>Plan first at $0 <ChevronRight size={15} /></button>

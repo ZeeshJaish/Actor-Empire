@@ -72,12 +72,12 @@ assert(
     'The exact incorporation threshold must not be bypassed.',
 );
 
-const incorporationBreakdown = getStreamingIncorporationBreakdown(100_000_000);
+const incorporationBreakdown = getStreamingIncorporationBreakdown(165_000_000);
 assert(
-    STREAMING_INCORPORATION_ECONOMY.cashRequired === 85_000_000
-        && STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed === 85_000_000
+    STREAMING_INCORPORATION_ECONOMY.cashRequired === 150_000_000
+        && STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed === 150_000_000
         && STREAMING_INCORPORATION_ECONOMY.openingTreasuryCash === 0,
-    'V8 incorporation must fully consume the exact $85M charge and open treasury at $0.',
+    'V8 incorporation must fully consume the exact $150M charge and open treasury at $0.',
 );
 assert(
     incorporationBreakdown.affordable
@@ -146,8 +146,8 @@ assert(incorporated.player.ownedStreamingPlatform.foundingDraft === null, 'The c
 const foundingProfile = incorporated.player.ownedStreamingPlatform.foundingProfile!;
 assert(foundingProfile.incorporationModel === 'FIXED_V8_ZERO_TREASURY', 'New companies should use the fixed v8 zero-treasury incorporation model.');
 assert(
-    foundingProfile.founderCashCharged === 85_000_000
-        && foundingProfile.setupCostsConsumed === 85_000_000
+    foundingProfile.founderCashCharged === 150_000_000
+        && foundingProfile.setupCostsConsumed === 150_000_000
         && foundingProfile.openingTreasuryCash === 0,
     'The canonical profile should preserve the exact incorporation economics.',
 );
@@ -160,7 +160,7 @@ assert(
 );
 assert(incorporated.player.ownedStreamingPlatform.founderOwnershipPercent === 100, 'Fixed incorporation should remain 100% player owned.');
 assert(incorporated.player.ownedStreamingPlatform.treasuryCash === 0, 'Operating treasury should open unfunded.');
-assert(incorporated.player.money === beforeCash - 85_000_000, 'Exactly $85M should leave personal cash.');
+assert(incorporated.player.money === beforeCash - 150_000_000, 'Exactly $150M should leave personal cash.');
 assert(incorporated.player.ownedStreamingPlatform.debtPrincipal === 0, 'Fixed incorporation must not create platform debt.');
 assert(
     incorporated.player.ownedStreamingPlatform.marketOperations.length === 0
@@ -186,9 +186,9 @@ const incorporationAction = incorporated.player.ownedStreamingPlatform.finance.c
     action => action.type === 'INCORPORATION',
 );
 assert(
-    incorporationAction?.amount === 85_000_000
+    incorporationAction?.amount === 150_000_000
         && incorporationAction.treasuryDelta === 0
-        && incorporationAction.personalCashDelta === -85_000_000
+        && incorporationAction.personalCashDelta === -150_000_000
         && incorporationAction.debtDelta === 0,
     'The finance ledger should record the exact atomic incorporation movement.',
 );
@@ -332,7 +332,7 @@ const npcSource = readFileSync('services/npcLogic.ts', 'utf8');
     'BRAND STUDIO',
     'AUDIENCE PROMISE',
     'FIXED INCORPORATION CHARTER',
-    'Your first $85M has one job.',
+    'Your first {STREAMING_INCORPORATION_LABEL} has one job.',
     '100% founder-owned',
     'No cash moves until you confirm',
     'AccessibleDialog',

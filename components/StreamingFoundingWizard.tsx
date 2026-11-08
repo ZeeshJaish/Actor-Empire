@@ -46,6 +46,7 @@ import {
   validateStreamingFoundingDraft,
 } from '../services/streamingFounding';
 import { markOwnedStreamingCinematicStatus } from '../services/ownedStreamingPlatform';
+import { STREAMING_INCORPORATION_LABEL } from '../services/streamingEconomy';
 import AccessibleDialog from './AccessibleDialog';
 import StreamingVisualScene from './StreamingVisualScene';
 import '../styles/streaming-founding.css';
@@ -470,7 +471,7 @@ export default function StreamingFoundingWizard({ player, onUpdatePlayer, onBack
       <section className="founding-charter" aria-labelledby="founding-charter-title">
         <div className="founding-charter-heading">
           <span>FIXED INCORPORATION CHARTER</span>
-          <h2 id="founding-charter-title">Your first $85M has one job.</h2>
+          <h2 id="founding-charter-title">Your first {STREAMING_INCORPORATION_LABEL} has one job.</h2>
           <p>It legally creates the company and is fully consumed by formation. The operating treasury opens at $0; infrastructure, staff and launch reach require fresh company capital.</p>
         </div>
 

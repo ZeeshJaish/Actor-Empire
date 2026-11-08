@@ -46,15 +46,15 @@ const createCompany = (): Player => {
 };
 
 let player = createCompany();
-assert(player.money === 415_000_000, 'The exact $85M formation charge should leave personal cash once.');
+assert(player.money === 350_000_000, 'The exact $150M formation charge should leave personal cash once.');
 assert(player.ownedStreamingPlatform.treasuryCash === 0, 'A new company must open with a $0 operating treasury.');
-assert(player.ownedStreamingPlatform.foundingProfile?.setupCostsConsumed === 85_000_000, 'The full formation payment should be consumed.');
+assert(player.ownedStreamingPlatform.foundingProfile?.setupCostsConsumed === 150_000_000, 'The full formation payment should be consumed.');
 assert(player.ownedStreamingPlatform.foundingProfile?.incorporationModel === 'FIXED_V8_ZERO_TREASURY', 'New companies should use the explicit V8 model.');
 
 const openingRoom = getStreamingFinanceRoom(player);
 assert(openingRoom.treasuryStatus === 'EMPTY' && openingRoom.nextAction.kind === 'INJECT', 'The first Finance brief should direct the founder to fund the operating account.');
 assert(openingRoom.periodLabel === 'PRE-LAUNCH' && openingRoom.periodRevenue === 0, 'Finance must not invent pre-launch operating revenue.');
-assert(openingRoom.ledger.some(entry => entry.category === 'FORMATION' && !entry.affectsTreasury && entry.displayAmount === 85_000_000), 'The passbook should disclose formation cost without pretending it entered treasury.');
+assert(openingRoom.ledger.some(entry => entry.category === 'FORMATION' && !entry.affectsTreasury && entry.displayAmount === 150_000_000), 'The passbook should disclose formation cost without pretending it entered treasury.');
 
 const personalBefore = player.money;
 const funded = contributeStreamingFounderCapital(player, 25_000_000, 'finance-room-audit-injection');

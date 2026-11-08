@@ -20,6 +20,7 @@ import { brandVars } from './presentation/brand';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Brand, Mark, brandColor, brandDeep, typeFace } from './StreamingBrandVisuals';
 import { PlaceholderAvatar } from './StreamingWallExperience';
+import { STREAMING_INCORPORATION_ECONOMY } from '../../services/streamingEconomy';
 
 
 const Counter: React.FC<{ to: number; ms: number }> = ({ to, ms }) => {
@@ -293,7 +294,7 @@ export const MachineWakesUp: React.FC<{
             </div>
             <div className={css.brule} />
             <div className={css.btitle}>WIRE TRANSFER CONFIRMATION</div>
-            <div className={css.bamt}>${' '}<Counter to={85_000_000} ms={2000} /><em>.00 USD</em></div>
+            <div className={css.bamt}>${' '}<Counter to={STREAMING_INCORPORATION_ECONOMY.cashRequired} ms={2000} /><em>.00 USD</em></div>
             <div>
               <div className={css.brow}><span>DEBIT</span><b>Personal holdings ····4417</b></div>
               <div className={css.brow}><span>CREDIT</span><b>Corporate formation settlement ····0092</b></div>
@@ -493,7 +494,7 @@ export const Activation: React.FC<{
             </div>
             <div className={css.brule} />
             <div className={css.btitle}>FOUNDING SETTLEMENT</div>
-            <div className={css.bamt}>${' '}<Counter to={85_000_000} ms={900} /><em>.00 USD</em></div>
+            <div className={css.bamt}>${' '}<Counter to={STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed} ms={900} /><em>.00 USD</em></div>
             <div>
               <div className={css.brow}><span>CONSUMED</span><b>{disbursed} · formation, registration &amp; rights</b></div>
               <div className={css.brow}><span>OPERATING CASH</span><b>{treasury}</b></div>

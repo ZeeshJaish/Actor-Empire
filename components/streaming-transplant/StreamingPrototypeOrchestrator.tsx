@@ -13,6 +13,7 @@
  * Cinematics only display already-committed choices; they never roll outcomes.
  */
 import css from './presentation/screens/Shell/Shell.module.css';
+import { STREAMING_INCORPORATION_ECONOMY } from '../../services/streamingEconomy';
 import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -131,11 +132,11 @@ export const DEFAULT_CONFIG: EpConfig = {
     { id: 'CCO_D', role: 'Chief Content Officer', name: 'Hana Sato', trait: 'Global-local curator', skill: 84, unlocks: 'Local-language titles travel farther', salary: 7_700_000, from: 'Vistaplay', years: 10 },
   ],
   unlockReqs: [
-    { id: 'cash', label: 'Liquid cash', have: 92_400_000, need: 85_000_000, kind: 'money' },
+    { id: 'cash', label: 'Liquid cash', have: 162_400_000, need: STREAMING_INCORPORATION_ECONOMY.cashRequired, kind: 'money' },
     { id: 'fame', label: 'Fame', have: 71, need: 65, kind: 'stat' },
     { id: 'rep', label: 'Reputation', have: 58, need: 55, kind: 'stat' },
   ],
-  setupCost: 85_000_000,
+  setupCost: STREAMING_INCORPORATION_ECONOMY.setupCostsConsumed,
   openingTreasury: 0,
   starterTitles: [
     { id: 't1', name: 'DEAD SIGNAL', kind: 'Original · Film', heat: 94 },

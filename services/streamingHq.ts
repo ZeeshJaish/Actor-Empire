@@ -19,56 +19,156 @@ export const STREAMING_HQ_SECTIONS: Array<{
     label: string;
     title: string;
 }> = [
-    { id: 'HOME', label: 'Home', title: 'Command Centre' },
-    { id: 'CONTENT', label: 'Content', title: 'Content Room' },
-    { id: 'TECH', label: 'Platform', title: 'Platform Operations' },
-    { id: 'MARKET', label: 'Market', title: 'Market Room' },
-    { id: 'COMPANY', label: 'Company', title: 'Company Office' },
+    /* the rooms by the names the headquarters shows (Audience and Boardroom replaced Market and Company) */
+    { id: 'HOME', label: 'Headquarters', title: 'Headquarters' },
+    { id: 'CONTENT', label: 'Content', title: 'Content' },
+    { id: 'TECH', label: 'Platform', title: 'Platform' },
+    { id: 'MARKET', label: 'Audience', title: 'Audience' },
+    { id: 'COMPANY', label: 'Boardroom', title: 'Boardroom' },
 ];
 
-export const STREAMING_HQ_TOUR_STEPS: Array<{
-    section: StreamingHqSection;
-    kicker: string;
+/* ============================================================================
+   THE STREAMING HALL TOUR
+   ----------------------------------------------------------------------------
+   Zeesh, 2026-11-08: the old tour walked five rooms (Home, Content, Platform,
+   Market, Company) that the cinematic desks replaced, and its coach card was
+   never mounted after the transplant, so "Take the tour" showed nothing and left
+   the tour stuck IN_PROGRESS. The tour now stays on the headquarters and points
+   at what is really there: readiness, the treasury, the two commands (or the
+   Slate once live), the four rooms, then a close. Each step speaks to the state
+   the company is in: pre-launch, the opening build, or live.
+   ========================================================================== */
+
+/** What the tour's spotlight lands on: the Command Deck marks each with data-hq-tour. */
+export type StreamingHqTourAnchor = 'readiness' | 'treasury' | 'commands' | 'slate' | 'operations' | 'rooms';
+export type StreamingHqTourMode = 'prelaunch' | 'building' | 'live';
+
+export interface StreamingHqTourCopy {
+    anchor: StreamingHqTourAnchor | null;
     title: string;
     description: string;
     focus: string;
-}> = [
+}
+
+export interface StreamingHqTourStep {
+    /** every step lives on the headquarters; kept so saves and the section logic stay compatible */
+    section: StreamingHqSection;
+    id: 'READINESS' | 'TREASURY' | 'COMMANDS' | 'ROOMS' | 'FINISH';
+    prelaunch: StreamingHqTourCopy;
+    building?: Partial<StreamingHqTourCopy>;
+    live: StreamingHqTourCopy;
+}
+
+const TOUR_REPLAY_NOTE = 'Replay this tour any time from the ? at the top.';
+
+export const STREAMING_HQ_TOUR_STEPS: StreamingHqTourStep[] = [
     {
         section: 'HOME',
-        kicker: 'TOUR 1 OF 5',
-        title: 'This is your command centre.',
-        description: 'Start here for launch priorities, platform signals and the next decision that matters.',
-        focus: 'Home explains the state of the business without making you hunt through every screen.',
+        id: 'READINESS',
+        prelaunch: {
+            anchor: 'readiness',
+            title: 'Your road to opening night.',
+            description: 'Launch readiness counts the checks your service must clear before it can go live. Every one you finish fills this number.',
+            focus: 'Clear every check and opening night unlocks.',
+        },
+        building: {
+            title: 'Your network is going up.',
+            description: 'Cities online counts the places your network already reaches. The crews keep building every week until opening night.',
+            focus: 'What you approved stays locked until you launch.',
+        },
+        live: {
+            anchor: 'readiness',
+            title: 'Your audience, every week.',
+            description: 'Subscribers, and how many joined or left this week. Almost every decision you make moves this number.',
+            focus: 'It updates when each week closes.',
+        },
     },
     {
-        section: 'CONTENT',
-        kicker: 'TOUR 2 OF 5',
-        title: 'Every title earns a job.',
-        description: 'Catalog, Originals and the future launch slate live in Content.',
-        focus: 'Until rights are licensed, this room shows a truthful pre-launch state instead of fake performance.',
+        section: 'HOME',
+        id: 'TREASURY',
+        prelaunch: {
+            anchor: 'treasury',
+            title: 'The treasury starts empty.',
+            description: 'Incorporation paid for the company, not for running it. Tap Treasury to move your own money in or raise from investors.',
+            focus: 'No money moves until you choose.',
+        },
+        live: {
+            anchor: 'treasury',
+            title: "The company's money.",
+            description: 'What the service earns lands here every week, and every cost leaves from here. Tap Treasury to put money in or raise.',
+            focus: 'Studio Finance shows where every dollar went.',
+        },
     },
     {
-        section: 'TECH',
-        kicker: 'TOUR 3 OF 5',
-        title: 'Build the service viewers actually use.',
-        description: 'Product features, playback, technology, infrastructure and delivery reliability live in Platform.',
-        focus: 'Research creates capability; Platform turns it into a dependable viewer experience.',
+        section: 'HOME',
+        id: 'COMMANDS',
+        prelaunch: {
+            anchor: 'commands',
+            title: 'Two commands get you live.',
+            description: 'Define the Launch picks your markets, plans and prices. Build the Platform sets up the network and the app. Each row shows its next step.',
+            focus: 'Once both are approved, this spot counts down the build.',
+        },
+        building: {
+            title: 'The build card.',
+            description: 'It shows what is being built, the weeks left, and when the build needs a decision from you.',
+            focus: 'Tap it to open the build.',
+        },
+        live: {
+            anchor: 'slate',
+            title: 'Your slate.',
+            description: 'Commission Originals and follow every title on its way to the service.',
+            focus: 'What is already streaming sits just below, in On the Service.',
+        },
     },
     {
-        section: 'MARKET',
-        kicker: 'TOUR 4 OF 5',
-        title: 'Know the audience before the fight.',
-        description: 'Launch reach, positioning, competitors and regional signals belong in Market.',
-        focus: 'Market share remains unavailable until the service is live and real results exist.',
+        section: 'HOME',
+        id: 'ROOMS',
+        prelaunch: {
+            anchor: 'rooms',
+            title: 'Four rooms run the company.',
+            description: 'Audience, Content, Platform and Boardroom each own one part of the opening. A lit dot means a room needs you.',
+            focus: 'Tap a room, or one of its chips, to go straight in.',
+        },
+        live: {
+            anchor: 'rooms',
+            title: 'Four rooms run the company.',
+            description: 'Audience, Content, Platform and Boardroom. A lit dot means a room needs you; See it as they do, just above, opens the app your viewers use.',
+            focus: 'Tap a room, or one of its chips, to go straight in.',
+        },
     },
     {
-        section: 'COMPANY',
-        kicker: 'TOUR 5 OF 5',
-        title: 'Control lives here.',
-        description: 'Ownership, treasury, founding leadership and permanent records sit in Company.',
-        focus: 'You remain CEO until you deliberately appoint someone else in a later phase.',
+        section: 'HOME',
+        id: 'FINISH',
+        prelaunch: {
+            anchor: null,
+            title: "That's your headquarters.",
+            description: 'Fund the treasury, work through both commands, then follow the lights. Opening night comes when every check clears.',
+            focus: TOUR_REPLAY_NOTE,
+        },
+        live: {
+            anchor: null,
+            title: "That's your control room.",
+            description: 'Watch the audience, keep the treasury healthy, and follow the lights into the rooms.',
+            focus: TOUR_REPLAY_NOTE,
+        },
     },
 ];
+
+/** One step as the coach shows it, for the state the company is in. */
+export const resolveStreamingHqTourStep = (
+    index: number,
+    mode: StreamingHqTourMode,
+): StreamingHqTourCopy & { kicker: string; index: number; total: number } => {
+    const total = STREAMING_HQ_TOUR_STEPS.length;
+    const safeIndex = Math.min(total - 1, Math.max(0, Math.round(Number(index) || 0)));
+    const step = STREAMING_HQ_TOUR_STEPS[safeIndex];
+    const copy: StreamingHqTourCopy = mode === 'live'
+        ? step.live
+        : mode === 'building'
+            ? { ...step.prelaunch, ...(step.building ?? {}) }
+            : step.prelaunch;
+    return { ...copy, kicker: `TOUR ${safeIndex + 1} OF ${total}`, index: safeIndex, total };
+};
 
 export interface StreamingHqChecklistItem {
     id: 'INCORPORATED' | 'INFRASTRUCTURE' | 'CATALOG' | 'ORIGINAL' | 'SLATE' | 'LAUNCH_READY';
@@ -322,10 +422,9 @@ export const visitStreamingHqSection = (
     player: Player,
     section: StreamingHqSection,
 ): Player => updateHqOnboarding(player, (state) => {
-    const sectionIndex = STREAMING_HQ_TOUR_STEPS.findIndex(step => step.section === section);
+    /* the tour lives on the headquarters now: walking into a room records the visit but never moves the tour */
     return {
         ...state,
-        currentStep: state.status === 'IN_PROGRESS' && sectionIndex >= 0 ? sectionIndex : state.currentStep,
         visitedSections: state.visitedSections.includes(section)
             ? state.visitedSections
             : [...state.visitedSections, section],
@@ -355,6 +454,14 @@ export const advanceStreamingHqTour = (player: Player): Player => updateHqOnboar
                 : [...state.visitedSections, nextSection],
         };
     },
+);
+
+/** One step back; the first step stays the first. */
+export const rewindStreamingHqTour = (player: Player): Player => updateHqOnboarding(
+    player,
+    (state) => (state.status !== 'IN_PROGRESS' || state.currentStep <= 0
+        ? state
+        : { ...state, currentStep: state.currentStep - 1 }),
 );
 
 export const skipStreamingHqTour = (player: Player): Player => updateHqOnboarding(

@@ -104,7 +104,7 @@ const lifestyleSource = readFileSync('views/LifestylePage.tsx', 'utf8');
     'Face the audience',
     'FOUNDER QUALIFICATION',
     'Open Platform Registration',
-    'The $85M rule is exact.',
+    'The {STREAMING_INCORPORATION_LABEL} rule is exact.',
     'Register. Enter Level 0. Build upward.',
     'AccessibleDialog',
     'aria-labelledby="stream-clearance-title"',

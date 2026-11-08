@@ -1,9 +1,11 @@
 import type { Player } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { transitionOwnedStreamingLifecycle } from './ownedStreamingPlatform';
+import { STREAMING_INCORPORATION_ECONOMY } from './streamingEconomy';
 
 export const STREAMING_ELIGIBILITY_THRESHOLDS = {
-    LIQUID_CASH: 85_000_000,
+    /* the cash you must hold to qualify is the cash incorporation charges ($150M since 2026-11-08) */
+    LIQUID_CASH: STREAMING_INCORPORATION_ECONOMY.cashRequired,
     FAME: 65,
     REPUTATION: 55,
 } as const;

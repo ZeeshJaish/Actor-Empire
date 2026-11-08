@@ -11,6 +11,8 @@ import {
     beginStreamingHqTour,
     getStreamingHqSnapshot,
     replayStreamingHqTour,
+    resolveStreamingHqTourStep,
+    rewindStreamingHqTour,
     skipStreamingHqTour,
     visitStreamingHqSection,
 } from '../services/streamingHq';
@@ -64,8 +66,8 @@ const snapshot = getStreamingHqSnapshot(incorporated);
 assert(snapshot.platformName === 'Northstar+', 'HQ identity should derive from the incorporated platform record.');
 assert(snapshot.statusLabel === 'PRE-LAUNCH', 'A founding company should be labeled pre-launch, not live.');
 assert(snapshot.treasuryCash === initialPlatform.treasuryCash, 'HQ treasury must derive from canonical company cash.');
-assert(snapshot.incorporationCost === 85_000_000, 'HQ should disclose the fixed $85M incorporation charge.');
-assert(snapshot.setupCostsConsumed === 85_000_000, 'HQ should disclose that the full $85M is consumed by formation.');
+assert(snapshot.incorporationCost === 150_000_000, 'HQ should disclose the fixed $150M incorporation charge.');
+assert(snapshot.setupCostsConsumed === 150_000_000, 'HQ should disclose that the full $150M is consumed by formation.');
 assert(snapshot.openingTreasuryCash === 0, 'HQ should disclose the $0 opening operating treasury.');
 assert(snapshot.founderOwnershipPercent === initialPlatform.founderOwnershipPercent, 'HQ ownership must derive from the founding transaction.');
 assert(snapshot.debtPrincipal === 0 && snapshot.capitalModelLabel === 'Founder-owned incorporation', 'HQ should show the debt-free fixed founding model.');
@@ -108,7 +110,18 @@ assert(begun.ownedStreamingPlatform.hqOnboarding.currentStep === 0, 'Orientation
 assert(begun.ownedStreamingPlatform.hqOnboarding.visitedSections.includes('HOME'), 'Starting orientation should record Home as visited.');
 
 const visitedTech = visitStreamingHqSection(begun, 'TECH');
-assert(visitedTech.ownedStreamingPlatform.hqOnboarding.currentStep === 2, 'Direct navigation during orientation should move coaching to that live section.');
+assert(visitedTech.ownedStreamingPlatform.hqOnboarding.currentStep === 0, 'The tour lives on the headquarters: walking into a room records the visit but never moves the tour.');
+const steppedOnce = advanceStreamingHqTour(begun);
+assert(steppedOnce.ownedStreamingPlatform.hqOnboarding.currentStep === 1, 'Next should move the tour one card on.');
+const steppedBack = rewindStreamingHqTour(steppedOnce);
+assert(steppedBack.ownedStreamingPlatform.hqOnboarding.currentStep === 0, 'Back should return to the previous card.');
+assert(rewindStreamingHqTour(steppedBack).ownedStreamingPlatform.hqOnboarding.currentStep === 0, 'The first card stays the first.');
+assert(resolveStreamingHqTourStep(2, 'prelaunch').anchor === 'commands' && resolveStreamingHqTourStep(2, 'live').anchor === 'slate',
+    'The third card points at the two commands before launch and at the Slate once live.');
+assert(resolveStreamingHqTourStep(0, 'building').title !== resolveStreamingHqTourStep(0, 'prelaunch').title,
+    'During the opening build the first card speaks about the network going up.');
+assert(resolveStreamingHqTourStep(4, 'prelaunch').anchor === null, 'The last card is a close, not a spotlight.');
+assert(!/Market Room|Company Office|Command Centre|Next area/.test(JSON.stringify(STREAMING_HQ_TOUR_STEPS)), 'The tour must not name the retired rooms.');
 assert(visitedTech.ownedStreamingPlatform.hqOnboarding.visitedSections.includes('TECH'), 'Visited sections should resume across sessions.');
 
 let completed = replayStreamingHqTour(visitedTech);
@@ -148,12 +161,12 @@ const boardroomSource = readFileSync('components/streaming-transplant/StreamingB
 const entrySource = readFileSync('components/StreamingLockedScreen.tsx', 'utf8');
 const hqSource = `${componentSource}\n${serviceSource}`;
 
-/* #304: the retired five-room HQ's words left with its code; these are the ones the live HQ still says */
+/* #304: the retired five-room HQ's words left with its code; these are the ones the live HQ still says.
+   2026-11-08: the section list names the rooms the headquarters shows (Audience and Boardroom, not Market and Company) */
 [
     'Content Room',
-    'Platform Operations',
-    'Market Room',
-    'Company Office',
+    "label: 'Audience'",
+    "label: 'Boardroom'",
     'First report after launch',
     'Explore on my own',
     'role="dialog"',
@@ -171,16 +184,17 @@ assert(
     'Pre-launch metrics must render as pending rather than as fake zeroes.',
 );
 
-/**
- * "Replay HQ orientation" lived in renderCompany, which stopped being mounted
- * when the cinematic desks replaced the five rooms. The tour itself is still
- * live (welcome, coach marks, skip); only the replay entry point is absent.
- * Asserted here so the gap stays visible rather than being silently forgotten.
- */
+/* 2026-11-08: the tour is a spotlight over the headquarters (StreamingHqTour), started from the welcome and replayed from
+   the ? in the deck's header. */
 assert(
     componentSource.includes('beginStreamingHqTour') && componentSource.includes('skipStreamingHqTour'),
     'The HQ orientation tour must remain available to new founders.',
 );
+assert(componentSource.includes('<StreamingHqTour') && componentSource.includes('onReplayTour={replayTour}'),
+    'The tour must be mounted on the headquarters and replayable from it.');
+assert(commandDeckSource.includes('Replay the Streaming Hall tour') && commandDeckSource.includes('data-hq-tour="operations"'),
+    'The deck must carry the replay button and the cards the tour points at.');
+assert(!componentSource.includes('renderTourCoach'), 'The coach the transplant stopped mounting must not come back as dead code.');
 assert(!componentSource.includes('Replay founding reveal'), 'The retired founding keynote must not remain reachable from HQ.');
 assert(!componentSource.includes('THE SIGNAL BEGINS'), 'The retired founding keynote must not render inside HQ.');
 assert(entrySource.includes('<StreamingPlatformHQ'), 'Incorporated founding careers should enter Platform HQ.');

@@ -196,7 +196,9 @@ export const PlatformHQ: React.FC<{
   onOpenLaunchTrack?: (track: StreamingLaunchTrackId) => void;
   onOpenLaunchDestination?: (destination: StreamingLaunchDestination) => void;
   onOpenOpeningBuild?: () => void;
-}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenBrandStudio, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack, onOpenOpeningBuild }) => {
+  /** the Streaming Hall tour, from its first card (2026-11-08) */
+  onReplayTour?: () => void;
+}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenBrandStudio, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack, onOpenOpeningBuild, onReplayTour }) => {
   const tf = typeFace(brand);
   const longName = (brand.name || '').length > 14;
   const [pulse, setPulse] = useState(0);
@@ -246,6 +248,9 @@ export const PlatformHQ: React.FC<{
               </div>
               <span className={css.tier} data-tier>{state.live ? state.tier : 'PRE-LAUNCH'}</span>
             </div>
+            {onReplayTour && (
+              <button type="button" className={css.hqhelp} onClick={onReplayTour} aria-label="Replay the Streaming Hall tour">?</button>
+            )}
           </div>
           <div className={css.hqwhere} data-where>
             <i className={css.pin} />
@@ -255,7 +260,7 @@ export const PlatformHQ: React.FC<{
           </div>
 
           <div className={css.hqheroes}>
-            <div className={cx(css.hero, css.big)}>
+            <div className={cx(css.hero, css.big)} data-hq-tour="readiness">
               <span className={css.hlabel}>{state.live ? state.audienceLabel ?? 'SUBSCRIBERS' : state.openingBuild ? 'CITIES ONLINE' : 'LAUNCH READINESS'}</span>
               {state.live ? (
                 <>
@@ -285,13 +290,13 @@ export const PlatformHQ: React.FC<{
                 once you were ALREADY over budget, or a chip three taps into the
                 Boardroom. The number you look at every week is now the door. */}
             {onOpenFinance ? (
-              <button type="button" className={cx(css.hero, css.heroTap)} onClick={onOpenFinance}
+              <button type="button" className={cx(css.hero, css.heroTap)} onClick={onOpenFinance} data-hq-tour="treasury"
                 aria-label={`Treasury ${money(state.treasury)}. Open financing.`}>
                 <span className={css.hlabel}>TREASURY</span>
                 <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
               </button>
             ) : (
-              <div className={css.hero}>
+              <div className={css.hero} data-hq-tour="treasury">
                 <span className={css.hlabel}>TREASURY</span>
                 <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
               </div>
@@ -329,7 +334,7 @@ export const PlatformHQ: React.FC<{
 
           {!state.live && state.openingBuild && (
             <button type="button" className={cx(css.buildCard, state.openingBuild.tone === 'ASK' && css.buildAsk, state.openingBuild.tone === 'READY' && css.buildReady)}
-              data-ui="opening-build-card" onClick={onOpenOpeningBuild}>
+              data-ui="opening-build-card" data-hq-tour="commands" onClick={onOpenOpeningBuild}>
               <span className={css.buildTop}>
                 <small><i aria-hidden="true" />{state.openingBuild.tone === 'READY' ? 'READY' : state.openingBuild.tone === 'ASK' ? 'NEEDS YOU' : 'BEING BUILT'}</small>
                 {state.openingBuild.tone !== 'READY' && <strong>{state.openingBuild.weeksLeft} <em>{state.openingBuild.weeksLeft === 1 ? 'WEEK' : 'WEEKS'}</em></strong>}
@@ -340,7 +345,7 @@ export const PlatformHQ: React.FC<{
             </button>
           )}
           {!state.live && state.launchProgram && !state.openingBuild && (
-            <nav className={css.launchCommandRows} aria-label="Pre-launch wizards">
+            <nav className={css.launchCommandRows} aria-label="Pre-launch wizards" data-hq-tour="commands">
               {state.launchProgram.tracks.map(track => {
                 const displayedMilestones = track.id === 'DEFINE_LAUNCH'
                   ? track.milestones.filter(isStreamingDefineLaunchWizardMilestone)
@@ -384,7 +389,7 @@ export const PlatformHQ: React.FC<{
         </div>}
 
         {/* ── row 1 · the slate ── */}
-        {state.live && <section className={css.hqsec}>
+        {state.live && <section className={css.hqsec} data-hq-tour="slate">
           <div className={css.sechead}><h2>The Slate</h2></div>
           <div className={css.rail}>
             <button className={cx(css.card, css.newcard)} onClick={onCommission}>
@@ -455,7 +460,7 @@ export const PlatformHQ: React.FC<{
         </section>}
 
         {/* ── row 3 · the operations console ── */}
-        <section className={cx(css.hqsec, css.console)}>
+        <section className={cx(css.hqsec, css.console)} data-hq-tour="operations">
           <span className={css.kicker}>{state.live ? 'PLATFORM CONTROL CONSOLE' : 'PRE-LAUNCH HEADQUARTERS'}</span>
           <div className={css.consolehead}>
             <h2 className={css.bighead}>{state.live ? 'OPERATIONS' : 'FOUR OPERATIONS'}</h2>
@@ -478,7 +483,7 @@ export const PlatformHQ: React.FC<{
             <i className={css.chev}>›</i>
           </button>}
 
-          <div className={css.consolebox}>
+          <div className={css.consolebox} data-hq-tour="rooms">
             <div className={css.divgrid}>
               {state.divisions.map(d => (
                 <div key={d.id} className={cx(css.divwrap, css[d.id.toLowerCase()])}>

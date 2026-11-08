@@ -9,7 +9,7 @@ import { getStreamingHqViewingSpotlight } from '../services/streamingAudienceMet
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useStreamingView } from './streaming-transplant/useStreamingView';
 import { advanceStreamingPresentationCursor } from '../services/streamingPresentationInputs';
-import {Building2, Check, ChevronRight, CircleDot, Clapperboard, Compass, Crown, Film, Globe2, Home, Layers3, LockKeyhole, Play, RadioTower, Server, ShieldCheck, Sparkles, WalletCards, X, type LucideIcon} from 'lucide-react';
+import {Building2, ChevronRight, Clapperboard, Compass, Crown, Film, Globe2, Home, Layers3, LockKeyhole, Play, RadioTower, Server, ShieldCheck, Sparkles, WalletCards, X, type LucideIcon} from 'lucide-react';
 import type {
   CampaignFormatId,
   OwnedStreamingLaunchRehearsalSnapshot,
@@ -33,9 +33,12 @@ import {
   beginStreamingHqTour,
   getStreamingHqSnapshot,
   replayStreamingHqTour,
+  rewindStreamingHqTour,
   skipStreamingHqTour,
   visitStreamingHqSection,
+  type StreamingHqTourMode,
 } from '../services/streamingHq';
+import StreamingHqTour from './StreamingHqTour';
 import { markOwnedStreamingCinematicStatus } from '../services/ownedStreamingPlatform';
 import StreamingCatalogSetup from './StreamingCatalogSetup';
 import OriginalsDesk from './originals/OriginalsDesk';
@@ -306,6 +309,9 @@ interface Props {
   onContentMarketOfferConsumed?: () => void;
 }
 
+/* the welcome's room row, in the headquarters' own order: Audience, Content, Platform, Boardroom */
+const WELCOME_ROOMS: StreamingHqSection[] = ['MARKET', 'CONTENT', 'TECH', 'COMPANY'];
+
 const SECTION_ICONS: Record<StreamingHqSection, LucideIcon> = {
   HOME: Home,
   CONTENT: Clapperboard,
@@ -531,7 +537,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* the tech the Tech tab opens on, when a locked plan step sent the player there */
   const [platformTechFocus, setPlatformTechFocus] = useState<StreamingTechId | null>(null);
   const [showWelcome, setShowWelcome] = useState(onboarding.status === 'NOT_STARTED');
-  const [showTourComplete, setShowTourComplete] = useState(false);
   const [showTechnologyCampus, setShowTechnologyCampus] = useState(false);
   /* where the Technology Campus opens: a branch's lab from Tech's Engineering list, the research
      still under way from its row; every other opener gets the Campus Map */
@@ -2024,7 +2029,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
 
   const startTour = () => {
     setShowWelcome(false);
-    setShowTourComplete(false);
     setActiveSection('HOME');
     chairAllow(() => persistCanonical(beginStreamingHqTour(player)));
   };
@@ -2034,29 +2038,19 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     chairAllow(() => persistCanonical(skipStreamingHqTour(player)));
   };
 
-  /* NO ENTRY POINT. Its only caller was the "Replay HQ orientation" button in
-     renderCompany, which stopped being mounted when the cinematic desks
-     replaced the five HQ rooms — so this has been unreachable since that
-     transplant, not since the dead code above was removed. Kept, with
-     replayStreamingHqTour behind it, because the feature is worth restoring:
-     it wants a home on the Boardroom or in the deck's LEGACY chip. */
+  /* the ? at the top of the headquarters (2026-11-08): the tour starts again from its first card */
   const replayTour = () => {
     setActiveSection('HOME');
-    setShowTourComplete(false);
     chairAllow(() => persistCanonical(replayStreamingHqTour(player)));
-    mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  /* the tour moves itself to each card; Finish on the last one completes it */
   const nextTourStep = () => {
-    const currentStep = onboarding.currentStep;
-    const nextStep = currentStep + 1;
     chairAllow(() => persistCanonical(advanceStreamingHqTour(player)));
-    if (nextStep >= STREAMING_HQ_TOUR_STEPS.length) {
-      setShowTourComplete(true);
-      return;
-    }
-    setActiveSection(STREAMING_HQ_TOUR_STEPS[nextStep].section);
-    mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const backTourStep = () => {
+    chairAllow(() => persistCanonical(rewindStreamingHqTour(player)));
   };
 
   const closeCatalogSetup = () => {
@@ -2113,32 +2107,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         status,
       ),
     }));
-  };
-
-  const renderTourCoach = () => {
-    if (onboarding.status !== 'IN_PROGRESS') return null;
-    const tourStep = STREAMING_HQ_TOUR_STEPS[onboarding.currentStep];
-    if (!tourStep || tourStep.section !== activeSection) return null;
-    const isLast = onboarding.currentStep === STREAMING_HQ_TOUR_STEPS.length - 1;
-    return (
-      <aside className="hq-tour-coach" aria-label={`HQ orientation: ${tourStep.title}`}>
-        <div className="hq-tour-track" aria-hidden="true">
-          {STREAMING_HQ_TOUR_STEPS.map((step, index) => (
-            <span key={step.section} className={index <= onboarding.currentStep ? 'is-filled' : ''} />
-          ))}
-        </div>
-        <span className="hq-eyebrow">{tourStep.kicker}</span>
-        <h2>{tourStep.title}</h2>
-        <p>{tourStep.description}</p>
-        <div className="hq-tour-focus"><CircleDot size={15} /> {tourStep.focus}</div>
-        <div className="hq-tour-actions">
-          <button type="button" className="hq-text-button" onClick={skipTour}>Skip tour</button>
-          <button type="button" className="hq-primary-button is-compact" onClick={nextTourStep}>
-            {isLast ? 'Finish tour' : 'Next area'} <ChevronRight size={17} />
-          </button>
-        </div>
-      </aside>
-    );
   };
 
   const renderTitleDossierLauncher = () => (
@@ -2329,6 +2297,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       }}
       onOpenLaunchDestination={openLaunchDestination}
       onOpenOpeningBuild={() => openOpeningBuild()}
+      onReplayTour={replayTour}
     />
   );
 
@@ -3088,6 +3057,18 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     );
   }
 
+  /* the screen in front of the player is a desk (a section), not a room opened over it */
+  const deckOnScreen = !showListing && !showContentMarket && !showCatalogSetup && !showOriginalsDesk && !showCommissionWizard && !showRightsExchange
+    && !showFinanceRoom && !showTechnologyCampus
+    && !showCampusConstruction && !showSlatePlanner
+    && !(showIncidentCommand && incidentCommand().available)
+    && !(showAnalyticsCenter && platform.launchCommit)
+    && !(showTitleDossier && platform.launchCommit);
+  /* the tour runs on the headquarters only; a stuck IN_PROGRESS from an older build simply resumes here */
+  const tourOnScreen = onboarding.status === 'IN_PROGRESS' && !showWelcome && deckOnScreen && activeSection === 'HOME';
+  const tourDeck = tourOnScreen ? commandDeckState() : null;
+  const tourMode: StreamingHqTourMode = tourDeck?.live ? 'live' : tourDeck?.openingBuild ? 'building' : 'prelaunch';
+
   return (
     <div
       className="streaming-hq-shell"
@@ -3097,13 +3078,18 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       } as React.CSSProperties}
     >
       <div className="streaming-zip-viewport" ref={mainRef} id="hq-main">
-        {!showListing && !showContentMarket && !showCatalogSetup && !showOriginalsDesk && !showCommissionWizard && !showRightsExchange
-          && !showFinanceRoom && !showTechnologyCampus
-          && !showCampusConstruction && !showSlatePlanner
-          && !(showIncidentCommand && incidentCommand().available)
-          && !(showAnalyticsCenter && platform.launchCommit)
-          && !(showTitleDossier && platform.launchCommit) ? renderSection() : null}
+        {deckOnScreen ? renderSection() : null}
       </div>
+
+      {tourOnScreen ? (
+        <StreamingHqTour
+          stepIndex={onboarding.currentStep}
+          mode={tourMode}
+          onNext={nextTourStep}
+          onBack={backTourStep}
+          onSkip={skipTour}
+        />
+      ) : null}
 
       {platform.publicCompany.listing && stockQuote() ? (
         <StreamingStockBug
@@ -3157,13 +3143,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         >
           <div className="hq-welcome">
             <span className="hq-welcome-mark"><LogoMark logoKey={identity.logoKey} /></span>
-            <span className="hq-eyebrow">YOUR PLATFORM DASHBOARD</span>
+            <span className="hq-eyebrow">YOUR HEADQUARTERS</span>
             <h1 id="hq-welcome-title">Welcome to {identity.name} Streaming Hall.</h1>
-            <p>Your platform is registered. Inject founder capital when you are ready to fund operations, or explore the dashboard first. No extra capital moves until you choose an action.</p>
-            <div className="hq-welcome-map" aria-label="Streaming Hall areas">
-              {STREAMING_HQ_SECTIONS.map(section => {
-                const Icon = SECTION_ICONS[section.id];
-                return <span key={section.id}><Icon size={17} />{section.label}</span>;
+            <p>Your company is registered and its treasury opens at $0. Inject capital when you are ready to fund the build, or look around first. No money moves until you choose.</p>
+            <div className="hq-welcome-map" aria-label="The four rooms of the headquarters">
+              {WELCOME_ROOMS.map(id => {
+                const section = STREAMING_HQ_SECTIONS.find(item => item.id === id);
+                const Icon = SECTION_ICONS[id];
+                return <span key={id}><Icon size={17} />{section?.label ?? id}</span>;
               })}
             </div>
             <button type="button" className="hq-primary-button" onClick={() => { skipTour(); openFinanceRoom('CAPITAL', 'INJECT'); }}>Inject capital <ChevronRight size={18} /></button>
@@ -3173,22 +3160,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         </AccessibleDialog>
       ) : null}
 
-      {showTourComplete ? (
-        <AccessibleDialog
-          className="hq-modal-backdrop"
-          role="dialog"
-          aria-labelledby="hq-complete-title"
-          onEscape={() => { setShowTourComplete(false); setActiveSection('HOME'); }}
-        >
-          <div className="hq-welcome hq-tour-complete">
-            <span className="hq-complete-icon"><Check size={28} /></span>
-            <span className="hq-eyebrow">ORIENTATION COMPLETE</span>
-            <h1 id="hq-complete-title">You know the building.</h1>
-            <p>Your first real operating move is infrastructure and subscription design. Until then, HQ keeps the launch plan honest and visible.</p>
-            <button type="button" className="hq-primary-button" onClick={() => { setShowTourComplete(false); setActiveSection('HOME'); }}>Return to Command Centre</button>
-          </div>
-        </AccessibleDialog>
-      ) : null}
 
 
       {showTechnologyCampus ? (

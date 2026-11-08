@@ -34,6 +34,7 @@ import {
   type StreamingLaunchMetric,
 } from '../services/streamingEligibility';
 import AccessibleDialog from './AccessibleDialog';
+import { STREAMING_INCORPORATION_LABEL } from '../services/streamingEconomy';
 import StreamingFoundingWizard from './StreamingFoundingWizard';
 import StreamingPlatformHQ from './StreamingPlatformHQ';
 import StreamingFoundingJourney from './StreamingFoundingJourney';
@@ -422,9 +423,9 @@ export default function StreamingLockedScreen({
           <div className="stream-entry-cost-truth">
             <div><Landmark size={19} /></div>
             <p>
-              <strong>The $85M rule is exact.</strong>
-              Qualification only opens registration. Incorporation later charges $85M once:
-              all $85M establishes the legal, regulatory, licensing and platform foundation. Company treasury opens at $0 and must be funded separately.
+              <strong>The {STREAMING_INCORPORATION_LABEL} rule is exact.</strong>
+              Qualification only opens registration. Incorporation later charges {STREAMING_INCORPORATION_LABEL} once:
+              all {STREAMING_INCORPORATION_LABEL} establishes the legal, regulatory, licensing and platform foundation. Company treasury opens at $0 and must be funded separately.
             </p>
           </div>
 
@@ -452,7 +453,7 @@ export default function StreamingLockedScreen({
             <li><span>01</span><div><strong>Create the identity</strong><p>Name the platform, shape its mark and sound, and decide what viewers should expect.</p></div></li>
             <li><span>02</span><div><strong>Incorporate the company</strong><p>You begin as Founder, Owner and CEO with 100% control and no forced partner.</p></div></li>
             <li><span>03</span><div><strong>Walk into an empty HQ</strong><p>Capacity, reach and technology are earned through real purchases—not selected from a launch menu.</p></div></li>
-            <li><span>04</span><div><strong>Produce your opening Original</strong><p>Opening Night requires a delivered Original from a production house you own. A new production house costs $50M in personal cash, separate from the $85M incorporation and your platform treasury. Plan this funding before incorporating.</p></div></li>
+            <li><span>04</span><div><strong>Produce your opening Original</strong><p>Opening Night requires a delivered Original from a production house you own. A new production house costs $50M in personal cash, separate from the {STREAMING_INCORPORATION_LABEL} incorporation and your platform treasury. Plan this funding before incorporating.</p></div></li>
           </ol>
         </section>
       </main>

@@ -37,9 +37,9 @@ export interface WallProps {
   avatarUrl?: string;
   rivals: WallRival[];
   requirements: Requirement[];
-  setupCost: string;      // "$85M"
+  setupCost: string;      // "$150M"
   treasury: string;       // "$0"
-  totalCost: string;      // "$85M"
+  totalCost: string;      // "$150M"
   onEnter: () => void;
   onClose: () => void;
   /** Activation only: re-render the same room with the slot already taken.
