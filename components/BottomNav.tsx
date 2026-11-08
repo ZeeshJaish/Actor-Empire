@@ -13,7 +13,7 @@ interface BottomNavProps {
 const NAV_CSS = `
 .ae-live-dock{
   --gold:#f8a810;--line:rgba(255,255,255,.095);--ghost:rgba(249,246,239,.22);--alert:#ff5c5c;
-  position:fixed;left:0;right:0;bottom:0;z-index:50;padding:0 16px calc(var(--ae-shell-nav-edge,12px) + env(safe-area-inset-bottom));pointer-events:none;
+  position:fixed;left:0;right:0;bottom:0;z-index:50;padding:0 16px calc(var(--ae-shell-nav-edge,6px) + env(safe-area-inset-bottom));pointer-events:none;
 }
 .ae-live-dock::before{content:"";position:absolute;left:0;right:0;bottom:0;height:104px;pointer-events:none;background:linear-gradient(180deg,rgba(7,6,5,0),#070605 64%);}
 .ae-live-nav{

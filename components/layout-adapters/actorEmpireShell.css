@@ -1,6 +1,7 @@
 .ae-game-shell {
   --ae-shell-nav-height: 60px;
-  --ae-shell-nav-edge: 12px;
+  /* the nav's own space above the home bar / Android buttons (Zeesh, 2026-11-08: 12px -> 6px) */
+  --ae-shell-nav-edge: 6px;
   --ae-shell-nav-gap: 20px;
   --ae-shell-nav-clearance: env(safe-area-inset-bottom);
   width: 100%;
@@ -22,6 +23,11 @@
 
 .ae-game-content { padding-bottom: var(--ae-shell-nav-clearance); }
 .ae-game-content--immersive { padding-bottom: 0; }
+/* Home ends at the nav's top and keeps the 20px gap inside its own dock, so the Age Up glow fades into the gap
+   instead of being cut flat at the page's edge */
+.ae-game-shell[data-shell-nav-visible="true"]:not([data-keyboard-open="true"]) .ae-game-content--dock-gap {
+  padding-bottom: calc(var(--ae-shell-nav-height) + var(--ae-shell-nav-edge) + env(safe-area-inset-bottom));
+}
 
 .ae-shell-header {
   box-sizing: border-box;

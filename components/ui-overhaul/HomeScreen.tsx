@@ -195,7 +195,7 @@ const CSS = `
   position:relative;z-index:1;flex:1;min-height:0;
   display:flex;flex-direction:column;
   overflow-y:auto;overflow-x:hidden;
-  padding:max(20px,calc(13px + env(safe-area-inset-top))) 16px 24px;
+  padding:max(15px,calc(8px + env(safe-area-inset-top))) 16px 24px;
   -webkit-overflow-scrolling:touch;scrollbar-width:none;
 }
 .ae-scroll::-webkit-scrollbar{display:none;}
@@ -406,6 +406,10 @@ const CSS = `
 
 /* ---------- dock ---------- */
 .ae-dock{position:relative;z-index:2;flex:none;padding:0 16px calc(12px + env(safe-area-inset-bottom));}
+/* under the app's bottom nav: the shell already leaves the nav's room and the home-indicator inset and ends this page
+   at the nav's top (.ae-game-content--dock-gap), so the dock keeps only the 20px gap, where the Age Up glow can fade.
+   It used to add the inset a second time: 66px between Age Up and the nav on an iPhone, 80px on a Galaxy */
+.ae-dock.is-under-shell-nav{padding-bottom:var(--ae-shell-nav-gap,20px);}
 .ae-dock::before{
   content:"";position:absolute;left:0;right:0;bottom:100%;height:42px;pointer-events:none;
   background:linear-gradient(180deg,rgba(7,6,5,0),var(--bg) 76%);
@@ -1074,7 +1078,7 @@ export default function ActorEmpireHome({
       </div>
 
       {/* ---------------- dock ---------------- */}
-      <div className="ae-dock">
+      <div className={"ae-dock" + (showNavigation ? "" : " is-under-shell-nav")}>
         <button
           className="ae-cta ae-anim"
           style={cssVar("--d", ".28s")}
