@@ -35,6 +35,8 @@ export interface AtlasCountry {
   /** 0–100 while a market is moving through review; null otherwise. */
   progress: number | null;
   view: StreamingAudienceWorldCountryView;
+  /** Open ground the player cannot enter without the Streaming+ Pack (never a country they already hold). */
+  streamingPlus?: boolean;
 }
 
 export interface AtlasShare {
@@ -90,9 +92,13 @@ const latestOperationByCountry = (operations: OwnedStreamingMarketOperation[]): 
   return byCountry;
 };
 
+const NO_LOCKS: ReadonlySet<string> = new Set();
+
 export const buildAtlasCountries = (
   worldCountries: StreamingAudienceWorldCountryView[] | undefined,
   operations: OwnedStreamingMarketOperation[] = [],
+  /** Streaming+ countries this player cannot enter (streamingPlusLockedCountryIds). */
+  plusLocked: ReadonlySet<string> = NO_LOCKS,
 ): AtlasCountry[] => {
   if (!worldCountries?.length) return [];
   const byCountry = latestOperationByCountry(operations);
@@ -108,6 +114,7 @@ export const buildAtlasCountries = (
       status,
       progress: state === 'OPENING' && operation?.clearance ? Math.round(operation.clearance.progressPercent) : null,
       view,
+      ...(state === 'AVAILABLE' && plusLocked.has(view.id) ? { streamingPlus: true } : {}),
     };
   });
 };

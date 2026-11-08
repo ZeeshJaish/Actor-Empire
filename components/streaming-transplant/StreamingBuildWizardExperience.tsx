@@ -1,4 +1,3 @@
-import { STREAMING_PLUS_CITY_IDS } from '../../services/streamingPlusPack';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { BuildWizard } from '../studio-finance/components/build/BuildWizard';
 import type {
@@ -655,7 +654,6 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         coord: { lat: site.latitude, lng: site.longitude },
         plot: plotFor(index, siblings),
         recommended: recommended.has(site.id),
-        streamingPlus: STREAMING_PLUS_CITY_IDS.has(site.id),
         note: site.tier === 1
           ? `A carrier hotel. Deep fibre, ${site.powerPricePerKwh}c power, and regional reach.`
           : site.tier === 2

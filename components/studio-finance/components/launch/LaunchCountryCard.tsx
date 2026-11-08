@@ -13,6 +13,10 @@
    counts this week's viewers and the whole entry cost of an expansion.
 
    Needs an `.sf` ancestor (the finance tokens) and launch.css.
+
+   2026-11-09: a Streaming+ country the player cannot take yet keeps the whole
+   card (it is worth reading) and trades the switch for the same control in the
+   pack's gold, which opens the pack's sheet.
    ========================================================================== */
 
 import type { Key, ReactNode } from 'react';
@@ -21,6 +25,8 @@ import { unclaimed } from '../../finance/launch';
 import { pct } from '../../finance/format';
 import { FlagField, flagAccent } from '../FlagField';
 import { ShareBar } from './CountryReport';
+import { StreamingPlusChip } from '../../../streamingPlus/StreamingPlusParts';
+import plusCss from '../../../streamingPlus/StreamingPlus.module.css';
 
 /* Plain words. "Fierce" was doing no work that "fought over" doesn't do. */
 export const COMPETITION_LABEL: Record<Competition, string> = {
@@ -58,11 +64,13 @@ interface Props {
   /** The pill on the band once it is picked. */
   pinned: string;
   switchLabel: string;
+  /** A Streaming+ country this player cannot take yet: the switch becomes the gold one, and onToggle opens the pack. */
+  plus?: boolean;
   onReport: () => void;
   onToggle: () => void;
 }
 
-export function LaunchCountryCard({ country, on, index = 0, figures, holders, chips, pinned, switchLabel, onReport, onToggle }: Props) {
+export function LaunchCountryCard({ country, on, index = 0, figures, holders, chips, pinned, switchLabel, plus = false, onReport, onToggle }: Props) {
   return (
     <li
       className={on ? 'lw-country is-on' : 'lw-country'}
@@ -112,7 +120,9 @@ export function LaunchCountryCard({ country, on, index = 0, figures, holders, ch
           <button type="button" className="lw-report" onClick={onReport}>
             <ReportGlyph />Full report
           </button>
-          <OpeningSwitch on={on} label={switchLabel} onClick={onToggle} />
+          {plus && !on
+            ? <PlusSwitch label={switchLabel} name={country.name} onClick={onToggle} />
+            : <OpeningSwitch on={on} label={switchLabel} onClick={onToggle} />}
         </div>
       </div>
     </li>
@@ -126,6 +136,16 @@ export function OpeningSwitch({ on, part = false, label, onClick }: { on: boolea
     <button type="button" className={`lw-switch${on ? ' is-on' : ''}${part ? ' is-part' : ''}`} aria-pressed={on} onClick={onClick}>
       <span>{label}</span>
       <i aria-hidden="true"><b /></i>
+    </button>
+  );
+}
+
+/* The switch of a Streaming+ country: the same place, size and words, with the pack's chip where the knob was. */
+export function PlusSwitch({ label, name, onClick }: { label: string; name: string; onClick: () => void }) {
+  return (
+    <button type="button" className={plusCss.countrySwitch} onClick={onClick} aria-label={`${name} is a Streaming+ country. See the Streaming+ Pack`} data-streaming-plus-country>
+      <span>{label}</span>
+      <StreamingPlusChip compact />
     </button>
   );
 }

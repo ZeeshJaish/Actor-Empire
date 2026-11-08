@@ -1040,13 +1040,12 @@ export const validateStreamingInfrastructureDraft = (
     if (!['FOUNDING', 'ACTIVE'].includes(platform.lifecycle) || !platform.identity || !platform.foundingProfile) {
         issues.push({ step: 0, code: 'INVALID_STATE', message: 'Infrastructure setup is available after incorporation.' });
     }
-    /* Streaming+ (2026-11-08): a pack city, Titan or Meridian Edge that the change would add, refused the same way for the
+    /* Streaming+ (2026-11-08): a Titan or Meridian Edge that the change would add, refused the same way for the
        opening Build, a revision, Suggest and auto-fill; what the company already has stays */
     const packBlock = streamingPlusNetworkBlock(
         player,
         (platform.pendingInfrastructureSetup || platform.infrastructureSetup)?.facilities || [],
         draft.facilities || [],
-        cityId => STREAMING_SERVER_SITES.find(site => site.id === cityId)?.name || cityId,
     );
     if (packBlock) issues.push({ step: 1, code: 'STREAMING_PLUS', message: packBlock.message });
     if (platform.launchCommit && platform.pendingInfrastructureSetup) {

@@ -354,3 +354,35 @@
   .bar { padding-left: 12px; padding-right: 12px; }
   .restore { padding: 0 12px; }
 }
+
+/* ---- a Streaming+ country's switch (Define the Launch and Enter new markets, 2026-11-09):
+   the card switch's place and size, in the pack's gold, the chip where the knob sits.
+   Under .sf too: its button reset (.sf button) outranks one class. ---- */
+.countrySwitch,
+:global(.sf) .countrySwitch {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 5px 8px;
+  min-height: 48px;
+  padding: 6px 8px 6px 14px;
+  border: 1px solid rgba(248, 168, 16, .55);
+  border-radius: 14px;
+  background: radial-gradient(120% 150% at 0% 0%, rgba(248, 192, 32, .18), transparent 60%), rgba(248, 168, 16, .07);
+  color: #f8c020;
+  font: 700 11px/1.2 var(--sf-font-ui, inherit);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, background .12s ease;
+}
+.countrySwitch:active,
+:global(.sf) .countrySwitch:active { transform: scale(.98); background: rgba(248, 168, 16, .14); }
+/* the words never shrink under their longest word: on a narrow card (320 px) the chip takes the next line */
+.countrySwitch > span:first-child { flex: 1 1 0; min-width: min-content; }

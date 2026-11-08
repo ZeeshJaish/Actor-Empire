@@ -1,4 +1,4 @@
-import { hasStreamingPlus, STREAMING_PLUS_IDENT_IDS, STREAMING_PLUS_STOREFRONT_IDS } from '../services/streamingPlusPack';
+import { hasStreamingPlus, STREAMING_PLUS_IDENT_IDS, STREAMING_PLUS_STOREFRONT_IDS, streamingPlusLocks } from '../services/streamingPlusPack';
 import React, { useEffect, useMemo, useRef } from 'react';
 import type {
   OwnedStreamingCustomIdentAudio,
@@ -336,12 +336,18 @@ export const buildLaunchData = (player: Player, preparedContext?: StreamingCatal
      rest grey — which reads as a decision the player made rather than a gap in
      the catalogue. The authored twenty-four keep their written entries; the
      rest are derived from the world registry the game already holds. */
+  /* Streaming+ (2026-11-09): the pack's 21 countries carry its chip until the pack is owned. A country the save
+     already holds (planned, filed or live) is the player's own and is never shown locked. */
+  const heldCountryIds = new Set(platform.marketOperations
+    .filter(operation => operation.countryId && operation.status !== 'EXITED')
+    .map(operation => operation.countryId!));
   const countries = STREAMING_WORLD_MARKETS.map(market => {
     const country = buildStreamingLaunchCountry(market);
     const audience = worldAudienceEconomy.countries[market.id];
     const participation = worldAudienceParticipation.countries[market.id];
     return {
       ...country,
+      streamingPlus: !heldCountryIds.has(market.id) && streamingPlusLocks(player, { kind: 'COUNTRY', id: market.id }),
       pricingCohorts: audience && participation ? audience.cohorts.flatMap(cohort => {
         const overlay = participation.cohorts.find(item => item.cohortId === cohort.id);
         if (!overlay) return [];
@@ -578,15 +584,17 @@ function OpeningLaunchExperience(props: Props) {
     if (props.operation) return null;
     const saved = platform.launchProgram.defineDraft;
     if (!saved) return props.initialDraft ?? null;
+    /* Streaming+ (2026-11-09): a pack country picked in an older draft and never filed comes off the pick */
+    const plusLocked = new Set(data.countries.filter(country => country.streamingPlus).map(country => country.id));
     return {
-      selectedCountryIds: [...saved.selectedCountryIds],
+      selectedCountryIds: saved.selectedCountryIds.filter(id => !plusLocked.has(id)),
       soundId: saved.soundId ?? undefined,
       packageId: saved.packageId ?? undefined,
       customAudio: saved.customAudio ? { ...saved.customAudio } : saved.customAudio,
       storefrontId: saved.storefrontId ?? undefined,
       pricing: saved.pricing,
     };
-  }, [platform.launchProgram.defineDraft, props.initialDraft, props.operation]);
+  }, [platform.launchProgram.defineDraft, props.initialDraft, props.operation, data.countries]);
   const buildBudgetSummary = useMemo(() => {
     const absoluteWeek = getAbsoluteWeek(props.player.age, props.player.currentWeek);
     const draft = platform.infrastructureSetupDraft;

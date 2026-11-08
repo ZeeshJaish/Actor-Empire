@@ -6,6 +6,7 @@ import { contributeStreamingFounderCapital } from '../services/streamingCompany'
 import { beginStreamingMarketClearance, saveStreamingMarketPlan, resolveStreamingMarketRequirement } from '../services/streamingMarkets';
 import { STREAMING_MARKET_SUB_REGIONS } from '../services/streamingMarketSubRegions';
 import { quoteStreamingMarketFilingEnergy } from '../services/streamingMarketFilingQuote';
+import { grantStreamingPlusForTesting } from '../services/streamingPlusPack';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const founder = (): Player => {
@@ -23,7 +24,8 @@ const founder = (): Player => {
   assert.equal(incorporated.changed, true);
   const funded = contributeStreamingFounderCapital(incorporated.player, 10_000_000_000, 's3-energy');
   assert.equal(funded.changed, true);
-  return funded.player;
+  /* it files every country of the world, so it carries the Streaming+ Pack (2026-11-09: 21 countries need it) */
+  return grantStreamingPlusForTesting(funded.player);
 };
 
 import { WORLD_COUNTRY_DEFINITIONS } from '../services/worldEconomy/worldCountryRegistry';

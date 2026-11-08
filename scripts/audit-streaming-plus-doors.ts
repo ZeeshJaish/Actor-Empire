@@ -1,8 +1,10 @@
 /**
  * Streaming+ Pack (2026-11-08): every door, without the pack (refused) and with it (not refused for the pack).
  * Zeesh: "wizard ya kahin se bhi ... aisa na ho ki idhar to premium hai lekin wizard ya kahin se hum log aur le sakte hain".
- * Doors: network orders (a pack city, a Titan, Meridian Edge), Build validation, Tech, campaigns (start, extend), the
- * front page, the ident (opening and rebrand), the IPO, the opening commission; what a save already has stays.
+ * Doors: the 21 Streaming+ countries (the market plan every screen saves through, filing, the Audience room's
+ * suggestion), network orders (a Titan, Meridian Edge; every city takes rooms since 2026-11-09), Build validation,
+ * Tech, campaigns (start, extend), the front page, the ident (opening and rebrand), the IPO, the opening
+ * commission; what a save already has stays.
  * Plus the forced-ad rules and the rewarded cash. (~60 s: it builds the test company first)
  */
 import assert from 'node:assert/strict';
@@ -23,9 +25,13 @@ import { quoteStreamingCampaign, streamingCampaignSubjects, extendStreamingCampa
 import { saveStreamingStorefrontPlan } from '../services/streamingLaunchProgram';
 import { rebrandStreamingIdent } from '../services/streamingBrandStudio';
 import { startStreamingCinematicIpoJourney } from '../services/streamingPublicMarkets';
-import { getStreamingServerSite } from '../services/streamingServerSites';
+import { getStreamingServerSite, STREAMING_SERVER_SITES } from '../services/streamingServerSites';
+import { STREAMING_WORLD_MARKETS } from '../services/streamingDayOneMarkets';
+import { beginStreamingMarketClearance, saveStreamingMarketPlan } from '../services/streamingMarkets';
+import { getStreamingAudienceMarket } from '../services/streamingAudienceMarket';
+import { buildAudienceRoomModel } from '../components/streaming-transplant/audienceRoomModel';
 import {
-    STREAMING_PLUS_CITY_IDS, hasStreamingPlus, streamingPlusNetworkBlock, streamingPlusTierOrFallback, streamingPlusCityOpen,
+    STREAMING_PLUS_COUNTRY_IDS, hasStreamingPlus, streamingPlusNetworkBlock, streamingPlusTierOrFallback, streamingPlusCountryOpen,
 } from '../services/streamingPlusPack';
 import { FORCED_AD_RULES, forcedAdBlocker, setForcedAdContext, showForcedAd, noteForcedAdWeekPassed, noteRealPurchase } from '../services/forcedAds';
 import { rewardedCashAmount } from '../services/rewardedCash';
@@ -51,18 +57,55 @@ const ok = (value: unknown, message: string) => { assert.ok(value, message); che
     const setup = withPack.ownedStreamingPlatform.infrastructureSetup!;
     const facilities = setup.facilities || [];
 
-    /* ---- network orders ---- */
-    const building = facilities.find(facility => !STREAMING_PLUS_CITY_IDS.has(facility.cityId) && facility.type !== 'CLOUD_ALLOCATION' && facility.lease?.tenure !== 'CLOUD' && (facility.rackGroups || []).length > 0)!;
-    ok(building, 'a building outside the pack cities');
+    /* ---- the 21 Streaming+ countries (2026-11-09) ---- */
+    ok(STREAMING_PLUS_COUNTRY_IDS.size === 21 && STREAMING_PLUS_COUNTRY_IDS.has('CN'), 'the pack holds 21 countries, China among them');
+    ok(['US', 'IN', 'GB', 'BR', 'MX', 'ID', 'FR', 'KR'].every(id => !STREAMING_PLUS_COUNTRY_IDS.has(id)), 'the free game keeps the US, India, the UK, Brazil, Mexico, Indonesia, France and Korea');
+    ok([...STREAMING_PLUS_COUNTRY_IDS].every(id => STREAMING_WORLD_MARKETS.some(market => market.id === id)), 'every pack country is a real market');
+    ok(!streamingPlusCountryOpen(free, 'CN') && streamingPlusCountryOpen(withPack, 'CN') && streamingPlusCountryOpen(free, 'US'), 'China needs the pack; the United States never does');
+    const held = new Set(withPack.ownedStreamingPlatform.marketOperations.filter(operation => operation.countryId && operation.status !== 'EXITED').map(operation => operation.countryId!));
+    const expansionIds = (player: Player) => player.ownedStreamingPlatform.marketOperations
+        .filter(operation => operation.entryKind === 'EXPANSION' && operation.countryId && operation.status !== 'EXITED').map(operation => operation.countryId!);
+    const packCountry = [...STREAMING_PLUS_COUNTRY_IDS].find(id => !held.has(id))!;
+    const freeCountry = STREAMING_WORLD_MARKETS.find(market => !STREAMING_PLUS_COUNTRY_IDS.has(market.id) && !held.has(market.id))!.id;
+    ok(packCountry && freeCountry, `a pack country (${packCountry}) and a free one (${freeCountry}) the company has not entered`);
+    const already = expansionIds(withPack);
+    const refusedPlan = saveStreamingMarketPlan(free, [...already, packCountry], 'EXPANSION');
+    ok(!refusedPlan.changed && refusedPlan.reason === 'STREAMING_PLUS' && refusedPlan.lockedCountryIds?.includes(packCountry), `planning ${packCountry} is refused without the pack (${refusedPlan.reason})`);
+    const packPlan = saveStreamingMarketPlan(withPack, [...already, packCountry], 'EXPANSION');
+    ok(packPlan.changed && expansionIds(packPlan.player).includes(packCountry), 'and planned with it');
+    const mixed = saveStreamingMarketPlan(free, [...already, packCountry, freeCountry], 'EXPANSION');
+    ok(mixed.changed && expansionIds(mixed.player).includes(freeCountry) && !expansionIds(mixed.player).includes(packCountry)
+        && Boolean(mixed.lockedCountryIds?.includes(packCountry)), `a mixed pick plans ${freeCountry} and leaves ${packCountry} out, by name`);
+    const filedFree = beginStreamingMarketClearance(free, [packCountry], 'EXPANSION');
+    ok(!filedFree.changed, `${packCountry} cannot be filed without the pack when it was never planned (${filedFree.reason})`);
+    /* a pack country the save already holds stays the player's: planned with the pack, then the pack is gone */
+    const heldPlan = withoutPack(packPlan.player);
+    const kept = saveStreamingMarketPlan(heldPlan, [...already, packCountry, freeCountry], 'EXPANSION');
+    ok(kept.changed && expansionIds(kept.player).includes(packCountry) && !kept.lockedCountryIds?.length, `a held ${packCountry} stays in the plan without the pack`);
+    const filedHeld = beginStreamingMarketClearance(kept.player, [packCountry], 'EXPANSION');
+    ok(filedHeld.reason !== 'STREAMING_PLUS', `and it can still be filed (${filedHeld.reason})`);
+    const freeRoom = buildAudienceRoomModel(free, getStreamingAudienceMarket(free));
+    ok(!freeRoom.streamingPlusOwned && buildAudienceRoomModel(withPack, getStreamingAudienceMarket(withPack)).streamingPlusOwned, 'the Audience room knows whether the pack is owned');
+    ok(!(freeRoom.nextMove?.id === 'ENTER_MARKET' && STREAMING_PLUS_COUNTRY_IDS.has(freeRoom.nextMove.countryId || '')),
+        `the Audience room never suggests a Streaming+ country without the pack (${freeRoom.nextMove?.id}${freeRoom.nextMove?.countryId ? ` ${freeRoom.nextMove.countryId}` : ''})`);
+
+    /* ---- network orders: every city takes rooms; Titan and Meridian Edge are the pack's ---- */
+    const building = facilities.find(facility => facility.type !== 'CLOUD_ALLOCATION' && facility.lease?.tenure !== 'CLOUD' && (facility.rackGroups || []).length > 0)!;
+    ok(building, 'a building to copy');
     const regionId = streamingNetworkRegionOf(building.cityId)!;
     const regionRooms = facilities.filter(facility => streamingNetworkRegionOf(facility.cityId) === regionId);
-    const packCity = [...STREAMING_PLUS_CITY_IDS].find(cityId => streamingNetworkRegionOf(cityId) === regionId && !regionRooms.some(room => room.cityId === cityId))!;
-    ok(packCity, `a pack city in ${regionId} the company does not use`);
-    const newRoom: OwnedStreamingFacility = { ...structuredClone(building), id: 'audit-pack-room', cityId: packCity };
+    /* a city inside a pack country, so a server there must still be free */
+    const packCity = STREAMING_SERVER_SITES.find(site => STREAMING_PLUS_COUNTRY_IDS.has(site.countryCode)
+        && streamingNetworkRegionOf(site.id) === regionId && !regionRooms.some(room => room.cityId === site.id))?.id;
+    ok(packCity, `a city in a Streaming+ country in ${regionId} the company does not use`);
+    /* Workhorses only: the test company's own rooms may hold Titans, which are the pack's */
+    const newRoom: OwnedStreamingFacility = {
+        ...structuredClone(building), id: 'audit-pack-room', cityId: packCity!,
+        rackGroups: (building.rackGroups || []).map(group => ({ ...group, serverTier: 'WORKHORSE' as const })),
+    };
     const toPackCity = { regionId, facilities: [...regionRooms, newRoom] };
-    const refusedCity = previewStreamingNetworkOrder(free, toPackCity);
-    ok(refusedCity.reason === 'STREAMING_PLUS' && refusedCity.streamingPlusItem?.kind === 'CITY', `a new room in ${getStreamingServerSite(packCity)?.name || packCity} is refused without the pack (${refusedCity.reason})`);
-    ok(previewStreamingNetworkOrder(withPack, toPackCity).reason !== 'STREAMING_PLUS', 'and not refused for the pack with it');
+    const roomThere = previewStreamingNetworkOrder(free, toPackCity);
+    ok(roomThere.reason !== 'STREAMING_PLUS', `a new room in ${getStreamingServerSite(packCity!)?.name || packCity} is not a pack item (${roomThere.reason})`);
 
     const titanRoom: OwnedStreamingFacility = { ...building, rackGroups: [...(building.rackGroups || []), { ...building.rackGroups![0], id: 'audit-titans', rackCount: 2, serverTier: 'TITAN' }] };
     const titans = { regionId, facilities: regionRooms.map(room => (room.id === building.id ? titanRoom : room)) };
@@ -74,13 +117,9 @@ const ok = (value: unknown, message: string) => { assert.ok(value, message); che
     ok(streamingPlusNetworkBlock(free, regionRooms, [...regionRooms, meridian])?.item.kind === 'CLOUD', 'Meridian Edge cloud is refused without the pack');
     ok(streamingPlusNetworkBlock(withPack, regionRooms, [...regionRooms, meridian]) === null, 'and allowed with it');
 
-    /* what a save already has stays: a room already in a pack city may shrink or stay, never grow */
-    const heldInPack: OwnedStreamingFacility = { ...building, id: 'held', cityId: packCity };
-    ok(streamingPlusNetworkBlock(free, [heldInPack], [heldInPack]) === null, 'a pack-city room the save already has stays');
-    const smaller = { ...heldInPack, rackGroups: (heldInPack.rackGroups || []).map(group => ({ ...group, rackCount: Math.max(1, group.rackCount - 1) })), installedRacks: Math.max(1, (heldInPack.installedRacks || 1) - 1) };
-    ok(streamingPlusNetworkBlock(free, [heldInPack], [smaller]) === null, 'and it can be made smaller');
+    /* what a save already has stays: a Titan room the save has may stay as it is */
+    ok(streamingPlusNetworkBlock(free, [titanRoom], [titanRoom]) === null, 'Titans the save already has stay');
     ok(streamingPlusTierOrFallback(free, 'TITAN', 'WORKHORSE') === 'WORKHORSE' && streamingPlusTierOrFallback(withPack, 'TITAN', 'WORKHORSE') === 'TITAN', 'the CTO falls back to Workhorses without the pack');
-    ok(!streamingPlusCityOpen(free, 'NYC') && streamingPlusCityOpen(withPack, 'NYC') && streamingPlusCityOpen(free, 'LA'), 'New York needs the pack; Los Angeles never does');
 
     /* ---- Build: the validation every commission and revision passes ---- */
     const draft = {
@@ -92,8 +131,10 @@ const ok = (value: unknown, message: string) => { assert.ok(value, message); che
         subscriptionPrices: { ...withPack.ownedStreamingPlatform.subscriptionPrices },
     } as any;
     const issues = validateStreamingInfrastructureDraft(free, draft).issues;
-    ok(issues.some(issue => issue.code === 'STREAMING_PLUS'), `Build refuses a pack city without the pack (${issues.map(issue => issue.code).join(',')})`);
-    ok(!validateStreamingInfrastructureDraft(withPack, draft).issues.some(issue => issue.code === 'STREAMING_PLUS'), 'and not with it');
+    ok(!issues.some(issue => issue.code === 'STREAMING_PLUS'), `Build takes a room in a Streaming+ country without the pack (${issues.map(issue => issue.code).join(',') || 'no issues'})`);
+    const titanDraft = { ...draft, facilities: facilities.map(room => (room.id === building.id ? titanRoom : room)) };
+    ok(validateStreamingInfrastructureDraft(free, titanDraft).issues.some(issue => issue.code === 'STREAMING_PLUS'), 'Build refuses new Titans without the pack');
+    ok(!validateStreamingInfrastructureDraft(withPack, titanDraft).issues.some(issue => issue.code === 'STREAMING_PLUS'), 'and not with it');
 
     /* ---- Tech ---- */
     const tech = unlockStreamingTech(free, 'PICTURE_12K');

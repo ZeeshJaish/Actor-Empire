@@ -6,10 +6,10 @@ export const STREAMING_PLUS_UNLOCKED_EVENT = 'ae:streaming-plus-unlocked';
 export interface StreamingPlusSheetRequest {
     /** where it was opened from (for analytics), e.g. 'network-city' */
     source: string;
-    /** the one line the sheet shows first, about what was tapped: "New York is a Streaming+ city." */
+    /** the one line the sheet shows first, about what was tapped: "Germany is a Streaming+ country." */
     line?: string;
     /** the item the player tapped, shown first */
-    focus?: 'cities' | 'servers' | 'tech' | 'company' | 'campaigns' | 'brand' | 'products';
+    focus?: 'countries' | 'servers' | 'tech' | 'company' | 'campaigns' | 'brand' | 'products';
 }
 
 export const openStreamingPlusSheet = (request: StreamingPlusSheetRequest) => {

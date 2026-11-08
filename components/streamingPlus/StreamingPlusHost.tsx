@@ -83,7 +83,7 @@ export const StreamingPlusSheet: React.FC<{
                     <div className={css.body}>
                         <span className={css.eyebrow}>{owned ? 'YOURS' : 'EXPANSION · ONE-TIME PURCHASE'}</span>
                         <h2 id="sp-sheet-title" className={css.title}>Streaming+ Pack</h2>
-                        <p className={css.lead}>Your streaming company is complete without it. The pack takes it further: famous cities, the high-end hardware, the future of the picture and Wall Street.</p>
+                        <p className={css.lead}>Your streaming company is complete without it. The pack takes it further: 21 more countries with China, the high-end hardware, the future of the picture and Wall Street.</p>
                         {request.line && !owned ? <p className={css.focus}><StreamingPlusIcon id="lock" size={15} />{request.line}</p> : null}
                         <p className={css.section}>WHAT YOU GET TODAY</p>
                         <ul className={css.list}>

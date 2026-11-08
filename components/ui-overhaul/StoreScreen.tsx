@@ -192,7 +192,7 @@ export default function StoreScreen({
             <span className="st-pack-b">
               <span className="st-pack-e"><StreamingPlusChip owned={streamingPlus.owned} />{streamingPlus.owned ? 'YOURS' : 'STREAMING EXPANSION'}</span>
               <b className="st-pack-n">Streaming+ Pack</b>
-              <span className="st-pack-l"><span>30 cities</span><span>Titan servers</span><span>10 future Tech</span><span>IPO</span><span>7 big moments</span><span>13 front pages</span></span>
+              <span className="st-pack-l"><span>21 countries</span><span>Titan servers</span><span>10 future Tech</span><span>IPO</span><span>7 big moments</span><span>13 front pages</span></span>
               <span className="st-pack-f">
                 <small>For your streaming company. One-time, every save.</small>
                 <span className={`st-pack-go${streamingPlus.owned ? ' is-owned' : ''}`}>{streamingPlus.owned ? <><Icon name="check" size={13} sw={2.6} />Yours</> : streamingPlus.price ? <>See inside · {streamingPlus.price}</> : 'See inside'}</span>

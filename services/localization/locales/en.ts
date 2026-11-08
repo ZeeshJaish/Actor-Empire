@@ -6634,7 +6634,7 @@ export const enTranslations: Record<TranslationKey, string> = {
         'premium.product.no_ads.title': 'No Ads',
         'premium.product.no_ads.description': 'Removes every forced ad: the break every 12 weeks and the breaks after big tasks. Ads you choose to watch for rewards stay available.',
         'premium.product.streaming_plus.title': 'Streaming+ Pack',
-        'premium.product.streaming_plus.description': 'Expands your streaming company: 30 Streaming+ cities, Titan servers, Meridian Edge cloud, 10 future tech steps, the IPO and Wall Street, 7 big campaign moments, 13 front pages and 2 idents.',
+        'premium.product.streaming_plus.description': 'Expands your streaming company: 21 Streaming+ countries with China, Titan servers, Meridian Edge cloud, 10 future tech steps, the IPO and Wall Street, 7 big campaign moments, 13 front pages and 2 idents.',
         'premium.product.energy_100.title': '100 Energy',
         'premium.product.energy_100.description': 'Adds 100 bonus energy that carries over week to week until used.',
         'premium.product.energy_250.title': '250 Energy',

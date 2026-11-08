@@ -17,7 +17,7 @@
  *
  * What the team did carries who did it: "Fixed by Marcus" on STATUS, "by Marcus" on a Network order.
  */
-import { streamingPlusCityOpen, streamingPlusTierOrFallback } from '../streamingPlusPack';
+import { streamingPlusTierOrFallback } from '../streamingPlusPack';
 import type {
     OwnedStreamingCrisis,
     OwnedStreamingFacility,
@@ -141,9 +141,8 @@ export const runCapacity: StreamingTeamJobRunner = (context) => {
     /* the rooms there with free positions where more racks add capacity, each with the order that fits */
     const sharp = executive.skill >= 80;
     const options = (platform.infrastructureSetup.facilities || [])
-        /* Streaming+: the CTO grows no room in a pack city and buys no Titan without the pack */
-        .filter(facility => streamingNetworkRegionOf(facility.cityId) === region.regionId && !isStreamingCloudFacility(facility)
-            && streamingPlusCityOpen(player, facility.cityId))
+        /* Streaming+: the CTO buys no Titan without the pack */
+        .filter(facility => streamingNetworkRegionOf(facility.cityId) === region.regionId && !isStreamingCloudFacility(facility))
         .flatMap(facility => {
             const positions = facility.lease?.rackPositions ?? 0;
             const free = Math.min(MAX_RACKS, positions - racksIn(facility));

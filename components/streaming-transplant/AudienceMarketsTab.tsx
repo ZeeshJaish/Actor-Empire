@@ -90,8 +90,9 @@ export const AudienceMarketsTab: React.FC<{
   const maxAudience = Math.max(1, ...yours.map(country => country.view.playerAudience));
 
   /* the best open ground: people streaming there × the share of homes nobody holds */
+  /* a Streaming+ country the player cannot enter is never a "best next market" */
   const best = useMemo(() => scoped
-    .filter(country => country.state === 'AVAILABLE' && country.view.activeViewers > 0)
+    .filter(country => country.state === 'AVAILABLE' && !country.streamingPlus && country.view.activeViewers > 0)
     .map(country => {
       const shares = sharesOf([country.view]);
       const leader = shares.shares.find(item => item.id !== 'PLAYER') ?? null;

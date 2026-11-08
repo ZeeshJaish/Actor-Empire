@@ -217,10 +217,6 @@ export function unservableIn(data: BuildData, region: RegionView): BuildMarket[]
     audience left to cover — and past that, more compute spreads across the
     whole region (#110), so the map fills the region rather than piling up
     in one country. Heaviest first. */
-/** A Streaming+ city without the pack takes no new rooms, racks or cloud; what is already there stays. */
-export const packLockedCity = (data: BuildData, city: Pick<City, 'streamingPlus'>): boolean =>
-  Boolean(city.streamingPlus && data.streamingPlus && !data.streamingPlus.owned);
-
 /** Titan and Meridian Edge are the pack's: without it nothing new of either is placed. */
 export const packLockedTier = (data: BuildData, tier: ServerTier): boolean =>
   tier === 'TITAN' && Boolean(data.streamingPlus && !data.streamingPlus.owned);
@@ -228,11 +224,11 @@ export const packLockedProvider = (data: BuildData, providerId: string | null | 
   providerId === 'MERIDIAN' && Boolean(data.streamingPlus && !data.streamingPlus.owned);
 
 function serverSites(data: BuildData, region: RegionView): City[] {
-  return region.cities.filter(city => buildingsIn(data, city.id).length > 0 && !packLockedCity(data, city));
+  return region.cities.filter(city => buildingsIn(data, city.id).length > 0);
 }
 
 function cloudSites(data: BuildData, region: RegionView): City[] {
-  return region.cities.filter(city => cloudIn(data, city.id) && !packLockedCity(data, city));
+  return region.cities.filter(city => cloudIn(data, city.id));
 }
 
 /** A conservative per-site cloud plan for every supported population cluster

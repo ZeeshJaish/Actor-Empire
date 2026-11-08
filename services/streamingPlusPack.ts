@@ -11,21 +11,33 @@ import type { Player } from '../types';
 
 export const STREAMING_PLUS_PRODUCT_ID = 'streaming_plus' as const;
 
-/** 30 of the 194 cities, a mix of big, mid and small in every region. Every
- *  country keeps at least half its cities; no launch market's city is here. */
-export const STREAMING_PLUS_CITY_IDS: ReadonlySet<string> = new Set([
+/** 21 countries, 35% of the world's viewers: China, then one launch market and a few
+ *  mid and small countries in every region. Without the pack they cannot be
+ *  launched in or entered.
+ *
+ *  This replaced 30 locked server cities on 2026-11-09. Zeesh: "विजार्ड में जाता हूँ
+ *  तो वहाँ तो कंट्रीज आते हैं, तो सिटी लॉक करने का तो कोई सीन नहीं है, हमें कंट्री लॉक
+ *  करना होगा". He took the 20 proposed countries ("mujhe yeh countries theek lag rhe")
+ *  and asked for one super country ("Ek super country aur add karna chahiye"), so
+ *  China was added.
+ *
+ *  Servers stay free everywhere. Rooms in Panama, Senegal, Fiji and Saudi Arabia
+ *  are the only reach for free neighbours. With them locked, Costa Rica, Cape
+ *  Verde, Mauritania and Tonga stay dark and Yemen thin, even with 12 racks in
+ *  every free city. */
+export const STREAMING_PLUS_COUNTRY_IDS: ReadonlySet<string> = new Set([
+    // Asia, with the super country
+    'CN', 'JP', 'VN', 'MY', 'SA', 'NP', 'LK',
     // North America
-    'NYC', 'MIA', 'YUL', 'MTY', 'HNL',
+    'CA', 'DO', 'PA',
     // South America
-    'SAO', 'SSA', 'MDE', 'COR',
+    'AR', 'EC', 'UY',
     // Europe
-    'FRA', 'BCN', 'MAN', 'MRS', 'NAP', 'LED', 'VVO',
-    // Asia
-    'SHA', 'BLR', 'OSA', 'SZX', 'HYD', 'HAN', 'SUB', 'PUS',
+    'DE', 'PT', 'IE',
     // Africa
-    'CAS', 'ALY', 'ABV', 'DUR',
+    'ZA', 'MA', 'SN',
     // Oceania
-    'MEL', 'WLG',
+    'NZ', 'FJ',
 ]);
 
 export const STREAMING_PLUS_SERVER_TIERS: ReadonlySet<string> = new Set(['TITAN']);
@@ -51,7 +63,7 @@ export const STREAMING_PLUS_STOREFRONT_IDS: ReadonlySet<string> = new Set([
 export const STREAMING_PLUS_IDENT_IDS: ReadonlySet<string> = new Set(['cinematic', 'living']);
 
 export type StreamingPlusItem =
-    | { kind: 'CITY'; id: string }
+    | { kind: 'COUNTRY'; id: string }
     | { kind: 'TIER'; id: string }
     | { kind: 'CLOUD'; id: string }
     | { kind: 'TECH'; id: string }
@@ -68,7 +80,7 @@ export const hasStreamingPlus = (player: { flags?: Record<string, unknown> | nul
 
 export const isStreamingPlusItem = (item: StreamingPlusItem): boolean => {
     switch (item.kind) {
-        case 'CITY': return STREAMING_PLUS_CITY_IDS.has(String(item.id || '').toUpperCase());
+        case 'COUNTRY': return STREAMING_PLUS_COUNTRY_IDS.has(String(item.id || '').trim().toUpperCase());
         case 'TIER': return STREAMING_PLUS_SERVER_TIERS.has(String(item.id || '').toUpperCase());
         case 'CLOUD': return STREAMING_PLUS_CLOUD_PROVIDERS.has(String(item.id || '').toUpperCase());
         case 'TECH': return STREAMING_PLUS_TECH_IDS.has(String(item.id || ''));
@@ -88,6 +100,17 @@ export const STREAMING_PLUS_NAME = 'Streaming+ Pack';
 
 /** The one line a refused action says. */
 export const streamingPlusRefusal = (what: string) => `${what} is part of the ${STREAMING_PLUS_NAME}.`;
+
+const NO_COUNTRIES: ReadonlySet<string> = new Set();
+/** The countries a player cannot launch in or enter now: the 21 without the pack, none with it. */
+export const streamingPlusLockedCountryIds = (owned: boolean): ReadonlySet<string> => (owned ? NO_COUNTRIES : STREAMING_PLUS_COUNTRY_IDS);
+
+/** For pickers: may this player launch in, or enter, this country now? */
+export const streamingPlusCountryOpen = (player: Parameters<typeof hasStreamingPlus>[0], countryId: string) =>
+    !streamingPlusLocks(player, { kind: 'COUNTRY', id: countryId });
+
+/** What a locked country's card and the sheet say: "Germany is a Streaming+ country." */
+export const streamingPlusCountryLine = (countryName: string) => `${countryName} is a Streaming+ country.`;
 
 /* ---- the network: what a change adds, compared with what was there ---- */
 interface FacilityView {
@@ -116,21 +139,18 @@ export interface StreamingPlusNetworkBlock {
 }
 
 /** The first pack item a network change would add without the pack, or null.
- *  Taking things away, repairs and what a save already has are always allowed. */
+ *  Taking things away, repairs and what a save already has are always allowed.
+ *  Every city takes rooms: the pack's countries lock selling there, not building there. */
 export const streamingPlusNetworkBlock = (
     player: Parameters<typeof hasStreamingPlus>[0],
     before: readonly FacilityView[] | null | undefined,
     after: readonly FacilityView[] | null | undefined,
-    cityName: (cityId: string) => string = cityId => cityId,
 ): StreamingPlusNetworkBlock | null => {
     if (hasStreamingPlus(player)) return null;
     const previous = new Map((before || []).map(facility => [facility.id, facility]));
     for (const facility of after || []) {
         const was = previous.get(facility.id);
         const grows = !was || sizeOf(facility) > sizeOf(was);
-        if (grows && STREAMING_PLUS_CITY_IDS.has(String(facility.cityId || '').toUpperCase())) {
-            return { item: { kind: 'CITY', id: facility.cityId }, cityId: facility.cityId, message: streamingPlusRefusal(`${cityName(facility.cityId)}, a Streaming+ city,`) };
-        }
         if (titansOf(facility) > titansOf(was)) {
             return { item: { kind: 'TIER', id: 'TITAN' }, cityId: facility.cityId, message: streamingPlusRefusal('The Titan server') };
         }
@@ -142,17 +162,13 @@ export const streamingPlusNetworkBlock = (
     return null;
 };
 
-/** For pickers (Suggest, the CTO, auto-fill): may a new room go to this city? */
-export const streamingPlusCityOpen = (player: Parameters<typeof hasStreamingPlus>[0], cityId: string) =>
-    !streamingPlusLocks(player, { kind: 'CITY', id: cityId });
-
 /** For pickers: the server tier to use when the wanted one is locked. */
 export const streamingPlusTierOrFallback = <T extends string>(player: Parameters<typeof hasStreamingPlus>[0], tier: T, fallback: T): T =>
     streamingPlusLocks(player, { kind: 'TIER', id: tier }) ? fallback : tier;
 
 /* ---- what the one sheet lists ---- */
 export const STREAMING_PLUS_TODAY: ReadonlyArray<{ id: string; title: string; line: string }> = [
-    { id: 'cities', title: '30 Streaming+ cities', line: 'New York, Frankfurt, Shanghai, São Paulo and 26 more, big to small, in every region' },
+    { id: 'countries', title: '21 Streaming+ countries', line: 'China, Japan, Germany, Canada and 17 more in every region: a third of the world’s viewers' },
     { id: 'servers', title: 'Titan servers and Meridian Edge', line: 'The high-end rack and the premium edge cloud: more reach from fewer rooms' },
     { id: 'tech', title: '10 future Tech steps', line: '12K to 24K, HDR Ultra, 16-bit colour, personal sound, car and holo screens, the taste engine, AI channels' },
     { id: 'company', title: 'The IPO and Wall Street', line: 'List your company, ring the bell, earnings calls, buybacks and your ticker' },

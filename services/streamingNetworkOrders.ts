@@ -219,8 +219,8 @@ export const previewStreamingNetworkOrder = (player: Player, input: StreamingNet
     };
     const changed = TIERS.some(tier => racksAdded[tier] > 0 || racksSold[tier] > 0) || cloudAdded > 0 || cloudDropped > 0 || newRoomIds.length > 0;
     if (!changed) return refuse('NO_CHANGE', preview);
-    /* Streaming+ (2026-11-08): a pack city, a Titan or Meridian Edge, added without the pack, is refused here, whoever asks */
-    const packBlock = streamingPlusNetworkBlock(player, current, input.facilities, cityId => getStreamingServerSite(cityId)?.name || cityId);
+    /* Streaming+ (2026-11-08): a Titan or Meridian Edge, added without the pack, is refused here, whoever asks */
+    const packBlock = streamingPlusNetworkBlock(player, current, input.facilities);
     if (packBlock) return { ...refuse('STREAMING_PLUS', preview), message: packBlock.message, streamingPlusItem: packBlock.item };
     if (platform.treasuryCash + refund < capitalCost) return refuse('INSUFFICIENT_TREASURY', preview);
     return { ...preview, ok: true, message: describeStreamingNetworkChange(regionId, preview) };

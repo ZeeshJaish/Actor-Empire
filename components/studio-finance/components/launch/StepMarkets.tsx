@@ -17,6 +17,11 @@
 
    #139: the country card is LaunchCountryCard, shared with the Audience room's
    Enter new markets.
+
+   2026-11-09: the 21 Streaming+ countries show the pack's gold switch and open
+   its sheet. Add all, a bloc's switch and its sheet take only what the player
+   can open, and the engine refuses the rest whoever asks
+   (saveStreamingMarketPlan).
    ========================================================================== */
 
 import { useMemo, useState } from 'react';
@@ -40,6 +45,9 @@ import {
   ReportGlyph,
 } from './LaunchCountryCard';
 import { quoteStreamingMarketFilingEnergy } from '../../../../services/streamingMarketFilingQuote';
+import { openStreamingPlusSheet } from '../../../../services/streamingPlusEvents';
+import { streamingPlusCountryLine } from '../../../../services/streamingPlusPack';
+import { StreamingPlusChip } from '../../../streamingPlus/StreamingPlusParts';
 
 export function StepMarkets({ data, draft, patch, chosen, handlers, initialCountryId }: StepProps) {
   const [region, setRegion] = useState(data.countries.find(country=>country.id===initialCountryId)?.region || data.regions[0]);
@@ -84,6 +92,10 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
   }, [inRegion]);
 
   const picked = useMemo(() => new Set(draft.selectedCountryIds), [draft.selectedCountryIds]);
+  /* A Streaming+ country the player cannot take: tapping it opens the pack. One already picked can still be taken off. */
+  const plusLocked = (country: Country) => Boolean(country.streamingPlus) && !picked.has(country.id);
+  const takeable = (countries: Country[]) => countries.filter((country) => !plusLocked(country));
+  const openPlus = (country: Country) => openStreamingPlusSheet({ source: 'launch-markets', focus: 'countries', line: streamingPlusCountryLine(country.name) });
   const clearanceByCountry = new Map(data.clearance.map((entry) => [entry.countryId, entry.outcome]));
   const unfiled = (countries: Country[]) => countries.filter((country) =>
     (clearanceByCountry.get(country.id) ?? 'NOT_FILED') === 'NOT_FILED');
@@ -94,6 +106,11 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
   const footprint = useMemo(() => summarize(chosen), [chosen]);
 
   const toggle = (id: string) => {
+    const country = data.countries.find((entry) => entry.id === id);
+    if (country && plusLocked(country)) {
+      openPlus(country);
+      return;
+    }
     const next = picked.has(id)
       ? draft.selectedCountryIds.filter((c) => c !== id)
       : [...draft.selectedCountryIds, id];
@@ -102,7 +119,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
 
   const addAll = (countries: Country[]) => {
     const next = new Set(draft.selectedCountryIds);
-    countries.forEach((c) => next.add(c.id));
+    takeable(countries).forEach((c) => next.add(c.id));
     patch({ selectedCountryIds: [...next] });
   };
   const removeAll = (countries: Country[]) => {
@@ -114,7 +131,8 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
      Clearance and the transaction use the same canonical quote function. */
   const energyFor = (countries: Country[]) => quoteStreamingMarketFilingEnergy(unfiled(countries).map(country => country.id));
   const pickedHere = inRegion.filter((country) => picked.has(country.id));
-  const allHere = inRegion.length > 0 && pickedHere.length === inRegion.length;
+  const openHere = takeable(inRegion);
+  const allHere = openHere.length > 0 && openHere.every((country) => picked.has(country.id));
 
   return (
     <>
@@ -158,7 +176,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
         </button>
         <button type="button" className={allHere ? 'lw-bulk is-on' : 'lw-bulk'} onClick={() => (allHere ? removeAll(inRegion) : addAll(inRegion))}>
           <i aria-hidden="true">{allHere ? '−' : '+'}</i>
-          {allHere ? 'Remove all' : `Add all ${inRegion.length}`}
+          {allHere ? 'Remove all' : `Add all ${openHere.length}`}
         </button>
       </div>
 
@@ -180,6 +198,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
                 <span className="lw-chip is-plain">{quoteStreamingMarketFilingEnergy([country.id])}E to file</span>}
               pinned="On opening day"
               switchLabel={on ? 'On opening day' : 'Add to opening day'}
+              plus={plusLocked(country)}
               onReport={() => setReport(country)}
               onToggle={() => toggle(country.id)}
             />
@@ -195,7 +214,9 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
           the filing desk. Opening it picks through country by country. */}
       {groups.map((group) => {
         const taken = group.countries.filter((c) => picked.has(c.id));
-        const all = taken.length === group.countries.length;
+        const groupOpen = takeable(group.countries);
+        const plusCount = group.countries.length - groupOpen.length;
+        const all = groupOpen.length > 0 && groupOpen.every((c) => picked.has(c.id));
         const open = unclaimed(group.summary.rivals);
         return (
           <article key={group.id} className={taken.length > 0 ? 'lw-group is-on' : 'lw-group'}>
@@ -231,10 +252,11 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
                 {/* The one line a single country does not need and a bloc
                     always does. */}
                 <span className="lw-chip is-plain sf-tone-warn">
-                  {unfiled(group.countries).length > 0
-                    ? `${energyFor(group.countries)} energy to file ${unfiled(group.countries).length} together`
+                  {unfiled(groupOpen).length > 0
+                    ? `${energyFor(groupOpen)} energy to file ${unfiled(groupOpen).length} together`
                     : 'Already filed'}
                 </span>
+                {plusCount > 0 && <StreamingPlusChip dim label={`${plusCount} STREAMING+`} />}
               </div>
 
               <div className="lw-country-actions">
@@ -244,8 +266,8 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
                 <OpeningSwitch
                   on={all}
                   part={taken.length > 0 && !all}
-                  label={all ? `All ${group.countries.length} on opening day` : taken.length > 0
-                    ? `${taken.length} of ${group.countries.length} · add all` : `Add all ${group.countries.length}`}
+                  label={all ? `All ${groupOpen.length} on opening day` : taken.length > 0
+                    ? `${taken.length} of ${groupOpen.length} · add all` : `Add all ${groupOpen.length}`}
                   onClick={() => (all ? removeAll(group.countries) : addAll(group.countries))}
                 />
               </div>
@@ -312,7 +334,11 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
         onClose={() => setReport(null)}
         eyebrow={report ? `${report.region} · ${report.code}` : undefined}
         title={report?.name ?? ''}
-        footer={report && (
+        footer={report && (plusLocked(report) ? (
+          <button type="button" className="sf-btn sf-btn--research" onClick={() => openPlus(report)}>
+            Add {report.name} with Streaming+ ›
+          </button>
+        ) : (
           <button
             type="button"
             className={picked.has(report.id) ? 'sf-btn sf-btn--ghost' : 'sf-btn sf-btn--primary'}
@@ -320,7 +346,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
           >
             {picked.has(report.id) ? 'Remove from opening day' : 'Add to opening day'}
           </button>
-        )}
+        ))}
       >
         {report && <CountryReport country={report} />}
       </Sheet>
@@ -334,7 +360,8 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
         const group = groups.find((entry) => entry.id === openGroupId);
         if (!group) return null;
         const taken = group.countries.filter((c) => picked.has(c.id));
-        const all = taken.length === group.countries.length;
+        const groupOpen = takeable(group.countries);
+        const all = groupOpen.length > 0 && groupOpen.every((c) => picked.has(c.id));
         return (
           <Sheet
             open
@@ -351,7 +378,7 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
                   className={all ? 'sf-btn sf-btn--ghost' : 'sf-btn sf-btn--primary'}
                   onClick={() => (all ? removeAll(group.countries) : addAll(group.countries))}
                 >
-                  {all ? 'Remove all' : `Add all ${group.countries.length}`}
+                  {all ? 'Remove all' : `Add all ${groupOpen.length}`}
                 </button>
               </div>
             }
@@ -373,12 +400,14 @@ export function StepMarkets({ data, draft, patch, chosen, handlers, initialCount
             <ul className="lw-group-list">
               {group.countries.map((country) => {
                 const on = picked.has(country.id);
+                const plus = plusLocked(country);
                 return (
                   <li key={country.id} className={on ? 'is-on' : undefined}>
-                    <button type="button" className="lw-group-pick" onClick={() => toggle(country.id)}>
+                    <button type="button" className="lw-group-pick" onClick={() => toggle(country.id)}
+                      aria-label={plus ? `${country.name} is a Streaming+ country. See the Streaming+ Pack` : undefined}>
                       <i aria-hidden="true">{on ? '✓' : '+'}</i>
                       <b>{country.name}</b>
-                      <span>{money(country.rightsEstimate + country.complianceCost)}</span>
+                      {plus ? <StreamingPlusChip /> : <span>{money(country.rightsEstimate + country.complianceCost)}</span>}
                     </button>
                     <span className="lw-group-meta">
                       {clearanceByCountry.get(country.id)?.replaceAll('_', ' ').toLowerCase() ?? 'not filed'} ·

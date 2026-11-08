@@ -43,7 +43,6 @@ import type {
 } from '../../finance/build';
 import { SERVER_TIERS, computeRacks, facilityReachFactor, facilityRacks, tiersOf } from '../../finance/build';
 import type { ServerTier } from '../../finance/build';
-import { packLockedCity } from '../../finance/placer';
 import { getPlaceByListingId } from '../../../../services/streamingSitePlaces';
 import { FIBRE_STANDARD_AT_LAUNCH, fibreMultiplier } from '../../../../services/streamingFibreLadder';
 import {
@@ -775,8 +774,6 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
       market: Boolean(country?.opening),
       regionId: country?.regionId,
       recommended: Boolean(city.recommended),
-      /* one of the 30 Streaming+ cities, shown gold with a lock until the pack is owned */
-      plus: packLockedCity(data, city),
     }];
   }), [countryById, data, data.cities, draft.facilities]);
 
@@ -1209,7 +1206,6 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
                    a place that is not on the table. It is only a suggestion
                    where it could be taken. */
                 pin.recommended && pin.market && !pin.held ? 'is-rec' : '',
-                pin.plus ? 'is-plus' : '',
               ].filter(Boolean).join(' ')}
               transform={`translate(${toScreen(pin.x).toFixed(2)} ${toScreen(pin.y).toFixed(2)})`}
               /* A pin carries a 16px invisible target for a thumb, and a
@@ -1236,7 +1232,6 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
               <circle r={16} className="bw-atlas-pin-hit" />
               {/* A held site keeps a live ring; an empty one is a dot. */}
               {pin.held && <circle r={DOT_PX * 2.2 * dotScale} className="bw-atlas-pin-ring" />}
-              {pin.plus && <circle r={DOT_PX * 2 * dotScale} className="bw-atlas-pin-plus" />}
               {pin.held ? (
                 <>
                   <path

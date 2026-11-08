@@ -99,8 +99,6 @@ export interface City {
   plot: { x: number; y: number };
   /** The team's shortlist for this footprint. */
   recommended?: boolean;
-  /** One of the 30 Streaming+ cities (services/streamingPlusPack.ts). */
-  streamingPlus?: boolean;
   /** Free text the marketplace shows: power prices, politics, weather. */
   note: string;
 }

@@ -63,6 +63,8 @@ export interface AudienceAtlasProps {
   selectedCountryId?: string | null;
   /** Countries picked on the market-entry page, drawn bright over open ground. */
   picked?: ReadonlySet<string>;
+  /** The market-entry page: Streaming+ countries the player cannot enter yet, drawn in the pack's gold. */
+  plus?: ReadonlySet<string>;
   onFocusRegion: (regionId: AtlasRegionId | null) => void;
   onSelectCountry: (countryId: string) => void;
   /** The figure at the foot of the picture, left. */
@@ -257,7 +259,7 @@ const chipWidth = (text: string, perChar: number, extra: number): number => (tex
 
 /* The key in the top corner, per mode. Rendered from here, and measured from
    here so country labels keep clear of it. */
-type LegendItem = { key: 'keyLive' | 'keyScale' | 'keyLeader' | 'keyOpening' | 'keyPicked'; label: string };
+type LegendItem = { key: 'keyLive' | 'keyScale' | 'keyLeader' | 'keyOpening' | 'keyPicked' | 'keyPlus'; label: string };
 /* #138: YOURS reads as a scale of your colour, WHO LEADS as each leader's colour; nothing is a bubble any more */
 const LEGEND: Record<AtlasMode, LegendItem[]> = {
   PLATFORM: [{ key: 'keyScale', label: 'Fewer → more' }, { key: 'keyOpening', label: 'On its way' }],
@@ -267,6 +269,7 @@ const LEGEND: Record<AtlasMode, LegendItem[]> = {
 /* YOURS: a live country's step by its share of your biggest market's audience */
 const STEP_FLOORS = [0, .04, .15, .4];
 const PICKED_KEY: LegendItem = { key: 'keyPicked', label: 'Picked' };
+const PLUS_KEY: LegendItem = { key: 'keyPlus', label: 'Streaming+' };
 
 /* The world itself: sea, shelf, relief and land, exactly as the Build map draws
    them. It never changes, so it is its own memoised layer — a camera move or a
@@ -311,7 +314,7 @@ export const AtlasWorld = React.memo(function AtlasWorld({ uid, onSea }: { uid: 
 /* ========================================================================== */
 
 export const AudienceAtlas = React.memo(function AudienceAtlas({
-  mode, countries, regions, accent, focusRegion, selectedCountryId, picked,
+  mode, countries, regions, accent, focusRegion, selectedCountryId, picked, plus,
   onFocusRegion, onSelectCountry, reading, aside, gauge,
 }: AudienceAtlasProps) {
   const uid = useId().replace(/:/g, '');
@@ -386,11 +389,24 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
     });
     return { path: ids.length ? lightMergedPath(ids) : '', markers };
   }, [picked]);
+  /* Streaming+ countries (2026-11-09): one merged gold shape; the set is fixed, so it merges once */
+  const plusTerritory = useMemo(() => {
+    const ids: string[] = [];
+    const markers: Array<{ id: string; point: [number, number] }> = [];
+    plus?.forEach(id => {
+      const geo = geoOf(id);
+      if (geo.shapeId && lightHasCountry(geo.shapeId)) ids.push(geo.shapeId);
+      else if (geo.point) markers.push({ id, point: geo.point });
+    });
+    return { path: ids.length ? lightMergedPath(ids) : '', markers };
+  }, [plus]);
   /* the scale's unit (paid accounts, homes watching free, buyers) is on the YOURS switch above the map; at 320 px a
      longer chip would run into the World chip */
   const legendItems = useMemo(() => (
-    mode === 'OPERATIONS' && picked && picked.size > 0 ? [...LEGEND.OPERATIONS, PICKED_KEY] : LEGEND[mode]
-  ), [mode, picked]);
+    mode === 'OPERATIONS'
+      ? [...LEGEND.OPERATIONS, ...(picked && picked.size > 0 ? [PICKED_KEY] : []), ...(plus && plus.size > 0 ? [PLUS_KEY] : [])]
+      : LEGEND[mode]
+  ), [mode, picked, plus]);
 
   /* #138 (Zeesh: "ब्लू बबल क्या दर्शाना चाह रहा है … रादर देन हम लोग इसका हाईलाइट कर सकते हैं"): the countries
      themselves are filled; the bubbles are gone.
@@ -591,6 +607,11 @@ export const AudienceAtlas = React.memo(function AudienceAtlas({
           {territory.markers.filter(marker => mode === 'OPERATIONS' || marker.tone !== 'live').map(marker => (
             <circle key={marker.id} cx={marker.point[0]} cy={marker.point[1]} r={(focusRegion ? 3.4 : 2.4) * unit}
               className={cx(css.market, css[`market_${marker.tone}`])} vectorEffect="non-scaling-stroke" />
+          ))}
+          {mode === 'OPERATIONS' && plusTerritory.path && <path d={plusTerritory.path} className={cx(css.market, css.market_plus)} vectorEffect="non-scaling-stroke" />}
+          {mode === 'OPERATIONS' && plusTerritory.markers.map(marker => (
+            <circle key={marker.id} cx={marker.point[0]} cy={marker.point[1]} r={(focusRegion ? 3.4 : 2.4) * unit}
+              className={cx(css.market, css.market_plus)} vectorEffect="non-scaling-stroke" />
           ))}
           {pickedTerritory.path && <path d={pickedTerritory.path} className={cx(css.market, css.market_picked)} vectorEffect="non-scaling-stroke" />}
           {pickedTerritory.markers.map(marker => (

@@ -12,6 +12,7 @@ import { getStreamingBuildMarketAccess } from '../services/streamingBuildMarketA
 import { BuildWizard } from '../components/studio-finance/components/build/BuildWizard';
 import { getStreamingPostIncorporationDestination } from '../components/StreamingFoundingJourney';
 import { WORLD_COUNTRY_DEFINITIONS } from '../services/worldEconomy/worldCountryRegistry';
+import { grantStreamingPlusForTesting } from '../services/streamingPlusPack';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 const founder = (): Player => {
@@ -27,7 +28,8 @@ const founder = (): Player => {
   });
   const result = incorporateOwnedStreamingPlatform(drafted);
   assert.equal(result.changed, true);
-  return result.player;
+  /* it plans whole regions and the whole world, so it carries the Streaming+ Pack (2026-11-09: 21 countries need it) */
+  return grantStreamingPlusForTesting(result.player);
 };
 
 test('incorporation opens the dashboard, while founder capital remains optional', () => {

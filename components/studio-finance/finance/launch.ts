@@ -121,6 +121,8 @@ export interface Country {
   /** Compliance and regulatory setup, charged at Market Clearance. */
   complianceCost: number;
   dossier: CountryDossier;
+  /** One of the Streaming+ countries, and this player cannot take it now (no pack, not already held). */
+  streamingPlus?: boolean;
 }
 
 export interface PricingCohortSignal {

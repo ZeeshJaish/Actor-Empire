@@ -24,6 +24,8 @@ import { AudienceTopTenTab } from './AudienceTopTenTab';
 import { CountUp } from './AudienceUi';
 import { ENFORCEMENT_WORDS, SHARING_POSTURE_WORDS } from './SharingPolicyCard';
 import { AudienceMarketEntry, type MarketEntryActions } from './AudienceMarketEntry';
+import { openStreamingPlusSheet } from '../../services/streamingPlusEvents';
+import { streamingPlusCountryLine, streamingPlusLockedCountryIds } from '../../services/streamingPlusPack';
 import {
   AUDIENCE_WORDS,
   buildAtlasCountries,
@@ -118,13 +120,15 @@ export const AudienceDesk: React.FC<{
     title: spotlight.title, service: brand.name, hue: spotlight.hue, brandHue: brand.hue, kind: 'TITLE' as const,
     art: { id: spotlight.id, genre: spotlight.genre, hue: spotlight.hue },
   } : null), [spotlight?.id, spotlight?.title, spotlight?.genre, spotlight?.hue, brand.name, brand.hue]);
-  const atlasCountries = useMemo(() => buildAtlasCountries(market?.worldCountries, marketOperations), [market, marketOperations]);
+  /* Streaming+ (2026-11-09): without the pack, its 21 countries are open ground that cannot be entered */
+  const atlasCountries = useMemo(() => buildAtlasCountries(market?.worldCountries, marketOperations, streamingPlusLockedCountryIds(room.streamingPlusOwned)), [market, marketOperations, room.streamingPlusOwned]);
+  const openPlusFor = useCallback((country: { name: string }) => openStreamingPlusSheet({ source: 'audience-country', focus: 'countries', line: streamingPlusCountryLine(country.name) }), []);
   const atlasRegions = useMemo(() => summariseRegions(atlasCountries), [atlasCountries]);
   const regionById = useMemo(() => new Map(atlasRegions.map(region => [region.id, region])), [atlasRegions]);
   const liveCountries = atlasCountries.filter(country => country.state === 'LIVE');
   const openingCountries = atlasCountries.filter(country => country.state === 'OPENING');
-  const pausedCountries = atlasCountries.filter(country => country.state === 'PAUSED');
-  const openGroundCount = Math.max(0, atlasCountries.length - liveCountries.length - openingCountries.length - pausedCountries.length);
+  /* open ground this player can enter: the Streaming+ countries are not counted without the pack */
+  const openGroundCount = atlasCountries.filter(country => country.state === 'AVAILABLE' && !country.streamingPlus).length;
   /* "Your audience" in the words of the business model: paid accounts for a
      subscription service, homes watching free for an ad-supported one, buyers
      for a rent-or-buy store (see AUDIENCE_WORDS). */
@@ -243,7 +247,7 @@ export const AudienceDesk: React.FC<{
               onFocus={focusOn}
               selectedCountryId={openCountryId}
               onOpenCountry={openCard}
-              onEnter={canEnterHere ? country => setEntry({ picked: [country.id], region: country.regionId }) : undefined}
+              onEnter={canEnterHere ? country => (country.streamingPlus ? openPlusFor(country) : setEntry({ picked: [country.id], region: country.regionId })) : undefined}
             />
           ) : (
             <div className={css.adpending}><b>Markets unavailable</b><span>The world map appears when this save's market data is ready.</span></div>
@@ -285,13 +289,18 @@ export const AudienceDesk: React.FC<{
           accent={c}
           accentHex={accentHex}
           onClose={() => setOpenCountryId(null)}
-          onEnterMarket={canEnterHere
+          onEnterMarket={openCountry.streamingPlus && (canEnterHere || onManageMarkets)
+            /* a Streaming+ country: the card's button opens the pack */
+            ? () => openPlusFor(openCountry)
+            : canEnterHere
             ? (entry
               /* already on the entry page: the card's button adds or removes the country from the pick */
               ? () => { const countryId = openCountry.id; setOpenCountryId(null); setEntryPicked(current => (current.includes(countryId) ? current.filter(id => id !== countryId) : [...current, countryId])); }
               : () => { const countryId = openCountry.id; setOpenCountryId(null); setEntry({ picked: [countryId], region: openCountry.regionId }); })
             : onManageMarkets ? () => { setOpenCountryId(null); onManageMarkets(); } : undefined}
-          enterLabel={entry ? (entry.picked.includes(openCountry.id) ? 'Remove from pick' : 'Pick for entry') : undefined}
+          enterLabel={openCountry.streamingPlus
+            ? (state.live ? 'Enter with Streaming+' : 'Add with Streaming+')
+            : entry ? (entry.picked.includes(openCountry.id) ? 'Remove from pick' : 'Pick for entry') : undefined}
           onShowRegion={() => { const regionId = openCountry.regionId; setOpenCountryId(null); setEntry(null); setTab('MARKETS'); focusOn(regionId); }}
         />
       )}

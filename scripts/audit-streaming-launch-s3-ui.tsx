@@ -14,6 +14,7 @@ import { STREAMING_WORLD_MARKETS } from '../services/streamingDayOneMarkets';
 import StreamingMarketExpansionWizard from '../components/StreamingMarketExpansionWizard';
 import { saveStreamingMarketPlan } from '../services/streamingMarkets';
 import { contentMarketFixture } from './helpers/contentMarketFixture';
+import { grantStreamingPlusForTesting } from '../services/streamingPlusPack';
 
 const caribbean = STREAMING_MARKET_SUB_REGIONS.find(group => group.id === 'CARIBBEAN')!;
 const countries: Country[] = caribbean.countryIds.map((id, index) => ({
@@ -148,7 +149,8 @@ test('the real launch-country adapter provides full dossiers and promoted presen
 });
 
 test('post-launch expansion exposes individual filing even if a batch cannot be afforded', () => {
-  const player = contentMarketFixture();
+  /* China is a Streaming+ country (2026-11-09): this company carries the pack */
+  const player = grantStreamingPlusForTesting(contentMarketFixture());
   player.ownedStreamingPlatform.launchCommit = { committedAtAbsoluteWeek: 1201 } as any;
   const planned = saveStreamingMarketPlan(player, ['CN', 'BD'], 'EXPANSION').player;
   planned.energy.current = 10;

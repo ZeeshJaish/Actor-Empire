@@ -42,6 +42,9 @@
 .market_paused{fill:#ff6b6b;fill-opacity:.32;stroke:#ff6b6b;stroke-opacity:.92}
 /* picked on the market-entry page: bright, so the plan reads at a glance */
 .market_picked{fill:#fff;fill-opacity:.5;stroke:#fff;stroke-opacity:1;stroke-width:1.6}
+/* the Streaming+ countries on the market-entry page, in the pack's gold (2026-11-09) */
+/* a dashed edge and a lighter fill, so it never reads as "on its way" amber */
+.market_plus{fill:#f8a810;fill-opacity:.18;stroke:#ffd56a;stroke-opacity:.95;stroke-width:1.2;stroke-dasharray:3 2}
 /* #138 YOURS: four steps of your colour, deeper with more of your audience */
 .market_step{fill:var(--atlas-accent);stroke:var(--atlas-accent);stroke-opacity:.95}
 .step0{fill-opacity:.3}.step1{fill-opacity:.5}.step2{fill-opacity:.72}.step3{fill-opacity:.94}
@@ -72,6 +75,7 @@
 .keyLive{background:var(--atlas-accent);box-shadow:0 0 0 1px rgba(255,255,255,.4)}
 .keyOpening{background:#f5b544}
 .keyPicked{background:#fff}
+.keyPlus{background:rgba(248,168,16,.22);box-shadow:inset 0 0 0 1.5px #ffd56a}
 .keyScale{width:26px !important;background:linear-gradient(90deg,
   color-mix(in srgb,var(--atlas-accent) 30%,#a9b4c2) 0 25%,color-mix(in srgb,var(--atlas-accent) 50%,#a9b4c2) 25% 50%,
   color-mix(in srgb,var(--atlas-accent) 72%,#a9b4c2) 50% 75%,var(--atlas-accent) 75%)}

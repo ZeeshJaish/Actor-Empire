@@ -25,7 +25,7 @@ import {
   canAddServer, cloudCeilingOf, coverWithCloud, emptySetup, facilitiesIn, openingRegions, packLockedProvider, packLockedTier, placeRegion, regionReport,
   regionsOf, regionalCloudMaximum, serverCeilingOf, whatIfsFor, type RegionReport, type RegionSetup, type WhatIf,
 } from '../../finance/placer';
-import { StreamingPlusChip, StreamingPlusChipButton } from '../../../streamingPlus/StreamingPlusParts';
+import { StreamingPlusChip } from '../../../streamingPlus/StreamingPlusParts';
 import { openStreamingPlusSheet } from '../../../../services/streamingPlusEvents';
 import { compactCount, money, pct } from '../../finance/format';
 import type { StageProps } from './BuildWizard';
@@ -134,13 +134,6 @@ export function RegionBoard({ data, draft, patch, totals, services, onStartOver,
         onShowRegion={showRegion}
         live={live}
       />
-      {data.streamingPlus && !data.streamingPlus.owned && (
-        <p className="bw-rg-plus-note">
-          <span className="bw-rg-plus-dot" aria-hidden="true" />
-          <span>Gold pins are the 30 Streaming+ cities. New rooms go to the other 164.</span>
-          <StreamingPlusChipButton request={{ source: 'network-cities', focus: 'cities', line: 'New York, Frankfurt, Shanghai, São Paulo and 26 more cities are part of the Streaming+ Pack.' }} />
-        </p>
-      )}
       {!live && <button type="button" className="bw-suggest-entry" onClick={() => setSuggesting(true)}><span><b>Suggest network</b><small>Find a setup for your budget</small></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></button>}
       {!live && suggesting && <NetworkSuggestionSheet data={data} draft={draft} onApply={patch} onClose={() => setSuggesting(false)} />}
       {live ? (

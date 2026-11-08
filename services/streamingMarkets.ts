@@ -17,6 +17,7 @@ import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { spendPlayerEnergy } from './premiumLogic';
 import { quoteStreamingMarketFilingEnergy } from './streamingMarketFilingQuote';
+import { streamingPlusLocks } from './streamingPlusPack';
 import {
     activateStreamingMarketOperation,
     advanceStreamingMarketOperation,
@@ -60,10 +61,12 @@ const addUniqueNews = (player: Player, additions: NewsItem[]): NewsItem[] => {
 export interface StreamingMarketMutationResult {
     player: Player;
     changed: boolean;
-    reason: 'SAVED' | 'STARTED' | 'ADVANCED' | 'RESOLVED' | 'REAPPLIED' | 'INVALID_STATE' | 'NO_MARKETS' | 'INSUFFICIENT_TREASURY' | 'INSUFFICIENT_ENERGY' | 'ALREADY_STARTED' | 'TOO_EARLY';
+    reason: 'SAVED' | 'STARTED' | 'ADVANCED' | 'RESOLVED' | 'REAPPLIED' | 'INVALID_STATE' | 'NO_MARKETS' | 'STREAMING_PLUS' | 'INSUFFICIENT_TREASURY' | 'INSUFFICIENT_ENERGY' | 'ALREADY_STARTED' | 'TOO_EARLY';
     shortfall: number;
     amount: number;
     energyCost?: number;
+    /** Streaming+ countries left out of a plan because the player has no pack. */
+    lockedCountryIds?: string[];
 }
 export interface StreamingMarketClearanceView {
     stage: StreamingMarketClearanceStage | null;
@@ -101,13 +104,18 @@ export const saveStreamingMarketPlan = (player: Player, countryIds: string[], en
         .filter(operation => operation.entryKind !== entryKind && operation.countryId && operation.status !== 'EXITED')
         .map(operation => operation.countryId!));
     const requested = normalizeStreamingDayOneMarketIds(countryIds);
-    const selected = requested.filter(countryId => !unavailableCountries.has(countryId));
+    const existingByCountry = new Map(platform.marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.countryId && operation.status !== 'EXITED').map(operation => [operation.countryId!, operation]));
+    /* Streaming+ (2026-11-09): a pack country goes into a plan only with the pack. The check is here, so the
+       wizard, Enter new markets and any later screen are all held by it. A country the save already holds stays. */
+    const lockedCountryIds = requested.filter(countryId => !existingByCountry.has(countryId)
+        && streamingPlusLocks(player, { kind: 'COUNTRY', id: countryId }));
+    const locked = new Set(lockedCountryIds);
+    const selected = requested.filter(countryId => !unavailableCountries.has(countryId) && !locked.has(countryId));
     if (requested.length > 0 && selected.length === 0) {
-        return { player, changed: false, reason: 'NO_MARKETS', shortfall: 0, amount: 0 };
+        return { player, changed: false, reason: lockedCountryIds.length ? 'STREAMING_PLUS' : 'NO_MARKETS', shortfall: 0, amount: 0, ...(lockedCountryIds.length ? { lockedCountryIds } : {}) };
     }
     const selectedSet = new Set(selected);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const existingByCountry = new Map(platform.marketOperations.filter(operation => operation.scope === 'COUNTRY' && operation.countryId && operation.status !== 'EXITED').map(operation => [operation.countryId!, operation]));
     const mutableStatuses = new Set(['NOT_ENTERED', 'EVALUATING', 'PLANNED', 'AWAITING_FUNDING']);
     const retained = platform.marketOperations.filter(operation => {
         if (operation.scope !== 'COUNTRY' || operation.entryKind !== entryKind || !operation.countryId) return true;
@@ -138,7 +146,7 @@ export const saveStreamingMarketPlan = (player: Player, countryIds: string[], en
         ...platform.launchProgram, status: 'PLANNING', startedAtAbsoluteWeek: platform.launchProgram.startedAtAbsoluteWeek ?? absoluteWeek,
         defineCurrentStep: 'MARKETS', configurationRevision: platform.launchProgram.configurationRevision + 1,
     }, marketOperations: operations }, player.id);
-    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0, amount: planned.reduce((sum, item) => sum + item.plannedCosts.total, 0) };
+    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0, amount: planned.reduce((sum, item) => sum + item.plannedCosts.total, 0), ...(lockedCountryIds.length ? { lockedCountryIds } : {}) };
 };
 
 /** Confirming entry settles rights/compliance once and starts the visible 4-6 week review. */

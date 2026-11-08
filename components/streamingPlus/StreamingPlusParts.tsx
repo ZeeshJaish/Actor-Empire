@@ -29,7 +29,7 @@ const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeL
 export const StreamingPlusIcon: React.FC<{ id: string; size?: number }> = ({ id, size = 20 }) => {
     const common = { width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true } as const;
     switch (id) {
-        case 'cities': return <svg {...common}><path {...stroke} d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle {...stroke} cx="12" cy="10" r="2.4" /></svg>;
+        case 'countries': return <svg {...common}><circle {...stroke} cx="12" cy="12" r="8.5" /><path {...stroke} d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5Z" /></svg>;
         case 'servers': return <svg {...common}><rect {...stroke} x="4" y="3.5" width="16" height="7" rx="1.8" /><rect {...stroke} x="4" y="13.5" width="16" height="7" rx="1.8" /><path {...stroke} d="M8 7h.01M8 17h.01M12 7h5M12 17h5" /></svg>;
         case 'tech': return <svg {...common}><rect {...stroke} x="6.5" y="6.5" width="11" height="11" rx="2" /><path {...stroke} d="M9.5 3v3.5M14.5 3v3.5M9.5 17.5V21M14.5 17.5V21M3 9.5h3.5M3 14.5h3.5M17.5 9.5H21M17.5 14.5H21" /><path {...stroke} d="M10 12h4" /></svg>;
         case 'company': return <svg {...common}><path {...stroke} d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z" /><path {...stroke} d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>;

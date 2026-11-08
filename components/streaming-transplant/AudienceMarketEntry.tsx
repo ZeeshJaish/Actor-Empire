@@ -19,6 +19,10 @@
    Presentation only. Every mutation is a callback the HQ owns (`actions`), so
    the page never touches the save itself, and no tap here loads code or saves
    anything except the explicit File / Submit / Refile buttons.
+
+   2026-11-09: the Streaming+ countries are gold on the map and come after open
+   ground in the list, with the pack's gold switch. A tap on one opens the pack's
+   sheet; they are never picked, counted or added by Add all.
    ========================================================================== */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -44,6 +48,8 @@ import {
   type AtlasRegionId,
 } from './audienceAtlasModel';
 import { getStreamingCountryMarketProfile, getStreamingDayOneMarket } from '../../services/streamingDayOneMarkets';
+import { openStreamingPlusSheet } from '../../services/streamingPlusEvents';
+import { streamingPlusCountryLine } from '../../services/streamingPlusPack';
 import {
   STREAMING_MARKET_REAPPLICATION_ENERGY,
   STREAMING_MARKET_REQUIREMENT_ENERGY,
@@ -127,7 +133,14 @@ export const AudienceMarketEntry: React.FC<{
   const [feedback, setFeedback] = useState<MarketEntryOutcome | null>(null);
 
   const regions = useMemo(() => summariseRegions(countries), [countries]);
-  const open = useMemo(() => countries.filter(country => country.state === 'AVAILABLE'), [countries]);
+  const open = useMemo(() => countries.filter(country => country.state === 'AVAILABLE' && !country.streamingPlus), [countries]);
+  /* Streaming+ countries without the pack: gold on the map, after open ground in the list */
+  const plusLocked = useMemo(() => countries.filter(country => country.streamingPlus), [countries]);
+  const plusIds = useMemo(() => new Set(plusLocked.map(country => country.id)), [plusLocked]);
+  const openPlus = useCallback((countryId: string) => {
+    const country = countries.find(item => item.id === countryId);
+    openStreamingPlusSheet({ source: 'audience-enter-markets', focus: 'countries', line: streamingPlusCountryLine(country?.name || countryId) });
+  }, [countries]);
   const openByRegion = useMemo(() => {
     const counts = new Map<string, number>();
     open.forEach(country => counts.set(country.regionId, (counts.get(country.regionId) || 0) + 1));
@@ -137,7 +150,10 @@ export const AudienceMarketEntry: React.FC<{
      them: people watching this week in the world simulation. */
   const scopedOpen = useMemo(() => (focusRegion ? open.filter(country => country.regionId === focusRegion) : open)
     .slice().sort((left, right) => right.view.activeViewers - left.view.activeViewers), [focusRegion, open]);
-  const shownOpen = showAll ? scopedOpen : scopedOpen.slice(0, 10);
+  const scopedPlus = useMemo(() => (focusRegion ? plusLocked.filter(country => country.regionId === focusRegion) : plusLocked)
+    .slice().sort((left, right) => right.view.activeViewers - left.view.activeViewers), [focusRegion, plusLocked]);
+  const listed = useMemo(() => [...scopedOpen, ...scopedPlus], [scopedOpen, scopedPlus]);
+  const shownOpen = showAll ? listed : listed.slice(0, 10);
   /* Coverage only for what is on screen and in the pick: it walks every
      facility against every audience cluster, so it is not run for all 197. */
   const coverageIds = useMemo(() => Array.from(new Set([...shownOpen.map(country => country.id), ...pickedIds])).sort(), [pickedIds, shownOpen]);
@@ -145,8 +161,12 @@ export const AudienceMarketEntry: React.FC<{
 
   const toggle = useCallback((countryId: string) => {
     setFeedback(null);
+    if (plusIds.has(countryId)) {
+      openPlus(countryId);
+      return;
+    }
     onPickedChange(current => (current.includes(countryId) ? current.filter(id => id !== countryId) : [...current, countryId]));
-  }, [onPickedChange]);
+  }, [onPickedChange, openPlus, plusIds]);
   const addAll = () => {
     setFeedback(null);
     onPickedChange(current => Array.from(new Set([...current, ...scopedOpen.map(country => country.id)])));
@@ -159,7 +179,8 @@ export const AudienceMarketEntry: React.FC<{
   }, [countries, onOpenCountry, toggle]);
 
   /* The tray: exact figures for the pick, the same numbers the filing charges. */
-  const pickList = useMemo(() => countries.filter(country => picked.has(country.id)), [countries, picked]);
+  /* a Streaming+ country is never in the pick, even if a card handed one over */
+  const pickList = useMemo(() => countries.filter(country => picked.has(country.id) && !country.streamingPlus), [countries, picked]);
   const totals = useMemo(() => pickList.reduce((sum, country) => {
     const facts = factsOf(country.id);
     return { viewers: sum.viewers + country.view.activeViewers, cost: sum.cost + (facts?.cost ?? 0) };
@@ -213,6 +234,7 @@ export const AudienceMarketEntry: React.FC<{
               accent={accent}
               focusRegion={focusRegion}
               picked={pickedSet}
+              plus={plusIds}
               onFocusRegion={setFocusRegion}
               onSelectCountry={onMapCountry}
               reading={{ value: String(picked.size), caption: picked.size ? `picked · ${compact(totals.viewers)} watching` : 'picked · tap open ground' }}
@@ -237,7 +259,7 @@ export const AudienceMarketEntry: React.FC<{
                 ? <button type="button" onClick={addAll}>Add all {scopedOpen.length}</button>
                 : <span>biggest audiences in {focusLabel}</span>}
             </div>
-            {scopedOpen.length === 0 ? (
+            {listed.length === 0 ? (
               <div className={css.empty}><b>Nothing left to enter here</b><span>Every country in {focusLabel} is already live or on its way.</span></div>
             ) : (
               <div className={css.cards}>
@@ -246,7 +268,8 @@ export const AudienceMarketEntry: React.FC<{
                     {shownOpen.map((country, index) => {
                       const facts = factsOf(country.id);
                       if (!facts) return null;
-                      const on = picked.has(country.id);
+                      const plus = Boolean(country.streamingPlus);
+                      const on = !plus && picked.has(country.id);
                       const cover = coverage[country.id];
                       return (
                         <LaunchCountryCard
@@ -268,6 +291,7 @@ export const AudienceMarketEntry: React.FC<{
                           )}
                           pinned="Picked"
                           switchLabel={on ? 'Picked' : 'Pick'}
+                          plus={plus}
                           onReport={() => onOpenCountry(country.id)}
                           onToggle={() => toggle(country.id)}
                         />
@@ -275,8 +299,8 @@ export const AudienceMarketEntry: React.FC<{
                     })}
                   </ul>
                 </div>
-                {scopedOpen.length > shownOpen.length && (
-                  <button type="button" className={css.more} onClick={() => setShowAll(true)}>Show all {scopedOpen.length}</button>
+                {listed.length > shownOpen.length && (
+                  <button type="button" className={css.more} onClick={() => setShowAll(true)}>Show all {listed.length}</button>
                 )}
               </div>
             )}

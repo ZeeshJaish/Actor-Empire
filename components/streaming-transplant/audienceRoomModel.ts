@@ -11,6 +11,7 @@ import { normalizeOwnedStreamingPlatformState } from '../../services/ownedStream
 import type { StreamingAudienceMarketView } from '../../services/streamingAudienceMarket';
 import { getStreamingWeeklyChartView, type StreamingChartBoard, type StreamingChartEntryView, type StreamingChartList, type StreamingWeeklyChartView } from '../../services/streamingWeeklyChart';
 import { buildAtlasCountries, sharesOf, type AudienceKind } from './audienceAtlasModel';
+import { hasStreamingPlus, streamingPlusLockedCountryIds } from '../../services/streamingPlusPack';
 
 export const WEEKS_PER_MONTH = 4.33;
 
@@ -128,6 +129,8 @@ export interface AudienceChartView extends Omit<StreamingWeeklyChartView, 'lists
 export interface AudienceRoomModel {
   live: boolean;
   kind: AudienceKind;
+  /** The Streaming+ Pack is owned: no country is locked. */
+  streamingPlusOwned: boolean;
   /** the last settled week (absolute), or null before launch */
   week: number | null;
   head: { audience: number; net: number | null; revenueMonthly: number | null };
@@ -331,6 +334,7 @@ export const buildAudienceRoomModel = (player: Player, market: StreamingAudience
   return {
     live,
     kind,
+    streamingPlusOwned: hasStreamingPlus(player),
     week,
     head: {
       audience: card.audience,
@@ -358,7 +362,7 @@ const withPosters = (view: StreamingWeeklyChartView): AudienceChartView => {
   return { ...view, lists: lists(view), own: { ...view.own, lists: lists(view.own) } };
 };
 
-const chooseNextMove = ({ platform, market, kind, churn, card, titles, operations }: {
+const chooseNextMove = ({ player, platform, market, kind, churn, card, titles, operations }: {
   player: Player;
   platform: ReturnType<typeof normalizeOwnedStreamingPlatformState>;
   market: StreamingAudienceMarketView;
@@ -398,8 +402,9 @@ const chooseNextMove = ({ platform, market, kind, churn, card, titles, operation
       tone: 'warn',
     };
   }
-  const open = buildAtlasCountries(market.worldCountries, operations)
-    .filter(country => country.state === 'AVAILABLE' && country.view.activeViewers >= 3_000_000)
+  /* a Streaming+ country is never the suggestion without the pack */
+  const open = buildAtlasCountries(market.worldCountries, operations, streamingPlusLockedCountryIds(hasStreamingPlus(player)))
+    .filter(country => country.state === 'AVAILABLE' && !country.streamingPlus && country.view.activeViewers >= 3_000_000)
     .map(country => ({ country, leader: sharesOf([country.view]).shares.filter(item => item.id !== 'PLAYER')[0]?.share ?? 0 }))
     .filter(item => item.leader < 35)
     .sort((left, right) => right.country.view.activeViewers - left.country.view.activeViewers)[0];
@@ -450,6 +455,8 @@ const chooseNextMove = ({ platform, market, kind, churn, card, titles, operation
 export const createEmptyAudienceRoom = (live: boolean): AudienceRoomModel => ({
   live,
   kind: 'ACCOUNTS',
+  /* a prototype with no save locks no country */
+  streamingPlusOwned: true,
   week: null,
   head: { audience: 0, net: null, revenueMonthly: null },
   card: { week: null, audience: 0, joined: 0, left: 0, returned: 0, net: 0, previousAudience: null, settled: false },
