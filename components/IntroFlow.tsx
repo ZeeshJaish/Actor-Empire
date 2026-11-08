@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import EmpireStudiozIntro from './EmpireStudiozIntro';
 import ActorEmpireLoading from './ActorEmpireLoading';
 import ActorEmpireStart from './ActorEmpireStart';
@@ -21,6 +21,8 @@ interface Props {
   /** Start at the title screen when the app already showed the boot bumper */
   skipIntro?: boolean;
   version?: string;
+  /** Optional card shown in the save-slot screen's flow, under the slots */
+  slotNotice?: ReactNode;
 }
 
 const DEMO_SLOTS: SlotEntry[] = [
@@ -41,6 +43,7 @@ export default function IntroFlow({
   onBeginCareer,
   skipIntro = false,
   version = 'Version 1.0.18',
+  slotNotice,
 }: Props) {
   const [act1, setAct1] = useState<ActState>('');
   const [act2, setAct2] = useState<ActState>('');
@@ -106,6 +109,7 @@ export default function IntroFlow({
       <SaveSlotScreen
         state={act4}
         slots={slots}
+        notice={slotNotice}
         version={version}
         onBack={() => {
           setAct4('');

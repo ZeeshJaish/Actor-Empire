@@ -696,6 +696,40 @@ export const bootstrapFirebase = async () => {
     bootstrapFirebaseAuth(),
     bootstrapPushMessaging(),
   ]);
+  // AE-016: reports this phone could not deliver earlier go again now that sign-in has run
+  void resendQueuedIssueReports();
+};
+
+/* AE-020: one phone failed anonymous sign-in at every start (918 times in 28 days), each time with a network call and
+   three telemetry writes. A failed sign-in now waits before the next try, kept across restarts: 10 minutes, then an
+   hour, then a day. Play never needs this sign-in; it carries issue reports. A stored sign-in is never delayed. */
+const AUTH_FAILURE_STORAGE_KEY = 'actorEmpire.anonymousAuthFailure.v1';
+const AUTH_RETRY_DELAYS_MS = [10 * 60_000, 60 * 60_000, 24 * 60 * 60_000];
+type AuthFailureRecord = { failedAt: number; failures: number };
+
+const readAuthFailure = (): AuthFailureRecord | null => {
+  try {
+    const parsed = JSON.parse(globalThis.localStorage?.getItem(AUTH_FAILURE_STORAGE_KEY) || 'null');
+    if (!parsed || typeof parsed.failedAt !== 'number' || typeof parsed.failures !== 'number') return null;
+    return { failedAt: parsed.failedAt, failures: parsed.failures };
+  } catch {
+    return null;
+  }
+};
+
+const writeAuthFailure = (record: AuthFailureRecord | null) => {
+  try {
+    if (record) globalThis.localStorage?.setItem(AUTH_FAILURE_STORAGE_KEY, JSON.stringify(record));
+    else globalThis.localStorage?.removeItem(AUTH_FAILURE_STORAGE_KEY);
+  } catch {
+    // The wait is a courtesy to the service; sign-in still works without it.
+  }
+};
+
+export const getAnonymousAuthRetryWaitMs = (record: AuthFailureRecord | null = readAuthFailure(), now = Date.now()) => {
+  if (!record) return 0;
+  const step = Math.min(AUTH_RETRY_DELAYS_MS.length - 1, Math.max(0, record.failures - 1));
+  return Math.max(0, record.failedAt + AUTH_RETRY_DELAYS_MS[step] - now);
 };
 
 export const bootstrapFirebaseAuth = async () => {
@@ -705,6 +739,11 @@ export const bootstrapFirebaseAuth = async () => {
   }
   if (firebaseAuthBootstrapped) return;
   firebaseAuthBootstrapped = true;
+  const retryWaitMs = readStoredAnonymousAuth()?.localId ? 0 : getAnonymousAuthRetryWaitMs();
+  if (retryWaitMs > 0) {
+    setFirebaseAuthStatus({ state: 'failed', userId: null, error: `Sign-in paused for ${Math.ceil(retryWaitMs / 60_000)} min after a failure` });
+    return;
+  }
 
   console.info('[Firebase Auth] Anonymous auth bootstrap starting', {
     platform: getTelemetryPlatform(),
@@ -738,6 +777,7 @@ export const bootstrapFirebaseAuth = async () => {
       source: storedAuth ? 'local_storage' : 'rest',
     });
     setFirebaseAuthStatus({ state: 'ready', userId: firebaseAuthUserId, error: undefined });
+    writeAuthFailure(null);
     await attachFirebaseAuthUserId();
     await runSafely('anonymous-auth-ready-log', () => FirebaseCrashlytics.log({ message: 'Firebase anonymous auth ready' }));
     await runSafely('anonymous-auth-success-event', () =>
@@ -767,6 +807,8 @@ export const bootstrapFirebaseAuth = async () => {
       platform: getTelemetryPlatform(),
     });
     setFirebaseAuthStatus({ state: 'failed', userId: null, error: message });
+    const failures = (readAuthFailure()?.failures || 0) + 1;
+    writeAuthFailure({ failedAt: Date.now(), failures });
     await runSafely('anonymous-auth-failed-log', () => FirebaseCrashlytics.log({ message: `Firebase anonymous auth failed: ${message}` }));
     await runSafely('anonymous-auth-failed-key', () =>
       FirebaseCrashlytics.setCustomKey({
@@ -782,6 +824,7 @@ export const bootstrapFirebaseAuth = async () => {
           app_version: APP_DISPLAY_VERSION,
           platform: getTelemetryPlatform(),
           error: message,
+          failures,
         }),
       })
     );
@@ -1197,16 +1240,72 @@ const createIssueId = () => {
   return `ae_${Date.now().toString(36)}_${randomSuffix}`;
 };
 
-const persistLocalIssueReport = (report: Record<string, unknown>) => {
+/* AE-016: a report that could not reach Firestore stayed only in this cache and was never sent again. Each cached
+   report now carries its delivery: 'queued' until Firestore has it, 'sent' after. Queued reports go again at the next
+   start-up (after sign-in), oldest first, stopping at the first failure; a report gets a few tries within two weeks.
+   The issue ID is the document ID, so a report that did arrive answers 409 on a resend and counts as sent. */
+const LOCAL_ISSUE_REPORTS_KEY = 'actorEmpireIssueReports';
+const ISSUE_REPORT_MAX_ATTEMPTS = 6;
+const ISSUE_REPORT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+export type IssueReportDelivery = 'queued' | 'sent';
+type LocalIssueReport = Record<string, unknown> & {
+  issue_id?: string;
+  created_at?: string;
+  delivery?: IssueReportDelivery;
+  delivery_attempts?: number;
+  delivery_error?: string;
+};
+const issueReportDeliveryListeners = new Set<(issueId: string, delivery: IssueReportDelivery) => void>();
+
+const readLocalIssueReports = (): LocalIssueReport[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(LOCAL_ISSUE_REPORTS_KEY) || '[]');
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is LocalIssueReport => Boolean(item) && typeof item === 'object')
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeLocalIssueReports = (reports: LocalIssueReport[]) => {
   if (typeof window === 'undefined') return;
   try {
-    const key = 'actorEmpireIssueReports';
-    const existing = JSON.parse(window.localStorage.getItem(key) || '[]');
-    const reports = Array.isArray(existing) ? existing : [];
-    window.localStorage.setItem(key, JSON.stringify([report, ...reports].slice(0, 10)));
+    window.localStorage.setItem(LOCAL_ISSUE_REPORTS_KEY, JSON.stringify(reports.slice(0, 10)));
   } catch (error) {
     console.warn('[Firebase] local issue report cache skipped', error);
   }
+};
+
+const persistLocalIssueReport = (report: Record<string, unknown>) => {
+  writeLocalIssueReports([{ ...report, delivery: 'queued', delivery_attempts: 0 }, ...readLocalIssueReports()]);
+};
+
+const updateLocalIssueReport = (issueId: string, patch: Partial<LocalIssueReport>) => {
+  const reports = readLocalIssueReports();
+  const index = reports.findIndex(report => report.issue_id === issueId);
+  if (index < 0) return;
+  reports[index] = { ...reports[index], ...patch };
+  writeLocalIssueReports(reports);
+  const delivery = patch.delivery;
+  if (delivery) issueReportDeliveryListeners.forEach(listener => listener(issueId, delivery));
+};
+
+export const getIssueReportDelivery = (issueId: string): IssueReportDelivery | null =>
+  readLocalIssueReports().find(report => report.issue_id === issueId)?.delivery ?? null;
+
+export const onIssueReportDeliveryChanged = (listener: (issueId: string, delivery: IssueReportDelivery) => void) => {
+  issueReportDeliveryListeners.add(listener);
+  return () => { issueReportDeliveryListeners.delete(listener); };
+};
+
+const withoutDeliveryFields = (report: LocalIssueReport): Record<string, unknown> => {
+  const copy: Record<string, unknown> = { ...report };
+  delete copy.delivery;
+  delete copy.delivery_attempts;
+  delete copy.delivery_error;
+  return copy;
 };
 
 type FirestoreValue =
@@ -1277,9 +1376,44 @@ const submitIssueReportToFirestore = async (report: Record<string, unknown>) => 
   );
 
   if (!response.ok) {
+    // the issue ID is the document ID: 409 means this report already arrived (a resend after a lost answer)
+    if (response.status === 409) return;
     const payload = await response.json().catch(() => ({}));
     const message = payload?.error?.message || `HTTP ${response.status}`;
     throw new Error(`Firestore issue report write failed: ${message}`);
+  }
+};
+
+let issueReportResendRunning = false;
+
+/** AE-016: sends again the reports this phone could not deliver, oldest first; stops at the first failure (still offline). */
+export const resendQueuedIssueReports = async () => {
+  if (!Capacitor.isNativePlatform() || issueReportResendRunning) return;
+  issueReportResendRunning = true;
+  try {
+    const now = Date.now();
+    const queued = readLocalIssueReports()
+      .filter(report => report.delivery === 'queued'
+        && typeof report.issue_id === 'string'
+        && (Number(report.delivery_attempts) || 0) < ISSUE_REPORT_MAX_ATTEMPTS
+        && now - (Date.parse(String(report.created_at || '')) || 0) < ISSUE_REPORT_MAX_AGE_MS)
+      .reverse();
+    for (const report of queued) {
+      const issueId = report.issue_id as string;
+      try {
+        await submitIssueReportToFirestore(withoutDeliveryFields(report));
+        updateLocalIssueReport(issueId, { delivery: 'sent', delivery_error: '' });
+        trackGameEvent('issue_report_firestore_saved', { issue_id: issueId, category: String(report.category || ''), resent: true });
+      } catch (error) {
+        updateLocalIssueReport(issueId, {
+          delivery_attempts: (Number(report.delivery_attempts) || 0) + 1,
+          delivery_error: getErrorMessage(error).slice(0, 200),
+        });
+        break;
+      }
+    }
+  } finally {
+    issueReportResendRunning = false;
   }
 };
 
@@ -1357,6 +1491,7 @@ export const submitPlayerIssueReport = (
       addBreadcrumb('issue_report_firestore_saved', { issue_id: issueId, category });
       trackGameEvent('issue_report_firestore_saved', { issue_id: issueId, category });
       setCrashKey('last_issue_report_firestore_status', 'saved');
+      updateLocalIssueReport(issueId, { delivery: 'sent' });
     })
     .catch((error) => {
       const message = getErrorMessage(error);
@@ -1369,6 +1504,8 @@ export const submitPlayerIssueReport = (
       });
       setCrashKey('last_issue_report_firestore_status', 'failed');
       setCrashKey('last_issue_report_firestore_error', message);
+      // stays queued: resendQueuedIssueReports sends it at the next start-up
+      updateLocalIssueReport(issueId, { delivery_attempts: 1, delivery_error: message.slice(0, 200) });
     });
 
   return issueId;

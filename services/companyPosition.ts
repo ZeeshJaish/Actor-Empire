@@ -126,6 +126,11 @@ export const getCompanyPosition = (
 ): CompanyPosition => {
     const strategicThreshold = getStrategicStakeThreshold(profile);
     if (profile.isPlayerOwned) {
+        /* Stocks fix (2026-11-08): a studio the player controls showed 100% even when control came with half its shares.
+           Show the real economic share, the one withdrawals pay out; a studio founded or bought outright stays at 100%. */
+        const ownedStudio = ((player as Partial<Player>).businesses || []).find(business => business.id === profile.id);
+        const realPercent = ownedStudio ? getStudioOwnershipPercent(player as Player, ownedStudio) : 100;
+        const ownershipPercent = Number.isFinite(realPercent) && realPercent > 0 ? roundPercent(Math.min(100, realPercent)) : 100;
         return {
             shares: 0,
             stockValue: 0,
@@ -137,7 +142,7 @@ export const getCompanyPosition = (
             privateUnrealizedGain: 0,
             privateLifetimeDistributions: 0,
             privateLastQuarterChangePercent: 0,
-            ownershipPercent: 100,
+            ownershipPercent,
             strategicThreshold,
             influenceStatus: 'CONTROLLING_OWNER',
             estimatedAnnualDividend: 0,

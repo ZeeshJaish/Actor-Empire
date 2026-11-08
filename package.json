@@ -497,6 +497,8 @@
     "audit:ios-crash-symbols": "node scripts/audit-ios-crash-symbols.mjs",
     "audit:ios-soak-determinism": "esbuild scripts/diagnose-ios-soak-determinism.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-ios-soak-determinism.mjs && node --import ./scripts/ios-soak-seed-loader.mjs /tmp/audit-ios-soak-determinism.mjs",
     "audit:admob": "node scripts/audit-admob-config.mjs",
+    "audit:rewarded-ad-lifecycle": "node scripts/audit-rewarded-ad-lifecycle.mjs",
+    "audit:stock-exploits": "esbuild scripts/audit-stock-exploits.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-stock-exploits.mjs && node /tmp/audit-stock-exploits.mjs",
     "audit:android-purchase-verification": "node scripts/audit-android-purchase-verification.mjs",
     "assets:lifestyle-prompts": "node scripts/export-lifestyle-asset-image-prompts.mjs",
     "assets:properties": "php scripts/generate-property-pixel-art.php && node scripts/export-lifestyle-asset-image-prompts.mjs",

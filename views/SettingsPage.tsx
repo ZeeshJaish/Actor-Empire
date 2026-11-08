@@ -8,7 +8,7 @@ import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '../services/newPlayerTutorial';
 import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
-import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent } from '../services/firebaseService';
+import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent, getIssueReportDelivery, onIssueReportDeliveryChanged, type IssueReportDelivery } from '../services/firebaseService';
 import { CountryFlagSvg } from '../components/studio-finance/components/FlagField';
 
 interface SettingsPageProps {
@@ -61,6 +61,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   const [reportCategory, setReportCategory] = useState(ISSUE_CATEGORIES[0].id);
   const [reportDetails, setReportDetails] = useState('');
   const [sentIssueId, setSentIssueId] = useState<string | null>(null);
+  const [sentIssueDelivery, setSentIssueDelivery] = useState<IssueReportDelivery | null>(null);
+  // AE-016: say whether the report reached the team, or waits on this phone for the next start-up
+  useEffect(() => {
+    if (!sentIssueId) {
+      setSentIssueDelivery(null);
+      return;
+    }
+    setSentIssueDelivery(getIssueReportDelivery(sentIssueId));
+    return onIssueReportDeliveryChanged((issueId, delivery) => {
+      if (issueId === sentIssueId) setSentIssueDelivery(delivery);
+    });
+  }, [sentIssueId]);
   const [supportNotice, setSupportNotice] = useState<string | null>(null);
   const [transferNotice, setTransferNotice] = useState<string | null>(null);
   const [isTransferBusy, setIsTransferBusy] = useState(false);
@@ -890,6 +902,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
                       <div>
                         <div className="font-black text-white">{tr('settings.support.reportSent')}</div>
                         <div className="text-xs text-emerald-200 font-mono mt-1">{sentIssueId}</div>
+                        {sentIssueDelivery && (
+                          <div className={`text-[11px] font-bold mt-1 ${sentIssueDelivery === 'sent' ? 'text-emerald-300' : 'text-amber-200'}`}>
+                            {tr(sentIssueDelivery === 'sent' ? 'settings.support.reportDelivered' : 'settings.support.reportQueued')}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <p className="text-sm text-zinc-300 leading-relaxed mt-4">

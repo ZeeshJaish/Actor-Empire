@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Clock3, Upload } from 'lucide-react';
 import { logoDataUri } from '../assets/logo';
 import type { ActState, SlotEntry } from './types';
@@ -16,6 +16,8 @@ interface Props {
   onBack?: () => void;
   version?: string;
   credit?: string;
+  /** An optional card in the flow under the slots (the alerts invite), never over a control */
+  notice?: ReactNode;
 }
 
 const formatTotalPlayTime = (totalPlayTimeMs: number) => {
@@ -34,6 +36,7 @@ export default function SaveSlotScreen({
   onBack,
   version = 'Version 1.0.18',
   credit = 'Designed & built by Zeesh',
+  notice,
 }: Props) {
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState<number | null>(null);
   const [isImportingSave, setIsImportingSave] = useState(false);
@@ -155,6 +158,7 @@ export default function SaveSlotScreen({
           )
         )}
       </div>
+      {notice && <div className="slot-notice">{notice}</div>}
       <div className="menu-foot credit" style={{ opacity: 0 }}>
         {credit}
       </div>

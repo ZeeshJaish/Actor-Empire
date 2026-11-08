@@ -2052,11 +2052,27 @@ export const processGameWeek = async (
     const eventsToday = nextPlayer.scheduledEvents.filter(e => e.week === nextPlayer.currentWeek);
     if (eventsToday.length > 0) {
         nextPlayer.scheduledEvents = nextPlayer.scheduledEvents.filter(e => e.week !== nextPlayer.currentWeek);
-        eventsToday.forEach(eventToday => {
+        /* AE-014: player.pendingEvent holds one red-carpet night (an award show or a premiere), and two nights in one
+           week overwrote each other, so a premiere could vanish. Award shows go first. A premiere that finds another
+           night waiting moves to next week; an award show that finds a premiere waiting moves that premiere to next
+           week. Other event kinds keep their old handling. */
+        const nextWeekNumber = nextPlayer.currentWeek >= 52 ? 1 : nextPlayer.currentWeek + 1;
+        const nightOrder = (event: ScheduledEvent) => (event.type === 'AWARD_CEREMONY' ? 0 : event.type === 'PREMIERE' ? 1 : 2);
+        const waitingNight = (candidateId: string) => {
+            const waiting = nextPlayer.pendingEvent;
+            return waiting && waiting.id !== candidateId && (waiting.type === 'AWARD_CEREMONY' || waiting.type === 'PREMIERE') ? waiting : null;
+        };
+        const moveToNextWeek = (event: ScheduledEvent) => {
+            nextPlayer.scheduledEvents.push({ ...event, week: nextWeekNumber });
+            logsToAdd.push({ msg: `📅 ${event.title} moves to next week.`, type: 'neutral' });
+        };
+        [...eventsToday].sort((a, b) => nightOrder(a) - nightOrder(b)).forEach(eventToday => {
             if (eventToday.type === 'AWARD_CEREMONY') {
                 const cleanedAwardEvent = sanitizeAwardCeremonyEvent(eventToday);
                 const nominations = cleanedAwardEvent.data?.nominations || [];
                 if (nominations.length > 0) {
+                    const waiting = waitingNight(cleanedAwardEvent.id);
+                    if (waiting?.type === 'PREMIERE') moveToNextWeek(waiting);
                     nextPlayer.pendingEvent = cleanedAwardEvent;
                     logsToAdd.push({ msg: `📅 Today is the day: ${cleanedAwardEvent.title}. Good luck!`, type: 'neutral' });
                 } else {
@@ -2067,6 +2083,10 @@ export const processGameWeek = async (
                 nextPlayer.pendingEvents.push(eventToday);
                 logsToAdd.push({ msg: `📅 Event: ${eventToday.title}`, type: 'neutral' });
             } else {
+                if (eventToday.type === 'PREMIERE' && waitingNight(eventToday.id)) {
+                    moveToNextWeek(eventToday);
+                    return;
+                }
                 nextPlayer.pendingEvent = eventToday;
                 logsToAdd.push({ msg: `📅 Event: ${eventToday.title}`, type: 'neutral' });
             }
@@ -2190,6 +2210,12 @@ export const processGameWeek = async (
     /* #254: another company's share sale is in the news; in the feed only when it dilutes the player's own shares */
     marketUpdate.corporateActions.forEach(action => {
         if (nextPlayer.portfolio?.some(holding => holding.stockId === action.stockId && holding.shares > 0)) logsToAdd.push({ msg: `📈 ${action.notification}`, type: 'neutral' });
+    });
+    /* Stocks fix: a company the player holds reports its quarter in the feed */
+    marketUpdate.earningsReports.forEach(report => {
+        if (nextPlayer.portfolio?.some(holding => holding.stockId === report.stockId && holding.shares > 0)) {
+            logsToAdd.push({ msg: `📊 ${report.notification}`, type: report.verdict === 'BEAT' ? 'positive' : report.verdict === 'MISS' ? 'negative' : 'neutral' });
+        }
     });
 
     // Calculate Dividends
@@ -4938,6 +4964,9 @@ export const processGameWeek = async (
             if (rel.type === 'SERIES' && !rel.projectDetails.episodeRatings?.length) {
                 potential.isRenewed = rollContinuationGreenlight(potential.renewalChance, 94);
             }
+            /* AE-022: a series from your own studio is yours to continue. The network-style roll above no longer ends
+               it: the next season is prepared in your Studio Vault, and you decide to make it or let the show end. */
+            if (rel.type === 'SERIES' && isPlayerProduction) potential.isRenewed = true;
             const hasForcedRareChaos = Boolean(rel.projectDetails.hiddenStats.forcedRareChaosKind);
             const shouldCheckRareChaos = hasForcedRareChaos
                 || (rel.type === 'SERIES' ? !potential.isRenewed : !potential.isSequelGreenlit);
@@ -5096,14 +5125,14 @@ export const processGameWeek = async (
                         } else {
                             newNews.unshift(rareChaos?.news || generateRenewalNews(rel.name, nextSeasonNum, nextPlayer.currentWeek, nextPlayer.age, language));
                             /* #247: the activity log says it too */
-                            logsToAdd.push({ msg: `📺 "${rel.name}" was renewed. Season ${nextSeasonNum} is waiting in your Studio Vault.`, type: 'positive' });
+                            logsToAdd.push({ msg: `📺 "${rel.name}": Season ${nextSeasonNum} is ready in your Studio Vault. Make it, or let the show end.`, type: 'positive' });
                             newInbox.unshift(createContinuationDecisionMessage({
                                 id: `renewal_decision_${rel.id}`,
                                 sender: rareChaos?.platformName ? `${rareChaos.platformName} Executive` : 'Network Exec',
                                 subject: rareChaos?.kind === 'PLATFORM_MOONSHOT'
                                     ? `Risky Season ${nextSeasonNum} Bet`
-                                    : `Season ${nextSeasonNum} Renewed`,
-                                text: `${rel.name} has been renewed. Season ${nextSeasonNum} is waiting in your Studio Vault with the returning-cast decision attached.`,
+                                    : `Season ${nextSeasonNum}: Your Call`,
+                                text: `${rel.name} is your studio's show. Season ${nextSeasonNum} is ready in your Studio Vault with the returning-cast decision attached. Make it when you want, or let the show end.`,
                                 week: nextPlayer.currentWeek,
                                 type: 'STUDIO_CONTINUATION' as const,
                                 data: {

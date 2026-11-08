@@ -623,6 +623,11 @@
     .slot-import{padding:9px 11px;font-size:9.5px;letter-spacing:.14em}
   }
   #act4.on .menu-foot{animation:riseIn .7s var(--ease-out) .5s forwards}
+  /* AE-006: the optional alerts card sits in the flow under the slots. As an overlay at the bottom it covered
+     Start on the title screen and Begin Career on the create screen. */
+  .slot-notice{width:100%;padding:18px 22px 0}
+  #act4 .slot-notice{opacity:0;transform:translateY(18px)}
+  #act4.on .slot-notice{animation:riseIn .7s var(--ease-out) .46s forwards}
 
   /* ================================================================
      ACT V — CREATE YOUR STAR
@@ -720,9 +725,21 @@
   }
   .upload-line-hero:active{transform:scale(.98)}
   .profile-builder-panel{
+    position:relative;
     border-color:rgba(245,158,11,.34);
     padding:16px;
+    /* scrolled into view below the status bar, not under it */
+    scroll-margin-top:max(16px,calc(10px + env(safe-area-inset-top)));
   }
+  .builder-close{
+    position:absolute;top:12px;right:12px;z-index:2;
+    width:36px;height:36px;border:0;border-radius:12px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    background:#151517;color:#c9cbd0;font-size:14px;font-weight:800;line-height:1;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+    transition:transform .12s ease;
+  }
+  .builder-close:active{transform:scale(.94)}
 
   .preset-grid{
     display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
@@ -812,14 +829,19 @@
   .btn-begin::after{content:'→';font-family:'Archivo',sans-serif;font-weight:800;font-size:20px}
 
   #act5 .create-wrap>*{opacity:0;transform:translateY(18px)}
-  #act5.on .create-wrap>*:nth-child(1){animation:riseIn .6s var(--ease-out) .05s forwards}
-  #act5.on .create-wrap>*:nth-child(2){animation:riseIn .6s var(--ease-out) .12s forwards}
-  #act5.on .create-wrap>*:nth-child(3){animation:riseIn .6s var(--ease-out) .19s forwards}
-  #act5.on .create-wrap>*:nth-child(4){animation:riseIn .6s var(--ease-out) .26s forwards}
-  #act5.on .create-wrap>*:nth-child(5){animation:riseIn .6s var(--ease-out) .31s forwards}
-  #act5.on .create-wrap>*:nth-child(6){animation:riseIn .6s var(--ease-out) .36s forwards}
-  #act5.on .create-wrap>*:nth-child(7){animation:riseIn .6s var(--ease-out) .41s forwards}
-  #act5.on .create-wrap>*:nth-child(8){animation:riseIn .6s var(--ease-out) .48s forwards}
+  /* AE-006: every child rises in, past the eighth too. Opening the portrait builder adds a child and moved Begin
+     Career to ninth place, where no rule reached it, so the button stayed invisible until a portrait was applied.
+     The delays keep the old order; the builder, added later, rises at once. */
+  #act5.on .create-wrap>*{animation:riseIn .6s var(--ease-out) .52s forwards}
+  #act5.on .create-wrap>*:nth-child(1){animation-delay:.05s}
+  #act5.on .create-wrap>*:nth-child(2){animation-delay:.12s}
+  #act5.on .create-wrap>*:nth-child(3){animation-delay:.19s}
+  #act5.on .create-wrap>*:nth-child(4){animation-delay:.26s}
+  #act5.on .create-wrap>*:nth-child(5){animation-delay:.31s}
+  #act5.on .create-wrap>*:nth-child(6){animation-delay:.36s}
+  #act5.on .create-wrap>*:nth-child(7){animation-delay:.41s}
+  #act5.on .create-wrap>*:nth-child(8){animation-delay:.48s}
+  #act5.on .create-wrap>.profile-builder-panel{animation-duration:.45s;animation-delay:0s}
 
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation-duration:.01s!important;transition-duration:.01s!important}

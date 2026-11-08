@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ActState, NewCareerData } from './types';
 import {
   createSeededProfileSelection,
@@ -52,7 +52,18 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
   );
   const selectedAvatarDataUrl = customAvatarDataUrl || selectedPresetAvatar;
   const selectedSelection = customSelection || selectedPreset;
+  const builderRef = useRef<HTMLDivElement>(null);
   const openBuilder = () => setIsBuilderOpen(true);
+  const closeBuilder = () => setIsBuilderOpen(false);
+  /* AE-006: the builder opens below the portrait, often under the fold on a phone. Bring it into view so the
+     tap visibly does something; its Close control and Apply sit inside it. */
+  useEffect(() => {
+    if (!isBuilderOpen) return;
+    const frame = requestAnimationFrame(() => {
+      builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isBuilderOpen]);
   const choosePreset = (index: number) => {
     setPresetIndex(index);
     setCustomAvatarDataUrl('');
@@ -88,8 +99,12 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
             )}
           </div>
           <div className="portrait-actions">
-            <button className="chip-btn solid" onClick={openBuilder}>
-              Build
+            <button
+              className="chip-btn solid"
+              aria-expanded={isBuilderOpen}
+              onClick={isBuilderOpen ? closeBuilder : openBuilder}
+            >
+              {isBuilderOpen ? 'Close' : 'Build'}
             </button>
             <button
               className="chip-btn ghost"
@@ -104,7 +119,15 @@ export default function CreateStarScreen({ state = 'on', onBegin, onBack }: Prop
         </div>
 
         {isBuilderOpen && (
-          <div className="panel profile-builder-panel">
+          <div className="panel profile-builder-panel" ref={builderRef}>
+            <button
+              type="button"
+              className="builder-close"
+              aria-label="Close the portrait builder"
+              onClick={closeBuilder}
+            >
+              ✕
+            </button>
             <ProfilePictureBuilder
               gender={profileGender}
               initialSelection={selectedSelection}

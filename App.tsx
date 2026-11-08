@@ -90,7 +90,7 @@ import type { SaveIntegrityReason } from './services/saveIntegrity';
 import { buildAvailableNewPlayerTutorialState, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
-import { getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
+import { detectDeviceGameLanguage, getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
 import { getHealthConditionLabel } from './services/healthConditions';
 import { applyProjectPromotionAttribution } from './services/projectPromotionAttribution';
 import { quoteRealEstateSale } from './services/realEstateLogic';
@@ -2493,6 +2493,7 @@ export const App: React.FC = () => {
       setIsShowingAd(true);
 
       let successCount = 0;
+      let lastFailureReason: string | undefined;
 
       try {
           for (let i = 1; i <= steps; i++) {
@@ -2504,7 +2505,10 @@ export const App: React.FC = () => {
                   await new Promise(resolve => setTimeout(resolve, 1500));
               }
 
-              const result = await showAd(type);
+              const result = await showAd(type, {
+                  // AE-005: the SDK says this step is earned. Note it at once, so a restart before the ad closes still pays it.
+                  onEarned: () => { pendingReceipt = recordPendingRewardAdStep(pendingReceipt, successCount + 1); },
+              });
               trackGameEvent('reward_ad_result', {
                   reward_type: type,
                   no_ads_owner: noAdsOwner,
@@ -2518,6 +2522,7 @@ export const App: React.FC = () => {
                   pendingReceipt = recordPendingRewardAdStep(pendingReceipt, successCount);
               } else {
                   // If user cancels or ad fails, break loop
+                  lastFailureReason = result.reason;
                   break;
               }
 
@@ -2538,9 +2543,11 @@ export const App: React.FC = () => {
           handleAdComplete(type, data, pendingReceipt.id);
       } else {
           clearPendingRewardAd(pendingReceipt.id);
+          // AE-005: "watch the complete ad" only when the player closed it early; no ad at all says so
+          const noAdReady = lastFailureReason === 'UNAVAILABLE' || lastFailureReason === 'ERROR';
           setToastMessage({
-              title: tr('app.rewards.cancelledTitle'),
-              subtext: tr('app.rewards.cancelledSubtext')
+              title: tr(noAdReady ? 'app.rewards.unavailableTitle' : 'app.rewards.cancelledTitle'),
+              subtext: tr(noAdReady ? 'app.rewards.unavailableSubtext' : 'app.rewards.cancelledSubtext')
           });
       }
   };
@@ -2637,7 +2644,8 @@ export const App: React.FC = () => {
           clearPendingRewardAd(pendingReceipt.id);
           return;
       }
-      if (pendingReceipt.status === 'READY_TO_GRANT' && pendingReceipt.completedSteps === pendingReceipt.stepsRequired) {
+      // AE-005: every step the SDK reported as earned counts, even when the app closed before the ad did.
+      if (pendingReceipt.completedSteps === pendingReceipt.stepsRequired) {
           trackGameEvent('reward_ad_recovered', {
               reward_type: pendingReceipt.type,
               completed_steps: pendingReceipt.completedSteps,
@@ -2900,6 +2908,8 @@ export const App: React.FC = () => {
           age,
           gender,
           avatar,
+          // AE-024: a new career starts in the phone's language when the game has it, else English
+          settings: { ...INITIAL_PLAYER.settings, language: detectDeviceGameLanguage() },
 	          flags: {
 	              ...(INITIAL_PLAYER.flags || {}),
 	              ...careerStartFlag(age, INITIAL_PLAYER.currentWeek || 1),

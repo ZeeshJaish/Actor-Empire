@@ -69,9 +69,13 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                         console.error('Production event choice failed:', error);
                         setResolveError(tr('production.modal.errorClose'));
                     }
+                } else {
+                    // AE-005: say why nothing happened; every choice stays open
+                    setResolveError(tr(result.reason === 'NOT_COMPLETED' ? 'app.rewards.goldenNotFinished' : 'app.rewards.goldenUnavailable'));
                 }
             } catch (error) {
                 console.error("Ad failed:", error);
+                setResolveError(tr('app.rewards.goldenUnavailable'));
             } finally {
                 setIsProcessingAd(false);
             }

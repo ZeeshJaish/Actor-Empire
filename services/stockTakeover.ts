@@ -13,7 +13,8 @@ import type {
 } from '../types';
 import { createDefaultStudioState } from './businessLogic';
 import { getEntertainmentStockSnapshot } from './entertainmentStockMarket';
-import { getStockOutstandingShares, getStockOwnershipPercent, normalizeStockPrice, normalizeStockPriceHistory } from './stockLogic';
+import { getStockOutstandingShares, getStockOwnershipPercent, normalizeStockPrice } from './stockLogic';
+import { getStockMarketAbsoluteWeek } from './stockMarketClock';
 import { isStreamingPlatformStudio } from './studioClassification';
 import { getPlayerLanguage, t } from './i18n';
 
@@ -40,8 +41,14 @@ export interface StockTakeoverResult {
         | 'INSUFFICIENT_CASH'
         | 'ALREADY_CONTROLLED'
         | 'CONTROL_NOT_READY'
-        | 'STREAMING_PLATFORM_RESERVED';
+        | 'STREAMING_PLATFORM_RESERVED'
+        | 'ROUTE_COOLDOWN';
 }
+
+/* Stocks fix (2026-11-08): a takeover route is shareholder politics, not share buying. Each one used to lift the share price
+   (+1.2% to +4.5%) and could run again at once: ten in one week took a 30% holder's Paramount shares up 55% to sell into,
+   a $0.44B profit. A company now takes one route per 12 weeks, and routes leave the share price alone. */
+export const TAKEOVER_ROUTE_COOLDOWN_WEEKS = 12;
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -304,6 +311,13 @@ export const executeStockTakeoverAction = (
         return { success: false, player, reason: route === 'CONTROL_TRANSFER' ? 'CONTROL_NOT_READY' : 'ROUTE_LOCKED' };
     }
 
+    if (route !== 'CONTROL_TRANSFER' && snapshot.activeCase) {
+        const weeksSince = getStockMarketAbsoluteWeek(player.age, player.currentWeek)
+            - getStockMarketAbsoluteWeek(snapshot.activeCase.createdYear, snapshot.activeCase.createdWeek);
+        // an heir's restarted clock can put the last route in the future: that never blocks
+        if (weeksSince >= 0 && weeksSince < TAKEOVER_ROUTE_COOLDOWN_WEEKS) return { success: false, player, reason: 'ROUTE_COOLDOWN' };
+    }
+
     const cost = options.golden ? Math.round(getRouteCost(route, stock) * 0.35) : getRouteCost(route, stock);
     if (player.money < cost) return { success: false, player, reason: 'INSUFFICIENT_CASH' };
 
@@ -390,23 +404,10 @@ export const executeStockTakeoverAction = (
         createdWeek: player.currentWeek,
         createdYear: player.age,
     };
-    const priceImpact = route === 'HOSTILE_TAKEOVER'
-        ? 0.045
-        : route === 'FRIENDLY_TAKEOVER'
-            ? 0.022
-            : 0.012;
+    // the share price is left alone: a route moves votes, not shares (see TAKEOVER_ROUTE_COOLDOWN_WEEKS)
     const withCase = persistTakeoverCase({
         ...player,
         money: player.money - cost,
-        stocks: player.stocks.map(candidate => {
-            if (candidate.id !== stock.id) return candidate;
-            const nextPrice = normalizeStockPrice(candidate, candidate.price * (1 + priceImpact));
-            return {
-                ...candidate,
-                price: nextPrice,
-                priceHistory: [...normalizeStockPriceHistory(candidate), nextPrice].slice(-20),
-            };
-        }),
     }, takeoverCase);
     const newsItem = createTakeoverNews(player, takeoverCase, language);
 

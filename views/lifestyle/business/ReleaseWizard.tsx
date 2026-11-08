@@ -1545,7 +1545,18 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                 description: tr('release.generated.premiereDescription', { project: project.name }),
                 data: { projectId: project.id }
             };
-            updatedPlayer.pendingEvent = premiereEvent;
+            /* AE-014: the premiere opened the moment the release was signed, weeks early, and replaced an award night
+               already waiting. It now waits for the release: scheduled for the week before it, so it opens as the
+               release week begins. A release this very week still opens it now, when no other night is waiting. */
+            if (weeksUntilRelease === 0 && !updatedPlayer.pendingEvent) {
+                updatedPlayer.pendingEvent = premiereEvent;
+            } else {
+                const premiereWeek = weekOfYear(currentAbsoluteWeek + Math.max(0, weeksUntilRelease - 1));
+                updatedPlayer.scheduledEvents = [
+                    ...(updatedPlayer.scheduledEvents || []).filter(event => event.id !== premiereEvent.id),
+                    { ...premiereEvent, week: premiereWeek },
+                ];
+            }
         }
 
         const commitmentIndex = updatedPlayer.commitments.findIndex(c => c.id === project.id);

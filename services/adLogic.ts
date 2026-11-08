@@ -1,4 +1,5 @@
 import { AdMob, InterstitialAdPluginEvents, MaxAdContentRating } from '@capacitor-community/admob';
+import { RewardAdPluginEvents } from '@capacitor-community/admob';
 import { AdType } from '../types';
 
 const ADMOB_IDS = {
@@ -83,6 +84,7 @@ export const initAds = async () => {
         initialized = true;
         console.log('AdMob initialized after consent');
         preloadInterstitial();
+        preloadRewarded();
     } catch (err) {
         console.error('AdMob init failed:', err);
     }
@@ -157,7 +159,138 @@ export const showPreloadedInterstitial = async (label = 'break'): Promise<boolea
     });
 };
 
-export const showAd = async (type: AdType): Promise<AdResult> => {
+/* ---- the rewarded ad (AE-005) ----
+   The plugin settles showRewardVideoAd() only when a reward is earned. Closing the ad early, or an ad that could not
+   open, never settled it, so the game's "ad playing" overlay and the golden choices stayed locked until a restart
+   (reward_ad_interrupted). The ad was also loaded only after the tap. Now:
+   - one ad is loaded in the background (after start-up and after each ad), so a tap opens it at once;
+   - a tap waits at most REWARDED_TAP_WAIT_MS for an ad that is not ready, then answers "no ad" and the game moves on;
+     an ad that finishes loading later is kept for the next tap and is never shown on its own;
+   - every show settles: when the ad closes (earned or not), when it fails to show, when it never opens, or at a long
+     last guard;
+   - a reward counts only when the SDK reports it earned (its Rewarded event or the show call's reward item). onEarned
+     hears it at that moment, before the ad closes, so a restart can still pay what was earned.
+   Google expires a loaded ad after an hour, so an older one is replaced. Only one rewarded ad is loaded at a time. */
+type RewardedState = 'IDLE' | 'LOADING' | 'READY' | 'SHOWING';
+let rewardedState: RewardedState = 'IDLE';
+let rewardedLoad: Promise<boolean> | null = null;
+let rewardedLoadedAt = 0;
+let lastRewardedLoadFailedAt = 0;
+const REWARDED_MAX_AGE_MS = 55 * 60_000;
+const REWARDED_TAP_WAIT_MS = 8_000;
+const REWARDED_OPEN_TIMEOUT_MS = 15_000;
+const REWARDED_SHOW_SAFETY_MS = 180_000;
+
+const isRewardedFresh = () => rewardedState === 'READY' && Date.now() - rewardedLoadedAt < REWARDED_MAX_AGE_MS;
+
+const loadRewarded = (): Promise<boolean> => {
+    if (!isNativeAds() || !initialized || !AdMob?.prepareRewardVideoAd) return Promise.resolve(false);
+    if (isRewardedFresh()) return Promise.resolve(true);
+    if (rewardedState === 'SHOWING') return Promise.resolve(false);
+    if (rewardedLoad) return rewardedLoad;
+    rewardedState = 'LOADING';
+    const load: Promise<boolean> = AdMob.prepareRewardVideoAd({ adId: ADMOB_IDS[adPlatform()].rewarded })
+        .then(() => {
+            rewardedState = 'READY';
+            rewardedLoadedAt = Date.now();
+            return true;
+        })
+        .catch(error => {
+            rewardedState = 'IDLE';
+            lastRewardedLoadFailedAt = Date.now();
+            console.warn('Rewarded ad load failed:', error);
+            return false;
+        })
+        .finally(() => { if (rewardedLoad === load) rewardedLoad = null; });
+    rewardedLoad = load;
+    return load;
+};
+
+/** Keeps one rewarded ad loaded in the background. Never loads during a show, nor soon after a failed load. */
+export const preloadRewarded = () => {
+    if (!isNativeAds() || !initialized) return;
+    if (rewardedState === 'LOADING' || rewardedState === 'SHOWING' || isRewardedFresh()) return;
+    if (Date.now() - lastRewardedLoadFailedAt < LOAD_RETRY_MS) return;
+    void loadRewarded();
+};
+
+const settleWithin = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => new Promise<T>(resolve => {
+    const timer = window.setTimeout(() => resolve(fallback), ms);
+    promise.then(
+        value => { window.clearTimeout(timer); resolve(value); },
+        () => { window.clearTimeout(timer); resolve(fallback); },
+    );
+});
+
+/** A tap's bounded wait for an ad that was not loaded yet: a second try only when the first failed early. */
+const waitForRewarded = async (): Promise<boolean> => {
+    if (isRewardedFresh()) return true;
+    const startedAt = Date.now();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const left = REWARDED_TAP_WAIT_MS - (Date.now() - startedAt);
+        if (left <= 0) break;
+        if (await settleWithin(loadRewarded(), left, false)) return isRewardedFresh();
+        // still loading when the wait ran out: it stays loading for the next tap and is not shown now
+        if (rewardedState === 'LOADING') break;
+        await new Promise(resolve => window.setTimeout(resolve, 600));
+    }
+    return false;
+};
+
+const showLoadedRewarded = (onEarned?: () => void): Promise<AdResult> => new Promise<AdResult>(resolve => {
+    rewardedState = 'SHOWING';
+    let settled = false;
+    let opened = false;
+    let earned = false;
+    let handles: Array<{ remove: () => Promise<void> | void }> = [];
+    const timers: number[] = [];
+    // The ad covering the app counts as opened: Android can pause the page behind it.
+    const onVisibility = () => { if (document.visibilityState === 'hidden') opened = true; };
+    const finish = (result: AdResult) => {
+        if (settled) return;
+        settled = true;
+        timers.forEach(timer => window.clearTimeout(timer));
+        handles.forEach(handle => { void handle.remove(); });
+        document.removeEventListener('visibilitychange', onVisibility);
+        rewardedState = 'IDLE';
+        window.setTimeout(preloadRewarded, 1500);
+        resolve(result);
+    };
+    const markEarned = () => {
+        if (earned) return;
+        earned = true;
+        try { onEarned?.(); } catch (error) { console.warn('Could not note the earned reward:', error); }
+    };
+    const afterClose = (): AdResult => (earned ? { success: true } : { success: false, reason: 'NOT_COMPLETED' });
+    const afterFailure = (): AdResult => (earned ? { success: true } : { success: false, reason: 'ERROR' });
+    document.addEventListener('visibilitychange', onVisibility);
+    Promise.all([
+        AdMob.addListener(RewardAdPluginEvents.Showed, () => { opened = true; }),
+        AdMob.addListener(RewardAdPluginEvents.Rewarded, () => markEarned()),
+        AdMob.addListener(RewardAdPluginEvents.Dismissed, () => finish(afterClose())),
+        AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => finish(afterFailure())),
+    ]).then(registered => {
+        handles = registered;
+        if (settled) { registered.forEach(handle => { void handle.remove(); }); return; }
+        AdMob.showRewardVideoAd()
+            .then(reward => { if (reward) markEarned(); })
+            .catch(error => {
+                console.warn('Rewarded ad could not show:', error);
+                finish(afterFailure());
+            });
+        timers.push(window.setTimeout(() => {
+            if (!opened && !earned && document.visibilityState === 'visible') finish({ success: false, reason: 'ERROR' });
+        }, REWARDED_OPEN_TIMEOUT_MS));
+        timers.push(window.setTimeout(() => finish(afterClose()), REWARDED_SHOW_SAFETY_MS));
+    }).catch(() => finish({ success: false, reason: 'ERROR' }));
+});
+
+export interface ShowAdOptions {
+    /** Rewarded ads: called once, when the SDK reports the reward as earned (before the ad closes). */
+    onEarned?: () => void;
+}
+
+export const showAd = async (type: AdType, options: ShowAdOptions = {}): Promise<AdResult> => {
     const wantsReward = isRewardedType(type);
 
     if (!wantsReward) {
@@ -168,30 +301,13 @@ export const showAd = async (type: AdType): Promise<AdResult> => {
     if (isNativeAds()) {
         await initAds();
 
-        if (!AdMob) return { success: false, reason: 'UNAVAILABLE' };
-
-        const ids = ADMOB_IDS[adPlatform()];
+        if (!AdMob || !initialized) return { success: false, reason: 'UNAVAILABLE' };
+        // one ad at a time: a second request while an ad is up gets "no ad", never a second locked show
+        if (rewardedState === 'SHOWING') return { success: false, reason: 'UNAVAILABLE' };
 
         try {
-            for (let attempt = 0; attempt < 2; attempt += 1) {
-                try {
-                    await AdMob.prepareRewardVideoAd({
-                        adId: ids.rewarded,
-                    });
-
-                    const reward = await AdMob.showRewardVideoAd();
-                    if (reward) return { success: true };
-                    return { success: false, reason: 'NOT_COMPLETED' };
-                } catch (error) {
-                    if (attempt === 1) {
-                        console.error('Rewarded ad failed:', error);
-                        return { success: false, reason: 'ERROR' };
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 600));
-                }
-            }
-
-            return { success: false, reason: 'UNAVAILABLE' };
+            if (!(await waitForRewarded())) return { success: false, reason: 'UNAVAILABLE' };
+            return await showLoadedRewarded(options.onEarned);
         } catch (err) {
             console.error('Ad failed:', err);
             return { success: false, reason: 'ERROR' };

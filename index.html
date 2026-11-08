@@ -213,6 +213,68 @@
         </div>
       </main>
     </div>
+  <script>
+    /* Start-up guard (black screen). Until the game draws its first screen, the boot shell above is all the player sees.
+       When the game's code cannot start (an Android System WebView too old to read it, a failed load, an error before the
+       first screen) or start-up runs very long, say so and offer Retry instead of a dark screen forever. A classic script
+       on purpose, so it runs even where the game's module code cannot. It never reloads by itself, adds nothing to any
+       tap, and leaves a note that index.tsx reports once the game is up. The Oct 15 rollback removed the earlier guard
+       but kept its styles, which this uses. */
+    (function () {
+      var NOTE_KEY = 'actorEmpire.bootFallback.v1';
+      var mounted = function () { return document.documentElement.dataset.actorEmpireMounted === 'true'; };
+      var shown = false;
+      var button = function (label, className, onClick) {
+        var element = document.createElement('button');
+        element.type = 'button';
+        element.className = className;
+        element.textContent = label;
+        element.addEventListener('click', onClick);
+        return element;
+      };
+      var show = function (kind) {
+        if (shown || mounted()) return;
+        var shell = document.querySelector('.ae-boot-shell__content');
+        if (!shell) return;
+        shown = true;
+        try { localStorage.setItem(NOTE_KEY, JSON.stringify({ kind: kind, at: Date.now() })); } catch (error) { /* note only */ }
+        var message = document.createElement('p');
+        message.className = 'ae-boot-shell__message';
+        message.setAttribute('role', 'status');
+        message.textContent = kind === 'webview'
+          ? "This phone's Android System WebView is too old for Actor Empire. Update Android System WebView and Chrome in the Play Store, then open the game again."
+          : kind === 'slow'
+            ? 'Starting is taking longer than usual. Your careers are safe on this phone.'
+            : 'Actor Empire could not start. Your careers are safe on this phone.';
+        var actions = document.createElement('div');
+        actions.className = 'ae-boot-shell__actions';
+        if (kind === 'webview') {
+          actions.appendChild(button('Update WebView', 'ae-boot-shell__retry', function () {
+            window.location.href = 'market://details?id=com.google.android.webview';
+          }));
+          actions.appendChild(button('Retry', 'ae-boot-shell__restart', function () { window.location.reload(); }));
+        } else {
+          actions.appendChild(button('Retry', 'ae-boot-shell__retry', function () { window.location.reload(); }));
+        }
+        shell.appendChild(message);
+        shell.appendChild(actions);
+      };
+      // the game's code needs Chrome 80 or newer (vite build target); Android's WebView reports its version as Chrome/NN
+      var ua = navigator.userAgent || '';
+      var chrome = /Android/.test(ua) ? ua.match(/Chrome\/(\d+)/) : null;
+      if (chrome && Number(chrome[1]) < 80) show('webview');
+      // a script that failed to load reports on its element (capture), a code error reports here as well
+      var errorTimer = 0;
+      window.addEventListener('error', function (event) {
+        var target = event && event.target;
+        // an image or a sound that fails is not a start-up failure; a script, a stylesheet or a code error is
+        if (target && target !== window && target.tagName && target.tagName !== 'SCRIPT' && target.tagName !== 'LINK') return;
+        if (mounted() || errorTimer) return;
+        errorTimer = window.setTimeout(function () { show('error'); }, 4000);
+      }, true);
+      window.setTimeout(function () { show('slow'); }, 25000);
+    })();
+  </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

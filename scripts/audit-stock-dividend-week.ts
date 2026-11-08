@@ -7,7 +7,8 @@ import { createBusiness } from '../services/businessLogic';
 import { migratePlayerSave } from '../services/saveMigration';
 
 const p = structuredClone(INITIAL_PLAYER);
-p.money = 1e6; p.age = 35; p.currentWeek = 12; p.stocks = initializeStocks(); p.world.projects = [];
+// stocks fix 2026-11-08: a fresh stock's first quarterly payout is week 13 (it was 12)
+p.money = 1e6; p.age = 35; p.currentWeek = 13; p.stocks = initializeStocks(); p.world.projects = [];
 const b = createBusiness('Funder', 'PRODUCTION_HOUSE', 'MAJOR_STUDIO', {} as any, '🎬', 1, 35);
 b.id = 'funder'; b.balance = 1e6; p.businesses = [b];
 p.stocks = p.stocks.map(s => ({ ...s, dividendYield: s.id === 'stk_nke' ? .02 : 0, volatility: 0 }));
@@ -22,9 +23,9 @@ try {
     assert.equal(personal[0].amount, .5);
     const corporate = result.player.businesses.find(b => b.id === 'funder')!.studioState!.financeLedger.filter(l => l.type === 'INVESTMENT_RETURN');
     assert.equal(corporate.reduce((sum, tx) => sum + tx.amount, 0), .5);
-    assert.equal(stock.lastDividendSettledAbsoluteWeek, getStockMarketAbsoluteWeek(35, 12), 'settle the source week, before the engine advances its clock');
+    assert.equal(stock.lastDividendSettledAbsoluteWeek, getStockMarketAbsoluteWeek(35, 13), 'settle the source week, before the engine advances its clock');
     const reloaded = migratePlayerSave(JSON.parse(JSON.stringify(result.player)));
-    assert.equal(getDividendPayout(reloaded.portfolio, reloaded.stocks, 12, { ...reloaded, age: 35 }), 0, 'settled reload cannot repay the paid source week');
+    assert.equal(getDividendPayout(reloaded.portfolio, reloaded.stocks, 13, { ...reloaded, age: 35 }), 0, 'settled reload cannot repay the paid source week');
     const next = await processGameWeek(reloaded);
     assert.equal(next.player.finance.history.filter(t => t.category === 'DIVIDEND' && t.description === 'Stock Dividends').length, 1);
     assert.equal(p.money, 1e6);

@@ -117,11 +117,10 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
             onDeleteSlot={(slotIndex) => onDeleteSlot(slotIndex + 1)}
             onImportData={onImportData}
             onBeginCareer={(data, slotIndex) => onCreateCareerFromIntro(data, slotIndex + 1)}
-        />
-
-        {showPushPrompt && (
-            <div className="absolute inset-x-4 bottom-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="rounded-[2rem] border border-emerald-300/25 bg-zinc-950/90 p-4 shadow-[0_24px_80px_rgba(16,185,129,0.2)] backdrop-blur-xl">
+            /* AE-006: the alerts invite sits in the save-slot screen's flow. As a bottom overlay it covered Start on the
+               title screen and Begin Career on the create screen. */
+            slotNotice={showPushPrompt ? (
+                <div className="rounded-[2rem] border border-emerald-300/25 bg-zinc-950/90 p-4 shadow-[0_24px_80px_rgba(16,185,129,0.2)]">
                     <div className="flex items-start gap-3">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-400 text-black shadow-[0_0_24px_rgba(52,211,153,0.35)]">
                             <Bell size={22} />
@@ -166,8 +165,8 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
                         </div>
                     </div>
                 </div>
-            </div>
-        )}
+            ) : undefined}
+        />
     </div>
   );
 };

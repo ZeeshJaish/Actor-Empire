@@ -32,6 +32,8 @@ import { ownSharesForCash, quoteOwnShareTrade, tradeOwnStreamingShares } from '.
 import {
     getStockTakeoverSnapshot,
 } from '../../services/stockTakeover';
+import type { StockWithEarnings } from '../../services/stockEarnings';
+import { getStockMarketAbsoluteWeek } from '../../services/stockMarketClock';
 
 interface StocksAppProps {
     player: Player;
@@ -263,6 +265,11 @@ export const StocksApp: React.FC<StocksAppProps> = ({
             if (result.changed) { onUpdatePlayer?.(result.player); setSharesInput(''); }
         };
         const hasSynergy = player.activeSponsorships.some(sponsorship => sponsorship.brandName === selectedStock.relatedBrandName);
+        /* Stocks fix: the company's quarterly results, the reason its price moves (services/stockEarnings.ts) */
+        const earnings = (selectedStock as StockWithEarnings).earnings;
+        const lastResults = earnings?.last;
+        const weeksToResults = earnings ? Math.max(0, earnings.nextResultsAbsoluteWeek - getStockMarketAbsoluteWeek(player.age, player.currentWeek)) : null;
+        const growthText = (value: number) => `${value >= 0 ? '+' : ''}${(value * 100).toFixed(1)}%`;
         const chartMin = Math.min(...selectedStock.priceHistory) * 0.9;
         const chartMax = Math.max(...selectedStock.priceHistory) * 1.1;
         const positionInvested = holding?.totalInvested ?? (holding?.averageCost !== undefined ? holding.shares * holding.averageCost : holding?.shares ? undefined : 0);
@@ -487,6 +494,23 @@ export const StocksApp: React.FC<StocksAppProps> = ({
                                 <div className="text-xs font-bold text-indigo-300">{tr('stocks.partnerStock')}</div>
                                 <div className="text-[10px] text-indigo-400">{tr('stocks.partnerStockSub')}</div>
                             </div>
+                        </div>
+                    ) : null}
+
+                    {earnings ? (
+                        <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="text-[9px] uppercase tracking-wider text-zinc-500">Latest results</div>
+                                <div className="text-[10px] text-zinc-500">{weeksToResults === 0 ? 'Next: this week' : `Next in ${weeksToResults} wk`}</div>
+                            </div>
+                            {lastResults ? (
+                                <div className={`mt-1 text-xs font-bold ${lastResults.verdict === 'BEAT' ? 'text-emerald-300' : lastResults.verdict === 'MISS' ? 'text-rose-300' : 'text-zinc-200'}`}>
+                                    {lastResults.verdict === 'BEAT' ? 'Beat estimates' : lastResults.verdict === 'MISS' ? 'Missed estimates' : 'As expected'}
+                                    <span className="font-medium text-zinc-400"> · sales {growthText(lastResults.revenueGrowth)} a year vs {growthText(lastResults.expectedGrowth)} expected{lastResults.brandLift > 0 ? ' · your campaign helped' : ''}</span>
+                                </div>
+                            ) : (
+                                <div className="mt-1 text-xs text-zinc-400">The price follows the company's quarterly results. The first ones are due soon.</div>
+                            )}
                         </div>
                     ) : null}
 

@@ -31,6 +31,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     } | null>(null);
     const [isResolvingFeedback, setIsResolvingFeedback] = useState(false);
     const [resolveError, setResolveError] = useState('');
+    const [adNotice, setAdNotice] = useState('');
     const mountedRef = useRef(true);
 
     useEffect(() => {
@@ -98,6 +99,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     };
 
     const handleOptionClick = async (option: LifeEventOption, idx: number) => {
+        setAdNotice('');
         setCrashContext(player, {
             flow: 'life_event_choice',
             event_id: event.id,
@@ -133,10 +135,13 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
 
                     impactResult = executeOptionImpact(option, idx, pCopy, true);
                 } else {
-                    return; // Ad failed or cancelled
+                    // AE-005: say why nothing happened; every choice stays open
+                    setAdNotice(tr(result.reason === 'NOT_COMPLETED' ? 'app.rewards.goldenNotFinished' : 'app.rewards.goldenUnavailable'));
+                    return;
                 }
             } catch (e) {
                 console.error("Ad failed", e);
+                setAdNotice(tr('app.rewards.goldenUnavailable'));
                 return;
             } finally {
                 setIsProcessingAd(false);
@@ -471,6 +476,11 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                         <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2 px-2">
                             {tr('life.modal.selectAction')}
                         </div>
+                        {adNotice && (
+                            <div role="status" className="mx-1 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">
+                                {adNotice}
+                            </div>
+                        )}
                         {lifeEvent.options.map((opt, idx) => (
                             <motion.button
                                 key={idx}

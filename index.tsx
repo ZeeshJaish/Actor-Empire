@@ -5,7 +5,7 @@ import './ui-layout/railInteractions.css';
 import { installHorizontalRailDrag } from './ui-layout/railInteractions';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
-import { bootstrapFirebase, installGlobalTelemetryHandlers, recordNonFatal } from './services/firebaseService';
+import { bootstrapFirebase, installGlobalTelemetryHandlers, recordNonFatal, trackGameEvent } from './services/firebaseService';
 
 installHorizontalRailDrag(document);
 
@@ -62,6 +62,14 @@ class RootRecoveryBoundary extends React.Component<{ children: React.ReactNode }
   }
 }
 
+/** Tells the start-up guard in index.html that the game drew its first screen. */
+const BootMountedMarker = () => {
+  React.useEffect(() => {
+    document.documentElement.dataset.actorEmpireMounted = 'true';
+  }, []);
+  return null;
+};
+
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Failed to find the root element');
 
@@ -70,6 +78,21 @@ try {
     console.error('Firebase bootstrap failed; continuing with the local game shell.', error);
   });
   installGlobalTelemetryHandlers();
+  // The start-up guard in index.html leaves a note when it had to show its message; report it once, now that
+  // telemetry runs, so we can see how often phones get stuck before the first screen.
+  try {
+    const bootNote = localStorage.getItem('actorEmpire.bootFallback.v1');
+    if (bootNote) {
+      localStorage.removeItem('actorEmpire.bootFallback.v1');
+      const parsed = JSON.parse(bootNote) as { kind?: unknown; at?: unknown };
+      trackGameEvent('startup_fallback_shown', {
+        kind: String(parsed?.kind || 'unknown').slice(0, 20),
+        minutes_ago: typeof parsed?.at === 'number' ? Math.max(0, Math.round((Date.now() - parsed.at) / 60_000)) : -1,
+      });
+    }
+  } catch {
+    // diagnostics only
+  }
 } catch (error) {
   // Telemetry must never prevent the local game and recovery UI from rendering.
   console.error('Startup telemetry could not initialize.', error);
@@ -79,6 +102,7 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <RootRecoveryBoundary>
+      <BootMountedMarker />
       <App />
     </RootRecoveryBoundary>
   </React.StrictMode>

@@ -8,6 +8,7 @@ import { getStudioSaleTreasuryLock } from './studioGroup';
 import { roundStockCash, settleStockCash } from './stockSettlement';
 import { getStockMarketAbsoluteWeek, stockLegacyMarkerAbsoluteWeek } from './stockMarketClock';
 import { canCreditCorporateStockReceipt } from './stockCashOwnership';
+import { createEarningsNews, describeEarningsReport, getCompanyProfile, getEarningsFairValue, initStockEarnings, isValidEarningsState, reportStockQuarter, type StockEarningsReport, type StockWithEarnings } from './stockEarnings';
 
 const KNOWN_OUTSTANDING_SHARES: Record<string, number> = {
     stk_apple: 15_300_000_000,
@@ -72,6 +73,34 @@ const MARKET_CAP_GROWTH_MULTIPLE_BY_SECTOR: Record<Stock['sector'], number> = {
 };
 
 const MAX_WEEKLY_PRICE_MOVE = 0.18;
+/** quarterly dividends, like real ones */
+const DIVIDEND_EVERY_WEEKS = 13;
+
+/* Stocks fix (players bought whole companies, and their own buying inflated the price for good). An order walks the
+   book, so it fills on average halfway along its full impact, but the market keeps only this share of that move: the
+   rest is absorbed, and the weekly pull towards the company's value does the remainder. */
+const TRADE_IMPACT_RETAINED = 0.25;
+/** Holdouts want more for each further share of a company you already largely own, like a takeover premium: 0.5 x
+ *  ownership^2, averaged over the shares bought. A few percent costs nothing extra; a whole company about 17%; its last
+ *  half about 29%. */
+const STAKE_PREMIUM_SCALE = 0.5;
+export const getStakePremium = (fromFraction: number, toFraction: number) => {
+    const from = Math.max(0, Math.min(1, fromFraction));
+    const to = Math.max(0, Math.min(1, toFraction));
+    if (!(to > from)) return 0;
+    return STAKE_PREMIUM_SCALE * (from * from + from * to + to * to) / 3;
+};
+
+/* AE-023: the hard ceiling held a grown company's price at one exact number, so its line went flat. The value a price
+   is pulled towards now bends below the ceiling instead: unchanged up to 70% of it, then approaching 95% of it ever
+   more slowly. Noise, momentum and the sector's mood keep the price moving around that value, so the line keeps
+   moving, and the ceiling itself stays a safety net that only a rare spike touches. */
+export const softenFairValueUnderCeiling = (fair: number, ceiling: number) => {
+    const knee = ceiling * 0.7;
+    const top = ceiling * 0.95;
+    if (!(fair > knee) || !(top > knee)) return fair;
+    return knee + (top - knee) * (1 - Math.exp(-(fair - knee) / (top - knee)));
+};
 const MIN_UNKNOWN_OUTSTANDING_SHARES = 250_000_000;
 const MAX_UNKNOWN_OUTSTANDING_SHARES_RANGE = 1_750_000_000;
 
@@ -363,9 +392,15 @@ export const calculateStockTradeQuote = (
         : Math.max(0, currentShares - shares);
     const ownershipDelta = shares / outstandingShares;
     const liquidityImpact = Math.min(0.12, ownershipDelta * 0.85);
-    const priceImpactPercent = liquidityImpact * 100 * (direction === 'BUY' ? 1 : -1);
-    const projectedPrice = normalizeStockPrice(stock, currentPrice * (1 + (priceImpactPercent / 100)));
-    const estimatedValue = roundStockCash(shares * ((currentPrice + projectedPrice) / 2));
+    // the fill averages half the full impact; the market keeps TRADE_IMPACT_RETAINED of it (see above)
+    const fullImpactPrice = normalizeStockPrice(stock, currentPrice * (1 + liquidityImpact * (direction === 'BUY' ? 1 : -1)));
+    const executionPrice = (currentPrice + fullImpactPrice) / 2;
+    const projectedPrice = normalizeStockPrice(stock, currentPrice + (fullImpactPrice - currentPrice) * TRADE_IMPACT_RETAINED);
+    const priceImpactPercent = currentPrice > 0 ? (projectedPrice / currentPrice - 1) * 100 : 0;
+    const stakePremium = direction === 'BUY'
+        ? getStakePremium(currentShares / outstandingShares, resultingShares / outstandingShares)
+        : 0;
+    const estimatedValue = roundStockCash(shares * executionPrice * (1 + stakePremium));
 
     return {
         shares,
@@ -618,6 +653,8 @@ export interface MarketUpdateResult {
     notifications: string[];
     news: NewsItem[];
     corporateActions: StockCorporateAction[];
+    /** this week's quarterly results (services/stockEarnings.ts) */
+    earningsReports: Array<{ stockId: string; stockSymbol: string; verdict: StockEarningsReport['verdict']; notification: string }>;
 }
 
 const getAutomaticShareIssueReason = (stock: Stock): StockShareIssueReason => {
@@ -665,10 +702,11 @@ export const getStockFairValue = (
 export const processStockMarket = (
     stocks: Stock[],
     week: number,
-    player?: Pick<Player, 'age' | 'world' | 'businesses' | 'flags'> & { id?: string },
+    player?: Pick<Player, 'age' | 'world' | 'businesses' | 'flags'> & { id?: string } & Partial<Pick<Player, 'portfolio' | 'activeSponsorships' | 'stats' | 'name'>>,
 ): MarketUpdateResult => {
     const notifications: string[] = [], news: NewsItem[] = [];
     const corporateActions: StockCorporateAction[] = [];
+    const earningsReports: MarketUpdateResult['earningsReports'] = [];
     const age = player?.age || 1;
     const absoluteWeek = getStockMarketAbsoluteWeek(age, week);
     const updatedStocks = stocks.map(originalStock => {
@@ -691,33 +729,63 @@ export const processStockMarket = (
                 outstandingShares: getStockOutstandingShares(stock), price: normalizedPrice, priceHistory: normalizedHistory };
         }
         /* #185: the price moves towards what the company is worth (15% of the gap a week), with momentum, the sector's
-           mood and noise seeded by the career, the company and the week. The old unseeded random walk and the box-office
-           drift re-applied every week are gone: a studio's hits and flops reach its price through its value. */
-        const valued = getStockFairValue(stock, player, absoluteWeek);
+           mood and noise seeded by the career, the company and the week. Stocks fix (2026-11-08): what a company is worth
+           now comes from its quarterly results and the parts of it that live in the game's world (services/stockEarnings.ts).
+           The #185 value only seeds a stock's first week on that model, so no saved price jumps. */
+        const shares = getStockOutstandingShares(stock);
+        let earnings = (stock as StockWithEarnings).earnings;
+        let fairAnchor = stock.fairAnchor;
+        if (!isValidEarningsState(earnings)) {
+            const valued = getStockFairValue(stock, player, absoluteWeek);
+            fairAnchor = valued.anchor;
+            earnings = initStockEarnings(stock, player, absoluteWeek, valued.fair, shares);
+        }
+        let report: StockEarningsReport | undefined;
+        if (absoluteWeek >= earnings.nextResultsAbsoluteWeek) {
+            const reported = reportStockQuarter(stock, earnings, player, absoluteWeek, `${player?.id || 'market'}`);
+            earnings = reported.state;
+            report = reported.report;
+        }
+        const fair = getEarningsFairValue(stock, earnings, player, absoluteWeek, shares);
         const lastMove = normalizedHistory.length >= 2 ? normalizedHistory.at(-1)! / Math.max(0.01, normalizedHistory.at(-2)!) - 1 : 0;
         const step = nextSharePrice({
             previous: normalizedPrice,
-            fair: valued.fair,
+            fair: softenFairValueUnderCeiling(fair, getStockPriceCeiling(stock)),
             lastMove,
             sector: stock.sector,
             absoluteWeek,
+            events: report?.priceReaction || 0,
             volatility: stock.volatility,
             seed: `${player?.id || 'market'}:${stock.id}`,
         });
-        const newPrice = normalizeStockPrice(stock, normalizedPrice * clampFinite(step.price / normalizedPrice, 1 - MAX_WEEKLY_PRICE_MOVE, 1 + MAX_WEEKLY_PRICE_MOVE));
+        let newPrice = normalizeStockPrice(stock, normalizedPrice * clampFinite(step.price / normalizedPrice, 1 - MAX_WEEKLY_PRICE_MOVE, 1 + MAX_WEEKLY_PRICE_MOVE));
         let lastPayoutAbsolute = stock.lastDividendPayoutAbsoluteWeek
             ?? stockLegacyMarkerAbsoluteWeek(age, week, stock.lastDividendPayoutWeek);
         let lastPayout = stock.lastDividendPayoutWeek || 0;
-        if (stock.dividendYield > 0 && absoluteWeek - lastPayoutAbsolute >= 12) {
+        /* Stocks fix: dividends are quarterly, every 13 weeks (it was 12 weeks at a quarter of the year's dividend each, 8%
+           over the stated yield), and the price drops by the dividend on its payout week, as on a real ex-dividend day, so
+           buying the week before and selling the week after earns nothing. */
+        if (stock.dividendYield > 0 && absoluteWeek - lastPayoutAbsolute >= DIVIDEND_EVERY_WEEKS) {
             lastPayoutAbsolute = absoluteWeek;
             lastPayout = week;
+            const dividendShare = Math.min(0.1, stock.dividendYield * getStudioDividendMultiplier(player as Player | undefined, stock) / 4);
+            newPrice = normalizeStockPrice(stock, newPrice * (1 - dividendShare));
         }
         const lastIssue = stock.lastShareIssueAbsoluteWeek
             ?? (stock.lastShareIssueWeek ? stockLegacyMarkerAbsoluteWeek(age, week, stock.lastShareIssueWeek) : getStockMarketAbsoluteWeek(age, 1) - 1);
-        const nextStock: Stock = { ...stock, outstandingShares: getStockOutstandingShares(stock), price: newPrice,
+        const nextStock: StockWithEarnings = { ...stock, outstandingShares: shares, price: newPrice,
             priceHistory: [...normalizedHistory, newPrice].slice(-20), lastDividendPayoutWeek: lastPayout,
             lastDividendPayoutAbsoluteWeek: lastPayoutAbsolute, lastMarketProcessedAbsoluteWeek: absoluteWeek,
-            lastShareIssueAbsoluteWeek: lastIssue, fairAnchor: valued.anchor };
+            lastShareIssueAbsoluteWeek: lastIssue, fairAnchor, earnings };
+        if (report) {
+            const playerName = player?.name;
+            const described = describeEarningsReport(stock, report, playerName);
+            earningsReports.push({ stockId: stock.id, stockSymbol: stock.symbol, verdict: report.verdict,
+                notification: `${stock.symbol}: ${described.headline}. ${described.detail}` });
+            // in the news when it matters: a company the player holds, or a result far from expectations
+            const held = Boolean(player?.portfolio?.some(item => item.stockId === stock.id && item.shares > 0));
+            if (held || Math.abs(report.surprise) > getCompanyProfile(stock).spread) news.push(createEarningsNews(stock, report, week, age, playerName));
+        }
         if (shouldIssueSharesThisWeek(nextStock, absoluteWeek, lastIssue)) {
             const issuePercent = 2 + (stableShareHash(`${nextStock.id}:${absoluteWeek}:issue-percent`) % 5);
             const issuance = applyStockShareIssuance(nextStock, { issuePercent, week, year: age, reason: getAutomaticShareIssueReason(nextStock) });
@@ -726,7 +794,7 @@ export const processStockMarket = (
         }
         return nextStock;
     });
-    return { stocks: updatedStocks, dividendsTotal: 0, notifications, news, corporateActions };
+    return { stocks: updatedStocks, dividendsTotal: 0, notifications, news, corporateActions, earningsReports };
 };
 
 /** Call only after both personal and corporate dividend receipts have settled successfully. */
