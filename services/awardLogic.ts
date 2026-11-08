@@ -777,21 +777,24 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
         );
 
         // LOWERED THRESHOLDS for accessibility
-        const threshold = week === 10 ? 85 : week === 38 ? 80 : 75; // Oscars 85, Emmys 80, Others 75
+        // Branch on the show, not the week: this runs at each show's invite week (50, 1, 6, 34), never at its
+        // ceremony week, so the old week checks sent every show down the Oscar branch. Emmy nominations got film
+        // categories the ceremony then dropped, and Globe acting nominations never matched the Globe list.
+        const threshold = awardType === 'OSCAR' ? 85 : awardType === 'EMMY' ? 80 : 75; // Oscars 85, Emmys 80, Others 75
 
         if (nomScore >= threshold) {
             let cat = '';
-            
+
             // Map to specific award show categories with gender
-            if (week === 38) { // EMMY
+            if (awardType === 'EMMY') {
                 if (project.mediaType !== 'SERIES') return; // Emmys are strictly TV
-                cat = isLeadRole ? `Outstanding Lead ${actorTerm}` : `Outstanding Supporting ${actorTerm}`; 
+                cat = isLeadRole ? `Outstanding Lead ${actorTerm}` : `Outstanding Supporting ${actorTerm}`;
             }
-            else if (week === 4) { // BAFTA
+            else if (awardType === 'BAFTA') {
                if (project.mediaType !== 'MOVIE') return; // BAFTA Film Awards
                cat = isLeadRole ? `Best ${actorTerm}` : `Best Supporting ${actorTerm}`;
             }
-            else if (week === 2) { // GOLDEN GLOBES
+            else if (awardType === 'GOLDEN_GLOBE') {
                 // Globes split Movie and TV
                 if (project.mediaType === 'SERIES') {
                     cat = `Best ${actorTerm} - TV Series`;

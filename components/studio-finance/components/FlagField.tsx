@@ -366,6 +366,6 @@ function neutralField(code: string): [Layout, ...string[]] {
   for (let i = 0; i < code.length; i += 1) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
   const layouts: Layout[] = ['h', 'v', 'canton'];
   const first = NEUTRAL[hash % NEUTRAL.length];
-  const second = NEUTRAL[(hash >> 3) % NEUTRAL.length];
-  return [layouts[hash % layouts.length], first, second === first ? NEUTRAL[(hash >> 5) % NEUTRAL.length] : second];
+  const second = NEUTRAL[(hash >>> 3) % NEUTRAL.length];
+  return [layouts[hash % layouts.length], first, second === first ? NEUTRAL[(hash >>> 5) % NEUTRAL.length] : second];
 }

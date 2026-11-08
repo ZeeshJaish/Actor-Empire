@@ -685,7 +685,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     ];
 
     return (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-2xl overflow-hidden">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#050505] overflow-hidden">
             <input
                 ref={fileInputRef}
                 type="file"
@@ -843,13 +843,13 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
                                  {/* Quick Stats */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:col-span-2">
-                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center min-h-[120px]">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.productionCost')}</div>
                                         <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
                                             {formatMoney(project.projectDetails?.estimatedBudget || project.budget || 0)}
                                         </div>
                                     </div>
-                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center min-h-[120px]">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.buzzLevel')}</div>
                                         <div className="flex items-baseline gap-1 overflow-hidden">
                                             <div className="text-2xl sm:text-3xl font-bold text-amber-500 tracking-tight">
@@ -858,7 +858,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             <div className="text-[10px] sm:text-sm font-bold text-zinc-600">/ 100</div>
                                         </div>
                                     </div>
-                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center min-h-[120px]">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.release')}</div>
                                         <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
                                             {releaseSummaryLabel}
@@ -867,9 +867,10 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                             {releaseTiming.releaseWeek ? tr('projectDashboard.timeline.week', { week: releaseTiming.releaseWeek }) : tr('projectDashboard.timeline.history')}
                                         </div>
                                     </div>
-                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center h-[120px]">
+                                    <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center min-h-[120px]">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.timeline')}</div>
-                                        <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
+                                        {/* "Run Week 44" is wider than a phone's half-width tile at 24px: smaller on phones and allowed two lines, never cut */}
+                                        <div className="text-lg sm:text-3xl font-bold text-white tracking-tight leading-tight break-words">
                                             {timelineValue}
                                         </div>
                                         <div className="mt-1 truncate text-[10px] font-black uppercase tracking-widest text-zinc-600">

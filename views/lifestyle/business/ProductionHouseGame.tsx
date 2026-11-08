@@ -264,8 +264,15 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
 
     // Calculate Studio Metrics
     const totalGross = activeReleases.reduce((sum, r) => sum + r.totalGross + (r.streamingRevenue || 0) + (r.soundtrackRevenue || 0), 0) + evaluationLibrary.reduce((sum, p) => sum + (p.gross || 0) + (p.streamingRevenue || 0) + (p.soundtrackRevenue || 0), 0);
-    const avgRating = evaluationLibrary.length > 0 ? evaluationLibrary.reduce((sum, p) => sum + (p.rating || 0), 0) / evaluationLibrary.length : 0;
-    
+    // Films still in cinemas count too: the Past Projects row and the box-office total already include them, so a studio
+    // whose first films were running showed TOTAL FILMS 0 and AVG RATING -.-- beside two rated releases.
+    const releasedRatings = [
+        ...activeReleases.map(r => Number(r.imdbRating || 0)),
+        ...evaluationLibrary.map(p => Number(p.rating || 0)),
+    ].filter(rating => rating > 0);
+    const releasedFilmCount = activeReleases.length + evaluationLibrary.length;
+    const avgRating = releasedRatings.length > 0 ? releasedRatings.reduce((sum, rating) => sum + rating, 0) / releasedRatings.length : 0;
+
     // Calculate Awards Won
     const awardsWon = evaluationLibrary.reduce((sum, p) => sum + (p.awards?.filter(a => a.outcome === 'WON').length || 0), 0);
     
@@ -1171,7 +1178,7 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">
                             <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-0.5"><Film size={10} className="text-blue-400"/> {tr('services.business.productionDashboard.metric.totalFilms')}</span>
-                            <span className="text-white font-bold text-sm">{evaluationLibrary.length}</span>
+                            <span className="text-white font-bold text-sm">{releasedFilmCount}</span>
                         </div>
                         <div className="w-px h-8 bg-zinc-800 shrink-0"></div>
                         <div className="flex flex-col shrink-0">

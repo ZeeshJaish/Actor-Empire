@@ -2550,7 +2550,9 @@ const upsertIndustryRelationships = (
             name: npc?.name || guestLabel,
             relation: startingCloseness >= 60 ? 'Friend' : 'Connection',
             closeness: startingCloseness,
-            image: npc?.avatar || '🎬',
+            // No emoji stand-in: screens draw <img> from this, so an empty slot gets an in-game portrait instead.
+            image: npc?.avatar || '',
+            gender: npc?.gender,
             lastInteractionWeek: player.currentWeek,
             lastInteractionAbsolute: absoluteWeek,
         });

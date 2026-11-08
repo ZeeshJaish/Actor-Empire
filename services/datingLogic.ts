@@ -57,6 +57,17 @@ const RANDOM_TINDER_NAMES: Record<'MALE' | 'FEMALE' | 'NON_BINARY', string[]> = 
         'Tatum', 'Wren'
     ],
 };
+
+/* A random match's first name is drawn from its gender's list, so the name tells the gender whenever it is in exactly
+   one list ('Kai' is in two and tells nothing). Used to give partners a gender when an older save lost it. */
+export const inferDatingNameGender = (name: string): 'MALE' | 'FEMALE' | 'NON_BINARY' | undefined => {
+    const firstName = String(name || '').trim().split(/\s+/)[0];
+    if (!firstName) return undefined;
+    const genders = (Object.keys(RANDOM_TINDER_NAMES) as Array<'MALE' | 'FEMALE' | 'NON_BINARY'>)
+        .filter(gender => RANDOM_TINDER_NAMES[gender].includes(firstName));
+    return genders.length === 1 ? genders[0] : undefined;
+};
+
 const RANDOM_TINDER_SURNAMES = [
     'Adams', 'Bennett', 'Brooks', 'Carter', 'Chaudhary', 'Chen', 'Clark', 'Cruz', 'Diaz', 'Ellis',
     'Foster', 'Garcia', 'Green', 'Hayes', 'Hughes', 'Kapoor', 'Khan', 'Kim', 'King', 'Lee',

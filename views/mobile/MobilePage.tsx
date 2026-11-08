@@ -34,7 +34,8 @@ import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { resolveShareholderVote } from '../../services/shareholderVoting';
 import { addBreadcrumb, markTraceAction, setCrashContext, setCurrentGameScreen } from '../../services/firebaseService';
 import { acceptPlatformAiPlayerCommission, declinePlatformAiPlayerCommission } from '../../services/platformAi';
-import { getGenderedAvatar } from '../../services/npcLogic';
+import { getGenderedAvatar, NPC_DATABASE } from '../../services/npcLogic';
+import { inferDatingNameGender } from '../../services/datingLogic';
 
 type MobileAppMode = 'HOME' | 'CASTLINK' | 'IMDB' | 'BOXOFFICE' | 'INSTAGRAM' | 'X' | 'YOUTUBE' | 'NEWS' | 'TEAM' | 'MESSAGES' | 'FORBES' | 'STOCKS' | 'DATING_FOLDER' | 'SOCIAL_FOLDER' | 'TINDER' | 'LUXE' | 'BANK' | 'GUIDE';
 
@@ -695,7 +696,11 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
           lastInteractionWeek: props.player!.currentWeek,
           lastInteractionAbsolute: getAbsoluteWeek(props.player!.age, props.player!.currentWeek),
           npcId: match.npcId,
-          age: match.age
+          age: match.age,
+          // The partner keeps the match's gender: without it the save filled in Mom's, and a couple could never have a baby.
+          gender: match.gender
+              || (match.npcId ? NPC_DATABASE.find(npc => npc.id === match.npcId)?.gender : undefined)
+              || inferDatingNameGender(match.name),
       };
 
       handleUpdatePlayer({

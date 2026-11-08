@@ -50,8 +50,9 @@
 .screenStat b{display:block;font:400 clamp(17px,5.4vw,23px)/1 'Anton','Archivo',sans-serif;letter-spacing:.015em;font-variant-numeric:tabular-nums}
 .screenStat span{display:block;margin-top:3px;font:800 7px/1.15 'Archivo','Inter',sans-serif;letter-spacing:.1em;color:#aeb6c4}
 .wallMap.wallMap{position:absolute;inset:0;width:100%;height:100%;opacity:.9}
-.rackBars{position:absolute;right:8px;bottom:7px;width:30%;height:22%;display:flex;align-items:flex-end;gap:2px}
-.rackBars i{flex:1;background:linear-gradient(180deg,var(--epx-brand-lift),var(--epx-brand));border-radius:1px 1px 0 0;transform-origin:50% 100%;animation:bar-grow .5s cubic-bezier(.2,.9,.3,1.2) both}
+.rackBars{position:absolute;right:8px;bottom:7px;width:30%;height:22%;display:flex;align-items:flex-end;justify-content:flex-end;gap:2px}
+/* one slot per city of the 14 shown, so a network with one city is one thin bar, not a solid block */
+.rackBars i{flex:0 0 calc((100% - 26px) / 14);background:linear-gradient(180deg,var(--epx-brand-lift),var(--epx-brand));border-radius:1px 1px 0 0;transform-origin:50% 100%;animation:bar-grow .5s cubic-bezier(.2,.9,.3,1.2) both}
 @keyframes bar-grow{from{transform:scaleY(0)}}
 .posterRow{position:absolute;left:46%;right:6px;top:26px;bottom:6px;display:flex;gap:4px;justify-content:flex-end;align-items:center;overflow:hidden}
 .posterRow span{flex:0 0 auto;height:100%;aspect-ratio:2/3;display:block;box-shadow:0 2px 8px #000}

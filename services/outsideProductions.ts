@@ -58,7 +58,9 @@ const hashString = (value: string): number => {
     return hash >>> 0;
 };
 
-const randomFrom = <T>(items: T[], seed: number): T => items[seed % items.length];
+// Seeds are unsigned 32-bit hashes; the offsets below use >>> because a signed >> turned half of them negative, which
+// picked items[-n] (an "undefined undefined" film) and pushed scout scores, release weeks and cash asks below zero.
+const randomFrom = <T>(items: T[], seed: number): T => items[Math.abs(Math.trunc(seed)) % items.length];
 
 const getGenreLabel = (language: GameLanguage, genre: Genre): string => (
     t(language, `services.outsideProducer.genre.${genre}`)
@@ -177,11 +179,11 @@ export const hasOutsideProductionExposure = (player: Player, projectId: string, 
 
 const buildScoutReport = (seed: number, recognition: number, lane: string): OutsideProductionScoutReport => {
     const scriptQuality = 42 + (seed % 45);
-    const directorQuality = 38 + ((seed >> 3) % 48);
-    const castQuality = 35 + ((seed >> 5) % 50);
-    const budgetDiscipline = 36 + ((seed >> 7) % 46);
-    const marketFit = 40 + ((seed >> 9) % 48);
-    const buzz = clamp(25 + ((seed >> 11) % 42) + recognition * 0.18, 0, 100);
+    const directorQuality = 38 + ((seed >>> 3) % 48);
+    const castQuality = 35 + ((seed >>> 5) % 50);
+    const budgetDiscipline = 36 + ((seed >>> 7) % 46);
+    const marketFit = 40 + ((seed >>> 9) % 48);
+    const buzz = clamp(25 + ((seed >>> 11) % 42) + recognition * 0.18, 0, 100);
     const riskBase = 100 - (budgetDiscipline * 0.35 + scriptQuality * 0.2 + castQuality * 0.18 + directorQuality * 0.16 + marketFit * 0.11);
     const laneRisk = lane === 'risk' ? 12 : lane === 'prestige' ? 5 : lane === 'contained' ? -6 : 0;
     const risk = clamp(Math.round(riskBase + laneRisk), 5, 88);
@@ -235,17 +237,17 @@ export const generateOutsideProducerInvestmentOffers = (player: Player, count = 
         const seed = hashString(`${player.name}:${absolute}:${index}:${player.money}:${player.stats?.fame || 0}`);
         const isFraudRiskOffer = recognition >= 45 && (seed % 100) < 14;
         const producer = isFraudRiskOffer ? randomFrom(FRAUD_RISK_PRODUCERS, seed + index) : randomFrom(PRODUCERS, seed + index);
-        const genre = randomFrom(GENRES, seed >> 2);
-        const projectTitle = `${randomFrom(TITLE_LEFT, seed >> 4)} ${randomFrom(TITLE_RIGHT, seed >> 6)}`;
+        const genre = randomFrom(GENRES, seed >>> 2);
+        const projectTitle = `${randomFrom(TITLE_LEFT, seed >>> 4)} ${randomFrom(TITLE_RIGHT, seed >>> 6)}`;
         const projectId = `outside_${absolute}_${index}_${projectTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
         if (hasOutsideProductionExposure(player, projectId)) continue;
 
         const budget = Math.round((8_000_000 + (seed % 82_000_000)) / 100_000) * 100_000;
-        const askRatio = isFraudRiskOffer ? 0.045 + ((seed >> 8) % 7) / 100 : 0.08 + ((seed >> 8) % 19) / 100;
+        const askRatio = isFraudRiskOffer ? 0.045 + ((seed >>> 8) % 7) / 100 : 0.08 + ((seed >>> 8) % 19) / 100;
         const cashAsk = Math.min(player.money, Math.round((budget * askRatio) / 100_000) * 100_000);
         if (cashAsk < 1_000_000) continue;
         const cleanStake = (cashAsk / budget) * 100;
-        const offeredStakePercent = Math.round(clamp(cleanStake * (isFraudRiskOffer ? 2.45 + ((seed >> 13) % 70) / 100 : 1.08 + ((seed >> 13) % 24) / 100), 3, isFraudRiskOffer ? 49 : 42) * 10) / 10;
+        const offeredStakePercent = Math.round(clamp(cleanStake * (isFraudRiskOffer ? 2.45 + ((seed >>> 13) % 70) / 100 : 1.08 + ((seed >>> 13) % 24) / 100), 3, isFraudRiskOffer ? 49 : 42) * 10) / 10;
         const finalTerms = !producer.flexible || (seed % 5 === 0);
         const baseScoutReport = buildScoutReport(seed, recognition, producer.lane);
         const scoutReport = isFraudRiskOffer
@@ -282,10 +284,10 @@ export const generateOutsideProducerInvestmentOffers = (player: Player, count = 
             maxCounterAttempts: OUTSIDE_PRODUCER_COUNTER_LIMIT,
             acceptanceChance,
             scoutReport,
-            directorName: randomFrom(DIRECTORS, seed >> 10),
-            castNames: [randomFrom(CAST, seed >> 12), randomFrom(CAST, seed >> 14), randomFrom(CAST, seed >> 16)].filter((name, idx, arr) => arr.indexOf(name) === idx),
-            expectedReleaseWeeks: 8 + ((seed >> 17) % 18),
-            expectedRunWeeks: 4 + ((seed >> 20) % 7),
+            directorName: randomFrom(DIRECTORS, seed >>> 10),
+            castNames: [randomFrom(CAST, seed >>> 12), randomFrom(CAST, seed >>> 14), randomFrom(CAST, seed >>> 16)].filter((name, idx, arr) => arr.indexOf(name) === idx),
+            expectedReleaseWeeks: 8 + ((seed >>> 17) % 18),
+            expectedRunWeeks: 4 + ((seed >>> 20) % 7),
             releasePath: scoutReport.marketFit > 72 ? 'THEATRICAL' : scoutReport.scriptQuality > 76 && scoutReport.buzz < 55 ? 'FESTIVAL' : 'STREAMING',
             fraudRisk: isFraudRiskOffer ? 'HIGH' : 'NONE',
             riskSignals: isFraudRiskOffer ? ['GENEROUS_TERMS', 'UNVERIFIED_FINANCING', 'SHELL_COMPANY', 'RUSHED_CLOSE'] : [],

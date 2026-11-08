@@ -12,7 +12,8 @@ import { INITIAL_PLAYER, type Business, type Message, type NewsItem, type Player
 import { ensureLifestyleActivityState } from './lifestyleActivities';
 import { getAbsoluteWeek, getRelationshipContactAbsoluteWeek, inferStreamingStartWeekAbsolute } from './legacyLogic';
 import { normalizeNewPlayerTutorialState } from './newPlayerTutorial';
-import { createGlobalActorPackNPCs, recoverInheritedGlobalActorPackIds } from './npcLogic';
+import { createGlobalActorPackNPCs, recoverInheritedGlobalActorPackIds, NPC_DATABASE } from './npcLogic';
+import { inferDatingNameGender } from './datingLogic';
 import {
     getStockOutstandingShares,
     initializeStocks,
@@ -888,11 +889,29 @@ const migrateInbox = (inbox: Message[] | undefined): Message[] => (
         .slice(0, 120)
 );
 
+const PARENT_RELATIONS = new Set(['Parent', 'Deceased Parent']);
+const PARTNER_RELATIONS = new Set(['Partner', 'Spouse', 'Ex-Partner', 'Ex-Spouse']);
+const NEUTRAL_RELATIONSHIP: Relationship = {
+    id: '', name: 'Connection', relation: 'Connection', closeness: 50, image: '', lastInteractionWeek: 0, lastInteractionAbsolute: 0,
+};
+
 const normalizeRelationship = (relationship: any, index: number, age: number, currentWeek: number): Relationship => {
+    // Only the starting parents may borrow the starting parents' details. Everyone added later (partners, children,
+    // friends) used to fall back to Mom by index, so a partner saved without a gender became FEMALE and a couple
+    // could never have a baby.
+    const parentLike = !relationship?.relation || PARENT_RELATIONS.has(String(relationship.relation));
     const fallback = INITIAL_PLAYER.relationships.find(item => item.id === relationship?.id)
-        || INITIAL_PLAYER.relationships[index]
-        || INITIAL_PLAYER.relationships[0];
+        || (parentLike ? INITIAL_PLAYER.relationships[index] || INITIAL_PLAYER.relationships[0] : undefined)
+        || NEUTRAL_RELATIONSHIP;
     const next = mergeDefaults(fallback, relationship) as Relationship;
+    if (PARTNER_RELATIONS.has(String(next.relation))) {
+        // Repair partners that lost their gender: an NPC partner has it on record, and a random dating match's
+        // first name comes from its gender's list.
+        const npcGender = next.npcId ? NPC_DATABASE.find(npc => npc.id === next.npcId)?.gender : undefined;
+        const nameGender = String(next.id || '').includes('tinder_rnd') ? inferDatingNameGender(next.name) : undefined;
+        const knownGender = npcGender || nameGender;
+        if (knownGender) next.gender = knownGender;
+    }
     next.id = String(next.id || fallback.id || `rel_${index}`);
     next.name = String(next.name || fallback.name || 'Connection');
     next.relation = VALID_RELATIONS.has(String(next.relation))

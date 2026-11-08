@@ -25,7 +25,10 @@ export const getCanonicalProfileAvatar = (
     gender: Gender | undefined,
     nameSeed: string,
 ): string => {
-    const existing = typeof avatarUrl === 'string' ? avatarUrl.trim() : '';
+    const raw = typeof avatarUrl === 'string' ? avatarUrl.trim() : '';
+    // An emoji placeholder such as '🎬' (industry contacts met at events) is not a picture: as an <img> source it showed
+    // a broken image, so it gets a portrait like an empty slot does.
+    const existing = /^(data:|https?:|blob:|\/|\.{1,2}\/|assets\/)/i.test(raw) ? raw : '';
     if (existing && !isLegacyPixelAvatar(existing)) return existing;
 
     const legacySeed = existing ? legacySeedFromUrl(existing) : '';
