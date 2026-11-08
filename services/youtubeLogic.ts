@@ -1,4 +1,4 @@
-import {projectBuiltinPerson} from './fictionalNames';
+import {canonicalPersonName,fictionalHandle,fictionalPersonName,projectBuiltinPerson} from './fictionalNames';
 import { resolveYoutubeWeek, readYoutubeAudience, quoteYoutubeBrand, quoteYoutubeNewSubscribers } from './youtubeEconomy';
 import { availableCreatorSpend, recordCreatorSpend } from './creatorEconomy';
 
@@ -314,9 +314,10 @@ const globalCreator = (
     forbesCategory?: string,
     age?: number
 ): GlobalCreatorProfile => ({
+    // Id and portrait stay keyed to the real name (saves keep their creators); the shown name and handle are the stand-in.
     id: `yt_global_${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
-    name,
-    handle: `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
+    name: fictionalPersonName(name),
+    handle: fictionalHandle(name, `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`),
     avatar: getGenderedAvatar(gender, `${name} ${country}`),
     followers: Math.max(1000, Math.floor(followersM * M)),
     country,
@@ -394,7 +395,8 @@ const BASE_GLOBAL_YOUTUBE_CREATORS = [
     globalCreator('Therese Lindgren', 'Sweden', 1, 'FEMALE')
 ];
 
-const baseCreatorNames = new Set(BASE_GLOBAL_YOUTUBE_CREATORS.map(creator => normalizeCreatorName(creator.name)));
+// Creators now carry their stand-in names, so the duplicate check compares real names.
+const baseCreatorNames = new Set(BASE_GLOBAL_YOUTUBE_CREATORS.map(creator => normalizeCreatorName(canonicalPersonName(creator.name))));
 
 const modTalentCreatorToProfile = (row: ModTalentRow): GlobalCreatorProfile =>
     globalCreator(

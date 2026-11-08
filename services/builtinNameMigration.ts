@@ -1,11 +1,11 @@
 import type {Player} from '../types';
-import {BUILTIN_NAME_VERSION,builtinPersonNameForId,fictionalPersonName,fictionalProjectTitle,fictionalCharacterName,isBuiltinPersonId,projectBuiltinPerson} from './fictionalNames';
+import {BUILTIN_NAME_VERSION,builtinPersonNameForId,fictionalPersonName,fictionalProjectTitle,fictionalCharacterName,isProjectablePersonId,projectBuiltinPerson} from './fictionalNames';
 import {BUILTIN_UNIVERSE_IDENTITIES} from './fictionalNameCatalog';
 
 const UNIVERSES = new Set(Object.keys(BUILTIN_UNIVERSE_IDENTITIES));
 type Scope = {project?:boolean;universe?:string;roster?:string;personId?:string};
 const personName = (id:unknown,name:unknown):unknown => {
-    if (!isBuiltinPersonId(id) || typeof name !== 'string') return name;
+    if (!isProjectablePersonId(id) || typeof name !== 'string') return name;
     return projectBuiltinPerson({id,name}).name;
 };
 
@@ -24,7 +24,7 @@ export const migrateBuiltinNames = (player: Player): Player => {
             if (next===value) next={...value};
             next[field]=replacement;
         };
-        const id=[value.npcId,value.actorId,value.sourceNpcId,value.id,scope.personId].find(isBuiltinPersonId);
+        const id=[value.npcId,value.actorId,value.sourceNpcId,value.id,scope.personId].find(isProjectablePersonId);
         if (id && typeof value.name==='string') {
             const projected=projectBuiltinPerson({...value,id});
             put('name',projected.name);
@@ -35,7 +35,7 @@ export const migrateBuiltinNames = (player: Player): Player => {
             const roleId=value[`${role}Id`] || value[`${role}NpcId`] || (role==='actor'||role==='npc'?id:undefined);
             put(field,personName(roleId,value[field]));
             const handleField=`${role}Handle`;
-            if(isBuiltinPersonId(roleId) && typeof value[handleField]==='string') {
+            if(isProjectablePersonId(roleId) && typeof value[handleField]==='string') {
                 const projected=projectBuiltinPerson({id:roleId,name:typeof value[field]==='string'?value[field]:builtinPersonNameForId(roleId),handle:value[handleField]});
                 put(handleField,projected.handle);
             }
@@ -62,7 +62,7 @@ export const migrateBuiltinNames = (player: Player): Player => {
             const childScope:Scope={
                 project:project && ['project','projectDetails','films','universeContract'].includes(field),
                 roster:scope.universe && field==='roster'?scope.universe:undefined,
-                personId:isBuiltinPersonId(field)?field:undefined,
+                personId:isProjectablePersonId(field)?field:undefined,
             };
             put(field,visit(child,childScope));
         }

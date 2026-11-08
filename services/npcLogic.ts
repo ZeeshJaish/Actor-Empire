@@ -1,4 +1,4 @@
-import {canonicalPersonName,projectBuiltinPerson} from './fictionalNames';
+import {canonicalPersonName,fictionalHandle,fictionalPersonName,projectBuiltinPerson} from './fictionalNames';
 
 // ... existing imports
 import { NPCActor, NPCTier, NPCPrestige, Player, InstaPost, InstaPostType, InteractionType, Genre, Gender, ActorTrait, MusicArtist, GameLanguage } from '../types';
@@ -694,8 +694,9 @@ const createNPCFromCeleb = (celeb: RealCeleb, id: string): NPCActor => {
 
     return {
         id,
-        name: celeb.name,
-        handle: celeb.handle,
+        // Real people appear under their satire stand-in; the portrait stays seeded by the real name so faces never change.
+        name: fictionalPersonName(celeb.name),
+        handle: celeb.handle ? fictionalHandle(celeb.name, celeb.handle) : celeb.handle,
         gender: celeb.gender,
         avatar: getGenderedAvatar(celeb.gender, celeb.name),
         tier: celeb.tier,
@@ -763,7 +764,8 @@ export const recoverInheritedGlobalActorPackIds = (flags: Player['flags']): stri
         const candidates = profiles.filter(npc => npc?.id?.startsWith(`mod_actor_${pack.id}_`));
         if (!candidates.length) continue;
         const names = new Map(createGlobalActorPackNPCs(pack.id).map(npc => [npc.id, npc.name]));
-        if (candidates.some(npc => names.get(npc.id) === npc.name)) recovered.add(pack.id);
+        // Compare real names: a save may hold the real name or its stand-in, the catalogue now issues the stand-in.
+        if (candidates.some(npc => canonicalPersonName(names.get(npc.id) || '') === canonicalPersonName(String(npc.name || '')))) recovered.add(pack.id);
     }
     return [...recovered];
 };
