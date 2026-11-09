@@ -125,7 +125,8 @@ assert.equal(
 
 const gameLoopSource = readFileSync(resolve(process.cwd(), 'services/gameLoop.ts'), 'utf8');
 const calendarAdvanceIndex = gameLoopSource.indexOf('nextPlayer.currentWeek += 1');
-const industryTurnIndex = gameLoopSource.indexOf('processIndustryWorldWeek(');
+// Round 5 (2026-11-09): the week loop runs the same industry week in steps.
+const industryTurnIndex = gameLoopSource.indexOf('processIndustryWorldWeekInSteps(');
 const ownedStreamingIndex = gameLoopSource.indexOf('processOwnedStreamingPlatformWeek(nextPlayer)');
 assert.ok(calendarAdvanceIndex >= 0 && industryTurnIndex > calendarAdvanceIndex, 'Rival streaming must settle after the calendar advances.');
 assert.ok(ownedStreamingIndex > industryTurnIndex, 'The rival/ecosystem coordinator must settle before the player-owned streaming report for the same entered week.');

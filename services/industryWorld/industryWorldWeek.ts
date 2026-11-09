@@ -38,17 +38,18 @@ export interface IndustryWorldWeekResult {
     executionOrder: IndustryWorldExecutionStage[];
 }
 
-/**
- * The single entered-week seam for compact rival-company simulation.
- * Domain services still own every mutation; this coordinator only establishes
- * deterministic order and a saved exactly-once checkpoint.
- */
-export const processIndustryWorldWeek = (
+type IndustryWorldWeekDiagnostics = { onPhase?: (name: string, elapsedMs: number) => void };
+
+/* Round 5 (2026-11-09): the week's steps as a generator that stops after the rival platforms and after the studios.
+   The plain call below runs it straight through; the week loop runs the same steps with a browser frame at each
+   stop, so a late career's ~300 ms block (about 1.2 s on a slow phone) becomes three of about 100 ms. Each frame
+   costs about 50 ms on a slow phone, so there are only two stops. Same steps, same order, same data. */
+function* industryWorldWeekSteps(
     player: Player,
     world: WorldState,
     absoluteWeek: number,
-    diagnostics?: { onPhase?: (name: string, elapsedMs: number) => void },
-): IndustryWorldWeekResult => {
+    diagnostics?: IndustryWorldWeekDiagnostics,
+): Generator<void, IndustryWorldWeekResult, void> {
     const ledger = normalizeIndustryEventLedger(world.industryEvents);
     if (ledger.lastProcessedAbsoluteWeek >= absoluteWeek) {
         return {
@@ -67,6 +68,7 @@ export const processIndustryWorldWeek = (
     let phaseStarted = performance.now();
     const streaming = processStreamingIndustryWorldWeek(player, world, absoluteWeek);
     diagnostics?.onPhase?.('industry_platforms_ms', performance.now() - phaseStarted);
+    yield;
     phaseStarted = performance.now();
     executionOrder.push('STUDIO_AI');
     const studio = processStudioAiWeek(
@@ -75,6 +77,7 @@ export const processIndustryWorldWeek = (
         absoluteWeek,
     );
     diagnostics?.onPhase?.('industry_studios_ms', performance.now() - phaseStarted);
+    yield;
     phaseStarted = performance.now();
     const upcomingRights = processStreamingUpcomingRightsWeek(
         { ...player, world: studio.world },
@@ -161,4 +164,38 @@ export const processIndustryWorldWeek = (
         processed: true,
         executionOrder,
     };
+}
+
+/**
+ * The single entered-week seam for compact rival-company simulation.
+ * Domain services still own every mutation; this coordinator only establishes
+ * deterministic order and a saved exactly-once checkpoint.
+ */
+export const processIndustryWorldWeek = (
+    player: Player,
+    world: WorldState,
+    absoluteWeek: number,
+    diagnostics?: IndustryWorldWeekDiagnostics,
+): IndustryWorldWeekResult => {
+    const steps = industryWorldWeekSteps(player, world, absoluteWeek, diagnostics);
+    let step = steps.next();
+    while (!step.done) step = steps.next();
+    return step.value;
+};
+
+/** The same week, with `pause` awaited between its phases (the week loop passes its frame yield). */
+export const processIndustryWorldWeekInSteps = async (
+    player: Player,
+    world: WorldState,
+    absoluteWeek: number,
+    diagnostics: IndustryWorldWeekDiagnostics | undefined,
+    pause: () => Promise<void>,
+): Promise<IndustryWorldWeekResult> => {
+    const steps = industryWorldWeekSteps(player, world, absoluteWeek, diagnostics);
+    let step = steps.next();
+    while (!step.done) {
+        await pause();
+        step = steps.next();
+    }
+    return step.value;
 };

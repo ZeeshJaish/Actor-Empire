@@ -841,14 +841,18 @@ const titleDiscoveryMix = (
     };
 };
 
-const buildViewingState = (
+/* Round 5 (2026-11-09): the viewing build as a generator with one stop, after the rival viewing. The plain build
+   below runs it straight through; the week loop runs the same steps with a browser frame at the stop, so a late
+   career's ~300 ms block (about 1.2 s on a slow phone) becomes two of about 150 ms. Each frame costs about 50 ms
+   on a slow phone, so there is only one stop. Same steps, same order, same data. */
+function* buildViewingStateSteps(
     player: Player,
     absoluteWeek: number,
     initializedAtAbsoluteWeek: number,
     snapshots: WorldStreamingViewingSnapshot[],
     priorState?: WorldStreamingViewingState,
     diagnostics: { onStage?: (stage: string) => void; preparedWorld?: boolean } = {},
-): WorldStreamingViewingState => {
+): Generator<void, WorldStreamingViewingState, void> {
     const markStage = (stage: string) => diagnostics.onStage?.(stage);
     const population = diagnostics.preparedWorld
         ? player.world.worldPopulation!
@@ -880,6 +884,7 @@ const buildViewingState = (
     const rivalViewing = projectRivalViewing(preparedPlayer, absoluteWeek, customers, choices,
         aiCatalogue.titles, priorState?.aiStoreEntitlements || [], offerRegistry);
     markStage('rival_viewing_ready');
+    yield;
     const royaltySourceReceipts = [...rivalViewing.royaltySourceReceipts];
     const playerCustomers = getWorldStreamingPlayerCustomerOutcome(customers);
     const platform = normalizeOwnedStreamingPlatformState(preparedPlayer.ownedStreamingPlatform, preparedPlayer.id);
@@ -1776,6 +1781,12 @@ const buildViewingState = (
     });
 };
 
+const runViewingSteps = (steps: Generator<void, WorldStreamingViewingState, void>): WorldStreamingViewingState => {
+    let step = steps.next();
+    while (!step.done) step = steps.next();
+    return step.value;
+};
+
 const buildState = (
     player: Player,
     absoluteWeek: number,
@@ -1784,7 +1795,7 @@ const buildState = (
     priorState?: WorldStreamingViewingState,
     diagnostics: { onStage?: (stage: string) => void; preparedWorld?: boolean } = {},
 ): WorldStreamingViewingState => {
-    return buildViewingState(player, absoluteWeek, initializedAtAbsoluteWeek, snapshots, priorState, diagnostics);
+    return runViewingSteps(buildViewingStateSteps(player, absoluteWeek, initializedAtAbsoluteWeek, snapshots, priorState, diagnostics));
 };
 
 export const createWorldStreamingViewingState = (
@@ -1811,6 +1822,32 @@ export const normalizeWorldStreamingViewingState = (
         input,
         diagnostics,
     );
+};
+
+/** normalizeWorldStreamingViewingState with `pause` awaited at each stop of a rebuild (the week loop's frame yield). */
+export const normalizeWorldStreamingViewingStateInSteps = async (
+    input: WorldStreamingViewingState | undefined,
+    player: Player,
+    absoluteWeek: number,
+    diagnostics: { onStage?: (stage: string) => void; preparedWorld?: boolean },
+    pause: () => Promise<void>,
+): Promise<WorldStreamingViewingState> => {
+    const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
+    if (isValidViewingState(input, week)) return input;
+    const steps = buildViewingStateSteps(
+        player,
+        week,
+        Math.max(0, Math.round(Number(input?.initializedAtAbsoluteWeek) || week)),
+        Array.isArray(input?.snapshots) ? input.snapshots : [],
+        input,
+        diagnostics,
+    );
+    let step = steps.next();
+    while (!step.done) {
+        await pause();
+        step = steps.next();
+    }
+    return step.value;
 };
 
 export const advanceWorldStreamingViewingToWeek = (

@@ -102,7 +102,7 @@ import {
     decidePlatformAiCommissionRenewals,
     syncPlatformAiPlayerCommissionProductions,
 } from './platformAi';
-import { processIndustryWorldWeek } from './industryWorld';
+import { processIndustryWorldWeekInSteps } from './industryWorld';
 import { calculateStreamingAdvertisingRevenueFullCurrency, calculateStreamingSubscriptionRevenueFullCurrency } from './streamingEconomyCore';
 import { attributeStreamingTitleRevenue, settleStreamingContractRoyaltyForPlayer,collectStreamingStudioRoyaltyReceipts } from './streamingContractSettlement';
 import {resolvePlatformController} from './platformAi/platformAiState';
@@ -218,7 +218,7 @@ import { normalizeWorldPopulationState } from './worldEconomy/worldPopulation';
 import { normalizeWorldStreamingCompetitionState } from './worldEconomy/worldStreamingCompetition';
 import { normalizeWorldStreamingCustomerState } from './worldEconomy/worldStreamingCustomers';
 import { normalizeWorldStreamingAudienceChoiceState, settleWorldStreamingAudienceEntitlements } from './worldEconomy/worldStreamingAudienceChoice';
-import { normalizeWorldStreamingViewingState } from './worldEconomy/worldStreamingViewing';
+import { normalizeWorldStreamingViewingStateInSteps } from './worldEconomy/worldStreamingViewing';
 import { advanceStreamingWeeklyChart } from './streamingWeeklyChart';
 import { runStreamingCampaignsWeek, settleStreamingCampaignResults } from './campaigns/streamingCampaigns';
 import { settleWorldStreamingPlatformEconomyWeek } from './worldEconomy/worldStreamingPlatformEconomy';
@@ -6572,11 +6572,13 @@ export const processGameWeek = async (
     emitLoopStage('streaming_industry_start');
     const industryPhases: Record<string, number> = {};
     const industryWorldStarted = performance.now();
-    const streamingIndustryResult = processIndustryWorldWeek(
+    /* Round 5 (2026-11-09): the same industry week, with a frame between its phases. */
+    const streamingIndustryResult = await processIndustryWorldWeekInSteps(
         nextPlayer,
         nextPlayer.world,
         enteredStreamingAbsoluteWeek,
         { onPhase: (name, ms) => { industryPhases[name] = ms; } },
+        yieldWeekProcessingFrame,
     );
     nextPlayer = streamingIndustryResult.player;
     nextPlayer.world = streamingIndustryResult.world;
@@ -6751,7 +6753,8 @@ export const processGameWeek = async (
     });
     await yieldWeekProcessingFrame();
     emitLoopStage('world_streaming_viewing_start', { absolute_week: enteredStreamingAbsoluteWeek });
-    nextPlayer.world.worldStreamingViewing = normalizeWorldStreamingViewingState(
+    /* Round 5 (2026-11-09): the same viewing build, with a frame at each of its stops. */
+    nextPlayer.world.worldStreamingViewing = await normalizeWorldStreamingViewingStateInSteps(
         nextPlayer.world.worldStreamingViewing,
         nextPlayer,
         enteredStreamingAbsoluteWeek,
@@ -6759,6 +6762,7 @@ export const processGameWeek = async (
             preparedWorld: true,
             onStage: stage => emitLoopStage(`world_streaming_viewing_${stage}`),
         },
+        yieldWeekProcessingFrame,
     );
     nextPlayer=recordCinemaStreamingAudience(nextPlayer);
     /* #245: what a title's opening counts from before its general release */
@@ -6784,6 +6788,9 @@ export const processGameWeek = async (
         paid_accounts: nextPlayer.world.worldStreamingPlatformEconomy?.global.endingPaidAccounts || 0,
         weekly_revenue: nextPlayer.world.worldStreamingPlatformEconomy?.global.weeklyRevenue || 0,
     });
+    /* Round 5 (2026-11-09): a frame between the rival economy and the player's own service week, two steps that
+       ran as one block of about 200 ms on a late career (about 0.8 s on a slow phone). */
+    await yieldWeekProcessingFrame();
     let ownedStreamingResult: ReturnType<typeof processOwnedStreamingPlatformWeek>;
     try {
         ownedStreamingResult = processOwnedStreamingPlatformWeek(nextPlayer);
