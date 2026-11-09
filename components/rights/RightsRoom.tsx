@@ -10,6 +10,7 @@ import type { Player, StreamingBiddingSession, StreamingOfferVersion, StreamingR
 import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { upsertStreamingBiddingSession } from '../../services/streamingBidding';
+import { markQuietPlayerUpdate } from '../../services/quietPlayerUpdates';
 import { resolveStreamingRightsRenewal, updateStreamingRightsStudioMandate, type StreamingRightsCalendarItem } from '../../services/streamingRightsCalendar';
 import { getStreamingStudioCommercialStatement } from '../../services/streamingRightsOffice';
 import { resolveStreamingPlatformBrandById } from '../../services/streamingPlatformBrandRegistry';
@@ -332,12 +333,15 @@ export default function RightsRoom({ player, studioId, onUpdatePlayer, onClose, 
         const opened = openRightsPackageRoom(player, { studioId, projectIds: picked, durationWeeks, exclusivity: exclusive ? 'EXCLUSIVE' : 'NON_EXCLUSIVE' });
         if (!opened.session) { setNote(opened.message || 'The room could not open.'); return; }
         onUpdatePlayer(opened.player);
+        setNote('');
         setRoom(opened.session);
     };
 
+    /* Beta report (2026-11-10): a clock tick stays in memory instead of starting a full save every
+       second; taking, leaving or closing the room saves as before. */
     const roomUpdate = (next: StreamingBiddingSession) => {
         setRoom(next);
-        onUpdatePlayer({ ...player, world: { ...player.world, streamingBiddingSessions: upsertStreamingBiddingSession(player.world.streamingBiddingSessions, next) } });
+        onUpdatePlayer(markQuietPlayerUpdate({ ...player, world: { ...player.world, streamingBiddingSessions: upsertStreamingBiddingSession(player.world.streamingBiddingSessions, next) } }));
     };
 
     const takeOffer = (offer: StreamingOfferVersion, session: StreamingBiddingSession) => {
@@ -363,6 +367,7 @@ export default function RightsRoom({ player, studioId, onUpdatePlayer, onClose, 
                 onStart={() => undefined}
                 onSessionChange={roomUpdate}
                 onAccept={takeOffer}
+                notice={note || null}
                 onFinish={() => setRoom(null)}
                 onContinue={() => setRoom(null)}
                 onLeave={() => { onUpdatePlayer(leaveRightsPackageRoom(player, room)); setRoom(null); setPicked([]); }}
@@ -501,7 +506,7 @@ export default function RightsRoom({ player, studioId, onUpdatePlayer, onClose, 
                     {view.openRooms.length > 0 && <section>
                         <SectionHead title="Still in the room" alert />
                         <div className="mx-4 space-y-2">{view.openRooms.map(item => (
-                            <button key={item.id} type="button" data-rights-back-to-room={item.id} onClick={() => setRoom(player.world.streamingBiddingSessions?.[item.biddingSessionId || ''] || null)} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border bg-[#241c0d] px-3 py-2 text-left active:scale-[0.99]" style={{ borderColor: `${GOLD}55` }}>
+                            <button key={item.id} type="button" data-rights-back-to-room={item.id} onClick={() => { setNote(''); setRoom(player.world.streamingBiddingSessions?.[item.biddingSessionId || ''] || null); }} className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border bg-[#241c0d] px-3 py-2 text-left active:scale-[0.99]" style={{ borderColor: `${GOLD}55` }}>
                                 <span className="min-w-0 text-[13px] font-black leading-tight text-white">{item.components.length} titles<small className="mt-0.5 block text-[10.5px] font-semibold text-zinc-400">Buyers are waiting on your answer</small></span>
                                 <span className="flex shrink-0 items-center gap-1 text-[11px] font-black text-[#f2cf7c]">Go back <ChevronRight size={13} /></span>
                             </button>

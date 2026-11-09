@@ -1091,6 +1091,7 @@
 .warRoomTop>strong{min-width:50px;text-align:right;font:900 24px ui-monospace,Menlo,monospace}.warUrgent{color:#ff5b52;animation:warBeat .7s infinite}
 @keyframes warBeat{50%{transform:scale(1.08)}}
 .warDrain{flex-shrink:0;height:3px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}.warDrain i{display:block;height:100%;background:#ffb54d;transition:width 1s linear}
+.warNotice{flex-shrink:0;margin:10px 0 2px;padding:9px 12px;border-radius:12px;font-size:11.5px;font-weight:700;line-height:1.45;color:#ffcf86;background:rgba(255,181,77,.08);box-shadow:inset 0 0 0 1px rgba(255,181,77,.3)}
 .warScroll{flex:1;min-height:0;overflow-y:auto;padding:6px 0 calc(12px + env(safe-area-inset-bottom,0px));scrollbar-width:none}
 .warBest{padding:20px 18px;border-radius:18px;text-align:center;background:linear-gradient(160deg,color-mix(in srgb,var(--pf) 20%,#111),rgba(255,255,255,.02));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pf) 38%,transparent)}
 .warBest>span{font-size:7.5px;font-weight:900;letter-spacing:.22em;color:#9a9285}.warBest>b{display:block;margin-top:8px;font:900 44px/1 ui-monospace,Menlo,monospace;letter-spacing:-.05em;color:var(--pf)}

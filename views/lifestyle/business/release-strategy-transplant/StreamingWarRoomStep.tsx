@@ -82,13 +82,15 @@ interface StreamingWarRoomStepProps {
   /** #252: the player's own service is live: the second door off the rights floor */
   yourService?: { name: string; color?: string } | null;
   onSendToYourService?: () => void;
+  /** Beta report (2026-11-10): why a TAKE was refused, shown inside the live room (it used to be silent there). */
+  notice?: string | null;
 }
 
 export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
   film, session, marketPlatforms, canAccept, energyCost, onStart, onSessionChange,
   onAccept, onFinish, onContinue, onLeave, onBack, preflightMessage, canStart = true,
   commissionedPremiere, onConfirmPremiere, firstNegotiation, onSignFirstNegotiation, onPassFirstNegotiation, leaveFunding, onLeaveFunding,
-  duringCinemaRun = false, yourService, onSendToYourService,
+  duringCinemaRun = false, yourService, onSendToYourService, notice = null,
 }) => {
   const premiereOf = (offer: StreamingOfferVersion) => (duringCinemaRun
     ? `${offer.platformName}: the week after cinemas close`
@@ -289,6 +291,7 @@ export const StreamingWarRoomStep: React.FC<StreamingWarRoomStepProps> = ({
         <strong className={session.roomSecondsRemaining <= 8 && !closed ? css.warUrgent : ''}>{closed ? '—' : `${session.roomSecondsRemaining}s`}</strong>
       </header>
       <div className={css.warDrain}><i style={{ width: `${closed ? 0 : progress}%` }} /></div>
+      {notice && <p className={css.warNotice} role="status" data-war-notice>{notice}</p>}
 
       <div className={css.warScroll}>
         {acceptedOffers.length > 0 && <section className={css.warAccepted}>

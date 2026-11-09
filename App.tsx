@@ -654,7 +654,7 @@ export const App: React.FC = () => {
   const slotOpenInProgressRef = useRef(false);
 
   // UI States
-  const [toastMessage, setToastMessage] = useState<{title: string, subtext: string} | null>(null);
+  const [toastMessage, setToastMessage] = useState<{title: string, subtext: string, tone?: 'warning'} | null>(null);
   const [activePressEvent, setActivePressEvent] = useState<{ project: Commitment, questions: PressInteraction[] } | null>(null);
   const [showProtectionPrompt, setShowProtectionPrompt] = useState<{ partnerId: string, partnerName: string } | null>(null);
   const [isBottomNavVisible, setIsBottomNavVisible] = useState(true);
@@ -848,6 +848,8 @@ export const App: React.FC = () => {
           reason?: SaveIntegrityReason;
           currentIsUnverified?: boolean;
           sourceByteEstimate?: number;
+          /** Internal: this is the one retry after a failed write. */
+          retriedWrite?: boolean;
       } = {}
   ): Promise<Player> => {
       if (options.weekDiagnostic) {
@@ -875,6 +877,7 @@ export const App: React.FC = () => {
           setToastMessage({
               title: 'Save Was Not Replaced',
               subtext: 'The new save did not preserve your complete career. Your previous save remains untouched.',
+              tone: 'warning',
           });
           return nextPlayer;
       }
@@ -904,11 +907,18 @@ export const App: React.FC = () => {
               reason: options.reason || 'AUTOSAVE',
               age: nextPlayer.age,
               week: nextPlayer.currentWeek,
+              retried_write: options.retriedWrite === true,
           });
           if (options.rethrow) throw error;
+          /* Beta report (2026-11-10): the career in memory is still good when a write fails. The usual
+             causes pass at once: a screen changed part of the career (energy, for one) while this save
+             waited to be written, so the stored copy no longer matched its check; or a slow write ran
+             out of time behind other saves. Prepare and write it once more before warning the player. */
+          if (!options.retriedWrite) return persistSlotSave(slot, nextPlayer, { ...options, retriedWrite: true });
           setToastMessage({
               title: 'Save Was Not Replaced',
               subtext: 'The new save failed its safety check. Your previous career remains untouched.',
+              tone: 'warning',
           });
           return nextPlayer;
       }
@@ -2167,7 +2177,10 @@ export const App: React.FC = () => {
   }, [toastMessage]);
 
   const handleUpdatePlayer = (updatedPlayer: Player) => {
-      setPlayer(prepareExternalPlayerUpdateForUi(updatedPlayer));
+      const prepared = prepareExternalPlayerUpdateForUi(updatedPlayer);
+      // Beta report (2026-11-10): a streaming room's clock tick keeps its quiet mark (no full save each second).
+      if (isQuietPlayerUpdate(updatedPlayer)) markQuietPlayerUpdate(prepared);
+      setPlayer(prepared);
   };
 
   const handleTrustedMarketUpdate = (updatedPlayer: Player) => {
@@ -3717,7 +3730,9 @@ export const App: React.FC = () => {
 	      />
 	      {toastMessage && (
 	          <div className="fixed top-[max(1.5rem,calc(env(safe-area-inset-top)+8px))] left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
-	              <div className="bg-emerald-500 rounded-full p-1"><CheckCircle size={20} className="text-black" strokeWidth={3}/></div>
+	              {toastMessage.tone === 'warning'
+	                  ? <div className="bg-amber-400 rounded-full p-1"><AlertTriangle size={20} className="text-black" strokeWidth={3}/></div>
+	                  : <div className="bg-emerald-500 rounded-full p-1"><CheckCircle size={20} className="text-black" strokeWidth={3}/></div>}
 	              <div><div className="font-bold text-sm">{toastMessage.title}</div><div className="text-xs text-zinc-400">{toastMessage.subtext}</div></div>
 	          </div>
 	      )}

@@ -39,6 +39,7 @@ import { buildStreamingBiddingRightsLot } from '../../../services/streamingRight
 import { getCanonicalScheduledRivals } from '../../../services/industryWorld/publicIndustryProjection';
 import { getForbesStreamingCompanies } from '../../../services/streamingPlatformEcosystem';
 import { buildReleaseStreamingBidderMarket } from '../../../services/releaseStreamingAuction';
+import { markQuietPlayerUpdate } from '../../../services/quietPlayerUpdates';
 import { getReleaseWizardEntryStep } from '../../../services/releasePlanningCommitment';
 import { runTaskAd } from '../../../services/forcedAds';
 import {
@@ -640,16 +641,48 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         }))
     ), [player.world.streamingPlatformEcosystem, player.world.platforms]);
 
-    const persistBiddingSession = (session: StreamingBiddingSession) => {
+    const persistBiddingSession = (session: StreamingBiddingSession, quiet = false) => {
         setBiddingSession(session);
-        onUpdatePlayer({
+        const nextPlayer = {
             ...player,
             world: {
                 ...player.world,
                 streamingBiddingSessions: upsertStreamingBiddingSession(player.world.streamingBiddingSessions, session),
             },
-        });
+        };
+        onUpdatePlayer(quiet ? markQuietPlayerUpdate(nextPlayer) : nextPlayer);
     };
+    /* Beta report (2026-11-10): the room's clock moves every second, and autosave waits only 0.75 s,
+       so every tick started a full save: ~45 saves per room on a late career, some of which failed
+       ("Save Was Not Replaced"). A tick now stays in memory and rides along with the next real save;
+       opening, taking, finishing and leaving the room save as before. */
+    const persistBiddingSessionTick = (session: StreamingBiddingSession) => persistBiddingSession(session, true);
+
+    /* Beta report (2026-11-10): the room and the signature price a film for each buyer the same way.
+       These are the room's own inputs: the bidder market, the shelf value (#315) and the quote. */
+    const buildRoomBidderMarket = () => buildReleaseStreamingBidderMarket(player, {
+        projectId: project.id,
+        title: project.name || project.title || 'Untitled project',
+        genre: project.projectDetails?.genre || project.genre || 'UNKNOWN',
+        packageScore: getProjectAuctionContext().packageScore,
+        absoluteWeek: biddingAbsoluteWeek,
+        earliestPremiereAbsoluteWeek: biddingRightsStartWeek,
+        studioPlatformRelations: studio?.studioState?.platformRelations || {},
+    });
+    const getShelfAloneValue = () => {
+        const auction = getProjectAuctionContext();
+        return calculateStreamingCatalogueReferenceValue({ quality: Number(auction.hiddenStats.qualityScore) || 50, audience: Number(project.totalViews || project.streaming?.totalViews) || 0,
+            budget: auction.projectBudget, theatricalGross: auction.theatricalGross, streamingRevenue: Number(project.streamingRevenue || project.projectDetails?.streamingRevenue) || 0, franchiseProtected: auction.hasProvenIp });
+    };
+    const quoteRoomCinemaBuyer = (
+        buyerId: string,
+        buyerCash: number,
+        countryIds: readonly string[],
+        shelfAloneValue: number,
+        rights?: { exclusivity: import('../../../types').StreamingLicenseExclusivity; windowType: import('../../../types').StreamingRightsWindowType },
+    ) => withShelfValue(
+        quoteCinemaRightsForBuyer(player, project.projectDetails || project, project.id, buyerId, biddingRightsStartWeek, 52, countryIds, rights?.exclusivity, rights?.windowType),
+        { titleId: project.id, buyerId, now: biddingAbsoluteWeek, releasedAtAbsoluteWeek: project.releasedAtAbsoluteWeek, aloneValue: shelfAloneValue, buyerCash });
 
     const startAuction = () => {
         /* #244: it is on the player's own service: pull it first */
@@ -663,18 +696,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         }
         setBiddingRightsMessage(null);
         const { packageScore, projectBudget, theatricalGross } = getProjectAuctionContext();
-        const bidderMarket = buildReleaseStreamingBidderMarket(player, {
-            projectId: project.id,
-            title: project.name || project.title || 'Untitled project',
-            genre: project.projectDetails?.genre || project.genre || 'UNKNOWN',
-            packageScore,
-            absoluteWeek: biddingAbsoluteWeek,
-            earliestPremiereAbsoluteWeek: biddingRightsStartWeek,
-            studioPlatformRelations: studio?.studioState?.platformRelations || {},
-        });
-        const auction = getProjectAuctionContext();
-        const shelfAloneValue = calculateStreamingCatalogueReferenceValue({ quality: Number(auction.hiddenStats.qualityScore) || 50, audience: Number(project.totalViews || project.streaming?.totalViews) || 0,
-            budget: projectBudget, theatricalGross, streamingRevenue: Number(project.streamingRevenue || project.projectDetails?.streamingRevenue) || 0, franchiseProtected: auction.hasProvenIp });
+        const bidderMarket = buildRoomBidderMarket();
+        const shelfAloneValue = getShelfAloneValue();
         try {
         const roomInput: Parameters<typeof createStreamingBiddingSession>[0] = {
             projectId: project.id,
@@ -698,9 +721,8 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                         requestedLevel: 'DUBS_AND_SUBTITLES',
                     })
                     : { localizationLevel: 'NONE' as const, requirements: [] };
-                const valuedPlatform = !isSeries ? applyCinemaRightsQuoteToBidder(platform, withShelfValue(
-                    quoteCinemaRightsForBuyer(player,project.projectDetails || project,project.id,platform.id,biddingRightsStartWeek,52,biddingLotBuild.lot.countryIds),
-                    { titleId: project.id, buyerId: platform.id, now: biddingAbsoluteWeek, releasedAtAbsoluteWeek: project.releasedAtAbsoluteWeek, aloneValue: shelfAloneValue, buyerCash: platform.cashAvailable })) : platform;
+                const valuedPlatform = !isSeries ? applyCinemaRightsQuoteToBidder(platform,
+                    quoteRoomCinemaBuyer(platform.id, platform.cashAvailable, biddingLotBuild.lot.countryIds, shelfAloneValue)) : platform;
                 return {
                     ...valuedPlatform,
                     canStartNewBids: valuedPlatform.canStartNewBids !== false && (worldPlatform
@@ -794,7 +816,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
             ?? biddingRightsStartWeek;
         const fundedPremiere = bid.id.startsWith('locked_premiere_');
         if (structuredAcceptance && !isSeries && !Object.values(player.world.streamingRightsContracts || {}).some((c:import('../../../types').StreamingRightsContract)=>c.sourceOfferId===structuredAcceptance.offer.id)) {
-            const quote=quoteCinemaRightsForBuyer(player,project.projectDetails || project,project.id,bid.platformId,promisedPremiereAbsoluteWeek,structuredAcceptance.offer.durationWeeks,structuredAcceptance.offer.countryIds,structuredAcceptance.offer.exclusivity,structuredAcceptance.offer.windowType);
+            /* Beta report (2026-11-10): re-check on the room's own basis (rights start, 52 weeks, shelf value,
+               the buyer's cash) with this offer's rights. Pricing the offer's own premiere and length instead
+               refused most standing offers, and every offer for an older film, so TAKE did nothing. */
+            const buyerCash = buildRoomBidderMarket().find(platform => platform.id === bid.platformId)?.cashAvailable ?? 0;
+            const quote = quoteRoomCinemaBuyer(bid.platformId, buyerCash, structuredAcceptance.offer.countryIds, getShelfAloneValue(), structuredAcceptance.offer);
             if(!quote.eligible || Math.round(structuredAcceptance.offer.fixedExposure*100)>quote.maximumBidCents){
                 setBiddingRightsMessage('Buyer resources or audience value changed. Reopen the room for an affordable offer.');return;
             }
@@ -1885,8 +1911,9 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     canAccept={hasStreamingDealEnergy}
                     energyCost={streamingDealEnergyCost}
                     onStart={startAuction}
-                    onSessionChange={persistBiddingSession}
+                    onSessionChange={persistBiddingSessionTick}
                     onAccept={handleAcceptStreamingOffer}
+                    notice={biddingRightsMessage}
                     onFinish={finishStreamingLicensing}
                     onContinue={() => setStep(3)}
                     onLeave={leaveAuction}
