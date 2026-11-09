@@ -14,6 +14,8 @@ import { createDeterministicId, createDeterministicRng } from '../deterministicR
 import { normalizeIndustryEventLedger } from './industryEventLedger';
 import { createIndustryMediaAvatar } from './industryMediaIdentities';
 import { normalizeIndustryMediaWorld } from './industryMediaLedger';
+import { personaSignOff } from './industryMediaPersonas';
+import { fillCopy, pickCopy, sentenceStart } from './mediaCopyVariety';
 
 const clamp = (value: number, minimum: number, maximum: number): number => (
     Math.max(minimum, Math.min(maximum, Math.round(value)))
@@ -200,12 +202,16 @@ const makeRetrospective = (
     if (!story || !institution) return undefined;
     const latest = narrative.landmarks[narrative.landmarks.length - 1];
     const origin = narrative.landmarks[0];
-    const label = THEME_LABELS[narrative.theme];
-    const headline = `${narrative.subjectName}'s ${label} narrative enters a new chapter`;
+    /* 2026-11-09 (Zeesh: "ek hi template baar baar"): varied by the piece's own seed, signed off in the critic's voice */
+    const seed = `c7-retro:${narrative.id}:${event.absoluteWeek}`;
+    const headline = sentenceStart(fillCopy(pickCopy(`${seed}:headline`, RETRO_HEADLINES), {
+        subject: narrative.subjectName,
+        story: THEME_STORIES[narrative.theme],
+    }));
     const history = origin && latest && origin.id !== latest.id
-        ? `The latest result follows an earlier chapter: ${origin.summary}`
-        : 'The latest result adds another verified chapter to the subject’s industry history.';
-    const subtext = `${latest?.summary || event.detail} ${history}`;
+        ? fillCopy(pickCopy(`${seed}:history`, RETRO_EARLIER), { origin: origin.summary })
+        : pickCopy(`${seed}:history`, RETRO_FIRST);
+    const subtext = [latest?.summary || event.detail, history, personaSignOff(personality?.id, seed)].filter(Boolean).join(' ');
     const authorName = personality?.name || institution.name;
     const authorHandle = personality?.handle || institution.handles.X || `@${institution.id}`;
     const rng = createDeterministicRng(`c7:narrative-retrospective:${narrative.id}:${event.absoluteWeek}`);
@@ -354,13 +360,49 @@ const THEME_LABELS: Record<IndustryMediaNarrativeTheme, string> = {
     FRANCHISE_ARCHITECT: 'franchise architect',
     OVERHYPED_STAR: 'overhyped star',
     RELIABLE_HITMAKER: 'reliable hitmaker',
-    COMEBACK: 'comeback story',
-    DECLINE: 'decline narrative',
-    GLOBAL_EXPANSION: 'global expansion story',
-    FADING_DOMINANCE: 'fading dominance narrative',
+    COMEBACK: 'comeback',
+    DECLINE: 'decline',
+    GLOBAL_EXPANSION: 'global expansion',
+    FADING_DOMINANCE: 'fading dominance',
     DIFFICULT_COLLABORATOR: 'difficult collaborator',
-    UNDERDOG: 'underdog story',
+    UNDERDOG: 'underdog',
 };
+
+/* the critics' look-back pieces (2026-11-09) */
+const THEME_STORIES: Record<IndustryMediaNarrativeTheme, string> = {
+    AMBITIOUS_RISK_TAKER: 'big-swing streak',
+    RECKLESS_SPENDER: 'spending habit',
+    AWARDS_POWERHOUSE: 'awards run',
+    FRANCHISE_ARCHITECT: 'franchise plan',
+    OVERHYPED_STAR: 'hype problem',
+    RELIABLE_HITMAKER: 'hit streak',
+    COMEBACK: 'comeback',
+    DECLINE: 'slide',
+    GLOBAL_EXPANSION: 'global push',
+    FADING_DOMINANCE: 'fading grip',
+    DIFFICULT_COLLABORATOR: 'difficult reputation',
+    UNDERDOG: 'underdog run',
+};
+const RETRO_HEADLINES = [
+    "{subject}'s {story} gets a new chapter",
+    "A new chapter in {subject}'s {story}",
+    "Another turn in {subject}'s {story}",
+    "{subject}'s {story} continues",
+    "What the latest result says about {subject}'s {story}",
+    '{subject} and the {story}: the next chapter',
+] as const;
+/* each keeps "earlier", "history" or "narrative": the piece is a look back */
+const RETRO_EARLIER = [
+    'The latest result follows an earlier chapter: {origin}',
+    'An earlier chapter, for the record: {origin}',
+    'The history here starts with this: {origin}',
+    'It goes back to an earlier result: {origin}',
+] as const;
+const RETRO_FIRST = [
+    'The latest result adds another verified chapter to the history.',
+    'One more chapter in a history the industry is following closely.',
+    'Another verified chapter for the narrative around it.',
+] as const;
 
 export interface IndustryNarrativeContext {
     narrativeId: string;

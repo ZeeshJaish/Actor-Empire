@@ -8,8 +8,10 @@ import type {
     IndustryMediaWorldState,
     Player,
     XPost,
+    IndustryMediaPersonality,
 } from '../../types';
 import { createDeterministicRng } from '../deterministicRandom';
+import { personaPolarity, personaReply } from './industryMediaPersonas';
 
 export const INDUSTRY_MEDIA_DISCUSSION_LIMIT = 120;
 export const INDUSTRY_MEDIA_DISCUSSION_TURN_LIMIT = 8;
@@ -254,13 +256,14 @@ const isPlayerRelated = (player: Player, story: IndustryMediaStory, event: Indus
     return Boolean((event.projectId && ownedProjectIds.has(event.projectId)) || (story.projectId && ownedProjectIds.has(story.projectId)));
 };
 
-const discussionLine = (signatureRole?: 'ANTAGONIST' | 'SUPPORTER', optimism = 50): string => {
-    if (signatureRole === 'ANTAGONIST') return 'The announcement is real. Execution is still the question.';
-    if (signatureRole === 'SUPPORTER') return 'The ambition deserves credit. Delivery will decide the rest.';
-    if (optimism >= 60) return 'There is reason for optimism, though the finished work still matters most.';
-    if (optimism <= 40) return 'The facts are clear; the larger promise still has to be earned.';
-    return 'The confirmed move matters. Its long-term meaning is still open to debate.';
-};
+/** A critic's reply in a thread, in their own voice (2026-11-09; it was one line per stance): good news, bad news or
+    wait-and-see by the event, sometimes with a lead-in or a sign-off, a line recent threads did not use first. */
+export const industryMediaDiscussionReplyLine = (
+    personality: Pick<IndustryMediaPersonality, 'id' | 'voiceArchetype' | 'signatureRole'>,
+    seed: string,
+    eventType?: IndustryEventFact['type'],
+    recentLines: readonly string[] = [],
+): string => personaReply(personality, eventType ? personaPolarity(eventType) : 'NEUTRAL', seed, recentLines);
 
 export interface EnsureIndustryMediaDiscussionInput {
     state: IndustryMediaWorldState;
@@ -269,6 +272,8 @@ export interface EnsureIndustryMediaDiscussionInput {
     post: XPost;
     player: Player;
     absoluteWeek: number;
+    /** lines written this week (news and X), so a reply does not repeat one */
+    recentLines?: readonly string[];
 }
 
 export interface EnsureIndustryMediaDiscussionResult {
@@ -318,6 +323,20 @@ export const ensureIndustryMediaDiscussion = (
         ...(input.post.mediaInstitutionId ? { mediaInstitutionId: input.post.mediaInstitutionId } : {}),
         mediaPersonalityId: sourcePersonality.id,
     };
+    /* the post itself, lines already out (this week's too), recent threads and the replies written here: each new
+       reply takes a line and a lead-in none of them used */
+    const recentReplies = [
+        input.post.content,
+        ...(input.recentLines || []),
+        ...(input.player.news || []).slice(0, 20).map(item => item.subtext || ''),
+        ...(input.player.x?.feed || []).slice(0, 30).map(post => String(post.content || '')),
+        ...input.state.discussions.slice(-16).flatMap(item => item.turns.filter(turn => turn.kind === 'MEDIA').map(turn => turn.content)),
+    ].filter(Boolean);
+    const replyFor = (item: IndustryMediaPersonality): string => {
+        const line = industryMediaDiscussionReplyLine(item, `${input.event.id}:${item.id}`, input.event.type, recentReplies);
+        recentReplies.push(line);
+        return line;
+    };
     const candidates = input.state.personalities
         .filter(item => item.isActive && item.channels.includes('X') && item.id !== sourcePersonality.id)
         .map(item => ({
@@ -334,7 +353,7 @@ export const ensureIndustryMediaDiscussion = (
             industryEventId: input.event.id,
             mediaStoryId: input.story.id,
             absoluteWeek: input.absoluteWeek,
-            content: discussionLine(item.signatureRole, item.optimism),
+            content: replyFor(item),
             claimMode: 'OPINION',
             ...(item.institutionId ? { mediaInstitutionId: item.institutionId } : {}),
             mediaPersonalityId: item.id,

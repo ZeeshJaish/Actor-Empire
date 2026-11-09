@@ -648,7 +648,10 @@ const REAL_DIRECTORS: RealCeleb[] = [
     { name: "Zack Snyder", handle: "@zacksnyder", followers: 6 * M, netWorth: 60 * M, tier: 'ESTABLISHED', occupation: 'DIRECTOR', bias: 'COMMERCIAL', gender: 'MALE', bio: "Slow motion.", talentBase: 78 },
     { name: "Chloé Zhao", handle: "@chloezhao", followers: 200000, netWorth: 5 * M, tier: 'RISING', occupation: 'DIRECTOR', bias: 'PRESTIGE', gender: 'FEMALE', bio: "Nomadland.", talentBase: 89 },
     { name: "James Gunn", handle: "@jamesgunn", followers: 3 * M, netWorth: 50 * M, tier: 'ESTABLISHED', occupation: 'DIRECTOR', bias: 'COMMERCIAL', gender: 'MALE', bio: "DC Studios CEO.", talentBase: 85 },
-    { name: "Bong Joon-ho", handle: "@bongjoonho", followers: 100000, netWorth: 30 * M, tier: 'ESTABLISHED', occupation: 'DIRECTOR', bias: 'PRESTIGE', gender: 'MALE', bio: "Parasite.", talentBase: 96 }
+    { name: "Bong Joon-ho", handle: "@bongjoonho", followers: 100000, netWorth: 30 * M, tier: 'ESTABLISHED', occupation: 'DIRECTOR', bias: 'PRESTIGE', gender: 'MALE', bio: "Parasite.", talentBase: 96 },
+    // CUSTOM DIRECTOR (Zeesh, 2026-11-09): good and dependable, never the best in the room. Talent 83 sits between
+    // Zack Snyder (78) and James Gunn (85); kept last so his id is celeb_dir_16 and no other director's id moves.
+    { name: "James Wilson", handle: "@jameswilsonfilms", followers: 420000, netWorth: 22 * M, tier: 'ESTABLISHED', occupation: 'DIRECTOR', bias: 'MIXED', gender: 'MALE', bio: "Tense, character-first thrillers on a sensible budget. Shoots on location whenever he can.", talentBase: 83, genres: ['THRILLER', 'DRAMA', 'CRIME'] }
 ];
 
 const existingModTalentNames = new Set([

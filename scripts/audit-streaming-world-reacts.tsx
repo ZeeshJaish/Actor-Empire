@@ -126,16 +126,17 @@ const plans = (premium: number, standard?: number) => ({ ...live, ownedStreaming
 const cheap = Math.floor(cheapest4k * (1 - STREAMING_VALUE_CLEAR_GAP) * 100 - 1) / 100;
 const praise = collectStreamingValueFacts(plans(cheap), week + 1);
 assert.equal(praise.length, 1);
-assert.deepEqual([praise[0].type, praise[0].importance, praise[0].headline], ['PLATFORM_VALUE_PRAISED', 'HIGH', `${name} has the cheapest 4K plan around`]);
+/* the verdict is written several ways (2026-11-09): it names the service and the picture */
+assert.deepEqual([praise[0].type, praise[0].importance, praise[0].headline.includes(name) && praise[0].headline.includes('4K')], ['PLATFORM_VALUE_PRAISED', 'HIGH', true], praise[0].headline);
 assert.match(praise[0].detail, new RegExp(`^Premium streams in 4K for \\$${cheap.toFixed(2)} a month\\. The next cheapest, .+'s .+, costs \\$${cheapest4k.toFixed(2)}\\.$`));
 assert.equal(collectStreamingValueFacts(plans(Math.round(cheapest4k * .9 * 100) / 100), week + 1).length, 0, '10% cheaper is not clearly cheaper');
 const dear = Math.ceil(cheapest4k / (1 - STREAMING_VALUE_CLEAR_GAP) * 100 + 1) / 100;
 const criticism = collectStreamingValueFacts(plans(dear), week + 1);
-assert.deepEqual([criticism[0]?.type, criticism[0]?.headline.endsWith('4K plan costs more than ' + criticism[0]?.detail.split('; ')[1].split("'s ")[0] + "'s")], ['PLATFORM_VALUE_CRITICISED', true]);
+assert.deepEqual([criticism[0]?.type, criticism[0]?.headline.includes(name) && criticism[0]?.headline.includes(criticism[0]?.detail.split('; ')[1].split("'s ")[0])], ['PLATFORM_VALUE_CRITICISED', true], criticism[0]?.headline);
 const less = getStreamingValueVerdict(plans(cheapest4k, 30), week + 1);
 assert.deepEqual([less?.kind, less?.mine.id], ['CRITICISED', 'STANDARD'], 'A 1080p plan dearer than a rival\'s 4K: pays more for less');
 const lessFact = collectStreamingValueFacts(plans(cheapest4k, 30), week + 1)[0];
-assert.equal(lessFact.headline, `${name} charges more for less`);
+assert.ok(lessFact.headline.includes(name) && /more|overcharg/i.test(lessFact.headline), lessFact.headline);
 assert.match(lessFact.detail, /^Standard costs \$30\.00 a month for 1080p; .+'s .+ streams 4K for \$\d+\.\d\d\.$/, 'The most damning cheaper plan: a better picture');
 const starter = collectStreamingValueFacts(live, week + 1)[0];
 assert.ok(!starter || starter.type === 'PLATFORM_VALUE_CRITICISED', 'The starter plans (480p) are read as the world reads them');
@@ -157,7 +158,8 @@ const lines = [
 const rebrandNews = reacted.player.news.filter(item => item.industryEventId === events.find(event => event.type === 'PLATFORM_REBRANDED')!.id);
 assert.ok(rebrandNews.length && rebrandNews.every(item => item.category === 'TOP_STORY'), 'The new look is a top story');
 const said = [...rebrandNews.map(item => item.subtext || ''), ...reacted.player.x.feed.filter(post => post.industryEventId === rebrandNews[0].industryEventId).map(post => post.content)];
-assert.ok(said.some(text => lines.some(line => text.endsWith(line))) || said.every(text => text.endsWith('Fans are split: some miss the old look.')), 'Critics weigh in on the new look');
+/* the critic's line, sometimes followed by their sign-off (2026-11-09) */
+assert.ok(said.some(text => lines.some(line => text.includes(line))) || said.every(text => text.endsWith('Fans are split: some miss the old look.')), 'Critics weigh in on the new look');
 const valueEvent = events.find(event => event.type === 'PLATFORM_VALUE_PRAISED')!;
 assert.ok(reacted.player.news.some(item => item.industryEventId === valueEvent.id) && reacted.player.x.feed.some(post => post.industryEventId === valueEvent.id), 'The value story in News and on X');
 const instagram = reacted.player.instagram?.feed?.filter(post => post.industryEventId && events.some(event => event.id === post.industryEventId)) || [];

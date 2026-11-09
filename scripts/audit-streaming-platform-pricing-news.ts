@@ -91,7 +91,8 @@ async function main() {
         'The question is how many subscribers stay at the new price.',
         'The test is whether the extra revenue outruns the cancellations it causes.',
     ];
-    assert.ok(reactions.some(line => said.endsWith(line)) || said === fact!.detail, 'The critics react to a price rise as a price rise');
+    /* the critic's line, sometimes followed by their sign-off (2026-11-09) */
+    assert.ok(reactions.some(line => said.includes(line)) || said === fact!.detail, 'The critics react to a price rise as a price rise');
     console.log(`PASS week: "${news!.headline}" — top story (${news!.sourceName}${news!.byline ? `, ${news!.byline}` : ''}) and X`);
     console.log(`  News: "${said}"`);
 

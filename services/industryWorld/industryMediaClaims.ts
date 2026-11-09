@@ -11,11 +11,13 @@ import type {
     IndustryMediaPersonality,
     IndustryMediaStory,
     Player,
+    IndustryMediaVoiceArchetype,
 } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { normalizeIndustryEventLedger } from './industryEventLedger';
 import { normalizeIndustryMediaWorld } from './industryMediaLedger';
 import { composeCopy, fillCopy, pickCopy, pickFreshCopy, sentenceStart } from './mediaCopyVariety';
+import { personaClaimOpeners, personaSignOff } from './industryMediaPersonas';
 
 const CLAIM_RELEVANCE_WEEKS = 12;
 
@@ -30,6 +32,9 @@ export interface IndustryMediaClaimCopyInput {
     seed?: string;
     /** headlines already out (news and X): the new headline takes a frame none of them used */
     recentLines?: readonly string[];
+    /** the source critic: their own way of opening a claim, and of signing off */
+    voiceArchetype?: IndustryMediaVoiceArchetype;
+    personalityId?: string;
 }
 
 export interface IndustryMediaClaimCopy {
@@ -260,15 +265,25 @@ const CLAIM_INTERPRETATIONS = [
     'On the table: {target}. It is not confirmed.',
 ] as const;
 
+/* Red Exclusive (2026-11-09): pure chaos, a bit funny, still never a fact. */
+const RED_EXCLUSIVE_FRAMES = ['🚨 RED EXCLUSIVE: {core}', 'Red Exclusive (trust me): {core}', 'Chaos report: {core}', 'Nobody asked, but: {core}', 'Unhinged take: {core}', '{core} (Red Exclusive called it first)'] as const;
+const RED_EXCLUSIVE_OPENERS = ['Red Exclusive is shouting again.', 'Grab the popcorn: Red Exclusive has a story.', 'Red Exclusive swears this one is real.', 'Zero proof, maximum confidence.', 'Red Exclusive woke up and chose chaos.', ''] as const;
+const RED_EXCLUSIVE_HEDGES = ['Nothing is confirmed, which has never stopped Red Exclusive.', 'Treat it as chaos until somebody confirms it.', 'It is unconfirmed. It is also very loud.', 'Nobody has confirmed a thing. Yet.'] as const;
+
 export const renderIndustryMediaClaimCopy = (input: IndustryMediaClaimCopyInput): IndustryMediaClaimCopy => {
     const seed = `claim-copy:${input.seed || `${input.kind}:${input.category}:${input.subjectName}:${input.targetName}`}`;
     const target = CLAIM_TARGET_WORDS[input.category]?.[input.targetName.trim().toLowerCase()] || input.targetName;
     const vars = { subject: input.subjectName, target, source: input.sourceName };
     const core = fillCopy(pickFreshCopy(`${seed}:core`, CLAIM_HEADLINE_CORES[input.category], input.recentLines), vars);
-    const headline = sentenceStart(fillCopy(pickCopy(`${seed}:frame`, CLAIM_HEADLINE_FRAMES[input.kind]), { ...vars, core }));
+    const chaos = input.sourceName === 'Red Exclusive';
+    const headline = sentenceStart(fillCopy(pickCopy(`${seed}:frame`, chaos ? RED_EXCLUSIVE_FRAMES : CLAIM_HEADLINE_FRAMES[input.kind]), { ...vars, core }));
     return {
         headline,
-        summary: composeCopy(`${seed}:summary`, [CLAIM_OPENERS[input.kind], CLAIM_LINES[input.category], CLAIM_HEDGES[input.kind]], vars),
+        summary: [composeCopy(`${seed}:summary`, [
+            chaos ? RED_EXCLUSIVE_OPENERS : [...CLAIM_OPENERS[input.kind], ...personaClaimOpeners(input.voiceArchetype, input.kind)],
+            CLAIM_LINES[input.category],
+            chaos ? RED_EXCLUSIVE_HEDGES : CLAIM_HEDGES[input.kind],
+        ], vars), personaSignOff(input.personalityId, seed)].filter(Boolean).join(' '),
         knownEvidence: `${pickCopy(`${seed}:evidence`, CLAIM_EVIDENCE_LEADS)} ${input.evidenceSummary}`,
         interpretation: sentenceStart(fillCopy(pickCopy(`${seed}:interpretation`, CLAIM_INTERPRETATIONS), vars)),
     };
@@ -465,7 +480,11 @@ const sourceFor = (
         const rightTie = createDeterministicRng(`c6:source:${item.event.id}:${item.category}:${right.id}`)();
         return rightTie - leftTie || left.id.localeCompare(right.id);
     });
-    const personality = candidates[0];
+    /* Red Exclusive (2026-11-09) breaks some of the gossip and makes some of the wild calls: about three rumours in ten
+       and one prediction in five go to the chaos voice when it covers the topic. Leaks stay with the most credible source. */
+    const chaosShare = item.kind === 'RUMOUR' ? .3 : item.kind === 'PREDICTION' ? .22 : 0;
+    const chaos = chaosShare ? candidates.find(candidate => candidate.id === 'red_exclusive') : undefined;
+    const personality = chaos && createDeterministicRng(`c6:chaos-source:${item.event.id}:${item.category}`)() < chaosShare ? chaos : candidates[0];
     const institution = personality?.institutionId ? institutions.get(personality.institutionId) : undefined;
     if (institution) return { institution, personality };
     const fallback = state.institutions.find(itemInstitution => itemInstitution.isActive && itemInstitution.channels.includes('X') && itemInstitution.focusCategories.includes(focus));
@@ -507,6 +526,7 @@ export const createIndustryMediaClaim = (
         targetName: selected.targetName,
         evidenceSummary: selected.event.detail,
         seed: claimKey,
+        ...(source.personality ? { voiceArchetype: source.personality.voiceArchetype, personalityId: source.personality.id } : {}),
         recentLines: [
             ...(player.news || []).slice(0, 40).map(item => item.headline),
             ...(player.x?.feed || []).slice(0, 60).map(post => String(post.content || '').split('\n')[0]),

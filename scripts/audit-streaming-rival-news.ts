@@ -85,7 +85,8 @@ async function main() {
         'Viewers who care about picture now have a reason to look elsewhere.',
         'Viewers who chase picture weigh the best on offer; the gap will show in who signs up.',
     ];
-    assert.ok(voiced.some(line => said.endsWith(line)) || said === gapFact!.detail, 'The media compare the pictures');
+    /* the critic's line, sometimes followed by their sign-off (2026-11-09) */
+    assert.ok(voiced.some(line => said.includes(line)) || said === gapFact!.detail, 'The media compare the pictures');
     console.log(`PASS week: "${news!.headline}" — News (${news!.sourceName}${news!.byline ? `, ${news!.byline}` : ''}), X and Instagram; "${launchFact!.headline}" weighed as its own story: ${launchPublished ? 'published' : `the week's other slot went to ${otherSlot.join(', ') || 'nothing in the news'}`}`);
     console.log(`  News: "${said}"`);
     console.log(`done in ${Math.round((performance.now() - started) / 1000)} s`);

@@ -12,12 +12,14 @@ import type {
     InstaPost,
     Player,
     XPost,
+    IndustryMediaVoiceArchetype,
 } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
 import { normalizeIndustryEventLedger } from './industryEventLedger';
 import { normalizeIndustryMediaWorld } from './industryMediaLedger';
 import { createIndustryMediaAvatar } from './industryMediaIdentities';
 import { fillCopy, pickCopy, pickFreshCopy, sentenceStart } from './mediaCopyVariety';
+import { personaVideoTitles } from './industryMediaPersonas';
 
 export const INDUSTRY_MEDIA_YOUTUBE_VIDEO_LIMIT = 160;
 export const INDUSTRY_MEDIA_CREATOR_CHANNEL_LIMIT = 80;
@@ -345,12 +347,36 @@ const formatFor = (
     return 'CREATOR_REACTION';
 };
 
-const roleFit = (personality: IndustryMediaPersonality, format: IndustryMediaYoutubeFormat): number => {
-    if (format === 'THEORY') return personality.role === 'THEORY_CREATOR' ? 120 : -200;
-    if (format === 'BUSINESS_BREAKDOWN') return personality.role === 'BUSINESS_ANALYST' ? 100 : 0;
-    if (format === 'REVIEW_AFTERMATH') return personality.role === 'CRITIC' ? 90 : 0;
-    if (format === 'CREATOR_REACTION') return personality.role === 'COMMENTATOR' ? 80 : 0;
-    return personality.role === 'COMMENTATOR' || personality.role === 'REPORTER' ? 55 : 25;
+/* 2026-11-09 (Zeesh: "review videos ki baari critics mein ghumao"): the right voice for a format still comes first, but
+   a columnist can review, a commentator can react and a reporter can explain; theories stay with the theory creators */
+const ROLE_FIT: Record<IndustryMediaYoutubeFormat, Partial<Record<IndustryMediaPersonality['role'], number>>> = {
+    THEORY: { THEORY_CREATOR: 120 },
+    BUSINESS_BREAKDOWN: { BUSINESS_ANALYST: 100, INVESTIGATOR: 70, REPORTER: 35, COLUMNIST: 25 },
+    REVIEW_AFTERMATH: { CRITIC: 90, COLUMNIST: 66, COMMENTATOR: 52, REPORTER: 46, BUSINESS_ANALYST: 34, THEORY_CREATOR: 26 },
+    CREATOR_REACTION: { COMMENTATOR: 80, COLUMNIST: 55, REPORTER: 40, CRITIC: 35, THEORY_CREATOR: 30 },
+    RESPONSE_ANALYSIS: { COMMENTATOR: 55, REPORTER: 55 },
+    EXPLAINED: { COMMENTATOR: 55, REPORTER: 55 },
+};
+const roleFit = (personality: IndustryMediaPersonality, format: IndustryMediaYoutubeFormat): number => (
+    ROLE_FIT[format]?.[personality.role]
+        ?? (format === 'THEORY' ? -200 : format === 'RESPONSE_ANALYSIS' || format === 'EXPLAINED' ? 25 : 0)
+);
+/* a creator behind several of the last videos steps back, so uploads go round (one critic had made almost half) */
+const INDUSTRY_MEDIA_YOUTUBE_ROTATION_WINDOW = 10;
+const INDUSTRY_MEDIA_YOUTUBE_ROTATION_PENALTY = 15;
+
+/* on a release, outcome or award the creator shapes the video: a commentator reacts, a reporter explains, an analyst
+   breaks down an outcome's numbers; critics and columnists review */
+const videoFormatFor = (
+    format: IndustryMediaYoutubeFormat,
+    creator: IndustryMediaPersonality,
+    story: IndustryMediaStory,
+): IndustryMediaYoutubeFormat => {
+    if (format !== 'REVIEW_AFTERMATH') return format;
+    if (creator.role === 'COMMENTATOR') return 'CREATOR_REACTION';
+    if (creator.role === 'REPORTER') return 'EXPLAINED';
+    if (creator.role === 'BUSINESS_ANALYST' && story.category === 'PROJECT_OUTCOME') return 'BUSINESS_BREAKDOWN';
+    return format;
 };
 
 const selectCreator = (
@@ -364,6 +390,10 @@ const selectCreator = (
         .filter(assignment => assignment.storyId === story.id)
         .map(assignment => assignment.personalityId)
         .filter((value): value is string => Boolean(value)));
+    const recentUploads = new Map<string, number>();
+    state.youtubeVideos.slice(-INDUSTRY_MEDIA_YOUTUBE_ROTATION_WINDOW).forEach(video => {
+        recentUploads.set(video.personalityId, (recentUploads.get(video.personalityId) || 0) + 1);
+    });
     return state.personalities
         .filter(personality => personality.isActive
             && personality.channels.includes('YOUTUBE')
@@ -378,6 +408,7 @@ const selectCreator = (
                 + personality.credibility * 0.28
                 + (assignedPersonalityIds.has(personality.id) ? 24 : 0)
                 - cadencePenalty
+                - (recentUploads.get(personality.id) || 0) * INDUSTRY_MEDIA_YOUTUBE_ROTATION_PENALTY
                 + rng() * 18;
             return { personality, score };
         })
@@ -393,13 +424,16 @@ const displaySubject = (story: IndustryMediaStory, event: IndustryEventFact): st
 /* 2026-11-09 (Zeesh: the same title came back with only the name changed): every format has several title frames
    and summaries, picked by the video's own key, so two creators covering one story upload two different videos. */
 const YOUTUBE_TITLES: Record<IndustryMediaYoutubeFormat, readonly string[]> = {
-    THEORY: ['{headline} — What It Could Mean', '{headline}: My Theory', 'Here Is What I Think {subject} Does Next', 'The Theory Nobody Is Talking About: {headline}', 'Connecting the Dots on {subject}', 'What {headline} Really Tells Us'],
-    EXPLAINED: ['{headline} — Explained', '{headline}, Explained in 10 Minutes', 'What You Missed: {headline}', 'The Story Behind {headline}', 'Everything We Know: {headline}'],
-    BUSINESS_BREAKDOWN: ['{headline} — The Business Explained', 'Follow the Money: {headline}', 'Why {subject} Made This Move', 'The Numbers Behind {headline}', 'Is {subject} Making a Mistake?', 'The Big Bet at {subject}, Explained'],
-    REVIEW_AFTERMATH: ['{headline} — The Full Aftermath', '{headline}. So What Happened?', 'What Went Right and Wrong: {headline}', 'The Fallout From {headline}', '{headline} — My Honest Breakdown', 'Everyone Is Wrong About This: {headline}'],
+    THEORY: ['{headline} — What It Could Mean', '{headline}: My Theory', 'Here Is What I Think {subject} Does Next', 'The Theory Nobody Is Talking About: {headline}', 'Connecting the Dots on {subject}', 'What This Really Tells Us About {subject}'],
+    EXPLAINED: ['{headline} — Explained', '{headline}, Explained in 10 Minutes', 'What You Missed: {headline}', 'The Story Behind It: {headline}', 'Everything We Know: {headline}'],
+    BUSINESS_BREAKDOWN: ['{headline} — The Business Explained', 'Follow the Money: {headline}', 'Why {subject} Made This Move', 'The Numbers Behind It: {headline}', 'Is {subject} Making a Mistake?', 'The Big Bet at {subject}, Explained'],
+    REVIEW_AFTERMATH: ['{headline} — The Full Aftermath', '{headline} — So What Happened?', 'What Went Right and Wrong: {headline}', 'The Fallout: {headline}', '{headline} — My Honest Breakdown', 'Everyone Is Wrong About This: {headline}'],
     RESPONSE_ANALYSIS: ['{subject} Responded — Did It Work?', 'Breaking Down the {subject} Statement', 'Did {subject} Just Fix It?', '{subject} Finally Speaks — My Take', 'That {subject} Response, Explained'],
     CREATOR_REACTION: ['{headline} — Creator Reaction', 'Reacting to: {headline}', 'I Did Not Expect This — {headline}', '{headline}: My Honest Reaction', 'We Need to Talk About {subject}', 'Live Reaction: {headline}'],
 };
+/* Red Exclusive (2026-11-09): pure chaos, a bit funny */
+const RED_EXCLUSIVE_TITLES = ['{headline}?!?! (EMERGENCY VIDEO)', 'I Am Losing It Over {subject}', 'RED ALERT: {headline}', 'Ranking {subject} From Chaotic to Unhinged', '{headline} — This Changes Everything (It Does Not)', 'Live Meltdown: {headline}'] as const;
+const RED_EXCLUSIVE_SUMMARIES = ['Pure chaos, a little research and far too much caffeine on the {subject} story.', 'Red Exclusive yells about {subject} so you do not have to.', 'An emergency video about {subject}. It is not an emergency.'] as const;
 const YOUTUBE_SUMMARIES: Record<IndustryMediaYoutubeFormat, readonly string[]> = {
     THEORY: ['A theory-led breakdown of the confirmed {subject} development and what it may suggest next.', 'Separating what is confirmed about {subject} from where it could go next.', 'One creator connects the dots on {subject}, with the facts kept apart from the guesses.'],
     EXPLAINED: ['The confirmed {subject} story, explained from the start.', 'A clear walk through what happened with {subject}.', 'Everything on the record about {subject}, in one place.'],
@@ -416,62 +450,107 @@ const copyFor = (
     response?: IndustryMediaPlayerResponse,
     seed = `${event.id}:${format}`,
     recentTitles: readonly string[] = [],
+    creatorId?: string,
+    archetype?: IndustryMediaVoiceArchetype,
 ): Pick<IndustryMediaYoutubeVideo, 'title' | 'summary' | 'confirmedFacts' | 'interpretation' | 'claimMode'> => {
     const subject = displaySubject(story, event);
     const shape = format === 'RESPONSE_ANALYSIS' && !response ? 'CREATOR_REACTION' : format;
-    const vars = { headline: event.headline, subject, outcome: response?.outcome?.toLowerCase() || 'mixed' };
-    const title = sentenceStart(fillCopy(pickFreshCopy(`youtube-title:${seed}`, YOUTUBE_TITLES[shape], recentTitles), vars));
-    const summary = sentenceStart(fillCopy(pickCopy(`youtube-summary:${seed}`, YOUTUBE_SUMMARIES[shape]), vars));
+    const vars = { headline: event.headline.replace(/\.\s*$/, ''), subject, outcome: response?.outcome?.toLowerCase() || 'mixed' };
+    const chaos = creatorId === 'red_exclusive';
+    const title = sentenceStart(fillCopy(pickFreshCopy(`youtube-title:${seed}`, chaos ? RED_EXCLUSIVE_TITLES : [...YOUTUBE_TITLES[shape], ...personaVideoTitles(archetype)], recentTitles), vars));
+    const take = (options: readonly string[]): string => pickCopy(`youtube-take:${seed}`, options);
+    const summary = sentenceStart(fillCopy(pickCopy(`youtube-summary:${seed}`, chaos ? RED_EXCLUSIVE_SUMMARIES : YOUTUBE_SUMMARIES[shape]), vars));
     if (shape === 'THEORY') return {
         title,
         summary,
         confirmedFacts: event.detail,
-        interpretation: 'Theory: this could shape another connected story, but no further project has been confirmed.',
+        interpretation: take([
+            'Theory: this could shape another connected story, but no further project has been confirmed.',
+            'Theory: the pieces may fit a bigger plan, though nothing more has been announced.',
+            'Theory: this could be a setup, but only the announcement itself is confirmed.',
+            'Possibly a first step toward something larger; nothing beyond the record is confirmed.',
+        ]),
         claimMode: 'SPECULATION',
     };
     if (shape === 'BUSINESS_BREAKDOWN') return {
         title,
         summary,
         confirmedFacts: event.detail,
-        interpretation: 'Analysis: the move may change competitive positioning, though later results will decide its value.',
+        interpretation: take([
+            'Analysis: the move may change competitive positioning, though later results will decide its value.',
+            'Analysis: the money logic is clear; whether it pays off is not yet known.',
+            'Analysis: a sensible bet on paper, with the real test still ahead.',
+        ]),
         claimMode: 'ANALYSIS',
     };
     if (shape === 'REVIEW_AFTERMATH') return {
         title,
         summary,
         confirmedFacts: event.detail,
-        interpretation: 'Analysis: the result strengthens one reading of the project, while its longer legacy remains unsettled.',
+        interpretation: take([
+            'Analysis: the result strengthens one reading of the project, while its longer legacy remains unsettled.',
+            'Analysis: the outcome is on the record; what it means long-term is still open.',
+            'Analysis: a clear result, and a lesson the rest of the industry will study.',
+        ]),
+        claimMode: 'ANALYSIS',
+    };
+    if (shape === 'EXPLAINED') return {
+        title,
+        summary,
+        confirmedFacts: event.detail,
+        interpretation: take([
+            'Context: the confirmed facts in order; what happens next is still open.',
+            'Context: what is on the record so far, without the guesswork.',
+            'Context: the story so far, as the public record tells it.',
+        ]),
         claimMode: 'ANALYSIS',
     };
     if (shape === 'RESPONSE_ANALYSIS' && response) return {
         title,
         summary,
         confirmedFacts: `${event.detail} The recorded public response resolved as ${response.outcome || 'MIXED'}.`,
-        interpretation: 'Analysis: the response changed the tone of the conversation, not the underlying industry facts.',
+        interpretation: take([
+            'Analysis: the response changed the tone of the conversation, not the underlying industry facts.',
+            'Analysis: the words shifted the mood; the facts underneath stayed the same.',
+            'Analysis: a statement can calm a story, but it cannot rewrite it.',
+        ]),
         claimMode: 'ANALYSIS',
     };
     return {
         title,
         summary,
         confirmedFacts: event.detail,
-        interpretation: 'Opinion: the decision is worth watching, but its eventual result is not yet known.',
+        interpretation: take([
+            'Opinion: the decision is worth watching, but its eventual result is not yet known.',
+            'Opinion: an interesting move, and far too early to call.',
+            'Opinion: this could go either way, which is what makes it worth watching.',
+        ]),
         claimMode: 'OPINION',
     };
 };
 
-const commentsFor = (format: IndustryMediaYoutubeFormat, outcome: IndustryMediaYoutubeOutcome): string[] => {
-    const opening = format === 'THEORY'
-        ? 'Finally, a theory that separates the confirmed facts from the possibilities.'
-        : format === 'BUSINESS_BREAKDOWN'
-            ? 'The context makes this deal much easier to understand.'
-            : format === 'RESPONSE_ANALYSIS'
-                ? 'The response mattered, but the original facts still stand.'
-                : 'This is the kind of industry context the headline needed.';
-    const result = outcome === 'BREAKOUT' ? 'This video is everywhere this week.'
-        : outcome === 'HIT' ? 'The comments are turning this into a much bigger conversation.'
-            : outcome === 'FLOP' ? 'Good topic, but this upload arrived after the conversation moved on.'
-                : 'A measured breakdown without pretending to know more than the record says.';
-    return [opening, result, 'I want to see how this story develops next.'];
+/* 2026-11-09: viewers' comments vary video to video (they were the same three lines under every upload) */
+const COMMENT_OPENINGS: Record<'THEORY' | 'BUSINESS_BREAKDOWN' | 'RESPONSE_ANALYSIS' | 'DEFAULT', readonly string[]> = {
+    THEORY: ['Finally, a theory that separates the confirmed facts from the possibilities.', 'Okay, this theory actually makes sense.', 'Saving this for when it turns out to be right.', 'The way you connected those dots, wow.'],
+    BUSINESS_BREAKDOWN: ['The context makes this deal much easier to understand.', 'I came for drama and left understanding business.', 'Nobody explains the money side like this.', 'This should be required viewing for studio executives.'],
+    RESPONSE_ANALYSIS: ['The response mattered, but the original facts still stand.', 'That statement aged in real time.', 'Great breakdown of what they said and what they did not say.', 'The comments on the original statement were wild.'],
+    DEFAULT: ['This is the kind of industry context the headline needed.', 'Came here straight from the headline.', 'Finally someone talking about this properly.', 'I was waiting for this video all week.'],
+};
+const COMMENT_RESULTS: Record<IndustryMediaYoutubeOutcome, readonly string[]> = {
+    BREAKOUT: ['This video is everywhere this week.', 'How is this blowing up already?', 'The algorithm finally got one right.'],
+    HIT: ['The comments are turning this into a much bigger conversation.', 'Sharing this with everyone I know.', 'This channel keeps getting better.'],
+    FLOP: ['Good topic, but this upload arrived after the conversation moved on.', 'Underrated video, honestly.', 'Why does this not have more views?'],
+    NORMAL: ['A measured breakdown without pretending to know more than the record says.', 'Solid video, as always.', 'Clear, calm and to the point.'],
+};
+const COMMENT_CLOSERS = ['I want to see how this story develops next.', 'Part two when?', 'Who else is here right after the news broke?', 'Bookmarking this for later.', 'What do you think happens next?', 'Here before this blows up.'] as const;
+
+const commentsFor = (format: IndustryMediaYoutubeFormat, outcome: IndustryMediaYoutubeOutcome, seed = `${format}:${outcome}`): string[] => {
+    const openings = format === 'THEORY' || format === 'BUSINESS_BREAKDOWN' || format === 'RESPONSE_ANALYSIS' ? COMMENT_OPENINGS[format] : COMMENT_OPENINGS.DEFAULT;
+    return [
+        pickCopy(`youtube-comment-open:${seed}`, openings),
+        pickCopy(`youtube-comment-result:${seed}`, COMMENT_RESULTS[outcome] || COMMENT_RESULTS.NORMAL),
+        pickCopy(`youtube-comment-close:${seed}`, COMMENT_CLOSERS),
+    ];
 };
 
 const thumbnailFor = (
@@ -642,20 +721,21 @@ export const processIndustryMediaYoutube = (
         if (createdVideos.length >= 2) break;
         const creator = selectCreator(mediaState, candidate.story, candidate.format, absoluteWeek, channels);
         if (!creator || !candidate.event) continue;
+        const format = videoFormatFor(candidate.format, creator, candidate.story);
         let channel = channels.get(creator.id) || createCreatorChannel(creator);
         if (channel.lastUploadAbsoluteWeek === absoluteWeek) continue;
         const performance = calculateIndustryMediaYoutubePerformance({
             personality: creator,
             channel,
             story: candidate.story,
-            format: candidate.format,
+            format,
             discussionHeat: discussionHeatFor(mediaState, candidate.story.id),
             absoluteWeek,
             seedKey: candidate.publicationKey,
         });
         const id = createDeterministicId('industry_youtube_video', candidate.publicationKey);
         const institution = mediaState.institutions.find(item => item.id === creator.institutionId);
-        const copy = copyFor(candidate.story, candidate.event, candidate.format, candidate.response, `${candidate.publicationKey}:${creator.id}`, recentTitles);
+        const copy = copyFor(candidate.story, candidate.event, format, candidate.response, `${candidate.publicationKey}:${creator.id}`, recentTitles, creator.id, creator.voiceArchetype);
         recentTitles.push(copy.title);
         const linkedClaim = [...mediaState.claims]
             .filter(claim => claim.anchorStoryId === candidate.story.id && claim.createdAbsoluteWeek < absoluteWeek)
@@ -669,9 +749,9 @@ export const processIndustryMediaYoutube = (
             evidenceEventIds: [...candidate.story.industryEventIds].slice(-INDUSTRY_MEDIA_YOUTUBE_EVIDENCE_LIMIT),
             personalityId: creator.id,
             ...(institution ? { institutionId: institution.id } : {}),
-            format: candidate.format,
+            format,
             ...copy,
-            thumbnail: thumbnailFor(candidate.format, institution),
+            thumbnail: thumbnailFor(format, institution),
             subjectKey: candidate.story.subjectKey,
             ...(candidate.story.companyId ? { companyId: candidate.story.companyId } : {}),
             ...(candidate.story.projectId ? { projectId: candidate.story.projectId } : {}),
@@ -680,7 +760,7 @@ export const processIndustryMediaYoutube = (
             lastPerformanceAbsoluteWeek: absoluteWeek,
             views: performance.views,
             likes: performance.likes,
-            comments: commentsFor(candidate.format, performance.outcome),
+            comments: commentsFor(format, performance.outcome, id),
             outcome: performance.outcome,
             subscriberDelta: performance.subscriberDelta,
             estimatedRevenue: performance.estimatedRevenue,

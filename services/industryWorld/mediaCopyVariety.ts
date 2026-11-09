@@ -26,11 +26,10 @@ export const fillCopy = (template: string, vars: CopyVars): string => template
 const plainWords = (text: string): string => text.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim();
 const frameWords = (frame: string): string[] => frame.split(/\{\w+\}/).map(plainWords).filter(part => part.length >= 4);
 
-/** True when a published line reads like this frame: its fixed words appear in it, in order. */
-export const lineUsesFrame = (line: string, frame: string): boolean => {
+/** True when a published line, already in plain words, reads like this frame: its fixed words appear in it, in order. */
+const plainUsesFrame = (text: string, frame: string): boolean => {
     const words = frameWords(frame);
     if (!words.length) return false;
-    const text = plainWords(line);
     let from = 0;
     for (const part of words) {
         const at = text.indexOf(part, from);
@@ -40,13 +39,17 @@ export const lineUsesFrame = (line: string, frame: string): boolean => {
     return true;
 };
 
+/** True when a published line reads like this frame: its fixed words appear in it, in order. */
+export const lineUsesFrame = (line: string, frame: string): boolean => plainUsesFrame(plainWords(line), frame);
+
 /** Like pickCopy, but frames that recent lines already used are skipped while a fresh one is left, so stories of one
     kind go through every frame before any frame comes back. Same seed and same history give the same pick. */
 export const pickFreshCopy = (seed: string, frames: readonly string[], recentLines: readonly string[] = []): string => {
     const start = pickCopy(seed, frames.map((_frame, index) => index));
+    const texts = recentLines.map(plainWords);
     for (let step = 0; step < frames.length; step += 1) {
         const frame = frames[(start + step) % frames.length];
-        if (!recentLines.some(line => lineUsesFrame(line, frame))) return frame;
+        if (!texts.some(text => plainUsesFrame(text, frame))) return frame;
     }
     return frames[start];
 };

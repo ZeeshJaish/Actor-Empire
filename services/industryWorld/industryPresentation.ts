@@ -329,6 +329,11 @@ export const projectIndustryEvents = (
     const instaPosts: InstaPost[] = [];
     const publicationKeys = [...ledger.publishedEventKeys];
     const selected = selectEditorialEvents(eligible, player.ownedStreamingPlatform?.identity?.slug);
+    /* lines already out (news and X) and the ones written this week: a critic's next line takes one none of them used */
+    const recentVoiceLines: string[] = [
+        ...(player.news || []).slice(0, 30).map(item => item.subtext || ''),
+        ...(player.x?.feed || []).slice(0, 40).map(post => String(post.content || '')),
+    ].filter(Boolean);
     const authorshipFor = (
         event: IndustryEventFact,
         mediaStoryId: string | undefined,
@@ -346,18 +351,17 @@ export const projectIndustryEvents = (
             absoluteWeek,
         });
         mediaWorld = coverage.state;
-        return {
+        const voice = createIndustryMediaVoice({
+            event,
+            story,
             institution: coverage.institution,
             personality: coverage.personality,
-            voice: createIndustryMediaVoice({
-                event,
-                story,
-                institution: coverage.institution,
-                personality: coverage.personality,
-                assignment: coverage.assignment,
-                channel,
-            }),
-        };
+            assignment: coverage.assignment,
+            channel,
+            recentLines: recentVoiceLines,
+        });
+        recentVoiceLines.push(voice.detail);
+        return { institution: coverage.institution, personality: coverage.personality, voice };
     };
     selected.forEach(event => {
         const mediaStoryId = mediaWorld.eventStoryIndex[event.id];
@@ -466,6 +470,7 @@ export const projectIndustryEvents = (
             post,
             player,
             absoluteWeek,
+            recentLines: recentVoiceLines,
         });
         mediaWorld = result.state;
         xPosts[index] = result.post;

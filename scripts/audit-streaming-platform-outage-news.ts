@@ -98,7 +98,8 @@ async function main() {
         'The real test is how quickly the service is working again.',
         'The number to watch is how many subscribers cancel over it in the weeks ahead.',
     ];
-    assert.ok(said.startsWith('Titles would not start') && (lines.some(line => said.endsWith(line)) || said === outage!.detail),
+    /* the critic's line, sometimes followed by their sign-off (2026-11-09) */
+    assert.ok(said.startsWith('Titles would not start') && (lines.some(line => said.includes(line)) || said === outage!.detail),
         'The media speak about an outage as an outage');
     assert.ok(!/expensive, risky|finished work|finished result/.test(said), 'not as a launch');
     const media = pass.world.industryMedia!;

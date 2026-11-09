@@ -166,9 +166,13 @@ export const IndustryMediaDiscussionPanel: React.FC<IndustryMediaDiscussionPanel
                     const isPlayerTurn = turn.kind === 'PLAYER';
                     const name = isPlayerTurn ? player.name : personality?.name || institution?.name || 'Public reaction';
                     const handle = isPlayerTurn ? player.x.handle : personality?.handle || institution?.handles.X || '@industry';
+                    /* a critic's or outlet's saved avatar is a key ("media-personality:…"), not a picture: draw theirs */
+                    const savedAvatar = personality?.avatar || institution?.avatar || '';
                     const avatar = isPlayerTurn
                         ? player.avatar
-                        : personality?.avatar || institution?.avatar || createIndustryMediaAvatar(name, institution?.primaryColor || '#3F3F46');
+                        : savedAvatar && !/^media-(personality|institution):/.test(savedAvatar)
+                            ? savedAvatar
+                            : createIndustryMediaAvatar(name, institution?.primaryColor || '#3F3F46');
                     return (
                         <div key={turn.id} className="relative flex gap-3 pb-4 last:pb-1">
                             <img src={avatar} alt="" className="h-8 w-8 shrink-0 rounded-full border border-zinc-800 bg-zinc-900 object-cover" />
@@ -177,7 +181,7 @@ export const IndustryMediaDiscussionPanel: React.FC<IndustryMediaDiscussionPanel
                                     <span className="truncate text-xs font-black text-white">{name}</span>
                                     <span className="truncate text-[10px] text-zinc-600">{handle}</span>
                                 </div>
-                                <div className="mt-1 text-sm leading-relaxed text-zinc-300">{turn.content}</div>
+                                <div className="mt-1 whitespace-pre-line text-sm leading-relaxed text-zinc-300">{turn.content}</div>
                             </div>
                         </div>
                     );

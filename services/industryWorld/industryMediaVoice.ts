@@ -6,6 +6,8 @@ import type {
     IndustryMediaStory,
     IndustryMediaStoryAssignment,
 } from '../../types';
+import { pickFreshCopy } from './mediaCopyVariety';
+import { personaOpinion, personaPolarity, personaSignOff, personaTheory } from './industryMediaPersonas';
 
 export interface IndustryMediaVoiceInput {
     event: IndustryEventFact;
@@ -14,6 +16,8 @@ export interface IndustryMediaVoiceInput {
     personality?: IndustryMediaPersonality;
     assignment: IndustryMediaStoryAssignment;
     channel: IndustryMediaChannel;
+    /** lines already out (news, X, and this week's): the critic's next line takes one none of them used */
+    recentLines?: readonly string[];
 }
 
 export interface IndustryMediaVoiceResult {
@@ -30,15 +34,6 @@ export interface IndustryMediaVoiceResult {
     usedNeutralFallback: boolean;
 }
 
-const POSITIVE_EVENTS = new Set<IndustryEventFact['type']>([
-    'COMPANY_LAUNCHED', 'COMPANY_PROMOTED', 'COMPANY_EXPANDED', 'COMPANY_RECOVERED',
-    'COMPANY_FUNDED', 'PROJECT_GREENLIT', 'PROJECT_RELEASED', 'PROJECT_HIT',
-    'AWARD_NOMINATED', 'AWARD_WON', 'RIGHTS_DEAL',
-]);
-const NEGATIVE_EVENTS = new Set<IndustryEventFact['type']>([
-    'COMPANY_DISTRESS', 'COMPANY_RESTRUCTURED', 'COMPANY_CLOSED', 'PROJECT_DELAYED',
-    'PROJECT_OVERRUN', 'PROJECT_HELD', 'PROJECT_FLOP', 'PROJECT_CANCELLED',
-]);
 /* what the media say about a service going down and coming back (Phase 5, #67), and about its prices
    (#68: "the way real critics react"): against, for, and anyone else */
 const PLATFORM_OPINIONS: Partial<Record<IndustryEventFact['type'], { against: string; for: string; neutral: string }>> = {
@@ -158,48 +153,55 @@ const canonicalTextFor = (input: IndustryMediaVoiceInput): string => [
     input.story.detail,
 ].join(' ');
 
+/* 2026-11-09 (Zeesh: "critics ko thoda live lagna chahiye"): each critic speaks in their own voice
+   (industryMediaPersonas.ts); a service going down or changing its price keeps the lines written for it */
 const opinionLine = (input: IndustryMediaVoiceInput): string => {
     const personality = input.personality;
     const platform = PLATFORM_OPINIONS[input.event.type];
-    if (platform) {
-        return personality?.signatureRole === 'ANTAGONIST' ? platform.against
+    if (platform && personality?.id !== 'red_exclusive') {
+        const line = personality?.signatureRole === 'ANTAGONIST' ? platform.against
             : personality?.signatureRole === 'SUPPORTER' ? platform.for : platform.neutral;
+        return [line, personaSignOff(personality?.id, input.event.id)].filter(Boolean).join(' ');
     }
-    if (personality?.signatureRole === 'ANTAGONIST') {
-        if (POSITIVE_EVENTS.has(input.event.type) && ['PROJECT_HIT', 'AWARD_WON', 'COMPANY_RECOVERED'].includes(input.event.type)) {
-            return 'Even I have to admit the result landed, but one win does not settle the larger argument.';
-        }
-        if (NEGATIVE_EVENTS.has(input.event.type)) {
-            return 'This is the risk critics warned about, and the people responsible still have plenty to prove.';
-        }
-        return 'This looks expensive, risky, and still has plenty to prove.';
-    }
-    if (personality?.signatureRole === 'SUPPORTER') {
-        if (NEGATIVE_EVENTS.has(input.event.type)) {
-            return 'This is a setback, but it does not erase the record or the ambition behind the work.';
-        }
-        return 'Ambition deserves credit when the public record supports taking the swing.';
-    }
-    if (personality?.role === 'CRITIC') {
-        return 'The announcement has promise, although the finished work still has to justify that confidence.';
-    }
-    if (personality?.voiceArchetype === 'POPULIST') {
-        return 'The audience will decide whether this is a real moment or only a loud one.';
-    }
+    if (personality) return personaOpinion(personality, personaPolarity(input.event.type), input.event.id, input.recentLines);
     return 'The real test is whether the finished result earns the confidence now being placed in it.';
 };
 
-const analysisLine = (input: IndustryMediaVoiceInput): string => {
-    const platform = PLATFORM_ANALYSIS[input.event.type];
-    if (platform) return platform;
-    if (input.story.category === 'RIGHTS') return 'The strategic question is how much value this window can create for both sides.';
-    if (input.story.category === 'COMPANY') return 'The next results will show whether this decision strengthens the wider business.';
-    if (input.story.category === 'PROJECT_OUTCOME') return 'The outcome now becomes evidence for the company\'s next slate decision.';
-    return 'The numbers-first question is whether the project can sustain the momentum behind this decision.';
+const ANALYSIS_LINES: Record<'RIGHTS' | 'COMPANY' | 'PROJECT_OUTCOME' | 'DEFAULT', readonly string[]> = {
+    RIGHTS: [
+        'The strategic question is how much value this window can create for both sides.',
+        'Rights deals are won in the fine print; the value shows up years later.',
+        'The real question is who gets the better end of this window.',
+    ],
+    COMPANY: [
+        'The next results will show whether this decision strengthens the wider business.',
+        'Company moves like this are judged a year later, not on the day.',
+        'The test is whether the rest of the business can carry this decision.',
+    ],
+    PROJECT_OUTCOME: [
+        'The outcome now becomes evidence for the company\'s next slate decision.',
+        'Results like this shape what gets greenlit next.',
+        'This result will be quoted in the next round of slate meetings.',
+    ],
+    DEFAULT: [
+        'The numbers-first question is whether the project can sustain the momentum behind this decision.',
+        'The question is whether the momentum lasts past the announcement.',
+        'Momentum is easy to start and expensive to keep.',
+    ],
 };
 
-const speculationLine = (): string => (
-    'Theory: this could suggest a wider connection, but nothing beyond the saved announcement is confirmed.'
+const analysisLine = (input: IndustryMediaVoiceInput): string => {
+    const category = input.story.category;
+    const family = category === 'RIGHTS' || category === 'COMPANY' || category === 'PROJECT_OUTCOME' ? ANALYSIS_LINES[category] : ANALYSIS_LINES.DEFAULT;
+    const line = PLATFORM_ANALYSIS[input.event.type]
+        || pickFreshCopy(`analysis:${input.event.id}:${input.personality?.id || input.institution.id}`, family, input.recentLines);
+    return [line, personaSignOff(input.personality?.id, `analysis:${input.event.id}`)].filter(Boolean).join(' ');
+};
+
+const speculationLine = (input: IndustryMediaVoiceInput): string => (
+    input.personality
+        ? personaTheory(input.personality, input.event.id, input.recentLines)
+        : 'Theory: this could suggest a wider connection, but nothing beyond the saved announcement is confirmed.'
 );
 
 const neutralResult = (input: IndustryMediaVoiceInput): IndustryMediaVoiceResult => ({
@@ -217,7 +219,7 @@ const neutralResult = (input: IndustryMediaVoiceInput): IndustryMediaVoiceResult
 });
 
 const framedLine = (input: IndustryMediaVoiceInput): string => {
-    if (input.assignment.angle === 'SPECULATION') return speculationLine();
+    if (input.assignment.angle === 'SPECULATION') return speculationLine(input);
     if (input.assignment.angle === 'OPINION') return opinionLine(input);
     if (input.assignment.angle === 'ANALYSIS') return analysisLine(input);
     return '';
@@ -229,7 +231,8 @@ const buildCandidate = (input: IndustryMediaVoiceInput): IndustryMediaVoiceResul
     return {
         headline: input.event.headline,
         detail,
-        content: `${input.event.headline} ${detail}`,
+        /* the headline on its own line, as a claim post has it (it ran into the detail) */
+        content: `${input.event.headline}\n\n${detail}`,
         claimMode: input.assignment.angle,
         industryEventId: input.event.id,
         mediaStoryId: input.story.id,

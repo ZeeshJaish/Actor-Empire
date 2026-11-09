@@ -113,6 +113,13 @@ const avatarFor = (institution: IndustryMediaInstitution, personality?: Industry
         : createIndustryMediaAvatar(institution.shortName, institution.primaryColor)
 );
 
+/* the source's own post does not open with their own name ("Mara Voss: …", "Mara Voss calls it: …") */
+const ownHeadline = (headline: string, authorName: string): string => (
+    headline.startsWith(`${authorName} calls it: `) ? `Calling it: ${headline.slice(authorName.length + 11)}`
+        : headline.startsWith(`${authorName}: `) ? sentenceStart(headline.slice(authorName.length + 2))
+            : headline
+);
+
 const originX = (
     claim: IndustryMediaClaim,
     institution: IndustryMediaInstitution,
@@ -123,7 +130,7 @@ const originX = (
     authorName: personality?.name || institution.name,
     authorHandle: personality?.handle || institution.handles.X || `@${institution.id}`,
     authorAvatar: avatarFor(institution, personality),
-    content: `${claim.headline}\n\n${claim.summary}`,
+    content: `${ownHeadline(claim.headline, personality?.name || institution.name)}\n\n${claim.summary}`,
     timestamp: claim.createdAbsoluteWeek,
     ...engagementFor(claim, 'origin'),
     isPlayer: false,
