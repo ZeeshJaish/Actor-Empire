@@ -727,14 +727,33 @@ const rollUpRoyaltyReceipts = (viewing: any) => {
   const rows = viewing?.royaltyReceipts;
   if (!Array.isArray(rows) || !rows.length) return viewing;
   const kept = new Map<string, any>();
+  /* Round 4 (2026-11-09): a late week has ~170,000 rows over a few hundred keys. A row whose four parts are all text
+     or null finds its group through maps of those parts, so the JSON key is built once per group, not per row; for
+     such parts, equal keys mean equal parts. Every group still lives in `kept` under its JSON key, in first-seen
+     order, so a row with any other part (keyed by JSON.stringify as before) meets the same groups. */
+  const byParts = new Map<string | null, Map<string | null, Map<string | null, Map<string | null, any>>>>();
+  const simple = (value: unknown): value is string | null => value === null || typeof value === 'string';
   for (const row of rows) {
-    const key = JSON.stringify([row.platformId, row.contractId ?? null, row.sourceKind ?? null, row.kind]);
+    const platformId = row.platformId, contractId = row.contractId ?? null, sourceKind = row.sourceKind ?? null, kind = row.kind;
+    let kinds: Map<string | null, any> | undefined;
+    if (simple(platformId) && simple(contractId) && simple(sourceKind) && simple(kind)) {
+      let contracts = byParts.get(platformId);
+      if (!contracts) byParts.set(platformId, contracts = new Map());
+      let sources = contracts.get(contractId);
+      if (!sources) contracts.set(contractId, sources = new Map());
+      kinds = sources.get(sourceKind);
+      if (!kinds) sources.set(sourceKind, kinds = new Map());
+      const group = kinds.get(kind);
+      if (group) { group.grossReceipts += row.grossReceipts; continue; }
+    }
+    const key = JSON.stringify([platformId, contractId, sourceKind, kind]);
     const had = kept.get(key);
     if (had) had.grossReceipts += row.grossReceipts;
     else kept.set(key, {
       receiptId: key, platformId: row.platformId, countryId: 'ALL', projectId: row.projectId, contractId: row.contractId ?? null,
       kind: row.kind, ...(row.sourceKind !== undefined ? { sourceKind: row.sourceKind } : {}), grossReceipts: row.grossReceipts,
     });
+    kinds?.set(kind, kept.get(key));
   }
   return { ...viewing, royaltyReceipts: [...kept.values()] };
 };

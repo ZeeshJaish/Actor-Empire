@@ -1,6 +1,11 @@
 /** The exact issued UTF-16 structural hash. Native JSON quoting handles ordinary
  * strings; surrogate-containing strings retain the issued UTF-16 spelling.
  * Mutable hash state and both bounded quoting caches are invocation-local. */
+/* Round 4 (2026-11-09): a late career's save has about 3,400 distinct keys and 22,000 distinct short values, so
+   caches capped at 2,048 missed about 350,000 times a save, each miss quoting the text again. The caps now hold
+   them; a cached quote is the same text, so every hash is unchanged. */
+const QUOTED_KEY_CACHE_LIMIT = 16_384;
+const QUOTED_VALUE_CACHE_LIMIT = 32_768;
 export const stableSaveHash = (value: unknown): string => {
     let first = 0x811c9dc5, second = 0x9e3779b9, offset = 0;
     const quoted = new Map<string, string>();
@@ -48,7 +53,7 @@ export const stableSaveHash = (value: unknown): string => {
             if (character === '\t') return '\\t';
             return `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`;
         })}"`;
-        if (text.length <= 128 && cache.size < 2048) cache.set(text, result);
+        if (text.length <= 128 && cache.size < (key ? QUOTED_KEY_CACHE_LIMIT : QUOTED_VALUE_CACHE_LIMIT)) cache.set(text, result);
         return result;
     };
     const visit = (item: unknown): void => {
@@ -110,7 +115,7 @@ export const stableSaveHashJson = (value: unknown): string => {
             if (character === '\t') return '\\t';
             return `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`;
         })}"`;
-        if (text.length <= 128 && quoted.size < 4096) quoted.set(text, result);
+        if (text.length <= 128 && quoted.size < QUOTED_VALUE_CACHE_LIMIT) quoted.set(text, result);
         return result;
     };
     // SerializeJSONProperty steps 2-4 (no replacer): toJSON, then boxed primitives

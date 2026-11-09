@@ -4,9 +4,12 @@ import { isCanonicalStreamingRightsContractRegistry } from './streamingRightsCor
 
 const OMIT = Symbol('omit-json-value');
 
+/* Round 4 (2026-11-09): the objects being copied are kept as the current path, a short list (a save is about ten
+   levels deep), instead of a Set: the same "is it already being copied" question, without hashing every one of
+   a late career's millions of objects in and out of a Set. */
 const cloneJsonValue = (
     value: unknown,
-    ancestors: Set<object>,
+    ancestors: object[],
     arraySlot: boolean,
 ): unknown | typeof OMIT => {
     if (value === null) return null;
@@ -20,14 +23,16 @@ const cloneJsonValue = (
         return arraySlot ? null : OMIT;
     }
     if (typeof value !== 'object') return arraySlot ? null : OMIT;
-    if (ancestors.has(value)) throw new TypeError('Converting circular structure to JSON');
+    for (let index = 0; index < ancestors.length; index += 1) {
+        if (ancestors[index] === value) throw new TypeError('Converting circular structure to JSON');
+    }
 
     const jsonValue = value as { toJSON?: () => unknown };
     if (typeof jsonValue.toJSON === 'function') {
         return cloneJsonValue(jsonValue.toJSON(), ancestors, arraySlot);
     }
 
-    ancestors.add(value);
+    ancestors.push(value);
     try {
         if (Array.isArray(value)) {
             const output = new Array<unknown>(value.length);
@@ -44,7 +49,7 @@ const cloneJsonValue = (
         }
         return output;
     } finally {
-        ancestors.delete(value);
+        ancestors.pop();
     }
 };
 
@@ -54,7 +59,7 @@ const cloneJsonValue = (
  * multi-megabyte intermediate string.
  */
 export const clonePlayerForWeekProcessing = <T extends Player>(player: T): T => {
-    const cloned = cloneJsonValue(player, new Set<object>(), false);
+    const cloned = cloneJsonValue(player, [], false);
     if (cloned === OMIT || !cloned || typeof cloned !== 'object') {
         throw new TypeError('Player state could not be cloned for weekly processing.');
     }
