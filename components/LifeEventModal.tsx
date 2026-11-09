@@ -3,6 +3,7 @@ import { EventImpactSignal, Player, ScheduledEvent, LifeEvent, LifeEventImpactRe
 import { AlertTriangle, ShieldAlert, Scale, User, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle, Activity, Newspaper } from 'lucide-react';
 import { motion } from 'motion/react';
 import { showAd } from '../services/adLogic';
+import { noteAdClosed } from '../services/forcedAds';
 import { addBreadcrumb, recordNonFatal, setCrashContext, trackGameEvent } from '../services/firebaseService';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/youtubeEventLogic';
 import { getPlayerLanguage, t } from '../services/i18n';
@@ -145,6 +146,8 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 return;
             } finally {
                 setIsProcessingAd(false);
+                // as the Store's rewarded ads do: the forced ads' minutes start again, so none lands right after this one
+                noteAdClosed();
             }
         } else {
             // Deep clone to prevent mutation issues

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { ChevronRight, Film, Loader2, MapPin, PlayCircle, Sparkles, Wallet } from 'lucide-react';
 import type { Player, ScheduledEvent } from '../../types';
 import { showAd } from '../../services/adLogic';
+import { noteAdClosed } from '../../services/forcedAds';
 import { getOriginalsStudio } from '../../services/originalsStudios';
 import { answerOriginalIssue, getOriginalIssueView, originalIssueEventData, type OriginalIssueChoice } from '../../services/originalsIssues';
 
@@ -56,6 +57,8 @@ export const OriginalIssueModal: React.FC<Props> = ({ player, event, onResolve }
             setNotice('The ad did not finish. Pick another answer.');
         } finally {
             setBusy(false);
+            // as the Store's rewarded ads do: the forced ads' minutes start again, so none lands right after this one
+            noteAdClosed();
         }
     };
 

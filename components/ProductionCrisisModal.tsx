@@ -3,6 +3,7 @@ import { Player, ScheduledEvent } from '../types';
 import { AlertTriangle, Film, ChevronRight, Activity, Clapperboard, PlayCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { showAd } from '../services/adLogic';
+import { noteAdClosed } from '../services/forcedAds';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { LocalizedTextVars } from '../types';
 
@@ -78,6 +79,8 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 setResolveError(tr('app.rewards.goldenUnavailable'));
             } finally {
                 setIsProcessingAd(false);
+                // as the Store's rewarded ads do: the forced ads' minutes start again, so none lands right after this one
+                noteAdClosed();
             }
         } else {
             try {

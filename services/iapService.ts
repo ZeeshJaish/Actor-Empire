@@ -47,6 +47,8 @@ interface PurchaseResult {
     transactionId?: string;
     /** Android consumable: finish it with finishAndroidConsumable once the grant is saved */
     purchaseToken?: string;
+    /** iOS: StoreKit keeps this transaction open until the grant is saved; then finish it with finishIOSTransaction */
+    iosTransactionId?: string;
 }
 
 interface RestoreResult {
@@ -103,6 +105,8 @@ interface PurchasesPlugin {
     getProducts(options: { productIds: string[] }): Promise<{ products?: NativeStoreProduct[] }>;
     purchaseProduct(options: { productId: string }): Promise<{ cancelled?: boolean; pending?: boolean; productId?: string; transactionId?: string }>;
     restorePurchases(): Promise<{ productIds?: string[] }>;
+    /** StoreKit 2: the paid transaction stays open until the game has saved what it bought (see finishIOSTransaction) */
+    finishTransaction(options: { transactionId: string }): Promise<{ finished?: boolean }>;
     addListener(eventName: 'purchaseCompleted', listenerFunc: (update: IOSStoreTransactionEvent) => void): Promise<PluginListenerHandle>;
 }
 
@@ -112,6 +116,9 @@ interface AndroidPurchasesPlugin {
     restorePurchases(): Promise<{ purchases?: AndroidPurchaseToken[] }>;
     acknowledgePurchase(options: { purchaseToken: string }): Promise<{ success?: boolean }>;
     consumePurchase(options: { purchaseToken: string }): Promise<{ success?: boolean }>;
+    /** Play reported purchases with no purchase open in the game (a pending payment completed, or a purchase made
+        while the game was busy). The game collects them the way Restore does. */
+    addListener(eventName: 'purchasesUpdated', listenerFunc: () => void): Promise<PluginListenerHandle>;
 }
 
 export interface PremiumCatalogProduct {
@@ -206,6 +213,61 @@ export const finishAndroidConsumable = async (purchaseToken: string): Promise<vo
         await purchases.consumePurchase({ purchaseToken });
     } catch (error) {
         console.warn('[IAP] Could not finish an unclaimed Android purchase', error);
+    }
+};
+
+/* The store transactions this device has granted and saved, newest last. A second guard, beside each save's own record
+   (processedIOSStoreTransactionIds), against a repeat grant when a store hands a transaction over again after a crash
+   while a different career is open. Written only after the save, so it never stops a first grant. */
+const DELIVERED_TRANSACTIONS_KEY = 'ae.iap.deliveredTransactions.v1';
+const readDeliveredTransactions = (): string[] => {
+    try {
+        const parsed = JSON.parse(window.localStorage.getItem(DELIVERED_TRANSACTIONS_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+export const wasStoreTransactionDelivered = (transactionId?: string): boolean =>
+    !!transactionId && readDeliveredTransactions().includes(transactionId);
+
+export const rememberStoreTransactionDelivered = (transactionId?: string): void => {
+    if (!transactionId) return;
+    try {
+        const list = readDeliveredTransactions().filter(id => id !== transactionId);
+        list.push(transactionId);
+        window.localStorage.setItem(DELIVERED_TRANSACTIONS_KEY, JSON.stringify(list.slice(-200)));
+    } catch {
+        /* storage unavailable: the save's own record still guards */
+    }
+};
+
+/** iOS: after the grant for this transaction is saved, tell StoreKit it was delivered. Until then StoreKit keeps it
+    open and hands it to the game again at the next launch (Transaction.updates), so a crash or a failed save between
+    the payment and the save loses nothing. An older native build finished it already and has no such method. */
+export const finishIOSTransaction = async (transactionId?: string): Promise<void> => {
+    if (!transactionId || import.meta.env.DEV || !isCapacitorIOS()) return;
+    const purchases = getPurchasesPlugin();
+    if (!purchases?.finishTransaction) return;
+    try {
+        await purchases.finishTransaction({ transactionId });
+    } catch (error) {
+        console.warn('[IAP] Could not finish an iOS transaction; StoreKit will deliver it again at the next launch', error);
+    }
+};
+
+/** Android: Play reports a purchase the game did not ask for at that moment (a pending payment that completed while
+    the game is open). The callback runs the same collection as Restore, which delivers and then finishes it. */
+export const startAndroidPurchaseUpdatesListener = async (onUpdate: () => void): Promise<PluginListenerHandle | null> => {
+    if (import.meta.env.DEV || !isCapacitorAndroid()) return null;
+    const purchases = getAndroidPurchasesPlugin();
+    if (!purchases?.addListener) return null;
+    try {
+        return await purchases.addListener('purchasesUpdated', () => onUpdate());
+    } catch (error) {
+        console.warn('[IAP] Android purchase updates are not available in this build', error);
+        return null;
     }
 };
 
@@ -321,9 +383,14 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
             if (!purchaseToken) {
                 return { success: false, message: 'Purchase did not return a verification token.' };
             }
-            /* Play: grant nothing until the payment completes; a pending purchase is collected by Restore or the next launch */
+            /* Play: grant nothing until the payment completes; a pending purchase is collected when Play reports it paid
+               (purchasesUpdated), by Restore, or at the next launch */
             if (purchase?.purchaseState === ANDROID_PENDING) {
                 return { success: false, pending: true, message: 'Your payment is pending. The item unlocks when Google Play confirms it.' };
+            }
+            /* only PURCHASED is paid: any other state (UNSPECIFIED) grants nothing, as Restore already does */
+            if (purchase?.purchaseState !== ANDROID_PURCHASED) {
+                return { success: false, message: 'Google Play did not confirm this payment. If you were charged, the item arrives through Restore Purchases.' };
             }
 
             const transactionId = purchase?.orderId || purchaseToken;
@@ -361,13 +428,15 @@ export const purchasePremiumProduct = async (productId: PremiumProductId): Promi
             return { success: false, cancelled: true, message: 'Purchase cancelled.' };
         }
         if (result?.pending) {
-            return { success: false, message: 'Purchase is pending approval.' };
+            return { success: false, pending: true, message: 'Purchase is pending approval.' };
         }
         return {
             success: true,
             message: 'Purchase confirmed.',
             storeProductId: result?.productId || storeProductId,
-            transactionId: result?.transactionId
+            transactionId: result?.transactionId,
+            /* granted and saved by the game first, then finished (finishIOSTransaction) */
+            iosTransactionId: result?.transactionId
         };
     } catch (error: any) {
         const message = String(error?.message || error || 'Purchase failed.');

@@ -63,7 +63,7 @@ import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGam
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { getStreamingEstate, handoffOwnedStreamingPlatformToHeir, type StreamingHandoffChoice } from './services/streamingLegacy';
 import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, hasPremiumProduct, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
-import { finishAndroidConsumable, isAndroidStore, purchasePremiumProduct, restorePremiumPurchases, startIOSPurchaseUpdatesListener, type IOSPurchaseUpdate } from './services/iapService';
+import { finishAndroidConsumable, finishIOSTransaction, isAndroidStore, purchasePremiumProduct, rememberStoreTransactionDelivered, restorePremiumPurchases, startAndroidPurchaseUpdatesListener, startIOSPurchaseUpdatesListener, wasStoreTransactionDelivered, type IOSPurchaseUpdate } from './services/iapService';
 import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
 import { applyParenthoodAbandonment, getPregnancyFeedbackCopy } from './services/familyLogic';
@@ -579,6 +579,13 @@ export const App: React.FC = () => {
   const autosaveTimerRef = useRef<number | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
+  /* iOS purchases StoreKit hands over outside a purchase tap (Ask to Buy approved later, a purchase finished while the
+     app was away, or one left open by a crash) arrive at start-up, often before a career is loaded. They wait here
+     until a career is playing; then each is granted once, saved, and only then finished with StoreKit. */
+  const pendingIOSPurchaseUpdatesRef = useRef<IOSPurchaseUpdate[]>([]);
+  const [iosPurchaseUpdatesWaiting, setIosPurchaseUpdatesWaiting] = useState(0);
+  /* Android: Play reported a purchase with none open in the game (a pending payment completed); collected like Restore */
+  const [androidPurchaseUpdatesWaiting, setAndroidPurchaseUpdatesWaiting] = useState(0);
   const playerRef = useRef(player);
   const rewardAdGrantInFlightRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -988,22 +995,43 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     purchaseUpdateHandlerRef.current = update => {
-      handleGenericUpdate(prev => {
-          const p = JSON.parse(JSON.stringify(prev)) as Player;
-          if (hasProcessedStoreTransaction(p, update.transactionId)) return p;
-          markProcessedStoreTransaction(p, update.transactionId);
-          const message = applyPremiumPurchase(p, update.premiumProductId, getPlayerLanguage(p));
-          setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
-          return p;
-      });
-      if (isNonConsumablePremiumProduct(update.premiumProductId)) {
-          void syncPermanentPremiumEntitlementsToSavedSlots([update.premiumProductId]);
-      }
-      /* Ask to Buy approved later, or a purchase finished while the app was away */
-      if (update.premiumProductId === 'streaming_plus') announceStreamingPlusUnlocked();
-      noteRealPurchase();
+      const queue = pendingIOSPurchaseUpdatesRef.current;
+      if (!update.transactionId || !queue.some(item => item.transactionId === update.transactionId)) queue.push(update);
+      setIosPurchaseUpdatesWaiting(count => count + 1);
     };
-  }, [handleGenericUpdate, language]);
+  }, []);
+
+  /* The waiting iOS purchases, once a career is playing. Each is granted once: the save's record of transactions and
+     the device's list of delivered ones stop a repeat when StoreKit hands one over again. The save comes first; only
+     after it is StoreKit told to finish them, so a crash or a failed save leaves them open for the next launch. */
+  useEffect(() => {
+    if (gameStatus !== 'PLAYING' || !currentSlot || pendingIOSPurchaseUpdatesRef.current.length === 0) return;
+    const updates = pendingIOSPurchaseUpdatesRef.current.splice(0);
+    const slot = currentSlot;
+    const hadStreamingPlus = hasPremiumProduct(playerRef.current, 'streaming_plus');
+    handleGenericUpdate(prev => {
+        const p = JSON.parse(JSON.stringify(prev)) as Player;
+        updates.forEach(update => {
+            if (hasProcessedStoreTransaction(p, update.transactionId) || wasStoreTransactionDelivered(update.transactionId)) return;
+            markProcessedStoreTransaction(p, update.transactionId);
+            const message = applyPremiumPurchase(p, update.premiumProductId, getPlayerLanguage(p));
+            setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
+        });
+        void persistSlotSave(slot, p, { rethrow: true })
+            .then(savedPlayer => {
+                setSaveSlots(previous => ({ ...previous, [slot]: savedPlayer }));
+                updates.forEach(update => rememberStoreTransactionDelivered(update.transactionId));
+                return Promise.all(updates.map(update => finishIOSTransaction(update.transactionId)));
+            })
+            .catch(error => recordNonFatal(error, 'premium_ios_update_persist_failed', { count: updates.length }));
+        return p;
+    });
+    const permanent = updates.map(update => update.premiumProductId).filter(isNonConsumablePremiumProduct);
+    if (permanent.length) void syncPermanentPremiumEntitlementsToSavedSlots(permanent);
+    /* Ask to Buy approved later, or a purchase finished while the app was away */
+    if (!hadStreamingPlus && updates.some(update => update.premiumProductId === 'streaming_plus')) announceStreamingPlusUnlocked();
+    noteRealPurchase();
+  }, [gameStatus, currentSlot, iosPurchaseUpdatesWaiting]);
 
   useEffect(() => {
     let disposed = false;
@@ -1023,6 +1051,28 @@ export const App: React.FC = () => {
       console.warn('[IAP] Failed to start iOS purchase update listener', error);
     });
 
+    return () => {
+      disposed = true;
+      void listenerHandle?.remove();
+    };
+  }, []);
+
+  /* Android: a pending payment that completes while the game is open is collected at once (as Restore does: granted,
+     saved, then acknowledged or consumed) instead of waiting for a Restore tap or the next launch. */
+  useEffect(() => {
+    let disposed = false;
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+    startAndroidPurchaseUpdatesListener(() => {
+      if (!disposed) setAndroidPurchaseUpdatesWaiting(count => count + 1);
+    }).then(handle => {
+      if (disposed) {
+          void handle?.remove();
+          return;
+      }
+      listenerHandle = handle;
+    }).catch(error => {
+      console.warn('[IAP] Failed to start Android purchase update listener', error);
+    });
     return () => {
       disposed = true;
       void listenerHandle?.remove();
@@ -2692,6 +2742,19 @@ export const App: React.FC = () => {
                   })
                   .catch(error => recordNonFatal(error, 'premium_consumable_persist_failed', { product_id: productId }));
           }
+          /* iOS, every product: StoreKit keeps the transaction open until this save is done. Only then is it finished,
+             so a crash or a failed save leaves it for the next launch, where the record above stops a second grant. */
+          if (result.iosTransactionId && currentSlot) {
+              const transactionId = result.iosTransactionId;
+              const slot = currentSlot;
+              void persistSlotSave(slot, p, { rethrow: true })
+                  .then(savedPlayer => {
+                      setSaveSlots(previous => ({ ...previous, [slot]: savedPlayer }));
+                      rememberStoreTransactionDelivered(transactionId);
+                      return finishIOSTransaction(transactionId);
+                  })
+                  .catch(error => recordNonFatal(error, 'premium_ios_purchase_persist_failed', { product_id: productId }));
+          }
           if (productId === 'streaming_plus' && !alreadyGranted) announceStreamingPlusUnlocked();
           return p;
       });
@@ -2895,6 +2958,15 @@ export const App: React.FC = () => {
       }, 4000);
       return () => window.clearTimeout(timer);
   }, [gameStatus, currentSlot]);
+
+  // Play reported a completed purchase while the game is open (purchasesUpdated): the same collection, once a career plays.
+  useEffect(() => {
+      if (androidPurchaseUpdatesWaiting === 0 || gameStatus !== 'PLAYING' || !currentSlot) return;
+      setAndroidPurchaseUpdatesWaiting(0);
+      void restorePremiumPurchases()
+          .then(result => applyRestoredPurchases(result, true))
+          .catch(error => recordNonFatal(error, 'android_purchase_update_check_failed'));
+  }, [androidPurchaseUpdatesWaiting, gameStatus, currentSlot]);
 
   // --- HANDLERS ---
   const handleStartGame = (name: string, age: number, gender: any, avatar: string, handle: string, slotOverride?: number) => {

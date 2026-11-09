@@ -137,7 +137,15 @@ public class AndroidPurchasesPlugin extends Plugin implements PurchasesUpdatedLi
     public void onPurchasesUpdated(@NonNull BillingResult billingResult, List<Purchase> purchases) {
         PluginCall call = activePurchaseCall;
         activePurchaseCall = null;
-        if (call == null) return;
+        if (call == null) {
+            /* No purchase is open in the game: a pending payment completed, or Play finished a purchase later.
+               Tell the game, which collects it the way Restore does (grant, save, then acknowledge or consume).
+               Retained until the game listens, so one that lands during start-up is not lost. */
+            if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK && purchases != null && !purchases.isEmpty()) {
+                notifyListeners("purchasesUpdated", new JSObject().put("count", purchases.size()), true);
+            }
+            return;
+        }
 
         int code = billingResult.getResponseCode();
         if (code == BillingClient.BillingResponseCode.USER_CANCELED) {

@@ -1310,17 +1310,26 @@ export const AwardNightFlow: React.FC<AwardNightFlowProps> = ({ config, onComple
   const [equipped, setEquipped] = useState<Equipped>({});
   const [pressResult, setPressResult] = useState<AwardPressResult | undefined>();
 
+  /* The night is over: its break (if loaded and allowed) comes as the player leaves the summary, after the short beat
+     and before the game moves on. Before, the game left first and the ad followed 700 ms later, on whatever page (or
+     popup) came next. A second Leave tap while the break runs does nothing. */
+  const leavingRef = useRef(false);
   const finish = useCallback(() => {
-    onComplete?.({
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    const result: AwardNightResult = {
       won: cfg.playerCategories?.some(category => category.won) ?? cfg.playerWins,
       styleScore: styleTotal(equipped),
       outfitName: outfitName(equipped),
       rideName: rideName(equipped),
       pressResult
-    });
-    setPhase('DRESS'); // demo loops; the game unmounts on onComplete
-    /* the night is over and saved: its break (if loaded and allowed) comes as the player leaves, never mid show */
-    window.setTimeout(() => { void runTaskAd('AWARD_NIGHT'); }, 700);
+    };
+    const leave = () => {
+      leavingRef.current = false;
+      onComplete?.(result);
+      setPhase('DRESS'); // demo loops; the game unmounts on onComplete
+    };
+    void runTaskAd('AWARD_NIGHT').then(leave, leave);
   }, [onComplete, cfg.playerWins, cfg.playerCategories, equipped, pressResult]);
 
   return (

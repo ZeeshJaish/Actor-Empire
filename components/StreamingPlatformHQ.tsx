@@ -582,6 +582,9 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* #253: a door the build has closed */
   const [buildLockNotice, setBuildLockNotice] = useState(false);
   const [showOpeningProgramme, setShowOpeningProgramme] = useState(false);
+  /* true from a fresh build commission until its break (if any) has closed: the build screen stays up meanwhile, so the
+     opening programme (the result) never opens under the ad */
+  const [buildResultHeld, setBuildResultHeld] = useState(false);
   const [openingProgrammeFocus, setOpeningProgrammeFocus] = useState<StreamingOpeningProgrammeFocus>('OVERVIEW');
   const [buildInitialSheet, setBuildInitialSheet] = useState<'money' | 'build' | undefined>(undefined);
   const [showFinanceRoom, setShowFinanceRoom] = useState(initialDestination === 'FINANCE');
@@ -1825,8 +1828,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     const committedPlayer = committed.player;
     buildCommittedPlayerRef.current = committedPlayer;
     persist(committedPlayer);
-    /* the opening network is commissioned (once) and saved: its break, if loaded and allowed, lands before the result is read */
-    if (committed.changed) void runTaskAd('BUILD');
     const setup = committedPlayer.ownedStreamingPlatform.infrastructureSetup;
     const absoluteWeek = getAbsoluteWeek(committedPlayer.age, committedPlayer.currentWeek);
     const weeksRemaining = Math.max(0, (setup?.readyAtAbsoluteWeek || absoluteWeek) - absoluteWeek);
@@ -1840,7 +1841,19 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       : `${networkLabel} commissioned and operational.`;
     setCompanyFeedback(message);
     setOpeningProgrammeFocus('OVERVIEW');
-    setShowOpeningProgramme(true);
+    /* the opening network is commissioned (once) and saved. Its break, if loaded and allowed, comes after the short beat
+       while the build screen still shows the commissioning; the result opens only once the break has closed (at once
+       when no break may show), so the ad never lands on the result. */
+    if (committed.changed) {
+      setBuildResultHeld(true);
+      const openResult = () => {
+        setBuildResultHeld(false);
+        setShowOpeningProgramme(true);
+      };
+      void runTaskAd('BUILD').then(openResult, openResult);
+    } else {
+      setShowOpeningProgramme(true);
+    }
     return { ok: true, message, next: 'BACK' as const };
   };
 
@@ -2710,7 +2723,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     return renderHome();
   };
 
-  if (!platform.launchCommit && (showOpeningProgramme || showCinematicBuild || showDefineLaunch)
+  if (!platform.launchCommit && !buildResultHeld && (showOpeningProgramme || showCinematicBuild || showDefineLaunch)
     && openingProgramme().commissioned) {
     return (
       <StreamingOpeningProgramme

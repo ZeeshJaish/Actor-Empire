@@ -33,25 +33,36 @@ declare global {
 }
 
 let initialized = false;
+/* one start-up at a time: a second caller waits for the first instead of starting the SDK again */
+let initializing: Promise<void> | null = null;
+
+/* One ad on screen at a time, rewarded or forced. Taken before the first wait, so two requests in the same moment
+   cannot both reach the SDK, and a forced break never opens over a rewarded ad (or the wait for one). */
+let activeAd: 'REWARDED' | 'INTERSTITIAL' | null = null;
 
 export const isRewardedType = (type: AdType) => type !== 'INTERSTITIAL';
 
 const isNativeAds = () => Boolean(window.Capacitor?.isNativePlatform?.());
 const adPlatform = (): 'ios' | 'android' => (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android');
 
-const requestConsent = async () => {
-    if (!AdMob?.requestConsentInfo) return;
+/* Google's consent gate (UMP): ads may be requested only when the consent SDK says canRequestAds. A consent error,
+   or a form the player has not answered, leaves the ad SDK unstarted, so nothing is loaded or shown; the next
+   rewarded tap or the next launch asks again. A plugin too old to report canRequestAds falls back to the status. */
+const requestConsent = async (): Promise<boolean> => {
+    if (!AdMob?.requestConsentInfo) return true;
 
     try {
-        const info = await AdMob.requestConsentInfo();
+        let info = await AdMob.requestConsentInfo();
         console.log('Consent status:', info?.status);
 
         if (info?.isConsentFormAvailable && info?.status === 'REQUIRED' && AdMob.showConsentForm) {
-            await AdMob.showConsentForm();
+            info = await AdMob.showConsentForm();
             console.log('AdMob consent form shown');
         }
+        return typeof info?.canRequestAds === 'boolean' ? info.canRequestAds : info?.status !== 'REQUIRED';
     } catch (err) {
         console.error('AdMob consent error:', err);
+        return false;
     }
 };
 
@@ -67,27 +78,33 @@ export const initAds = async () => {
     }
 
     if (initialized) return;
+    if (initializing) return initializing;
 
     if (!AdMob?.initialize) {
         console.warn('AdMob plugin not found. Native ads are unavailable.');
         return;
     }
 
-    await requestConsent();
-
-    try {
-        /* Ads must fit the store's age rating (Apple 2.5.18): the App Store lists
-           the game 4+, Google Play lists it Teen. */
-        await AdMob.initialize({
-            maxAdContentRating: adPlatform() === 'ios' ? MaxAdContentRating.General : MaxAdContentRating.Teen,
-        });
-        initialized = true;
-        console.log('AdMob initialized after consent');
-        preloadInterstitial();
-        preloadRewarded();
-    } catch (err) {
-        console.error('AdMob init failed:', err);
-    }
+    initializing = (async () => {
+        if (!(await requestConsent())) {
+            console.warn('AdMob not started: consent does not allow ad requests yet');
+            return;
+        }
+        try {
+            /* Ads must fit the store's age rating (Apple 2.5.18): the App Store lists
+               the game 4+, Google Play lists it Teen. */
+            await AdMob.initialize({
+                maxAdContentRating: adPlatform() === 'ios' ? MaxAdContentRating.General : MaxAdContentRating.Teen,
+            });
+            initialized = true;
+            console.log('AdMob initialized after consent');
+            preloadInterstitial();
+            preloadRewarded();
+        } catch (err) {
+            console.error('AdMob init failed:', err);
+        }
+    })().finally(() => { initializing = null; });
+    return initializing;
 };
 
 /* ---- the interstitial, loaded ahead of time ----
@@ -113,8 +130,9 @@ export const preloadInterstitial = () => {
         });
 };
 
-/** In development and on the web there is nothing to preload: the break is simulated or handled by the web ad API. */
-export const isInterstitialReady = (): boolean => (isNativeAds() ? interstitialState === 'READY' : true);
+/** In development and on the web there is nothing to preload: the break is simulated or handled by the web ad API.
+    While another ad is on screen (or a rewarded tap is waiting for one) the break is not ready. */
+export const isInterstitialReady = (): boolean => (isNativeAds() ? interstitialState === 'READY' && !activeAd : true);
 
 /** Shows the preloaded interstitial and resolves when it closes (true) or could not show (false). Never loads on demand. */
 export const showPreloadedInterstitial = async (label = 'break'): Promise<boolean> => {
@@ -131,10 +149,13 @@ export const showPreloadedInterstitial = async (label = 'break'): Promise<boolea
         console.log(`[DEV SIMULATION] Forced ad: ${label}`);
         return true;
     }
+    /* never over another ad: a rewarded ad on screen, or a rewarded tap still fetching one */
+    if (activeAd) return false;
     if (interstitialState !== 'READY' || !AdMob?.showInterstitial) {
         preloadInterstitial();
         return false;
     }
+    activeAd = 'INTERSTITIAL';
     interstitialState = 'SHOWING';
     return new Promise<boolean>(resolve => {
         let settled = false;
@@ -144,6 +165,7 @@ export const showPreloadedInterstitial = async (label = 'break'): Promise<boolea
             settled = true;
             handles.forEach(handle => { void handle.remove(); });
             interstitialState = 'IDLE';
+            if (activeAd === 'INTERSTITIAL') activeAd = null;
             window.setTimeout(preloadInterstitial, 1500);
             resolve(shown);
         };
@@ -302,8 +324,10 @@ export const showAd = async (type: AdType, options: ShowAdOptions = {}): Promise
         await initAds();
 
         if (!AdMob || !initialized) return { success: false, reason: 'UNAVAILABLE' };
-        // one ad at a time: a second request while an ad is up gets "no ad", never a second locked show
-        if (rewardedState === 'SHOWING') return { success: false, reason: 'UNAVAILABLE' };
+        /* one ad at a time: a second request while an ad is up, or while the first tap is still fetching one, gets
+           "no ad", never a second show (and never a second reward). The slot is taken before the first wait. */
+        if (activeAd || rewardedState === 'SHOWING') return { success: false, reason: 'UNAVAILABLE' };
+        activeAd = 'REWARDED';
 
         try {
             if (!(await waitForRewarded())) return { success: false, reason: 'UNAVAILABLE' };
@@ -311,6 +335,8 @@ export const showAd = async (type: AdType, options: ShowAdOptions = {}): Promise
         } catch (err) {
             console.error('Ad failed:', err);
             return { success: false, reason: 'ERROR' };
+        } finally {
+            if (activeAd === 'REWARDED') activeAd = null;
         }
     }
 

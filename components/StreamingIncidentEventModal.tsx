@@ -10,6 +10,7 @@ import {
     type StreamingIncidentEventChoice,
 } from '../services/streamingIncidentEvent';
 import { showAd } from '../services/adLogic';
+import { noteAdClosed } from '../services/forcedAds';
 
 /* #75: a new incident on STATUS as the week's popup (Zeesh: "us popup ka use karke"), with STATUS's three
    answers and the popup's golden one: an ad, repaired now with no energy and no cash. */
@@ -58,6 +59,8 @@ export const StreamingIncidentEventModal: React.FC<Props> = ({ player, event, on
             else setNotice('The ad did not finish. Pick another way to answer it.');
         } finally {
             setBusy(false);
+            // as the Store's rewarded ads do: the forced ads' minutes start again, so none lands right after this one
+            noteAdClosed();
         }
     };
 
