@@ -258,6 +258,11 @@ export const PlatformHQ: React.FC<{
               ? `${state.territories} territor${state.territories === 1 ? 'y' : 'ies'} · Level ${state.reachLevel}`
               : 'Founder headquarters · the service is under construction'}
           </div>
+          {/* Zeesh 2026-11-09: one quiet line telling players the streaming update is still being finished */}
+          <p className={css.hqwip} data-wip>
+            <i className={css.wipdot} aria-hidden="true" />
+            <span>Streaming update is still in the works — not at its best yet.</span>
+          </p>
 
           <div className={css.hqheroes}>
             <div className={cx(css.hero, css.big)} data-hq-tour="readiness">
