@@ -1,4 +1,4 @@
-import { hashDeterministicSeed } from '../deterministicRandom';
+import { hashDeterministicSeed, hashDeterministicSeedPieces } from '../deterministicRandom';
 
 export const cinemaCount = (n: number, label: string): number => {
     if (!Number.isSafeInteger(n) || n<0) throw new RangeError(`Invalid cinema ${label}`);
@@ -6,6 +6,8 @@ export const cinemaCount = (n: number, label: string): number => {
 };
 export const cinemaSum = (values: readonly number[]): number => cinemaCount(values.reduce((a,b)=>a+b,0),'sum');
 export const cinemaKey = (seed: number, week: number, key: string): number => hashDeterministicSeed(`${seed}:${week}:${key}`);
+/** cinemaKey of a key given as pieces in order, never joined: cinemaKeyPieces(s, w, ['ab', 'c']) === cinemaKey(s, w, 'abc'). */
+export const cinemaKeyPieces = (seed: number, week: number, pieces: readonly string[]): number => hashDeterministicSeedPieces([`${seed}:${week}:`, ...pieces]);
 
 /** Exact proportional floor and largest remainders. Tie order is keyed, never owner/iteration order. */
 export const apportionCinemaIntegers = (total: number, weights: readonly {id:string;weight:number}[], seed: number, week: number): Map<string,number> => {

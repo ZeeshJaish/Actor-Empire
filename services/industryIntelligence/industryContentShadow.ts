@@ -102,8 +102,23 @@ export const collectIndustryContentGlobalRecent = (
     const ecosystemOperators = Object.values(world.streamingPlatformEcosystem?.operators || {}).flatMap(operator => (
         operator.intelligence?.content.selectedFingerprints || []
     ));
-    return [...studios, ...platforms, ...ecosystemOperators]
-        .filter(item => item.ownerCompanyId !== excludingCompanyId)
-        .sort((left, right) => right.createdAtAbsoluteWeek - left.createdAtAbsoluteWeek || left.id.localeCompare(right.id))
-        .slice(0, 96);
+    /* Round 3 (2026-11-09): only the newest 96 are kept, so they are picked in one pass instead of sorting
+       every company's fingerprints for each company's turn. The kept list stays in order and a later equal
+       row goes after an earlier one, exactly as the stable sort placed them before the cut. */
+    const order = (left: IndustryContentFingerprint, right: IndustryContentFingerprint) => (
+        right.createdAtAbsoluteWeek - left.createdAtAbsoluteWeek || left.id.localeCompare(right.id)
+    );
+    const newest: IndustryContentFingerprint[] = [];
+    for (const item of [...studios, ...platforms, ...ecosystemOperators]) {
+        if (item.ownerCompanyId === excludingCompanyId) continue;
+        if (newest.length === 96 && order(item, newest[95]) >= 0) continue;
+        let low = 0, high = newest.length;
+        while (low < high) {
+            const middle = (low + high) >> 1;
+            if (order(item, newest[middle]) < 0) high = middle; else low = middle + 1;
+        }
+        newest.splice(low, 0, item);
+        if (newest.length > 96) newest.pop();
+    }
+    return newest;
 };

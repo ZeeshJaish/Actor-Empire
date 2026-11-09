@@ -102,6 +102,37 @@ export const attachStreamingRoyaltyReceipts = (
             routeCache.set(key, positions);
             return positions;
         };
+        /* Round 3 (2026-11-09): a source for one title reads that title's rows through an index built once
+           per cached list (same rows, same order), instead of filtering the whole list for every title, route
+           and country; a source for every title reads the cached list itself, which is never changed. */
+        const projectRows = new Map<object, Map<string, ReturnType<typeof eligible>>>();
+        const noRows: ReturnType<typeof eligible> = [];
+        const eligibleFor = (countryId: string, route: StreamingTitleAccessRoute, projectId?: string) => {
+            const positions = eligible(countryId, route);
+            if (!projectId) return positions;
+            let index = projectRows.get(positions);
+            if (!index) {
+                index = new Map();
+                for (const row of positions) {
+                    const rows = index.get(row.projectId);
+                    if (rows) rows.push(row); else index.set(row.projectId, [row]);
+                }
+                projectRows.set(positions, index);
+            }
+            return index.get(projectId) || noRows;
+        };
+        /* Round 3 (2026-11-09): the rows of a list that can keep a receipt are found once per list. A source's
+           amounts fund receipts and nothing else, so a list with no such row is not allocated at all. */
+        const keptRows = new Map<object, number[]>();
+        const keptOf = (positions: ReturnType<typeof eligible>) => {
+            let kept = keptRows.get(positions);
+            if (!kept) {
+                kept = [];
+                for (let index = 0; index < positions.length; index++) if (keepsReceipt(positions[index].contractId)) kept.push(index);
+                keptRows.set(positions, kept);
+            }
+            return kept;
+        };
         if (offer.isPlayer) for (const title of summary.titlePerformance) {
             title.revenue.attributedSubscriptionRevenue = 0;
             for (const country of title.countryPerformance) country.revenue.attributedSubscriptionRevenue = 0;
@@ -119,12 +150,23 @@ export const attachStreamingRoyaltyReceipts = (
                     : route.kind === 'AD_SUPPORTED' ? row?.accessMix.freeViewingAccounts || 0
                     : row?.accessMix.storeViewingAccounts || 0;
             };
+            /* Round 3 (2026-11-09): a list's weights for one kind of access are worked out once per country.
+               Plans, advertising and sponsorship split over the same lists with the same weights, and nothing a
+               weight reads (access mix, title quality, title age) changes inside this loop. */
+            const listWeights = new Map<object, Map<string, number[]>>();
+            const weightsOf = (positions: ReturnType<typeof eligible>, route: StreamingTitleAccessRoute) => {
+                let byKind = listWeights.get(positions);
+                if (!byKind) { byKind = new Map(); listWeights.set(positions, byKind); }
+                let weights = byKind.get(route.kind);
+                if (!weights) { weights = positions.map(position => positionWeight(position, route)); byKind.set(route.kind, weights); }
+                return weights;
+            };
             const planPools = allocateStreamingStoreUnits(countryPools[countryIndex] || 0, plans.map(plan => plan.monthlySubscriptionRevenue));
             const planViewers = allocateStreamingStoreUnits(delivered?.accessMix.paidViewingAccounts || 0, plans.map(plan => plan.paidAccounts));
             plans.forEach((plan, planIndex) => {
                 const route: StreamingTitleAccessRoute = {kind: 'SUBSCRIPTION', planId: plan.planId};
                 const positions = eligible(countryId, route);
-                const accounts = allocateStreamingStoreUnits(planViewers[planIndex] || 0, positions.map(position => positionWeight(position, route)));
+                const accounts = allocateStreamingStoreUnits(planViewers[planIndex] || 0, weightsOf(positions, route));
                 const signals = positions.map((position, index) => {
                     const title = titleMap.get(position.projectId);
                     const row = countryTitle(position.projectId);
@@ -165,14 +207,17 @@ export const attachStreamingRoyaltyReceipts = (
                 if (gross === 0) return;
                 const routePools = allocateStreamingStoreUnits(gross, routes.map(row => row.weight));
                 routes.forEach(({route}, routeIndex) => {
-                    const positions = eligible(countryId, route).filter(row => !projectId || row.projectId === projectId);
-                    const amounts = allocateStreamingStoreUnits(routePools[routeIndex] || 0, positions.map(row => positionWeight(row, route)));
-                    positions.forEach((position, titleIndex) => {
-                        if (!(amounts[titleIndex] > 0)) return;
-                        if (keepsReceipt(position.contractId)) receipts.push({receiptId: JSON.stringify([week, offer.platformId, countryId, 'NON_STORE', index, routeIndex, position.projectId]),
+                    const positions = eligibleFor(countryId, route, projectId);
+                    const kept = keptOf(positions);
+                    if (!kept.length) return;
+                    const amounts = allocateStreamingStoreUnits(routePools[routeIndex] || 0, weightsOf(positions, route));
+                    for (const titleIndex of kept) {
+                        const position = positions[titleIndex];
+                        if (!(amounts[titleIndex] > 0)) continue;
+                        receipts.push({receiptId: JSON.stringify([week, offer.platformId, countryId, 'NON_STORE', index, routeIndex, position.projectId]),
                             platformId: offer.platformId, countryId, projectId: position.projectId, contractId: position.contractId,
                             kind: 'NON_STORE', sourceKind, grossReceipts: amounts[titleIndex], ...(route.kind === 'SUBSCRIPTION' ? {planId: route.planId} : {})});
-                    });
+                    }
                 });
             };
             for (const source of sourcesByPlatform.get(offer.platformId)?.get(countryId) || []) {

@@ -1,7 +1,7 @@
 import { issueCinemaResult } from './boxOfficeIdentity';
 import { compactCinemaMarketState } from './boxOfficeHistory';
 import { buildCinemaAudienceSnapshot } from './boxOfficeAudience';
-import { allocateCinemaResources, apportionCinemaIntegers, cinemaCount, cinemaKey, cinemaSum, cinemaWeeklyWallet } from './boxOfficeMath';
+import { allocateCinemaResources, apportionCinemaIntegers, cinemaCount, cinemaKeyPieces, cinemaSum, cinemaWeeklyWallet } from './boxOfficeMath';
 import { CINEMA_AUDIENCE_PROFILE, CINEMA_MARKET_TUNING_VERSION, CINEMA_SUPPLY_PROFILE as P } from './boxOfficeProfiles';
 import { splitRealizedCinemaGross } from './boxOfficeSettlement';
 import { quoteCinemaSupply } from './boxOfficeSupply';
@@ -10,6 +10,16 @@ import type { CinemaAdmissionAllocation, CinemaWeekInput, CinemaWeekResult } fro
 
 const group = <T>(rows:readonly T[],key:(r:T)=>string):Map<string,T[]> => {
     const result=new Map<string,T[]>();for(const row of rows){const id=key(row);const list=result.get(id)||[];list.push(row);result.set(id,list)}return result;
+};
+/* Round 3 (2026-11-09): values kept under an exact pair of ids, one map inside another, where every cell of
+   every title used to build a JSON text key for each lookup. Same pairs, same values, same insertion order. */
+type PairIndex<V> = {get:(a:string,b:string)=>V|undefined;set:(a:string,b:string,value:V)=>void};
+const pairIndex = <V>():PairIndex<V> => {
+    const outer=new Map<string,Map<string,V>>();
+    return {get:(a,b)=>outer.get(a)?.get(b),set:(a,b,value)=>{let inner=outer.get(a);if(!inner){inner=new Map();outer.set(a,inner)}inner.set(b,value)}};
+};
+const groupPairs = <T>(rows:readonly T[],first:(r:T)=>string,second:(r:T)=>string):PairIndex<T[]> => {
+    const result=pairIndex<T[]>();for(const row of rows){const a=first(row),b=second(row);const list=result.get(a,b);if(list)list.push(row);else result.set(a,b,[row])}return result;
 };
 const unique = (ids:readonly string[],kind:string):void => {if(ids.some(id=>!id)||new Set(ids).size!==ids.length)throw new Error(`Duplicate/missing cinema ${kind} identity`)};
 const validate = (input:CinemaWeekInput):void => {
@@ -83,54 +93,89 @@ const fingerprint = (value:unknown):string => {
     // Produce the issued v2 canonical JSON directly. Rebuilding a parallel
     // object tree serialized every nested array element again at each ancestor.
     // Strings here live only for this invocation; no mutable-state hash cache.
-    const keysQuoted=new Map<string,string>();
-    const quoteKey=(key:string):string=>{
-        const hit=keysQuoted.get(key);if(hit!==undefined)return hit;
-        const text=JSON.stringify(key);if(key.length<=128 && keysQuoted.size<2048)keysQuoted.set(key,text);return text;
-    };
     const isIndex=(key:string):boolean=>{const n=Number(key);return Number.isInteger(n)&&n>=0&&n<4294967295&&String(n)===key;};
     /* Perf plan Phase 3 (2026-11-09): tens of thousands of rows share a key list, so the ordered keys are
-       kept per exact key sequence (a trie, no delimiter) for this invocation; same order, same text. */
-    type KeyNode={next:Map<string,KeyNode>;ordered?:readonly string[]};
+       kept per exact key sequence (a trie, no delimiter) for this invocation; same order, same text.
+       Round 3 (2026-11-09): the kept layout also holds each key's quoted label, so a field needs no lookup. */
+    type KeyLayout={ordered:readonly string[];first:readonly string[];rest:readonly string[]};
+    type KeyNode={next:Map<string,KeyNode>;layout?:KeyLayout};
     const keyRoot:KeyNode={next:new Map()};let keyNodes=0;
     const orderKeys=(keys:string[]):readonly string[]=>{
         let firstNamed=0;while(firstNamed<keys.length && isIndex(keys[firstNamed]))firstNamed++;
         return firstNamed?keys.slice(0,firstNamed).concat(keys.slice(firstNamed).sort((a,b)=>a.localeCompare(b))):keys.sort((a,b)=>a.localeCompare(b));
     };
-    const orderedKeys=(keys:string[]):readonly string[]=>{
-        if(keys.length>32)return orderKeys(keys);
+    const layout=(keys:string[]):KeyLayout=>{
+        const ordered=orderKeys(keys);
+        return {ordered,first:ordered.map(key=>`${JSON.stringify(key)}:`),rest:ordered.map(key=>`,${JSON.stringify(key)}:`)};
+    };
+    const layoutOf=(keys:string[]):KeyLayout=>{
+        if(keys.length>32)return layout(keys);
         let node=keyRoot;
         for(const key of keys){
             let next=node.next.get(key);
-            if(!next){if(keyNodes>=4096)return orderKeys(keys);next={next:new Map()};node.next.set(key,next);keyNodes++;}
+            if(!next){if(keyNodes>=4096)return layout(keys);next={next:new Map()};node.next.set(key,next);keyNodes++;}
             node=next;
         }
-        return node.ordered || (node.ordered=orderKeys(keys.slice()));
+        return node.layout || (node.layout=layout(keys.slice()));
     };
-    const canonical=(v:unknown):string|undefined=>{
+    // Kinds, ids and names repeat by the thousand; each is quoted once per invocation.
+    const quoted=new Map<string,string>();
+    const quote=(text:string):string=>{
+        let json=quoted.get(text);
+        if(json===undefined){json=JSON.stringify(text);if(text.length<=64 && quoted.size<8192)quoted.set(text,json);}
+        return json;
+    };
+    // JSON.stringify's own text for a non-object: a finite number is ToString, any other number is null,
+    // and undefined, a function or a symbol has none.
+    const primitive=(v:unknown):string|undefined=>typeof v==='string'?quote(v)
+        :typeof v==='number'?(Number.isFinite(v)?String(v):'null'):typeof v==='boolean'?(v?'true':'false'):JSON.stringify(v);
+    /* Round 3 (2026-11-09): the same v2 text, written as pieces. Only an element of a sorted array is joined
+       into one string, because the sort compares element texts; objects append to the enclosing pieces, and
+       the top level is hashed piece by piece. A late career's 14M-character text was copied at every object
+       level and joined whole before hashing. Returns false when the value has no JSON text. */
+    const write=(v:unknown,out:string[]):boolean=>{
         if(Array.isArray(v)) {
-            const rows=Array.from({length:v.length},(_,index)=>canonical(v[index]));
+            if(v.length<2){out.push('[');if(v.length && !write(v[0],out))out.push('null');out.push(']');return true;}
+            const rows:(string|undefined)[]=new Array(v.length);
+            for(let index=0;index<v.length;index++)rows[index]=text(v[index]);
             rows.sort((a,b)=>a===undefined?(b===undefined?0:1):b===undefined?-1:a.localeCompare(b));
-            return `[${rows.map(text=>text===undefined?'null':text).join(',')}]`;
+            out.push('[');
+            for(let index=0;index<rows.length;index++){if(index)out.push(',');out.push(rows[index] ?? 'null');}
+            out.push(']');
+            return true;
         }
         if(v && typeof v==='object') {
-            const record=v as Record<string,unknown>,keys=Object.keys(record);
+            const record=v as Record<string,unknown>;
             // JSON.stringify(Object.fromEntries(sortedEntries)) still emits
             // integer-index keys first, in numeric order. Object.keys has that
             // order already; only the following named keys use locale ordering.
-            const ordered=orderedKeys(keys);
-            const fields:string[]=[];
-            for(const key of ordered){const text=canonical(record[key]);if(text!==undefined)fields.push(`${quoteKey(key)}:${text}`)}
-            return `{${fields.join(',')}}`;
+            const {ordered,first,rest}=layoutOf(Object.keys(record));
+            out.push('{');
+            let empty=true;
+            for(let index=0;index<ordered.length;index++){
+                const mark=out.length;
+                out.push(empty?first[index]:rest[index]);
+                if(write(record[ordered[index]],out))empty=false;else out.length=mark;
+            }
+            out.push('}');
+            return true;
         }
-        return JSON.stringify(v);
+        const json=primitive(v);
+        if(json===undefined)return false;
+        out.push(json);
+        return true;
+    };
+    const text=(v:unknown):string|undefined=>{
+        if(!v || typeof v!=='object')return primitive(v);
+        const out:string[]=[];write(v,out);return out.join('');
     };
     // sourceSignature is derived from these same facts. Including its full
     // serialized copy again inflated both canonicalization and result issuance.
     // v2 changes diagnostic identity only; exact source/issued checks stay intact.
     const {live,...facts}=value as CinemaWeekInput;
     const independentFacts={...facts,...(live?{live:{clockEpoch:live.clockEpoch}}:{})};
-    return `cinema-input-v2:${cinemaKey(0,0,canonical(independentFacts)!).toString(16)}`;
+    const pieces:string[]=[];write(independentFacts,pieces);
+    return `cinema-input-v2:${cinemaKeyPieces(0,0,pieces).toString(16)}`;
 };
 
 const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
@@ -164,6 +209,8 @@ const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             && !closedRuns.has(runKey(t.id,pool.id));
     });
     const snapshot=buildCinemaAudienceSnapshot({...input,supply});
+    // Round 3 (2026-11-09): each title reads its own choices, in their order, not the whole list three times.
+    const choicesByTitle=group(snapshot.choices,c=>c.titleId);
     const requests=snapshot.choices.filter(r=>r.kind!=='DEFER').map(r=>({...r,id:`${r.titleId}:${r.cohortId}:${r.kind}`,remaining:r.requestedAdmissions}));
     const cohorts=[...input.cohorts].sort((a,b)=>a.id.localeCompare(b.id)).map(c=>({cohortId:c.id,
         walletCents:cinemaWeeklyWallet(c.market?.monthlyCinemaBudgetCents || 0,input.absoluteWeek),spentCents:0,unspentCents:0,
@@ -176,7 +223,7 @@ const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
     for(const pool of [...supply.pools].sort((a,b)=>a.ticketPriceCents-b.ticketPriceCents||a.id.localeCompare(b.id))) {
         const titleIds=(offersByPool.get(pool.id)||[]).map(o=>o.titleId).sort();
         const candidates=(requestsByCountry.get(pool.countryId)||[]).filter(r=>r.remaining>0 && titleIds.includes(r.titleId));
-        const candidatesByCohort=group(candidates,r=>r.cohortId),countryCohorts=cohortsByCountry.get(pool.countryId)||[];
+        const candidatesByCohort=group(candidates,r=>r.cohortId),candidatesByTitle=group(candidates,r=>r.titleId),countryCohorts=cohortsByCountry.get(pool.countryId)||[];
         let poolAdmissions=0;
         const wanted=new Map<string,number>();
         for(const c of countryCohorts) {
@@ -186,7 +233,7 @@ const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         }
         const desired=titleIds.map(id=>{
             const title=titleIndex.get(id)!;
-            const demand=cinemaSum(candidates.filter(r=>r.titleId===id).map(r=>wanted.get(r.id)||0));
+            const demand=cinemaSum((candidatesByTitle.get(id)||[]).map(r=>wanted.get(r.id)||0));
             const grace=input.absoluteWeek-title.market!.releaseWeek<P.discoveryGraceWeeks;
             return {id,demand,discovery:grace,prior:runIndex.get(runKey(id,pool.id)),minutes:title.market!.runtimeMinutes+P.turnaroundMinutes};
         });
@@ -198,7 +245,7 @@ const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
             ...titleIds.map(id=>id===r.titleId?1:0),
         ]})),limits,input.seed,input.absoluteWeek);
         for(const titleId of titleIds) {
-            const rows=candidates.filter(r=>r.titleId===titleId),showCount=shows.get(titleId)||0;
+            const rows=candidatesByTitle.get(titleId)||[],showCount=shows.get(titleId)||0;
             let sold=0;
             for(const r of rows) {
                 const admissions=joint.get(r.id)!;if(!admissions)continue;
@@ -231,11 +278,12 @@ const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         supplyRows.push({poolId:pool.id,shows:totalShows,usedScreenMinutes:cinemaSum(desired.map(r=>(shows.get(r.id)||0)*r.minutes)),
             availableScreenMinutes:pool.weeklyScreenMinutes,seats:totalShows*pool.seatsPerShow,admissions:poolAdmissions});
     }
-    const allocationsByTitle=group(allocations,a=>a.titleId),allocationsByCell=group(allocations,a=>JSON.stringify([a.titleId,a.cohortId]));
-    const footfall=new Map<string,number>();
-    for(const a of allocations){const key=JSON.stringify([a.cohortId,a.poolId]);footfall.set(key,(footfall.get(key)||0)+a.admissions)}
-    const posterPools=group(exhibition.filter(e=>e.shows>0&&e.screens>0),e=>JSON.stringify([e.titleId,poolIndex.get(e.poolId)!.countryId]));
-    const firstRequests=new Map(snapshot.choices.filter(r=>r.kind==='FIRST').map(r=>[JSON.stringify([r.titleId,r.cohortId]),r]));
+    const allocationsByTitle=group(allocations,a=>a.titleId),allocationsByCell=groupPairs(allocations,a=>a.titleId,a=>a.cohortId);
+    const footfall=pairIndex<number>();
+    for(const a of allocations)footfall.set(a.cohortId,a.poolId,(footfall.get(a.cohortId,a.poolId)||0)+a.admissions);
+    const posterPools=groupPairs(exhibition.filter(e=>e.shows>0&&e.screens>0),e=>e.titleId,e=>poolIndex.get(e.poolId)!.countryId);
+    const firstRequests=pairIndex<(typeof snapshot.choices)[number]>();
+    for(const r of snapshot.choices)if(r.kind==='FIRST')firstRequests.set(r.titleId,r.cohortId,r);
     const titles=[...input.titles].sort((a,b)=>a.id.localeCompare(b.id)).map(t=>{
         const rows=allocationsByTitle.get(t.id)||[];
         const splits=rows.map(r=>{const pool=poolIndex.get(r.poolId)!;return splitRealizedCinemaGross({grossCents:r.admissions*r.priceCents,exhibitorBasisPoints:pool.exhibitorBasisPoints,distributionBasisPoints:pool.distributionBasisPoints})});
@@ -249,12 +297,12 @@ const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         const admissions=cinemaSum(rows.map(r=>r.admissions));
         return {titleId:t.id,screens:titleScreens.get(t.id)||0,countries,satisfactionScore:admissions ? rows.reduce((n,r)=>n+r.admissions*r.satisfaction,0)/admissions : null,
             firstAdmissions:cinemaSum(rows.filter(r=>r.kind==='FIRST').map(r=>r.admissions)),repeatAdmissions:cinemaSum(rows.filter(r=>r.kind==='REPEAT').map(r=>r.admissions)),
-            deferredPeople:cinemaSum(snapshot.choices.filter(r=>r.titleId===t.id && r.kind==='DEFER').map(r=>r.interestedPeople)),
+            deferredPeople:cinemaSum((choicesByTitle.get(t.id)||[]).filter(r=>r.kind==='DEFER').map(r=>r.interestedPeople)),
             grossCents:cinemaSum(splits.map(s=>s.grossCents)),producerReceiptsCents:cinemaSum(splits.map(s=>s.producerReceiptsCents)),
             exhibitorReceiptsCents:cinemaSum(splits.map(s=>s.exhibitorReceiptsCents)),distributionDeductionsCents:cinemaSum(splits.map(s=>s.distributionDeductionsCents))};
     });
     for(const title of snapshot.titles)for(const cell of title.cells) {
-        const rows=allocationsByCell.get(JSON.stringify([title.titleId,cell.cohortId]))||[];
+        const rows=allocationsByCell.get(title.titleId,cell.cohortId)||[];
         const first=cinemaSum(rows.filter(a=>a.kind==='FIRST').map(a=>a.admissions)),repeat=cinemaSum(rows.filter(a=>a.kind==='REPEAT').map(a=>a.admissions));
         if(repeat) {
             const eligible=cell.seenBands.map((b,i)=>({id:String(i),wanted:b.satisfaction>55?b.people:0,units:[1]}));
@@ -272,27 +320,28 @@ const calculateCinemaWeek = (input:CinemaWeekInput):CinemaWeekResult => {
         // A paid release booking includes local exhibitor placement. Only realized OTHER-title
         // patrons near its actual screen footprint can discover it. An offer alone buys no placement;
         // one booked screen cannot advertise to every visitor across an entire chain.
-        const posters=posterPools.get(JSON.stringify([title.titleId,inputCohortIndex.get(cell.cohortId)!.countryId]))||[];
+        const posters=posterPools.get(title.titleId,inputCohortIndex.get(cell.cohortId)!.countryId)||[];
         const otherVisits=cinemaSum(posters.map(o=>{
-            const visitors=(footfall.get(JSON.stringify([cell.cohortId,o.poolId]))||0)-rows.filter(a=>a.poolId===o.poolId).reduce((n,a)=>n+a.admissions,0);
+            const visitors=(footfall.get(cell.cohortId,o.poolId)||0)-rows.filter(a=>a.poolId===o.poolId).reduce((n,a)=>n+a.admissions,0);
             return Math.floor(visitors*o.screens/Math.max(1,poolIndex.get(o.poolId)!.screens));
         }));
         cell.pendingLocalFootfall=otherVisits?{absoluteWeek:input.absoluteWeek,otherFilmAdmissions:otherVisits}:undefined;
         const seen=cell.seenBands.reduce((n,b)=>n+b.people,0);
-        const firstIntent=firstRequests.get(JSON.stringify([title.titleId,cell.cohortId]))?.requestedAdmissions || 0;
+        const firstIntent=firstRequests.get(title.titleId,cell.cohortId)?.requestedAdmissions || 0;
         cell.deferredPeople=Math.min(cell.deferredPeople+Math.max(0,firstIntent-first),Math.max(0,cell.awarePeople-seen));
     }
     for(const title of titles)title.deferredPeople=cinemaSum(snapshot.titles.find(t=>t.titleId===title.titleId)!.cells.map(c=>c.deferredPeople));
     for(const title of titles){
         const cells=snapshot.titles.find(t=>t.titleId===title.titleId)!.cells;
-        const choices=snapshot.choices.filter(c=>c.titleId===title.titleId&&c.kind==='FIRST');
+        const titleChoices=choicesByTitle.get(title.titleId)||[];
+        const choices=titleChoices.filter(c=>c.kind==='FIRST');
         const cellsByCountry=group(cells,c=>inputCohortIndex.get(c.cohortId)?.countryId || '');
         const countries=[...inputCohortsByCountry.keys()].sort().map(countryId=>{
             const local=cellsByCountry.get(countryId)||[];
             return {countryId,awarePeople:cinemaSum(local.map(c=>c.awarePeople)),deferredPeople:cinemaSum(local.map(c=>c.deferredPeople))};
         }).filter(c=>c.awarePeople>0||c.deferredPeople>0);
         Object.assign(title,{audienceSignals:{awarePeople:cinemaSum(cells.map(c=>c.awarePeople)),
-            homeWaitingPeople:cinemaSum(snapshot.choices.filter(c=>c.titleId===title.titleId&&c.kind==='DEFER'&&c.reasons.includes('KNOWN_STREAMING_WINDOW')).map(c=>c.interestedPeople)),
+            homeWaitingPeople:cinemaSum(titleChoices.filter(c=>c.kind==='DEFER'&&c.reasons.includes('KNOWN_STREAMING_WINDOW')).map(c=>c.interestedPeople)),
             discoveryPeople:cinemaSum(choices.map(c=>c.discoveryPeople)),
             familiarPeople:cinemaSum(choices.map(c=>Math.floor(c.awarePeople*c.universeFamiliarity))),countries}});
     }

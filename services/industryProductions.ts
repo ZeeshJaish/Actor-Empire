@@ -281,6 +281,16 @@ export const upsertCanonicalIndustryProduction = (
 ): Record<string, IndustryProductionCommitment> => {
     const normalizedProduction = normalizeIndustryProduction(production, Number.MAX_SAFE_INTEGER);
     if (!normalizedProduction) return registry || {};
+    /* Round 3 (2026-11-09): replacing a record that is already there, in a registry whose keys are already
+       in sorted order, keeps every key where it is, so the result is that same order with one value swapped.
+       Checking the order costs one comparison per neighbouring pair of keys; the rebuild below also built an
+       entry per record and added every record again. Any other registry still takes the rebuild. */
+    if (registry && Object.prototype.hasOwnProperty.call(registry, normalizedProduction.id)) {
+        const keys = Object.keys(registry);
+        let ordered = true;
+        for (let index = 1; index < keys.length && ordered; index += 1) ordered = keys[index - 1].localeCompare(keys[index]) <= 0;
+        if (ordered) return { ...registry, [normalizedProduction.id]: normalizedProduction };
+    }
     return Object.fromEntries(Object.entries({
         ...(registry || {}),
         [normalizedProduction.id]: normalizedProduction,

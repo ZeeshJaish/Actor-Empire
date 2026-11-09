@@ -9,6 +9,20 @@ export const hashDeterministicSeed = (value: string): number => {
     return hash >>> 0;
 };
 
+/** hashDeterministicSeed over the pieces' text in order, without joining it:
+ *  hashDeterministicSeedPieces(['ab', 'c']) === hashDeterministicSeed('abc'). */
+export const hashDeterministicSeedPieces = (pieces: readonly string[]): number => {
+    let hash = 2_166_136_261;
+    for (let piece = 0; piece < pieces.length; piece += 1) {
+        const value = pieces[piece];
+        for (let index = 0; index < value.length; index += 1) {
+            hash ^= value.charCodeAt(index);
+            hash = Math.imul(hash, 16_777_619);
+        }
+    }
+    return hash >>> 0;
+};
+
 export const createDeterministicRng = (seed: string | number): (() => number) => {
     let state = typeof seed === 'number' ? seed >>> 0 : hashDeterministicSeed(seed);
     return () => {

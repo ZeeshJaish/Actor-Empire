@@ -39,13 +39,24 @@ export const allocateStreamingStoreUnits = (total:number,weights:number[]):numbe
     if(!units) return safe.map(()=>0);
     const exact=safe.map(weight=>units*weight/sum);
     const counts=exact.map(Math.floor);
-    let remainder=units-counts.reduce((value,count)=>value+count,0);
+    const remainder=units-counts.reduce((value,count)=>value+count,0);
     /* Lag round 2 (2026-11-09): the same largest-remainder order (larger fraction first, then lower index)
        on plain indices instead of an object per row; when nothing is left to hand out, nothing is sorted. */
     if(remainder<=0) return counts;
     const fractions=exact.map((value,index)=>value-counts[index]);
-    const order=fractions.map((_,index)=>index).sort((a,b)=>fractions[b]-fractions[a] || a-b);
-    for(let rank=0;rank<order.length && remainder>0;rank++){counts[order[rank]]++;remainder--;}
+    /* Round 3 (2026-11-09): only the set of winners matters (each gets one unit), so the ranked sort is
+       replaced by its cut-off: the `take` largest fractions win, ties at the cut-off go to the lower indexes,
+       exactly the indexes the ranked order gave. Fractions are finite, in [0, 1). */
+    const size=fractions.length,take=Math.min(size,Math.ceil(remainder));
+    if(take>=size){for(let index=0;index<size;index++)counts[index]++;return counts;}
+    const cutoff=new Float64Array(fractions).sort()[size-take];
+    let ties=take;
+    for(let index=0;index<size;index++)if(fractions[index]>cutoff)ties--;
+    for(let index=0;index<size;index++){
+        const fraction=fractions[index];
+        if(fraction>cutoff)counts[index]++;
+        else if(fraction===cutoff && ties>0){counts[index]++;ties--;}
+    }
     return counts;
 };
 

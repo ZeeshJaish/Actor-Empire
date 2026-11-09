@@ -621,10 +621,19 @@ const clamp = (value: unknown, min: number, max: number, fallback = min): number
     const numeric = Number(value);
     return Math.max(min, Math.min(max, Number.isFinite(numeric) ? numeric : fallback));
 };
+/* Round 3 (2026-11-09): the owned service is normalised dozens of times a week. Text that is already clean
+   (single spaces between words, nothing to trim, within the limit) is returned as it is, because collapsing,
+   trimming and cutting it gave back the same characters; any other text takes the full clean-up. */
+const CLEAN_TEXT = /^(?:\S+(?: \S+)*)?$/;
 const cleanText = (value: unknown, fallback = '', maxLength = 160): string => (
     typeof value === 'string'
-        ? value.replace(/\s+/g, ' ').trim().slice(0, maxLength)
+        ? value.length <= maxLength && CLEAN_TEXT.test(value) ? value : value.replace(/\s+/g, ' ').trim().slice(0, maxLength)
         : fallback
+);
+/* Round 3 (2026-11-09): a record's own id, cleaned exactly as cleanText cleans it; only a record without one
+   derives an id. The derived id used to be built (joined and hashed) on every pass, even when unused. */
+const cleanIdOr = (value: unknown, derive: () => string, maxLength: number): string => (
+    typeof value === 'string' ? cleanText(value, '', maxLength) : derive()
 );
 const cleanCustomMarkDataUrl = cleanStreamingBrandMarkDataUrl;
 const uniqueStrings = (value: unknown, limit?: number): string[] => {
@@ -863,7 +872,7 @@ const normalizeExecutiveDevelopment = (value: unknown): OwnedStreamingExecutiveD
     );
     const status = isOneOf(source.status, ['IN_PROGRESS', 'COMPLETED'] as const, 'IN_PROGRESS');
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_exec_development', idempotencyKey), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_exec_development', idempotencyKey), 120),
         idempotencyKey,
         executiveId,
         track: isOneOf(source.track, EXECUTIVE_DEVELOPMENT_TRACKS, 'ROLE_MASTERY'),
@@ -1154,7 +1163,7 @@ const normalizeBoardMotion = (value: unknown): OwnedStreamingBoardMotion | null 
     if (!idempotencyKey) return null;
     const calledAtAbsoluteWeek = Math.max(0, Math.round(clamp(source.calledAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_board_motion', idempotencyKey), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_board_motion', idempotencyKey), 120),
         idempotencyKey,
         motionId: isOneOf(source.motionId, BOARD_MOTION_IDS, 'RIGHTS_AUTHORITY'),
         title: cleanText(source.title, 'Board motion', 160),
@@ -1187,7 +1196,7 @@ const normalizeCelebrityInvestor = (value: unknown): OwnedStreamingCelebrityInve
     const candidateId = cleanText(source.candidateId, '', 120);
     if (!candidateId) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_celebrity_investor', candidateId), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_celebrity_investor', candidateId), 120),
         candidateId,
         name: cleanText(source.name, 'Celebrity investor', 120),
         status: isOneOf(source.status, ['ACCEPTED', 'DECLINED', 'BOUGHT_OUT'] as const, 'DECLINED'),
@@ -1466,7 +1475,7 @@ const normalizeRivalMove = (value: unknown): OwnedStreamingRivalMove | null => {
     const createdAtAbsoluteWeek = Math.max(0, Math.round(clamp(source.createdAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
     const targetExecutiveId = cleanText(source.targetExecutiveId, '', 120) || null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_rival_move', idempotencyKey), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_rival_move', idempotencyKey), 120),
         idempotencyKey,
         platformId: isOneOf(source.platformId, PLATFORM_IDS, 'NETFLIX'),
         platformName: cleanText(source.platformName, 'Rival platform', 100),
@@ -1510,7 +1519,7 @@ const normalizeRivalWeeklySnapshot = (value: unknown): OwnedStreamingRivalWeekly
     const platformName = cleanText(source.platformName, '', 100);
     if (!platformName) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_rival_week', source.platformId, absoluteWeek), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_rival_week', source.platformId, absoluteWeek), 120),
         absoluteWeek,
         platformId: isOneOf(source.platformId, PLATFORM_IDS, 'NETFLIX'),
         platformName,
@@ -1529,7 +1538,7 @@ const normalizeRegionalLaunch = (value: unknown): OwnedStreamingRegionalLaunch |
     const readyAtAbsoluteWeek = Math.max(startedAtAbsoluteWeek, Math.round(clamp(source.readyAtAbsoluteWeek, startedAtAbsoluteWeek, Number.MAX_SAFE_INTEGER, startedAtAbsoluteWeek)));
     const status = isOneOf(source.status, ['ACTIVE', 'IN_PROGRESS'] as const, 'IN_PROGRESS');
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_region', idempotencyKey), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_region', idempotencyKey), 120),
         idempotencyKey,
         regionId: isOneOf(source.regionId, REGION_IDS, 'HOME_MARKET'),
         regionName: cleanText(source.regionName, 'Market region', 100),
@@ -1565,7 +1574,7 @@ const normalizeMarketShareSnapshot = (value: unknown): OwnedStreamingMarketShare
     });
     if (!entries.length) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_market_share', absoluteWeek), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_market_share', absoluteWeek), 120),
         absoluteWeek,
         entries,
     };
@@ -1603,7 +1612,7 @@ const normalizeAwardSeason = (value: unknown): OwnedStreamingAwardSeason | null 
         }];
     });
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_awards', idempotencyKey), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_awards', idempotencyKey), 120),
         idempotencyKey,
         seasonNumber: Math.max(1, Math.round(clamp(source.seasonNumber, 1, 1_000, 1))),
         absoluteWeek: Math.max(0, Math.round(clamp(source.absoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -1917,7 +1926,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         const detectedAtAbsoluteWeek = Math.max(0, Math.round(clamp(item.detectedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
         const stage = isOneOf(item.stage, ['DETECTED', 'RECOVERING', 'RESOLVED'] as const, 'DETECTED');
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_crisis', idempotencyKey), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_crisis', idempotencyKey), 120),
             idempotencyKey,
             type: isOneOf(item.type, ['PLATFORM_OUTAGE', 'ACCOUNT_BREACH', 'CONTENT_LEAK', 'RECOMMENDATION_BACKLASH', 'RIGHTS_COMPLIANCE', 'EMPLOYEE_ALLEGATION',
                 'APP_CRASH', 'FEATURE_BROKEN', 'SLOW_STREAMING'] as const, 'PLATFORM_OUTAGE'),
@@ -1959,7 +1968,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         const idempotencyKey = cleanText(item.idempotencyKey, '', 180);
         if (!idempotencyKey) return null;
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_shadow', idempotencyKey), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_shadow', idempotencyKey), 120),
             idempotencyKey,
             type: isOneOf(item.type, ['INTELLIGENCE_PURCHASE', 'WHISPER_CAMPAIGN', 'CONTRACT_PRESSURE', 'COVERT_CONTENT_LEAK', 'CORPORATE_ESPIONAGE', 'SERVICE_DISRUPTION_ATTEMPT'] as const, 'INTELLIGENCE_PURCHASE'),
             targetPlatformId: isOneOf(item.targetPlatformId, PLATFORM_IDS, 'NETFLIX'),
@@ -1982,7 +1991,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         const idempotencyKey = cleanText(item.idempotencyKey, '', 180);
         if (!idempotencyKey) return null;
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_trust', idempotencyKey), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_trust', idempotencyKey), 120),
             idempotencyKey,
             type: isOneOf(item.type, ['SECURITY_DRILL', 'WHISTLEBLOWER_CHANNEL', 'TRANSPARENCY_REPORT', 'INDEPENDENT_AUDIT'] as const, 'SECURITY_DRILL'),
             title: cleanText(item.title, 'Trust initiative', 120),
@@ -1998,7 +2007,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         if (!idempotencyKey) return null;
         const status = isOneOf(item.status, ['OPEN', 'CLOSED'] as const, 'OPEN');
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_regulator', idempotencyKey), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_regulator', idempotencyKey), 120),
             idempotencyKey,
             title: cleanText(item.title, 'Regulatory inquiry', 120),
             status,
@@ -2019,7 +2028,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         if (!idempotencyKey) return null;
         const status = isOneOf(item.status, ['OPEN', 'RESOLVED'] as const, 'OPEN');
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_whistleblower', idempotencyKey), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_whistleblower', idempotencyKey), 120),
             idempotencyKey,
             title: cleanText(item.title, 'Internal report', 120),
             allegation: cleanText(item.allegation, 'An employee raised an operating concern.', 300),
@@ -2045,7 +2054,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         const detectedAtAbsoluteWeek = Math.max(0, Math.round(clamp(item.detectedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
         const stage = isOneOf(item.stage, ['DETECTED', 'RECOVERING', 'RESOLVED'] as const, 'DETECTED');
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_infrastructure_incident', idempotencyKey), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_infrastructure_incident', idempotencyKey), 120),
             idempotencyKey,
             type: isOneOf(item.type, ['POWER_FAILURE', 'COOLING_INCIDENT', 'FIBRE_CUT', 'TRAFFIC_SPIKE', 'REGIONAL_OUTAGE', 'CYBERATTACK', 'DDOS_ATTACK', 'RIVAL_SABOTAGE'] as const, 'REGIONAL_OUTAGE'),
             severity: isOneOf(item.severity, ['MINOR', 'SERIOUS', 'MAJOR', 'CRITICAL'] as const, 'SERIOUS'),
@@ -2108,7 +2117,7 @@ const normalizeCrisisSecurity = (value: unknown): OwnedStreamingCrisisSecuritySt
         const factId = cleanText(item.factId, '', 120);
         if (!idempotencyKey || !factId) return null;
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_infrastructure_award', idempotencyKey), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_infrastructure_award', idempotencyKey), 120),
             idempotencyKey,
             category: isOneOf(item.category, ['RELIABILITY_LEADERSHIP', 'RECOVERY_EXCELLENCE', 'SUSTAINABLE_SCALE', 'GLOBAL_BACKBONE'] as const, 'RELIABILITY_LEADERSHIP'),
             title: cleanText(item.title, 'Infrastructure distinction', 120),
@@ -2159,7 +2168,7 @@ const normalizeSuccessionPlan = (value: unknown): OwnedStreamingSuccessionPlan |
     const candidateName = cleanText(source.candidateName, '', 120);
     if (!candidateId || !candidateName) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_succession', candidateId), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_succession', candidateId), 120),
         candidateType: isOneOf(source.candidateType, ['EXECUTIVE', 'FAMILY_HEIR'] as const, 'EXECUTIVE'),
         candidateId,
         candidateName,
@@ -2204,7 +2213,7 @@ const normalizeLegacyMontage = (value: unknown): OwnedStreamingLegacyMontage | n
         const factId = cleanText(item.factId, '', 120);
         if (!factId) return null;
         return {
-            id: cleanText(item.id, createDeterministicId('streaming_legacy_chapter', factId), 120),
+            id: cleanIdOr(item.id, () => createDeterministicId('streaming_legacy_chapter', factId), 120),
             title: cleanText(item.title, 'A defining moment', 120),
             caption: cleanText(item.caption, 'The company changed direction.', 280),
             absoluteWeek: Math.max(0, Math.round(clamp(item.absoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -2213,7 +2222,7 @@ const normalizeLegacyMontage = (value: unknown): OwnedStreamingLegacyMontage | n
     }).filter((item): item is OwnedStreamingLegacyMontage['chapters'][number] => Boolean(item)).slice(0, 12);
     if (!chapters.length) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_legacy_montage', idempotencyKey), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_legacy_montage', idempotencyKey), 120),
         idempotencyKey,
         eraNumber: Math.max(1, Math.round(clamp(source.eraNumber, 1, 10_000, 1))),
         createdAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.createdAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
@@ -2846,7 +2855,7 @@ const normalizeLaunchMarketingPlan = (value: unknown): OwnedStreamingLaunchMarke
         lastProcessedAbsoluteWeek: source.lastProcessedAbsoluteWeek === null || source.lastProcessedAbsoluteWeek === undefined ? null
             : Math.max(0, Math.round(clamp(source.lastProcessedAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         forecastSnapshot: {
-            id: cleanText(forecastSource.id, createDeterministicId('streaming_marketing_forecast', signature), 120),
+            id: cleanIdOr(forecastSource.id, () => createDeterministicId('streaming_marketing_forecast', signature), 120),
             version: 1,
             signature,
             effectiveBudget: Math.max(0, Math.round(clamp(forecastSource.effectiveBudget, 0, Number.MAX_SAFE_INTEGER))),
@@ -3840,7 +3849,7 @@ const normalizeLaunchCommit = (value: unknown): OwnedStreamingLaunchCommit | nul
     const idempotencyKey = cleanText(source.idempotencyKey, '', 180);
     if (!idempotencyKey) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_launch', idempotencyKey), 100),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_launch', idempotencyKey), 100),
         idempotencyKey,
         committedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.committedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         capacityPlan: isOneOf(source.capacityPlan, LAUNCH_CAPACITY_PLANS, 'STANDARD'),
@@ -3894,7 +3903,7 @@ const normalizeTitleWeekPerformance = (value: unknown): OwnedStreamingTitleWeekP
     const absoluteWeek = Math.max(0, Math.round(clamp(source.absoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
     const discovery = asRecord(source.discoveryMix);
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_title_week', projectId, absoluteWeek), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_title_week', projectId, absoluteWeek), 120),
         projectId,
         title,
         source: isOneOf(source.source, SLATE_ENTRY_SOURCES, 'OWNED_LIBRARY'),
@@ -4153,7 +4162,7 @@ const normalizeWeeklyDecision = (value: unknown): OwnedStreamingWeeklyDecision |
     )));
     const status = isOneOf(source.status, ['LOCKED', 'APPLIED'] as const, 'LOCKED');
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_decision', idempotencyKey), 100),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_decision', idempotencyKey), 100),
         idempotencyKey,
         planId: isOneOf(source.planId, WEEKLY_PLAN_IDS, 'RETENTION_SPOTLIGHT'),
         label: cleanText(source.label, 'Weekly operating plan', 100),
@@ -4220,7 +4229,7 @@ const normalizeGrowthAction = (value: unknown): OwnedStreamingGrowthAction | nul
     const artworkVariants = uniqueStrings(source.artworkVariants, 2)
         .filter((variant): variant is StreamingArtworkVariant => ARTWORK_VARIANTS.includes(variant as StreamingArtworkVariant));
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_growth', idempotencyKey), 120),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_growth', idempotencyKey), 120),
         idempotencyKey,
         projectId,
         title,
@@ -4246,7 +4255,7 @@ const normalizeSnapshot = (value: unknown): OwnedStreamingWeeklySnapshot | null 
     const absoluteWeek = Math.max(0, Math.round(Number(source.absoluteWeek)));
     if (!Number.isFinite(absoluteWeek)) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_snapshot', absoluteWeek), 100),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_snapshot', absoluteWeek), 100),
         absoluteWeek,
         ...normalizeMetrics(source),
         causeMarkers: uniqueStrings(source.causeMarkers, 8),
@@ -4266,7 +4275,7 @@ const normalizeCycleReview = (value: unknown): OwnedStreamingCycleReview | null 
     );
     const rivalSource = asRecord(source.rivalMovement);
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_cycle', idempotencyKey), 100),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_cycle', idempotencyKey), 100),
         idempotencyKey,
         ledgerFactId,
         kind: isOneOf(source.kind, CYCLE_REVIEW_KINDS, 'FOUR_WEEK_BEAT'),
@@ -4341,7 +4350,7 @@ const normalizeLedgerEntry = (value: unknown): OwnedStreamingLedgerEntry | null 
     const absoluteWeek = Math.max(0, Math.round(clamp(source.absoluteWeek, 0, Number.MAX_SAFE_INTEGER)));
     const type = isOneOf(source.type, LEDGER_EVENT_TYPES, 'SYSTEM_REPAIR');
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_event', idempotencyKey), 100),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_event', idempotencyKey), 100),
         idempotencyKey,
         absoluteWeek,
         type,
@@ -4357,7 +4366,7 @@ const normalizeCinematicEvent = (value: unknown): OwnedStreamingCinematicEvent |
     const factIds = uniqueStrings(source.factIds, 12);
     if (!idempotencyKey || !factIds.length) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_scene', idempotencyKey), 100),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_scene', idempotencyKey), 100),
         idempotencyKey,
         type: isOneOf(source.type, CINEMATIC_TYPES, 'MILESTONE'),
         status: isOneOf(source.status, ['QUEUED', 'VIEWED', 'DISMISSED'] as const, 'QUEUED'),
@@ -4386,7 +4395,7 @@ const normalizeOpeningProgrammeCommission = (
     if (!idempotencyKey || !launchDefinitionSignature || !infrastructureConfigurationSignature
         || !rehearsalSignature || !marketingForecastSignature) return null;
     return {
-        id: cleanText(source.id, createDeterministicId('streaming_opening_programme', idempotencyKey), 180),
+        id: cleanIdOr(source.id, () => createDeterministicId('streaming_opening_programme', idempotencyKey), 180),
         idempotencyKey,
         committedAtAbsoluteWeek: Math.max(0, Math.round(clamp(source.committedAtAbsoluteWeek, 0, Number.MAX_SAFE_INTEGER))),
         launchDefinitionSignature,

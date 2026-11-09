@@ -39,6 +39,28 @@ const evidence = (input: CinemaWeekInput): CinemaViewingEvidence[] => {
     }
     return [...unique.values()];
 };
+/* Round 3 (2026-11-09): a cell's seen bands are a short list of flat plain rows, cloned for every title and
+   cohort. Such a list is copied directly, as structuredClone copies it (own string keys in order, the same
+   values); a list with holes, extra properties, another prototype or a non-primitive value still goes
+   through structuredClone. */
+const cloneFlatRows = <T>(rows: readonly T[]): T[] => {
+    if (!Array.isArray(rows) || Object.getPrototypeOf(rows) !== Array.prototype) return structuredClone(rows) as T[];
+    const indexes = Object.keys(rows);
+    if (indexes.length !== rows.length || indexes.some((key, index) => key !== String(index))) return structuredClone(rows) as T[];
+    const copies = new Array<T>(rows.length);
+    for (let index = 0; index < rows.length; index++) {
+        const row = rows[index] as unknown;
+        if (!row || typeof row !== 'object' || Object.getPrototypeOf(row) !== Object.prototype) return structuredClone(rows) as T[];
+        const copy: Record<string, unknown> = {};
+        for (const key of Object.keys(row)) {
+            const value = (row as Record<string, unknown>)[key];
+            if (value !== null && (typeof value === 'object' || typeof value === 'function' || typeof value === 'symbol')) return structuredClone(rows) as T[];
+            copy[key] = value;
+        }
+        copies[index] = copy as T;
+    }
+    return copies;
+};
 
 /** Exposes the proposed awareness state for the shadow allocator. Never persists or charges it. */
 export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: CinemaChoiceRequest[]; titles: CinemaTitleAudienceState[]} => {
@@ -56,6 +78,21 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
     // Read-only language lists can be shared by many title/cohort comparisons.
     // This cache belongs only to this snapshot; later calls see edits freshly.
     const cohortLanguages=new Map<readonly string[],Set<string>>();
+    /* Round 3 (2026-11-09): a viewing row's strongest role weight per person is found once per snapshot (the
+       same Math.max over the same weights), instead of filtering the row's whole cast for every title, cohort
+       and cast member. Rows and casts are read-only here. */
+    const castWeights=new Map<CinemaViewingEvidence,Map<string,number>>();
+    const castWeightOf=(row:CinemaViewingEvidence,personId:string):number=>{
+        let weights=castWeights.get(row);
+        if(!weights){
+            const lists=new Map<string,number[]>();
+            for(const c of row.cast){const list=lists.get(c.personId);if(list)list.push(c.roleWeight);else lists.set(c.personId,[c.roleWeight]);}
+            weights=new Map();
+            for(const [id,list] of lists)weights.set(id,Math.max(0,...list));
+            castWeights.set(row,weights);
+        }
+        return weights.get(personId) ?? 0;
+    };
     for (const title of [...input.titles].sort((a,b)=>a.id.localeCompare(b.id))) {
         const facts = title.market;
         let titleLanguages:string[]|undefined;
@@ -74,7 +111,7 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             releaseWeek:facts?.releaseWeek ?? input.absoluteWeek,appliedExposureIds:exposure.appliedEventIds,cells:[]};
         for (const cohort of sortedCohorts) {
             const old = priorCells.get(cohort.id);
-            const seenBands = structuredClone(old?.seenBands || []);
+            const seenBands = cloneFlatRows(old?.seenBands || []);
             const seen = Math.min(cohort.people,seenBands.reduce((n,b)=>n+b.people,0));
             let aware = Math.min(cohort.people,Math.max(seen,awarenessIndex.get(cohort.id) || 0));
             const m = cohort.market;
@@ -95,7 +132,7 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             const localDiscovery=people((cohort.people-aware)*-Math.expm1(-qualifiedLocal/Math.max(1,cohort.people)));
             aware+=localDiscovery;
             const cell = {cohortId:cohort.id,awarePeople:aware,seenBands,deferredPeople:0,
-                pendingLocalFootfall:applyLocal?undefined:structuredClone(pending),lastAppliedLocalFootfallWeek:applyLocal?pending.absoluteWeek:old?.lastAppliedLocalFootfallWeek,lastDiscoveryWeek:old?.lastDiscoveryWeek ?? -1,lastChoiceWeek:input.absoluteWeek,discoveryContactsUsed:old?.discoveryContactsUsed || 0};
+                pendingLocalFootfall:applyLocal || pending===undefined?undefined:cloneFlatRows([pending])[0],lastAppliedLocalFootfallWeek:applyLocal?pending.absoluteWeek:old?.lastAppliedLocalFootfallWeek,lastDiscoveryWeek:old?.lastDiscoveryWeek ?? -1,lastChoiceWeek:input.absoluteWeek,discoveryContactsUsed:old?.discoveryContactsUsed || 0};
             next.cells.push(cell);
             if (!facts || !m || facts.releaseWeek > input.absoluteWeek) continue;
             const own = historyByCohort.get(cohort.id)||[];
@@ -115,7 +152,7 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             // delivered experiences, so repeated disappointment can erode a previous favorite.
             const attachmentFor = (kind:'ACTOR'|'STUDIO', id:string, currentWeight:number):number => {
                 const experienced=own.flatMap(h=>{
-                    const oldWeight=kind==='STUDIO' ? (h.ownerId===id?1:0) : Math.max(0,...h.cast.filter(c=>c.personId===id).map(c=>c.roleWeight));
+                    const oldWeight=kind==='STUDIO' ? (h.ownerId===id?1:0) : castWeightOf(h,id);
                     return oldWeight>0 ? [{people:h.people,quality:h.satisfaction,weight:Math.min(currentWeight,oldWeight)}] : [];
                 });
                 for(const a of cohortAffinities) if(a.kind===kind && a.id===id)
