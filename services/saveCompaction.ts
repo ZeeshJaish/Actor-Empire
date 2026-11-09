@@ -511,10 +511,48 @@ const compactPlatformAiRightsContracts = (
   });
 };
 
+/* Perf plan Phase 3 (2026-11-09): a studio film released more than two years ago keeps every field that a
+   screen, a total or the weekly simulation reads (titles, studio, status, money, result, talent and its
+   contracts), but not three records that only matter while it is being made: the content fingerprint
+   snapshot, the processed-step keys and the production problems (an empty list, as a new row has). In a
+   late career that is about 6 MB of the save. Films still in cinemas and any production the player's own
+   records mention (their platform, deals, Originals, projects) stay whole. */
+const SLIM_RELEASED_PRODUCTION_AFTER_WEEKS = 104;
+type ProductionSlimming = {
+  absoluteWeek: number;
+  openCinemaTitleIds: ReadonlySet<string>;
+  playerReferences: () => ReadonlySet<string>;
+};
+const collectStrings = (value: unknown, into: Set<string>, seen: Set<object>): void => {
+  if (typeof value === 'string') { if (value) into.add(value); return; }
+  if (!value || typeof value !== 'object' || seen.has(value as object)) return;
+  seen.add(value as object);
+  if (Array.isArray(value)) { for (const item of value) collectStrings(item, into, seen); return; }
+  for (const item of Object.values(value as Record<string, unknown>)) collectStrings(item, into, seen);
+};
+const slimmableReleasedProduction = (production: any, slimming: ProductionSlimming): boolean => {
+  if (production?.status !== 'RELEASED') return false;
+  const execution = production.studioAiExecution;
+  if (!execution || typeof execution !== 'object') return false;
+  const fat = execution.fingerprintSnapshot !== undefined
+    || (Array.isArray(execution.processedKeys) && execution.processedKeys.length > 0)
+    || (Array.isArray(execution.problems) && execution.problems.length > 0);
+  if (!fat) return false;
+  const lastActive = Math.max(Number(production.updatedAtAbsoluteWeek) || 0, Number(production.createdAtAbsoluteWeek) || 0);
+  if (slimming.absoluteWeek - lastActive <= SLIM_RELEASED_PRODUCTION_AFTER_WEEKS) return false;
+  const id = stableHistoryId(production.id), projectId = stableHistoryId(production.canonicalProjectId);
+  return !slimming.openCinemaTitleIds.has(id) && !slimming.openCinemaTitleIds.has(projectId);
+};
+const slimReleasedProduction = (production: any): any => {
+  const { fingerprintSnapshot: _snapshot, ...execution } = production.studioAiExecution;
+  return { ...production, studioAiExecution: { ...execution, processedKeys: [], problems: [] } };
+};
+
 const compactIndustryProductions = (
   value: unknown,
   platforms: any,
   retainedAwardProjectIds: Set<string>,
+  slimming?: ProductionSlimming,
 ): Record<string, any> => {
   const productions = Object.values(value && typeof value === 'object' ? value as Record<string, any> : {});
   const referencedIds = new Set<string>();
@@ -536,7 +574,14 @@ const compactIndustryProductions = (
     ),
     terminalLimit: PLATFORM_AI_TERMINAL_PRODUCTION_MAX_ITEMS,
   });
-  return Object.fromEntries(kept.map((production: any) => [production.id, production]));
+  if (!slimming) return Object.fromEntries(kept.map((production: any) => [production.id, production]));
+  let references: ReadonlySet<string> | null = null;
+  return Object.fromEntries(kept.map((production: any) => {
+    if (!slimmableReleasedProduction(production, slimming)) return [production.id, production];
+    references = references || slimming.playerReferences();
+    const mentioned = references.has(stableHistoryId(production.id)) || references.has(stableHistoryId(production.canonicalProjectId));
+    return [production.id, mentioned ? production : slimReleasedProduction(production)];
+  }));
 };
 
 const compactTalentBookingHistory = (value: unknown, platforms: any, productions: Record<string, any>): any[] => {
@@ -894,6 +939,19 @@ const compactWorld = (player: any) => {
     world.industryProductions,
     platforms,
     retainedAwardProjectIds,
+    {
+      absoluteWeek,
+      openCinemaTitleIds: new Set(Object.entries(world.cinemaMarket?.titles || {})
+        .filter(([, title]: [string, any]) => !title?.closed)
+        .map(([titleId]) => titleId)),
+      // everything the player owns outside the shared world: platform, deals, Originals, projects, flags
+      playerReferences: () => {
+        const strings = new Set<string>();
+        const seen = new Set<object>();
+        for (const [key, item] of Object.entries(player || {})) if (key !== 'world') collectStrings(item, strings, seen);
+        return strings;
+      },
+    },
   );
   const talentBookings = compactTalentBookingHistory(world.talentBookings, platforms, industryProductions);
   const streamingRightsContracts = compactStreamingRightsContracts({ ...player, world: { ...world, platforms } });
