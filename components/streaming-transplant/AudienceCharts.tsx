@@ -6,8 +6,10 @@
 import React, { useId, useMemo, useRef, useState } from 'react';
 import r from './presentation/screens/AudienceDesk/AudienceRoom.module.css';
 import { cx } from './presentation/cx';
+import { gameYearWeekShort, gameYearWeekText } from '../../services/gameWeek';
 
 /* ── a line over weeks ─────────────────────────────────────────────────── */
+/** `week` is an absolute week; the chart shows it as the game's year and week ("15YR 21WK"), never the raw number */
 export interface TrendPointView { week: number; value: number }
 
 export const TrendChart: React.FC<{
@@ -62,7 +64,7 @@ export const TrendChart: React.FC<{
     <div className={r.chart}>
       <svg ref={svg} className={r.chartSvg} viewBox={`0 0 ${W} ${H}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onEnd}
         onPointerCancel={() => setHover(null)} onPointerLeave={() => setHover(null)}
-        role="img" aria-label={`From ${format(points[0].value)} in week ${points[0].week} to ${format(points[last].value)} in week ${points[last].week}`}>
+        role="img" aria-label={`From ${format(points[0].value)} in ${gameYearWeekText(points[0].week)} to ${format(points[last].value)} in ${gameYearWeekText(points[last].week)}`}>
         <defs>
           <linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity=".32" />
@@ -84,10 +86,10 @@ export const TrendChart: React.FC<{
       {hover !== null && (
         <div className={r.chartTip} style={{ left: `${Math.min(80, Math.max(16, geom.x(shown) / W * 100))}%` }}>
           <b>{format(points[shown].value)}</b>
-          <span>WK {points[shown].week}{shown > 0 && <> · <em className={change === 0 ? '' : good ? r.up : r.down}>{change > 0 ? '▲' : change < 0 ? '▼' : '='} {format(Math.abs(change))}</em></>}</span>
+          <span>{gameYearWeekShort(points[shown].week)}{shown > 0 && <> · <em className={change === 0 ? '' : good ? r.up : r.down}>{change > 0 ? '▲' : change < 0 ? '▼' : '='} {format(Math.abs(change))}</em></>}</span>
         </div>
       )}
-      <div className={r.chartAxis}><span>WK {points[0].week}</span><span>WK {points[Math.floor(last / 2)].week}</span><span>WK {points[last].week}</span></div>
+      <div className={r.chartAxis}><span>{gameYearWeekShort(points[0].week)}</span><span>{gameYearWeekShort(points[Math.floor(last / 2)].week)}</span><span>{gameYearWeekShort(points[last].week)}</span></div>
     </div>
   );
 };

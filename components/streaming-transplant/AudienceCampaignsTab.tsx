@@ -17,6 +17,7 @@ import { cx } from './presentation/cx';
 import { Poster } from '../../content-market-exact/Poster';
 import { compact } from './audienceAtlasModel';
 import type { AudienceCampaignRow, AudienceCampaignsView } from './audienceRoomModel';
+import { gameYearWeekShort } from '../../services/gameWeek';
 import { CampaignScenePreview } from '../campaigns/scenes/CampaignScenePreview';
 import { CAMPAIGN_SCENES } from '../campaigns/scenes/sceneCatalogue';
 import type { CreativeSubject } from '../campaigns/scenes/defaultCreative';
@@ -120,7 +121,7 @@ export const AudienceCampaignsTab: React.FC<{
               <b>{row.title}</b>
               {row.grade && <em className={cx(r.grade, r[`grade${row.grade}`])} title={GRADE_WORDS[row.grade]}>{row.grade}</em>}
             </span>
-            <span className={r.campChips}>{row.channels.map(channel => <i key={channel}>{channel}</i>)}<i className={r.campWeek}>WK {row.resultsWeek}</i></span>
+            <span className={r.campChips}>{row.channels.map(channel => <i key={channel}>{channel}</i>)}<i className={r.campWeek}>{gameYearWeekShort(row.resultsWeek)}</i></span>
             <span className={r.campStats}>
               <span><b className={r.up}>+{compact(row.viewers ?? 0)}</b><small>VIEWERS</small></span>
               {byJoin ? (

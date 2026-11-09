@@ -25,6 +25,7 @@ import { streamingLicenceWaitsForSlate } from '../../services/streamingCatalog';
 import { originalOnTheShelf, planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
 import { getStreamingViewerPersonal, getStreamingViewerPlans, getStreamingViewerQuality, streamingNetworkPictureTier } from '../../services/streamingViewerQuality';
 import { getStreamingViewerOutage } from '../../services/streamingViewerOutage';
+import { gameYearWeekShort } from '../../services/gameWeek';
 import {
   getStreamingOpenIncidents, getStreamingServiceStatus, STREAMING_STATUS_LINE_WEEKS, streamingStatusLineWeeks, type StreamingStatusLevel,
 } from '../../services/streamingStatusBoard';
@@ -439,7 +440,7 @@ export const createCanonicalNetworkState = (player: Player): NetworkState => {
   }));
   const incidents = platform.crisisSecurity.crises.slice(-8).reverse().map(crisis => ({
     id: crisis.id,
-    when: `WK ${crisis.detectedAtAbsoluteWeek}`,
+    when: gameYearWeekShort(crisis.detectedAtAbsoluteWeek),
     title: crisis.title,
     severity: ['MAJOR', 'CRITICAL'].includes(crisis.severity) ? 'major' as const : 'minor' as const,
     resolvedIn: crisis.resolvedAtAbsoluteWeek ? `${Math.max(0, crisis.resolvedAtAbsoluteWeek - crisis.detectedAtAbsoluteWeek)}w` : 'Open',
@@ -528,10 +529,10 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
     return { id: director?.id || `EMPTY-${index}`, holder: director?.name, votes: director ? 1 : undefined };
   });
   const holders = [
-    { id: 'FOUNDER', name: player.name, pct: platform.founderOwnershipPercent, since: `WK ${platform.identity?.foundedAtAbsoluteWeek ?? 0}`, you: true },
-    ...platform.finance.equityHolders.map(holder => ({ id: holder.id, name: holder.holderName, pct: holder.ownershipPercent, since: `WK ${holder.issuedAtAbsoluteWeek}` })),
+    { id: 'FOUNDER', name: player.name, pct: platform.founderOwnershipPercent, since: gameYearWeekShort(platform.identity?.foundedAtAbsoluteWeek ?? absoluteWeek), you: true },
+    ...platform.finance.equityHolders.map(holder => ({ id: holder.id, name: holder.holderName, pct: holder.ownershipPercent, since: gameYearWeekShort(holder.issuedAtAbsoluteWeek) })),
   ];
-  if (listing) holders.push({ id: 'PUBLIC', name: 'Public float', pct: Math.max(0, 100 - holders.reduce((sum, holder) => sum + holder.pct, 0)), since: `WK ${listing.listedAtAbsoluteWeek}` });
+  if (listing) holders.push({ id: 'PUBLIC', name: 'Public float', pct: Math.max(0, 100 - holders.reduce((sum, holder) => sum + holder.pct, 0)), since: gameYearWeekShort(listing.listedAtAbsoluteWeek) });
   /* #163: the cap table by size */
   holders.sort((left, right) => right.pct - left.pct);
   return {

@@ -25,3 +25,12 @@ export const gameWeekText = (absoluteWeek: number, now?: number | null) => `week
 
 /** a tight label: "W14" */
 export const gameWeekShort = (absoluteWeek: number) => `W${weekOfYear(absoluteWeek)}`;
+
+/** the game's year for a week: the age it falls in, as "Y34 W12" elsewhere counts it */
+export const gameYearOf = (absoluteWeek: number) => yearOf(absoluteWeek) + 1;
+
+/** year and week for charts and chips: "34YR 12WK" (Zeesh, 1.0.26 beta: never a raw "WK 763", never "last year") */
+export const gameYearWeekShort = (absoluteWeek: number) => `${gameYearOf(absoluteWeek)}YR ${weekOfYear(absoluteWeek)}WK`;
+
+/** the same for screen readers: "year 34, week 12" */
+export const gameYearWeekText = (absoluteWeek: number) => `year ${gameYearOf(absoluteWeek)}, week ${weekOfYear(absoluteWeek)}`;

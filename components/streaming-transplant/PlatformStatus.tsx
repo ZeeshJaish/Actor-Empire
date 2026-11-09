@@ -43,6 +43,7 @@ import type {
   StreamingStatusSection,
 } from '../../services/streamingStatusBoard';
 import type { StreamingIncidentRepairOption, StreamingIncidentRepairPath } from '../../services/streamingIncidentRepair';
+import { gameYearWeekShort, gameYearWeekText } from '../../services/gameWeek';
 
 /** what a repair did: its message for the player */
 export type PlatformRepairResult = { ok: boolean; message: string };
@@ -290,10 +291,10 @@ const IncidentHistory: React.FC<{ incidents: StreamingStatusIncident[] }> = ({ i
           return (
             <div className={cx(st.pitem, incident.major && st.major)} role="listitem" key={incident.id}>
               <button type="button" className={st.phead} aria-expanded={open} onClick={() => setTold(open ? null : incident.id)}
-                aria-label={`${incident.kind}${city ? ` in ${city}` : ''}, week ${incident.openedAtWeek}. ${ran}. ${open ? 'Hide' : 'Show'} what happened`}>
+                aria-label={`${incident.kind}${city ? ` in ${city}` : ''}, ${gameYearWeekText(incident.openedAtWeek)}. ${ran}. ${open ? 'Hide' : 'Show'} what happened`}>
                 <i className={st.pdot} aria-hidden="true" />
                 <b className={st.pname}>{incident.kind}{city ? ` · ${city}` : ''}{incident.repairedBy && <em className={st.pby}>Fixed by {incident.repairedBy.split(' ')[0]}</em>}</b>
-                <span className={st.pwhen}>WK {incident.openedAtWeek}{incident.weeks > 0 ? ` · ${weeksShort(incident.weeks)}` : ''}</span>
+                <span className={st.pwhen}>{gameYearWeekShort(incident.openedAtWeek)}{incident.weeks > 0 ? ` · ${weeksShort(incident.weeks)}` : ''}</span>
               </button>
               {open && <p className={st.pnote}><b>{incident.title}</b>{incident.note ? `${incident.note} ` : ''}{ran}.</p>}
             </div>

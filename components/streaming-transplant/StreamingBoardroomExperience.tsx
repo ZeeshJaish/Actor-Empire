@@ -477,7 +477,7 @@ export const Boardroom = ({
             {state.holders.map(holder => (
               <div className={cx(css.holder, holder.you ? css.you : '')} key={holder.id}>
                 <i className={cx(css.hchip, holder.you ? css.you : '')} />
-                <div className={css.hid}><b>{holder.you ? `${holder.name} (you)` : holder.name}</b><span>since {holder.since.toLowerCase()}</span></div>
+                <div className={css.hid}><b>{holder.you ? `${holder.name} (you)` : holder.name}</b><span>since {holder.since}</span></div>
                 <em>{holder.pct.toFixed(1)}%</em>
               </div>
             ))}
