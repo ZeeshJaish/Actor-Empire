@@ -232,6 +232,7 @@ import type { WorldEconomyValidationResult } from '../types';
 import { createWeekSimulationSeed } from './weekProcessingDeterminism';
 import { rollUpStreamingBreakdowns, rollUpTheatricalBreakdowns } from './boxOffice/pastProjectBreakdownRollup';
 import { settleSocialAudiences } from './socialAudienceLimits';
+import { isDeveloperMessage } from './developerNotes';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -1923,6 +1924,8 @@ export const processGameWeek = async (
         if (msg.expiresIn !== undefined) {
             const expiresIn = Number(msg.expiresIn) - 1;
             if (expiresIn <= 0) {
+                /* a developer's note leaves quietly when its weeks are up: it is not an offer (2026-11-09) */
+                if (isDeveloperMessage(msg)) return messages;
                 logsToAdd.push({ msg: `⚠️ Offer expired: "${msg.subject}"`, type: 'neutral' });
                 messages.push({
                     ...msg,

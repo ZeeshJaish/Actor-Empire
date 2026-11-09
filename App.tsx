@@ -78,6 +78,7 @@ import { hydrateGenreXP } from './services/genreCatalog';
 import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
+import { deliverDeveloperNotes } from './services/developerNotes';
 import { prepareExternalPlayerUpdateForUi, prepareProcessedWeekForUi, prepareTrustedMarketUpdateForUi } from './services/playerUiState';
 import { applyIndustryMediaCampaignParticipation } from './services/industryWorld';
 import { yieldForWeekProcessingPaint } from './services/weekProcessingScheduler';
@@ -1235,6 +1236,14 @@ export const App: React.FC = () => {
       setShowWhatsNewModal(true);
     }
   }, [gameStatus, isInitializing]);
+
+  /* 2026-11-09: this version's note from the developer reaches the open save once, new career or returning player
+     (services/developerNotes.ts); it rides along with the next real save */
+  useEffect(() => {
+    if (isInitializing || gameStatus !== 'PLAYING') return;
+    const withNotes = deliverDeveloperNotes(player);
+    if (withNotes !== player) setPlayer(withNotes);
+  }, [gameStatus, isInitializing, player]);
 
   const handleDismissWhatsNew = () => {
     try {

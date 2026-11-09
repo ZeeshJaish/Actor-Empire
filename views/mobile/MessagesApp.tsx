@@ -12,6 +12,60 @@ import { calculateOutsideInvestmentAcceptanceChance } from '../../services/outsi
 import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { getCharacterIdentityLabels, getOpportunityCharacterProfile } from '../../services/characterIdentityLogic';
 import { resolveStreamingPlatformBrandById } from '../../services/streamingPlatformBrandRegistry';
+import { isDeveloperMessage } from '../../services/developerNotes';
+import { ZEDBURY_PATH, ZEDBURY_VIEWBOX } from '../../assets/zedbury';
+
+/* Zeesh, 2026-11-09: the developer's note reads like a letter from the studio (it was an emoji in a white circle on a
+   black card). Only the developer's messages use these. */
+const ZedburyMark: React.FC<{ className?: string }> = ({ className }) => (
+    <svg viewBox={ZEDBURY_VIEWBOX} className={className} aria-hidden="true">
+        <path d={ZEDBURY_PATH} fillRule="evenodd" clipRule="evenodd" fill="#f23117" />
+    </svg>
+);
+
+const DeveloperLetter: React.FC<{ message: Message; version: string }> = ({ message, version }) => {
+    const paragraphs = message.text.split(/\n\s*\n/).map(block => block.trim()).filter(Boolean);
+    const lastLines = (paragraphs[paragraphs.length - 1] || '').split('\n');
+    /* a closing "name / studio" block becomes the signature */
+    const hasSignature = paragraphs.length > 1 && lastLines.length <= 3 && lastLines.every(line => line.trim().length <= 32);
+    const body = hasSignature ? paragraphs.slice(0, -1) : paragraphs;
+    return (
+        <article className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#0b0b0d] text-white shadow-2xl">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-44" style={{ background: 'radial-gradient(70% 100% at 50% 0%, rgba(242, 49, 23, 0.22), rgba(242, 49, 23, 0) 72%)' }} />
+            <div className="relative px-6 pb-6 pt-6">
+                <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black">
+                        <ZedburyMark className="h-7 w-7" />
+                    </span>
+                    <div className="min-w-0">
+                        <div className="text-[15px] font-black leading-tight">Zeesh</div>
+                        <div className="text-[12px] text-zinc-400">Developer · Zedbury Studios</div>
+                    </div>
+                </div>
+                <div className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-[#ff6a4d]">From the developer</div>
+                <h2 className="mt-2 text-[22px] font-black leading-tight">{message.subject}</h2>
+                <div className="mt-5 space-y-4 text-[15px] leading-7 text-zinc-300">
+                    {body.map((paragraph, index) => (
+                        <p key={index}>
+                            {paragraph.split('\n').map((line, lineIndex, lines) => (
+                                <React.Fragment key={lineIndex}>{line}{lineIndex < lines.length - 1 && <br />}</React.Fragment>
+                            ))}
+                        </p>
+                    ))}
+                </div>
+                <div className="mt-7 flex items-center gap-3 border-t border-white/[0.08] pt-5">
+                    <ZedburyMark className="h-6 w-6 shrink-0" />
+                    <div className="min-w-0 leading-snug">
+                        {(hasSignature ? lastLines : ['Zeesh', 'Zedbury Studios']).map((line, index) => (
+                            <div key={index} className={index === 0 ? 'text-[13px] font-bold text-white' : 'text-[10.5px] font-bold uppercase tracking-[0.18em] text-zinc-500'}>{line}</div>
+                        ))}
+                    </div>
+                    <span className="ml-auto shrink-0 rounded-full border border-white/10 px-2 py-0.5 font-mono text-[10px] text-zinc-500">v{version}</span>
+                </div>
+            </div>
+        </article>
+    );
+};
 
 interface MessagesAppProps {
   player: Player;
@@ -101,10 +155,6 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
       const offer = player.world.platformAiPlayerCommissionOffers?.[String(message.data?.offerId || '')];
       return offer ? resolveStreamingPlatformBrandById(offer.platformId, offer.platformName) : null;
   };
-  const isDeveloperMessage = (message?: Message | null) => Boolean(
-      message?.id === 'msg_dev_welcome' ||
-      (message?.sender === 'Zeesh (Developer)' && message?.subject === 'A Note from the Creator')
-  );
   const openCurrentStudioAcquisition = () => {
       if (!selectedStudioAcquisitionMessage || selectedStudioAcquisitionExpired) return;
       onOpenStudioAcquisition?.(
@@ -424,7 +474,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         msg.type === 'SHAREHOLDER_VOTE' ? 'bg-gradient-to-br from-sky-700 to-emerald-700' :
                                         msg.type === 'RIGHTS_REPORT' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
                                         msg.type === 'RIGHTS_NEGOTIATION' ? 'bg-gradient-to-br from-zinc-800 to-amber-800' :
-                                        isDeveloperMessage(msg) ? 'bg-gradient-to-br from-zinc-700 to-black' :
+                                        isDeveloperMessage(msg) ? 'bg-black ring-1 ring-white/10' :
                                         msg.type === 'SYSTEM' ? 'bg-slate-500' :
                                         'bg-slate-400'
                                     }`}>
@@ -438,6 +488,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                                 ? <FileSearch size={20} />
                                                 : msg.type === 'RIGHTS_NEGOTIATION'
                                                     ? <FileSignature size={20} />
+                                                : isDeveloperMessage(msg)
+                                                    ? <ZedburyMark className="h-7 w-7" />
                                                 : msg.sender[0]}
                                     </div>
                                     )}
@@ -901,38 +953,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                             </div>
                         </div>
                     ) : selectedMessage.type === 'SYSTEM' && isDeveloperMessage(selectedMessage) ? (
-                        <div className="bg-gradient-to-br from-zinc-900 to-black p-8 rounded-3xl border border-zinc-800 shadow-2xl relative overflow-hidden text-white">
-                            {/* Watermark */}
-                            <div className="absolute top-0 right-0 p-8 opacity-5">
-                                <Heart size={200} />
-                            </div>
-
-                            <div className="relative z-10">
-                                {/* Sender Icon */}
-                                <div className="flex justify-center mb-6">
-                                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg border-4 border-zinc-800 text-3xl">
-                                        👨‍💻
-                                    </div>
-                                </div>
-
-                                <h2 className="text-2xl font-serif text-center mb-4 font-bold tracking-wide">{selectedMessage.subject}</h2>
-                                <div className="w-12 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent mx-auto mb-8"></div>
-
-                                <div className="space-y-4 text-sm font-sans text-zinc-300 leading-relaxed text-left">
-                                    {selectedMessage.text.split('\n').map((line, i) => (
-                                        line.trim() === '' ? <br key={i}/> : <p key={i}>{line}</p>
-                                    ))}
-                                </div>
-
-                                <div className="mt-10 pt-6 border-t border-zinc-800 flex justify-between items-end">
-                                    <div className="text-xs text-zinc-600 font-mono">v{APP_DISPLAY_VERSION}</div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-white text-sm">Zeesh</div>
-                                        <div className="text-xs text-amber-500 font-bold uppercase tracking-widest">Zeesh Apps</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <DeveloperLetter message={selectedMessage} version={APP_DISPLAY_VERSION} />
                     ) : (
                         // STANDARD MESSAGE LAYOUT
                         <>
