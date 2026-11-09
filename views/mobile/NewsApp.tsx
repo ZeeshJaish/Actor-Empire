@@ -3,6 +3,7 @@ import { GameLanguage, Player, NewsCategory, NewsItem } from '../../types';
 import { ArrowLeft, BarChart3, BriefcaseBusiness, ChevronRight, Clapperboard, Flame, Newspaper, Radio, Search, Sparkles, UserRound } from 'lucide-react';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { IndustryClaimBadge, IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
+import { refreshIndustryClaimNews } from '../../services/industryWorld/industryMediaClaimPublication';
 import { IndustryNarrativeContext } from './IndustryNarrativeContext';
 import { StoredMediaImage } from '../../components/StoredMediaImage';
 
@@ -269,7 +270,7 @@ const NewsAppLegacy: React.FC<NewsAppProps> = ({ player, onBack }) => {
   const [tab, setTab] = useState<NewsCategory>('TOP_STORY');
   const [selectedStory, setSelectedStory] = useState<NewsItem | null>(null);
   const language = getPlayerLanguage(player);
-  const newsItems = player.news || [];
+  const newsItems = refreshIndustryClaimNews(player, player.news || []);
   const filteredNews = tab === 'TOP_STORY'
       ? newsItems.filter(n => n.category === 'TOP_STORY' || (isMusicStory(n) && n.impactLevel === 'HIGH'))
       : newsItems.filter(n => n.category === tab);
@@ -322,7 +323,7 @@ export const NewsApp: React.FC<NewsAppProps> = ({ player, onBack }) => {
   const [tab, setTab] = useState<NewsViewTab>('TOP');
   const [selectedStory, setSelectedStory] = useState<NewsItem | null>(null);
   const language = getPlayerLanguage(player);
-  const newsItems = player.news || [];
+  const newsItems = refreshIndustryClaimNews(player, player.news || []);
   const filteredNews = getFilteredNews(newsItems, tab);
   const featured = filteredNews[0];
   const remaining = filteredNews.slice(1);

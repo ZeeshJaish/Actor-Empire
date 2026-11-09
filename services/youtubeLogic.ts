@@ -1,3 +1,4 @@
+import { INDUSTRY_MEDIA_CREATOR_SUBSCRIBER_CEILING, INDUSTRY_MEDIA_VIDEO_VIEW_CEILING, softIndustryMediaCeiling } from './industryWorld/industryMediaYoutube';
 import {canonicalPersonName,fictionalHandle,fictionalPersonName,projectBuiltinPerson} from './fictionalNames';
 import { resolveYoutubeWeek, readYoutubeAudience, quoteYoutubeBrand, quoteYoutubeNewSubscribers } from './youtubeEconomy';
 import { availableCreatorSpend, recordCreatorSpend } from './creatorEconomy';
@@ -626,7 +627,7 @@ export const generateYoutubeFeed = (player: Player): YoutubeVideo[] => {
                     title: video.title,
                     type,
                     thumbnailColor: 'bg-zinc-900',
-                    views: video.views,
+                    views: softIndustryMediaCeiling(video.views, INDUSTRY_MEDIA_VIDEO_VIEW_CEILING, `views:${video.id}`),
                     likes: video.likes,
                     earnings: 0,
                     weekUploaded,
@@ -648,7 +649,7 @@ export const generateYoutubeFeed = (player: Player): YoutubeVideo[] => {
                         summary: video.summary,
                         confirmedFacts: video.confirmedFacts,
                         ...(video.interpretation ? { interpretation: video.interpretation } : {}),
-                        creatorSubscribers: channel.subscribers,
+                        creatorSubscribers: softIndustryMediaCeiling(channel.subscribers, INDUSTRY_MEDIA_CREATOR_SUBSCRIBER_CEILING, `subscribers:${channel.id}`),
                         creatorCredibility: channel.credibility,
                         creatorAvatar: createIndustryMediaAvatar(
                             personality.name,

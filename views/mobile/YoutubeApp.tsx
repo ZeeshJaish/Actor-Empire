@@ -1,4 +1,4 @@
-import { quoteYoutubeUpload, quoteYoutubeNewSubscribers, quoteYoutubeLive, quoteYoutubeMemberships, settleYoutubeActivity, readYoutubeAudience } from '../../services/youtubeEconomy';
+import { quoteYoutubeUpload, rollYoutubeUploadLuck, quoteYoutubeNewSubscribers, quoteYoutubeLive, quoteYoutubeMemberships, settleYoutubeActivity, readYoutubeAudience } from '../../services/youtubeEconomy';
 import { recordCreatorSpend, readCreatorLedger } from '../../services/creatorEconomy';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -161,6 +161,13 @@ const YoutubeThumbnail: React.FC<{ video: YoutubeVideo; className?: string; chil
         </div>
     );
 };
+
+/* the one word a creator video's thumbnail carries, in the same type as a vlog's "DAILY VLOG" */
+const INDUSTRY_THUMBNAIL_WORDS: Record<string, string> = {
+    THEORY: 'Theory', EXPLAINED: 'Explained', BUSINESS_BREAKDOWN: 'Breakdown',
+    REVIEW_AFTERMATH: 'Aftermath', RESPONSE_ANALYSIS: 'Response', CREATOR_REACTION: 'Reaction',
+};
+const industryThumbnailWord = (format: string): string => INDUSTRY_THUMBNAIL_WORDS[format] || 'Industry';
 
 export const IndustryYoutubeContextPanel: React.FC<{ video: YoutubeVideo }> = ({ video }) => {
     const context = video.industryContext;
@@ -856,7 +863,7 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500'];
         const thumbnailColor = colors[Math.floor(Math.random() * colors.length)];
         const planViews = Math.floor((seededViews + (assetContext?.viewBoost || 0) + Math.floor(plan.viewBoost * (0.75 + Math.random() * 0.6))) * identity.viewMultiplier);
-        const finalSeededViews = quoteYoutubeUpload(player, {qualityScore, type:videoType, uploadPlan} as YoutubeVideo, planViews, committedReach);
+        const finalSeededViews = quoteYoutubeUpload(player, {qualityScore, type:videoType, uploadPlan} as YoutubeVideo, planViews, committedReach, rollYoutubeUploadLuck());
 
         return {
             id: `vid_${Date.now()}_${Math.random()}`,
@@ -1326,33 +1333,13 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         <button type="button" onClick={() => openWatchPage(video)} className="mb-6 group cursor-pointer w-full text-left block">
             {/* Thumbnail */}
             <YoutubeThumbnail video={video} className="w-full aspect-video rounded-xl mb-3 shadow-sm">
-                {video.industryContext ? (
-                    <>
-                        <div className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: video.industryContext.primaryColor }} />
-                        <div className="absolute -right-2 top-1/2 -translate-y-1/2 text-[5rem] font-black leading-none tracking-[-0.08em] text-white/[0.06]">
-                            {video.industryContext.thumbnailMotif.slice(0, 3)}
-                        </div>
-                        <div className="absolute left-4 top-4 flex items-center gap-2">
-                            <span className="bg-black/75 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-white backdrop-blur-sm">
-                                {video.industryContext.thumbnailLabel}
-                            </span>
-                            <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/60">
-                                {video.industryContext.claimMode === 'SPECULATION' ? 'Theory, not a leak' : 'Industry record'}
-                            </span>
-                        </div>
-                        <div className="absolute inset-x-4 bottom-4 pr-12">
-                            <div className="line-clamp-2 text-[1.35rem] font-black leading-[0.96] tracking-[-0.04em] text-white drop-shadow-xl">
-                                {video.title}
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <div className="relative z-10 text-center transform group-hover:scale-105 transition-transform duration-300">
-                        <span className="block text-white/90 font-black text-3xl uppercase tracking-tighter drop-shadow-lg scale-y-110">
-                            {getVideoTypeConfig(video.type).label}
-                        </span>
-                    </div>
-                )}
+                {/* 2026-11-09, Zeesh: creator videos looked like another app. Same card as every other video; only the
+                    creator's colours and the format word on the thumbnail set them apart. */}
+                <div className="relative z-10 text-center transform group-hover:scale-105 transition-transform duration-300">
+                    <span className="block text-white/90 font-black text-3xl uppercase tracking-tighter drop-shadow-lg scale-y-110">
+                        {video.industryContext ? industryThumbnailWord(video.industryContext.format) : getVideoTypeConfig(video.type).label}
+                    </span>
+                </div>
 
                 {/* Duration Badge */}
                 <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded">12:34</div>
@@ -1379,10 +1366,8 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
                         </div>
                     )}
                     {video.industryContext && (
-                        <div className="mt-1 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em]">
-                            <span style={{ color: video.industryContext.primaryColor }}>{video.industryContext.format.replace(/_/g, ' ')}</span>
-                            <span className="text-zinc-700">◆</span>
-                            <span className="text-zinc-500">{formatNumber(video.industryContext.creatorSubscribers)} subscribers</span>
+                        <div className="mt-1 text-[10px] font-black uppercase tracking-[0.14em] line-clamp-1" style={{ color: video.industryContext.primaryColor }}>
+                            {video.industryContext.format.replace(/_/g, ' ')}
                         </div>
                     )}
                             </>

@@ -1,6 +1,7 @@
 import type { Player, YoutubeChannel, YoutubeVideo, YoutubeEconomyState } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { creatorNumber as n, creatorClamp as clamp, readCreatorWorld, readCreatorLedger, availableCreatorSpend, claimCreatorAction, creatorPositiveReward } from './creatorEconomy';
+import { limitSocialGain } from './socialAudienceLimits';
 const videoTotal = (channel: YoutubeChannel) => channel.videos.reduce((sum, v) => sum + n(v.views), 0);
 export const readYoutubeEconomy = (channel: YoutubeChannel): YoutubeEconomyState => channel.economy?.schemaVersion === 1 ? channel.economy : { schemaVersion: 1, lifetimeViews: Math.max(n(channel.totalChannelViews), videoTotal(channel)), observedVideoViews: videoTotal(channel), lastProcessedAbsoluteWeek: -1, recentWeeks: [], recentPublicationKeys: [], merchDemand: 1 };
 const age = (p: Player, v: YoutubeVideo) => Math.max(0, (p.age - (v.yearUploaded ?? p.age)) * 52 + p.currentWeek - v.weekUploaded);
@@ -16,6 +17,27 @@ export const readYoutubeAudience = (p: Player) => {
     const engaged = Math.min(world.eligiblePeople * .15, Math.max(bootstrapReach, observed * .65)) * (.4 + .6 * clamp(n(channel.audienceTrust, 55) / 100));
     return { ...world, subscribers: subs, observedWeeklyViews: observed, engagedPeople: Math.floor(engaged), newPeopleRemaining: Math.max(0, world.eligiblePeople - n(channel.subscribers)) };
 };
+/* 2026-11-09 (Zeesh: a famous star's channel was far too small, but nothing should be guaranteed): a share of the
+   channel's own subscribers watches each upload, more for better videos and a trusted channel; fame brings outside
+   viewers to good videos only; a famous face turns viewers into subscribers a little more readily; the back catalogue
+   keeps a share of subscribers watching while the channel is active. All of it on top of the measured audience. */
+export const YOUTUBE_REACH = Object.freeze({
+    subscriberShareBase: .03,
+    subscriberShareQuality: .12,
+    fameDrawPeople: 120_000,
+    libraryShare: .015,
+    fameConversion: 1.6,
+});
+const trustShare = (p: Player) => .4 + .6 * clamp(n(p.youtube?.audienceTrust, 55) / 100);
+const fameShare = (p: Player) => clamp(n(p.stats?.fame) / 100);
+/** Views a channel's own subscribers give one upload of this quality (they are already subscribed). */
+const subscriberViews = (p: Player, subscribers: number, quality: number) => (
+    subscribers * (YOUTUBE_REACH.subscriberShareBase + YOUTUBE_REACH.subscriberShareQuality * quality * quality) * trustShare(p) * (.35 + quality)
+);
+/** One upload's luck: most land near their quality, some miss, about one in sixteen takes off. */
+export const rollYoutubeUploadLuck = (random: () => number = Math.random): number => (
+    random() < .06 ? 2.5 + random() * 1.5 : .55 + random() * 1.05
+);
 /** Publication/event views are added once, not reconstructed from a shrinking video list. */
 export const recordYoutubeViews = (p: Player, key: string, previousTotal: number, delta: number): Player => {
     const old = p.youtube.economy;
@@ -28,19 +50,24 @@ export const recordYoutubeViews = (p: Player, key: string, previousTotal: number
     return { ...p, youtube: { ...p.youtube, totalChannelViews: lifetime, economy: { ...e, lifetimeViews: lifetime, observedVideoViews: videoTotal(p.youtube),
                 recentWeeks: [...history, { week, views: n(current?.views) + n(delta), newSubscribers: n(current?.newSubscribers) }].slice(-12), recentPublicationKeys: [...e.recentPublicationKeys, key].slice(-128) } } };
 };
-export const quoteYoutubeUpload = (p: Player, video: YoutubeVideo, seededViews = 0, committedReach = false) => {
+export const quoteYoutubeUpload = (p: Player, video: YoutubeVideo, seededViews = 0, committedReach = false, luck = 1) => {
     const a = readYoutubeAudience(p), count = readCreatorLedger(p).actions.YOUTUBE || 0;
     const quality = clamp(n(video.qualityScore, 50) / 100);
     const fatigue = 1 / (1 + count * .55) ** 1.3;
     const plan = video.uploadPlan === 'PROJECT_PROMO' ? 1.2 : video.uploadPlan === 'VIRAL_BAIT' ? 1.18 : 1;
     const discovery = (250 + 1200 * quality + Math.pow(clamp(p.stats.fame / 100), 2) * a.eligiblePeople * .000001) * plan;
-    const organic = (a.engagedPeople * .12 + discovery) * (.35 + quality) * fatigue;
+    const subscriberReach = a.subscribers * (YOUTUBE_REACH.subscriberShareBase + YOUTUBE_REACH.subscriberShareQuality * quality * quality) * trustShare(p);
+    const fameDraw = Math.pow(fameShare(p), 2.5) * YOUTUBE_REACH.fameDrawPeople * quality * quality * plan;
+    const organic = (Math.max(a.engagedPeople * .12, subscriberReach) + discovery + fameDraw) * (.35 + quality) * fatigue * Math.max(.2, n(luck, 1));
     const promise = committedReach ? n(seededViews) : Math.min(n(seededViews), a.engagedPeople * .8 + discovery * 4) * fatigue;
     return Math.floor(Math.min(a.eligiblePeople, organic + promise));
 };
 export const quoteYoutubeNewSubscribers = (p: Player, views: number, quality = 70) => {
     const a = readYoutubeAudience(p), saturation = a.eligiblePeople ? a.newPeopleRemaining / a.eligiblePeople : 0;
-    return Math.floor(Math.min(a.newPeopleRemaining, n(views) * .3 * (.004 + .016 * clamp(quality / 100)) * saturation));
+    const fameConversion = 1 + YOUTUBE_REACH.fameConversion * fameShare(p) ** 2;
+    /* only new viewers can subscribe: the share a channel's own subscribers gave is taken out (some always arrive new) */
+    const newViewers = Math.max(n(views) * .12, n(views) - subscriberViews(p, a.subscribers, clamp(quality / 100)));
+    return limitSocialGain('YOUTUBE', n(p.stats?.fame), n(p.youtube?.subscribers), Math.floor(Math.min(a.newPeopleRemaining, newViewers * .3 * (.004 + .016 * clamp(quality / 100)) * fameConversion * saturation)));
 };
 export const resolveYoutubeWeek = (p: Player, random: () => number = Math.random) => {
     const channel = p.youtube, e = readYoutubeEconomy(channel), a = readYoutubeAudience(p);
@@ -52,7 +79,9 @@ export const resolveYoutubeWeek = (p: Player, random: () => number = Math.random
     const fresh = weighted.some(w => age(p, w.v) <= 2);
     const discovery = fresh ? (500 + meanQuality * 2500 + Math.pow(clamp(p.stats.fame / 100), 2) * a.eligiblePeople * .000002) : 0;
     const variance = .85 + clamp(random()) * .3;
-    const impressions = Math.floor(Math.min(a.eligiblePeople, ((a.engagedPeople * (1 - Math.exp(-weight * .6))) + discovery) * (.25 + meanQuality) * variance));
+    const active = Math.min(1, Math.max(.15, channel.videos.filter(v => age(p, v) <= 8).length / 4));
+    const libraryAudience = a.subscribers * YOUTUBE_REACH.libraryShare * trustShare(p) * active;
+    const impressions = Math.floor(Math.min(a.eligiblePeople, ((Math.max(a.engagedPeople, libraryAudience) * (1 - Math.exp(-weight * .6))) + discovery) * (.25 + meanQuality) * variance));
     const revenue = channel.isMonetized ? Math.floor(impressions / 1000 * Math.min(4, a.referenceCpm * .15)) : 0;
     let allocated = 0, paidCents = 0, newSubs = 0;
     const videos = weighted.map(({ v, weight: w }, i) => {

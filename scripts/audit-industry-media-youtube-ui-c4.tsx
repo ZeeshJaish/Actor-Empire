@@ -41,7 +41,11 @@ const appMarkup = renderToStaticMarkup(<YoutubeApp player={published} onBack={no
 assert.match(appMarkup, /Film &amp; TV/);
 assert.match(appMarkup, /Theories/);
 assert.match(appMarkup, /Industry/);
-assert.match(appMarkup, /Empire Studios confirms the Night Signal universe/);
+/* 2026-11-09: creator titles vary by video (not always "<headline> — …"); the feed must show this video's own title */
+const feedVideo = generateYoutubeFeed(published).find(video => video.industryContext) as YoutubeVideo;
+const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+assert.ok(appMarkup.includes(escapeHtml(feedVideo.title)), `the feed shows the creator video title: ${feedVideo.title}`);
+assert.match(feedVideo.title, /Empire Studios|Night Signal/);
 assert.match(appMarkup, /THEORY/);
 
 const industryVideo = generateYoutubeFeed(published).find(video => video.industryContext) as YoutubeVideo;

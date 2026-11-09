@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {writeFileSync} from 'node:fs';
 import {INITIAL_PLAYER,type YoutubeVideo} from '../types';
+import {SOCIAL_PLATFORM_MAX} from '../services/socialAudienceLimits';
 import {processGameWeek} from '../services/gameLoop';
 import {t} from '../services/i18n';
 async function main(){const previous=Math.random;Math.random=()=>.3;
@@ -20,7 +21,8 @@ async function main(){const previous=Math.random;Math.random=()=>.3;
  viral.flags.youtubeMilestonesUnlocked=['subs_10000','views_1000000','subs_100000'];
  viral.youtube.videos=[{id:'viral-video',title:'Viral cap probe',type:'VLOG',qualityScore:90,views:1000,earnings:0,likes:10,weekUploaded:52,yearUploaded:25,weeklyHistory:Array(104).fill(0),comments:[],isPlayer:true} as YoutubeVideo];
  const viralNext=(await processGameWeek(viral)).player;
- assert.equal(viralNext.currentWeek,1);assert.equal(viralNext.age,26);assert.equal(viralNext.youtube.subscribers,1e10);assert.equal(viralNext.x.followers,1e10);assert.equal(viralNext.stats.followers,1e10);
+ assert.equal(viralNext.currentWeek,1);assert.equal(viralNext.age,26);/* 2026-11-09 (Zeesh): old 10B counters settle under each platform's top in the week; they never grow past it */
+ assert.ok(viralNext.youtube.subscribers<SOCIAL_PLATFORM_MAX.YOUTUBE);assert.ok(viralNext.x.followers<SOCIAL_PLATFORM_MAX.X);assert.ok(viralNext.stats.followers<SOCIAL_PLATFORM_MAX.INSTAGRAM);
  assert.equal(viralNext.youtube.totalChannelViews,viralNext.youtube.economy?.lifetimeViews,'Viral events must use the canonical lifetime counter');assert.ok(viralNext.youtube.videos[0].weeklyHistory.length<=104);
  assert.ok(viralNext.youtube.fanMood-viral.youtube.fanMood<=3,'Weekly viral events obey the positive mood budget');
  rows.push({subscribers:1e10,bonus:0,afterSubscribers:viralNext.youtube.subscribers,case:'VIRAL_YEAR_ROLLOVER',views:viralNext.youtube.totalChannelViews});

@@ -16,6 +16,7 @@ import { resolveRivalStreamingTechGrowth } from './streamingRivalTech';
 import { streamingTechLaunchStory } from './streamingPlatformNews';
 import { streamingPictureRank } from './streamingPlanOffer';
 import { getStreamingTechDefinition, streamingTechVersion } from './streamingTechTreeCatalogue';
+import { fillCopy, pickCopy, sentenceStart } from './industryWorld/mediaCopyVariety';
 
 const PICTURES: StreamingTechId[] = ['PICTURE_24K', 'PICTURE_16K', 'PICTURE_12K', 'PICTURE_8K', 'PICTURE_4K', 'PICTURE_1080P', 'PICTURE_720P', 'PICTURE_480P'];
 
@@ -78,8 +79,15 @@ export const collectRivalTechFacts = (
                 idempotencyKey: `quality-gap:${own.slug}:${id}:${rank}`,
                 absoluteWeek, type: 'PLATFORM_QUALITY_GAP', importance: 'HIGH',
                 companyId: own.slug, companyName: own.name, platformId: own.slug,
-                headline: `${name} now streams sharper than ${own.name}`,
-                detail: `${name} streams in ${picture}; ${own.name}'s best plan streams in ${mine.name}.`,
+                /* 2026-11-09: written several ways, picked by the gap's own key; the detail keeps both pictures */
+                headline: sentenceStart(fillCopy(pickCopy(`quality-gap:${own.slug}:${id}:${rank}`, [
+                    '{rival} now streams sharper than {own}', '{rival} pulls ahead of {own} on picture', 'A sharper picture at {rival} than at {own}',
+                    '{own} falls behind {rival} on picture quality', '{rival} beats {own} on picture quality',
+                ]), { rival: name, own: own.name })),
+                detail: sentenceStart(fillCopy(pickCopy(`quality-gap-detail:${own.slug}:${id}:${rank}`, [
+                    "{rival} streams in {picture}; {own}'s best plan streams in {mine}.",
+                    "{own}'s best plan tops out at {mine}, while {rival} now streams in {picture}.",
+                ]), { rival: name, own: own.name, picture, mine: mine.name })),
                 evidence: [{ kind: 'PLATFORM', id: own.slug }, { kind: 'PLATFORM', id }],
             }));
         });

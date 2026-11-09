@@ -19,6 +19,7 @@ import { resolveStreamingPlanOffer, streamingPictureRank } from './streamingPlan
 import { normalizeStreamingPricingConfiguration } from './streamingPricingEconomy';
 import { getStreamingTechGroupLadder, resolveStreamingTechTree } from './streamingTechTreeCatalogue';
 import { getWorldStreamingRivalOffers } from './worldEconomy/worldStreamingOffers';
+import { fillCopy, pickCopy, sentenceStart } from './industryWorld/mediaCopyVariety';
 
 /** "clearly": a quarter cheaper */
 export const STREAMING_VALUE_CLEAR_GAP = .25;
@@ -91,9 +92,12 @@ export const collectStreamingValueFacts = (player: Player, absoluteWeek: number)
     const theirs = pictureName(rival.rank);
     const praised = verdict.kind === 'PRAISED';
     const less = rival.rank > mine.rank || (mine.ads && !rival.ads);
-    const headline = praised
-        ? `${name} has the cheapest ${picture} plan${mine.ads ? ' with ads' : ''} around`
-        : less ? `${name} charges more for less` : `${name}'s ${picture} plan costs more than ${rival.rival}'s`;
+    /* 2026-11-09: each verdict is written several ways, picked by the verdict's own key */
+    const headline = sentenceStart(fillCopy(pickCopy(`streaming-value:${slug}:${verdict.kind}:${mine.id}:${Math.round(mine.price * 100)}`, praised
+        ? ['{name} has the cheapest {picture} plan{ads} around', 'Best value in {picture}: {name}', 'Nobody streams {picture} for less than {name}', '{name} undercuts every rival on {picture}']
+        : less ? ['{name} charges more for less', '{name} asks more and gives less', 'Paying more for less at {name}', 'Is {name} overcharging?']
+            : ["{name}'s {picture} plan costs more than {rival}'s", '{rival} streams {picture} for less than {name}', 'Price check: {name} against {rival} on {picture}', '{name} looks pricey next to {rival}']),
+    { name, picture, ads: mine.ads ? ' with ads' : '', rival: rival.rival }));
     const detail = praised
         ? `${mine.name} streams in ${picture} for ${money(mine.price)} a month. The next cheapest, ${rival.rival}'s ${rival.name}, costs ${money(rival.price)}.`
         : `${mine.name} costs ${money(mine.price)} a month for ${picture}${mine.ads ? ' with ads' : ''}; ${rival.rival}'s ${rival.name} streams ${theirs}${rival.ads ? ' with ads' : ''} for ${money(rival.price)}.`;

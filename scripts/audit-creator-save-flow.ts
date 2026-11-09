@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { INITIAL_PLAYER, type Player, type YoutubeVideo } from '../types';
+import { SOCIAL_PLATFORM_MAX } from '../services/socialAudienceLimits';
 import { processGameWeek } from '../services/gameLoop';
 import { migratePlayerSave } from '../services/saveMigration';
 import { prepareVerifiedPlayerForPersistence } from '../services/savePreparation';
@@ -29,7 +30,9 @@ async function main() {
         const savedRoster = structuredClone(p.studio.talentRoster);
         p = migratePlayerSave(p);
         assert.equal(p.money, 1234567);
-        assert.equal(p.youtube.subscribers, 1e10);
+        /* 2026-11-09 (Zeesh): an old 10B counter settles where fame 15 belongs, under YouTube's top, on load */
+        assert.ok(p.youtube.subscribers < SOCIAL_PLATFORM_MAX.YOUTUBE && p.youtube.subscribers > 0, `legacy subscribers settle: ${p.youtube.subscribers}`);
+        const settledSubscribers = p.youtube.subscribers;
         assert.equal(p.youtube.totalChannelViews, 305000);
         const worldBefore = JSON.stringify(p.world);
         const world = readCreatorWorld(p);
@@ -59,7 +62,7 @@ async function main() {
             p = (await processGameWeek(p)).player;
             assert.ok(p.youtube.totalChannelViews >= before, 'Next Week must retain non-video views');
             assert.equal(p.youtube.economy?.lifetimeViews,p.youtube.totalChannelViews,'Weekly audience events must settle the same lifetime counter');assert.ok(p.youtube.videos.every(v=>v.weeklyHistory.length<=104));
-            assert.equal(p.youtube.subscribers, 1e10, 'Legacy subscriber counter must survive saturation unchanged');
+            assert.ok(p.youtube.subscribers <= Math.max(settledSubscribers * 1.02, settledSubscribers + 5_000), 'A settled legacy counter barely moves: fame 15 leaves little room above it');
             assert.ok(Number.isFinite(p.money));
             assert.ok(p.youtube.members >= 0);
             p = await roundTrip(p);

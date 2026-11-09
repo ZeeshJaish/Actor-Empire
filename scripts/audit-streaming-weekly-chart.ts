@@ -200,16 +200,19 @@ async function main() {
         [`streaming-chart:${slug}:enter:901`, 'MEDIUM'],
     ], 'Week 901: your title takes the world\'s #1, and another of yours enters the ten');
     assert.ok(first.every(fact => fact.type === 'PLATFORM_CHART_MOMENT' && fact.companyId === slug && fact.companyName === brandName));
-    assert.equal(first[0].headline, 'Title p1 is the most-watched title in the world');
-    assert.equal(first[1].headline, 'Title p2 enters the world\'s Top 10', 'The #1 is not counted again as an entry');
+    /* 2026-11-09: chart news is written several ways; each headline names its own title, and the #1 is not an entry */
+    assert.ok(first[0].headline.includes('Title p1') && !first[0].headline.includes('Title p2'), first[0].headline);
+    assert.ok(first[1].headline.includes('Title p2') && !first[1].headline.includes('Title p1'), 'The #1 is not counted again as an entry');
+    assert.ok(/Top 10|most-watched|debut|chart/i.test(first[1].headline), first[1].headline);
     assert.deepEqual(pass(902, 903), [], 'A quiet week (the same #1, the same ten) makes no story');
     const fourth = pass(904, 905);
     assert.deepEqual(fourth.map(fact => [fact.idempotencyKey, fact.importance, fact.companyId]), [
         [`streaming-chart:${slug}:hold:p1:904`, 'HIGH', slug],
         [`streaming-chart:${slug}:dominance:NETFLIX:904`, 'MEDIUM', 'NETFLIX'],
     ], 'Week 904: a fourth week at #1 (yours, so big news), and Netflix reaching six of the ten');
-    assert.equal(fourth[0].headline, 'Title p1 holds #1 for a fourth week');
-    assert.equal(fourth[1].headline, 'Netflix holds 6 of the world\'s Top 10');
+    assert.ok(fourth[0].headline.includes('Title p1') && /#1|top/i.test(fourth[0].headline), fourth[0].headline);
+    assert.ok(fourth[1].headline.includes('Netflix') && fourth[1].headline.includes('6'), fourth[1].headline);
+    assert.ok(fourth[0].detail.includes('4 weeks') || fourth[0].detail.includes('4 straight weeks'), fourth[0].detail);
     assert.equal(pass(-1, 905).length, 2, 'A pass looks back two weeks at most, so an old save makes no stories of its history');
     assert.deepEqual(pass(905, 906), [], 'A title slipping out and back into the ten is not news again');
     console.log(`PASS news: ${[...first, ...fourth].map(fact => `"${fact.headline}" (${fact.importance})`).join(' · ')}; a quiet week makes none`);

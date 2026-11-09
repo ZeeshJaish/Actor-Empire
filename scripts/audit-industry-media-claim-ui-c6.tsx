@@ -31,7 +31,9 @@ const source: IndustryMediaSourceRecord = {
 
 for (const kind of ['RUMOUR', 'LEAK', 'PREDICTION'] as const) {
     const markup = renderToStaticMarkup(<IndustryClaimBadge claim={{ ...base, kind }} />);
-    assert.match(markup, new RegExp(kind === 'RUMOUR' ? 'Rumour' : kind === 'LEAK' ? 'Leak' : 'Prediction'));
+    /* 2026-11-09, Zeesh: the Prediction tag on prediction news is wrong; an open prediction carries no tag */
+    if (kind === 'PREDICTION') assert.equal(markup, '');
+    else assert.match(markup, new RegExp(kind === 'RUMOUR' ? 'Rumour' : 'Leak'));
 }
 const open = renderToStaticMarkup(
     <IndustryClaimContextPanel claim={base} sourceName="Screenline" byline="Mara Voss" sourceRecord={source} />,

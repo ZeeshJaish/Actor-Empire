@@ -53,8 +53,11 @@ async function main() {
     const gap = eightK.find(fact => fact.type === 'PLATFORM_QUALITY_GAP');
     assert.ok(launch8k && launch8k.importance === 'HIGH', 'Apple TV+ launches 8K on its fourth step');
     assert.ok(gap, 'and goes past the test company\'s best plan (4K)');
-    assert.deepEqual([gap!.importance, gap!.headline, gap!.detail, gap!.companyId],
-        ['HIGH', `${apple} now streams sharper than ${own.name}`, `${apple} streams in 8K; ${own.name}'s best plan streams in 4K.`, own.slug]);
+    /* 2026-11-09: the gap is written several ways; whichever it is names both services and both pictures */
+    assert.equal(gap!.importance, 'HIGH');
+    assert.equal(gap!.companyId, own.slug);
+    assert.ok(gap!.headline.includes(apple) && gap!.headline.includes(own.name), gap!.headline);
+    assert.ok(gap!.detail.includes(apple) && gap!.detail.includes('8K') && gap!.detail.includes('4K'), gap!.detail);
     assert.equal(collectRivalTechFacts(withPace(week - step * 5), qa.world, week - 1, week).filter(fact => fact.type === 'PLATFORM_QUALITY_GAP').length, 0,
         'Its next step is no new comparison');
     console.log(`PASS gap: "${gap!.headline}" — ${gap!.detail}`);

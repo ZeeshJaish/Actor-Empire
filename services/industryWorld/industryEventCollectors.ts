@@ -8,6 +8,7 @@ import type {
     StreamingEcosystemEvent,
     WorldState,
 } from '../../types';
+import { fillCopy, pickCopy, pickFreshCopy, sentenceStart, type CopyVars } from './mediaCopyVariety';
 import { createIndustryEventFact } from './industryEventLedger';
 
 const ids = <T extends { id: string }>(items: T[] | undefined): Set<string> => (
@@ -124,11 +125,75 @@ const collectStudioFacts = (before: WorldState, after: WorldState, absoluteWeek:
     })
 );
 
+/* 2026-11-09 (Zeesh: "ek hi title baar baar repeat ho raha hai, bas naam aur subject alag hai"): each studio film
+   event is written one of several ways, picked by the event's own key, so a story never changes once written.
+   Details say what happened in plain words; they stay facts. */
+type StudioEventFamily = { headlines: readonly string[]; details: readonly string[] };
+const STUDIO_GREENLIT: StudioEventFamily = {
+    headlines: ['{company} greenlights {title}', '{title} gets the green light', '{company} says yes to {title}', 'Green light for {title} at {company}', '{company} puts {title} into production', '{title} is a go', '{company} bets on {title}', 'New from {company}: {title}'],
+    details: ['{title} is now in production at {company}.', '{company} has started work on {title}.', 'Work begins on {title}, a new {company} film.'],
+};
+const STUDIO_CAST: StudioEventFamily = {
+    headlines: ['{title} assembles its principal creative team', '{title} finds its cast', 'The team behind {title} is set', 'Casting wraps on {title}', '{title} locks in its leads'],
+    details: ['{company} has signed the main cast and crew for {title}.', 'The key people on {title} are now attached.', '{company} has finished putting the {title} team together.'],
+};
+const STUDIO_DATED: StudioEventFamily = {
+    headlines: ['{company} dates {title}', '{title} gets a release date', 'Mark the calendar: {title}', '{company} sets {title} for {when}', '{title} arrives in {when}', 'It is official: {title} lands in {when}', '{company} locks in {title}', 'Release date set for {title}'],
+    details: ['{title} is set for {when}.', '{company} plans to release {title} in {when}.', 'The release of {title} is planned for {when}.'],
+};
+const STUDIO_CANCELLED: StudioEventFamily = {
+    headlines: ['{company} cancels {title}', '{title} is cancelled', '{company} pulls the plug on {title}', 'The end of the road for {title}', '{title} will not be finished'],
+    details: ['{company} has stopped work on {title} for good.', 'Work on {title} is over; {company} has cancelled it.', '{company} has walked away from {title}.'],
+};
+const STUDIO_RELEASED: StudioEventFamily = {
+    headlines: ['{title} is released', '{title} opens', '{title} arrives', '{title} is out now', 'Release day for {title}', '{company} unveils {title}', '{title} hits screens', 'The wait is over for {title}'],
+    details: ['{company} has released {title}.', '{title} is now out from {company}.', 'Audiences can now see {title}, from {company}.'],
+};
+const STUDIO_HIT: StudioEventFamily = {
+    headlines: ['{title} breaks out', '{title} is a hit', 'Audiences turn up for {title}', '{title} pays off for {company}', 'A big win for {title}', '{company} strikes gold with {title}', '{title} beats expectations', 'Crowds keep coming for {title}'],
+    details: ['{company} has a hit on its hands with {title}.', '{title} finished with a strong result for {company}.', 'The final numbers make {title} a hit for {company}.'],
+};
+const STUDIO_FLOP: StudioEventFamily = {
+    headlines: ['{title} falls short', '{title} disappoints', 'A tough result for {title}', '{title} misses its mark', 'Audiences pass on {title}', 'No lift-off for {title}', '{title} comes up short for {company}', 'A quiet run for {title}'],
+    details: ['{title} finished below what {company} needed.', '{title} did not deliver for {company}.', 'The final numbers make {title} a miss for {company}.'],
+};
+const STUDIO_PROBLEMS: Record<'PROJECT_DELAYED' | 'PROJECT_OVERRUN' | 'PROJECT_HELD', StudioEventFamily> = {
+    PROJECT_DELAYED: {
+        headlines: ['{title} moves behind schedule', '{title} hits a delay', 'Delay for {title}', '{title} slips back', 'Schedule trouble for {title}'],
+        details: ['{company} is dealing with a production problem on {title}.', 'A production problem has slowed {title} at {company}.', '{company} has a schedule problem on {title}.'],
+    },
+    PROJECT_OVERRUN: {
+        headlines: ['{title} faces a budget overrun', '{title} runs over budget', 'Costs climb on {title}', 'Budget trouble for {title}', '{title} gets more expensive'],
+        details: ['{company} is covering extra costs on {title}.', 'Spending on {title} has gone past the plan at {company}.', '{company} now expects {title} to cost more than planned.'],
+    },
+    PROJECT_HELD: {
+        headlines: ['{title} is placed on hold', '{title} goes on hold', 'Work stops on {title}', '{company} pauses {title}', '{title} is on ice'],
+        details: ['{company} has paused {title} while it deals with a production problem.', 'Production on {title} is stopped for now at {company}.', '{company} has put {title} on hold.'],
+    },
+};
+/** headlines already out (the last half year of events, plus this week's as they are written): a new headline takes
+    a frame none of them used, so two flops never read the same until every flop frame has been used */
+type StudioEventFramesUsed = string[];
+const studioEventCopy = (
+    family: StudioEventFamily,
+    key: string,
+    vars: CopyVars,
+    used?: StudioEventFramesUsed,
+): { headline: string; detail: string } => {
+    const headline = sentenceStart(fillCopy(pickFreshCopy(`studio-event:${key}`, family.headlines, used), vars));
+    used?.push(headline);
+    return {
+        headline,
+        detail: sentenceStart(fillCopy(pickCopy(`studio-event-detail:${key}`, family.details), vars)),
+    };
+};
+
 const productionProblemFacts = (
     beforeProduction: IndustryProductionCommitment | undefined,
     production: IndustryProductionCommitment,
     companyName: string,
     absoluteWeek: number,
+    used?: StudioEventFramesUsed,
 ): IndustryEventFact[] => {
     const knownProblems = new Set(beforeProduction?.studioAiExecution?.problems.map(problem => problem.id) || []);
     return (production.studioAiExecution?.problems || []).flatMap(problem => {
@@ -145,15 +210,18 @@ const productionProblemFacts = (
             companyName,
             projectId: production.canonicalProjectId,
             productionId: production.id,
-            headline: `${production.title} ${type === 'PROJECT_OVERRUN' ? 'faces a budget overrun' : type === 'PROJECT_HELD' ? 'is placed on hold' : 'moves behind schedule'}`,
-            detail: `${companyName} is responding to a saved production problem; the consequence remains attached to the project.`,
+            ...studioEventCopy(STUDIO_PROBLEMS[type === 'PROJECT_OVERRUN' || type === 'PROJECT_HELD' ? type : 'PROJECT_DELAYED'],
+                `production-problem:${production.id}:${problem.id}`, { title: production.title, company: companyName }, used),
             evidence: [{ kind: 'PRODUCTION', id: production.id }, { kind: 'PROJECT', id: production.canonicalProjectId }],
         })];
     });
 };
 
-const collectProductionFacts = (before: WorldState, after: WorldState, absoluteWeek: number): IndustryEventFact[] => (
-    Object.values(after.industryProductions || {}).flatMap(production => {
+const collectProductionFacts = (before: WorldState, after: WorldState, absoluteWeek: number): IndustryEventFact[] => {
+    const used: StudioEventFramesUsed = (after.industryEvents?.events || [])
+        .filter(event => absoluteWeek - event.absoluteWeek <= 26)
+        .map(event => event.headline);
+    return Object.values(after.industryProductions || {}).flatMap(production => {
         if (production.source !== 'STUDIO_INDEPENDENT') return [];
         const previous = before.industryProductions?.[production.id];
         const studioName = after.studios?.[production.producerStudioId]?.name || String(production.producerStudioId);
@@ -174,8 +242,7 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
             idempotencyKey: `production-created:${production.id}`,
             type: 'PROJECT_GREENLIT',
             importance: 'LOW',
-            headline: `${studioName} greenlights ${production.title}`,
-            detail: `${production.title} entered the canonical physical-production pipeline.`,
+            ...studioEventCopy(STUDIO_GREENLIT, `production-created:${production.id}`, { title: production.title, company: studioName }, used),
         }));
         if (production.studioAiExecution?.talentSelected && !previous?.studioAiExecution?.talentSelected) {
             facts.push(createIndustryEventFact({
@@ -183,8 +250,7 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
                 idempotencyKey: `production-cast:${production.id}`,
                 type: 'PROJECT_CAST',
                 importance: 'MEDIUM',
-                headline: `${production.title} assembles its principal creative team`,
-                detail: `${studioName} attached canonical talent to the production.`,
+                ...studioEventCopy(STUDIO_CAST, `production-cast:${production.id}`, { title: production.title, company: studioName }, used),
             }));
         }
         if (production.studioAiExecution?.plannedReleaseAbsoluteWeek !== undefined
@@ -194,8 +260,9 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
                 idempotencyKey: `production-release-plan:${production.id}`,
                 type: 'PROJECT_RELEASE_PLANNED',
                 importance: 'MEDIUM',
-                headline: `${studioName} dates ${production.title}`,
-                detail: `${production.title} is planned for absolute ${gameWeekText(production.studioAiExecution.plannedReleaseAbsoluteWeek)}.`,
+                ...studioEventCopy(STUDIO_DATED, `production-release-plan:${production.id}`, {
+                    title: production.title, company: studioName, when: gameWeekText(production.studioAiExecution.plannedReleaseAbsoluteWeek),
+                }, used),
             }));
         }
         if (production.status === 'CANCELLED' && previous?.status !== 'CANCELLED') facts.push(createIndustryEventFact({
@@ -203,8 +270,7 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
             idempotencyKey: `production-cancelled:${production.id}`,
             type: 'PROJECT_CANCELLED',
             importance: 'HIGH',
-            headline: `${studioName} cancels ${production.title}`,
-            detail: `The production ended with its spending, bookings, and problems preserved.`,
+            ...studioEventCopy(STUDIO_CANCELLED, `production-cancelled:${production.id}`, { title: production.title, company: studioName }, used),
         }));
         if (production.status === 'RELEASED' && previous?.status !== 'RELEASED') {
             facts.push(createIndustryEventFact({
@@ -212,8 +278,7 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
                 idempotencyKey: `production-released:${production.id}`,
                 type: 'PROJECT_RELEASED',
                 importance: 'HIGH',
-                headline: `${production.title} is released`,
-                detail: `${studioName} completed the saved release plan for ${production.title}.`,
+                ...studioEventCopy(STUDIO_RELEASED, `production-released:${production.id}`, { title: production.title, company: studioName }, used),
             }));
         }
         const result=production.studioAiExecution?.result;
@@ -224,14 +289,13 @@ const collectProductionFacts = (before: WorldState, after: WorldState, absoluteW
                 idempotencyKey: `production-result:${production.id}:${outcome}`,
                 type: outcome === 'HIT' ? 'PROJECT_HIT' : 'PROJECT_FLOP',
                 importance: 'HIGH',
-                headline: `${production.title} ${outcome === 'HIT' ? 'breaks out' : 'falls short'}`,
-                detail: `${studioName}'s exact commercial settlement records a ${outcome.toLowerCase()} result.`,
+                ...studioEventCopy(outcome === 'HIT' ? STUDIO_HIT : STUDIO_FLOP, `production-result:${production.id}:${outcome}`, { title: production.title, company: studioName }, used),
             }));
         }
-        facts.push(...productionProblemFacts(previous, production, studioName, absoluteWeek));
+        facts.push(...productionProblemFacts(previous, production, studioName, absoluteWeek, used));
         return facts;
-    })
-);
+    });
+};
 
 export const collectIndustryEventFacts = (
     before: WorldState,

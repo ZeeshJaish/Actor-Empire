@@ -78,6 +78,7 @@ import { createWorldEconomyHealthSummary } from './worldEconomy/worldEconomyInte
 
 import { healCopiedEpisodeRatings } from './seriesIdentity';
 import { advanceOriginalPitches } from './originalsPitches';
+import { settleLegacySocialCounts } from './socialAudienceLimits';
 
 export const SAVE_MIGRATION_VERSION = 53;
 const ACQUISITION_RIVAL_BID_MAX_ROUNDS = 3;
@@ -1113,7 +1114,7 @@ const withCinemaMigration = (player: Player): Player => {
     return migrateBuiltinNames(synchronized);
 };
 export const migratePlayerSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean } = {}): Player => (
-    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : advanceOriginalPitches(healCopiedEpisodeRatings(migrateSave(input, options))))
+    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : settleLegacySocialCounts(advanceOriginalPitches(healCopiedEpisodeRatings(migrateSave(input, options)))))
 );
 
 const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean }): Player => {

@@ -230,6 +230,7 @@ import {
 } from './worldEconomy/worldEconomyIntegrity';
 import type { WorldEconomyValidationResult } from '../types';
 import { createWeekSimulationSeed } from './weekProcessingDeterminism';
+import { settleSocialAudiences } from './socialAudienceLimits';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -7393,5 +7394,6 @@ export const processGameWeek = async (
     });
     const titleWorld = rememberProjectTitles(nextPlayer.world, getCurrentPlayerProjectTitles(nextPlayer), targetAbsoluteWeek);
     if (titleWorld !== nextPlayer.world) nextPlayer = { ...nextPlayer, world: titleWorld };
-    return { player: syncLinkedNpcRelationships(nextPlayer), triggerAd };
+    /* 2026-11-09: one week of follower and subscriber growth from every source, limited by what fame can hold */
+    return { player: settleSocialAudiences(player, syncLinkedNpcRelationships(nextPlayer)), triggerAd };
 };

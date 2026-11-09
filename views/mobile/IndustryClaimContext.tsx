@@ -63,13 +63,17 @@ const kindTone: Record<IndustryMediaClaim['kind'], string> = {
   PREDICTION: 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200',
 };
 
+/* 2026-11-09, Zeesh: a "Prediction" tag on prediction news is wrong. A call reads as a call without a label; rumours,
+   leaks and every resolved claim keep theirs. */
 export const IndustryClaimBadge: React.FC<{ claim: IndustryMediaClaim; compact?: boolean }> = ({ claim, compact }) => (
+  claim.status === 'OPEN' && claim.kind === 'PREDICTION' ? null : (
   <span
     data-industry-claim={claim.id}
     className={`inline-flex items-center rounded-full border font-black uppercase tracking-[0.16em] ${compact ? 'px-2 py-0.5 text-[8px]' : 'px-2.5 py-1 text-[9px]'} ${claim.status === 'OPEN' ? kindTone[claim.kind] : statusTone[claim.status]}`}
   >
     {claim.status === 'OPEN' ? `${kindLabel[claim.kind]} · Unconfirmed` : statusLabel[claim.status]}
   </span>
+  )
 );
 
 export const IndustryClaimResolutionStrip: React.FC<{ claim: IndustryMediaClaim }> = ({ claim }) => {

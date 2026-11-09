@@ -32,6 +32,7 @@ import { IndustryNarrativeContext } from './IndustryNarrativeContext';
 import { StoredMediaImage } from '../../components/StoredMediaImage';
 import { applyProjectPromotionAttribution, getEligiblePromotionProjects } from '../../services/projectPromotionAttribution';
 import './x-app-responsive.css';
+import { limitSocialGain } from '../../services/socialAudienceLimits';
 
 interface XAppProps {
     player: Player;
@@ -395,6 +396,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
 
         const remainingPeople = Math.max(0,creatorWorld.eligiblePeople-currentXFollowers);
         organicGain = Math.min(remainingPeople,Math.floor(organicGain*(creatorWorld.eligiblePeople ? remainingPeople/creatorWorld.eligiblePeople : 0)));
+        organicGain = limitSocialGain('X', player.stats.fame, currentXFollowers, organicGain);
         const newXFollowers = currentXFollowers + organicGain;
 
         const newPost: XPost = {
@@ -529,7 +531,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
         const likes = Math.max(1, Math.floor(reach * (0.08 + Math.random() * 0.08)));
         const retweets = Math.floor(likes * (mode === 'QUOTE' ? 0.35 : 0.18));
         const replies = Math.floor(likes * (toneConfig.controversy > 4 ? 0.28 : 0.1));
-        const gainedFollowers = Math.min(Math.max(0,creatorWorld.eligiblePeople-player.x.followers),Math.max(0,Math.floor(likes * (toneConfig.controversy > 4 ? 0.012 : 0.018))));
+        const gainedFollowers = limitSocialGain('X', player.stats.fame, player.x.followers, Math.min(Math.max(0,creatorWorld.eligiblePeople-player.x.followers),Math.max(0,Math.floor(likes * (toneConfig.controversy > 4 ? 0.012 : 0.018)))));
         const newPost: XPost = {
             id: actionId,
             authorId: 'PLAYER',
@@ -1004,7 +1006,7 @@ export const XApp: React.FC<XAppProps> = ({ player, onBack, onUpdatePlayer }) =>
                                     <div>
                                         <span className="font-bold text-white">
                                             {formatNumber(selectedProfile ? selectedProfile.followers : (player.x.followers || 0))}
-                                        </span>
+                                        </span>{' '}
                                         <span className="text-zinc-500">{tr('x.followers')}</span>
                                     </div>
                                 </div>

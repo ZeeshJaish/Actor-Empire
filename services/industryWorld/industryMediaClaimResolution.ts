@@ -115,39 +115,39 @@ const decisionFor = (
         if (event.type === 'PROJECT_CANCELLED') return { status: 'SUPERSEDED', explanation: 'The project was cancelled before the casting report could be resolved.' };
         if (event.type !== 'PROJECT_CAST') return null;
         const talentIds = evidenceIds(event, 'TALENT');
-        if (claim.target.talentId && talentIds.includes(claim.target.talentId)) return { status: 'CONFIRMED', explanation: 'The later canonical cast announcement matched the reported talent.' };
+        if (claim.target.talentId && talentIds.includes(claim.target.talentId)) return { status: 'CONFIRMED', explanation: 'The later cast announcement matched the reported talent.' };
         const leadWasAnnounced = event.evidence.some(item => item.kind === 'TALENT' && String(item.metric || '').toUpperCase() === 'LEAD');
-        return leadWasAnnounced ? { status: 'REFUTED', explanation: 'The canonical lead casting contradicted the reported talent.' } : null;
+        return leadWasAnnounced ? { status: 'REFUTED', explanation: 'The lead casting contradicted the reported talent.' } : null;
     }
     if (claim.category === 'PROJECT_OUTCOME') {
         if (!['PROJECT_HIT', 'PROJECT_FLOP', 'PROJECT_SLEEPER'].includes(event.type)) return null;
         return expected
-            ? { status: 'CONFIRMED', explanation: 'The canonical release outcome matched the prediction.' }
-            : { status: 'REFUTED', explanation: 'The canonical release outcome contradicted the prediction.' };
+            ? { status: 'CONFIRMED', explanation: 'The release outcome matched the prediction.' }
+            : { status: 'REFUTED', explanation: 'The release outcome contradicted the prediction.' };
     }
     if (claim.category === 'RELEASE_WINDOW') {
         if (event.type === 'PROJECT_CANCELLED') return { status: 'SUPERSEDED', explanation: 'Cancellation superseded the predicted release window.' };
         if (!['PROJECT_RELEASE_PLANNED', 'PROJECT_RELEASED'].includes(event.type) || claim.target.expectedAbsoluteWeek === undefined) return null;
         const distance = Math.abs(event.absoluteWeek - claim.target.expectedAbsoluteWeek);
         const tolerance = Math.max(0, claim.target.toleranceWeeks || 0);
-        if (distance <= tolerance) return { status: 'CONFIRMED', explanation: 'The canonical release timing landed inside the predicted window.' };
+        if (distance <= tolerance) return { status: 'CONFIRMED', explanation: 'The release timing landed inside the predicted window.' };
         if (distance <= Math.max(tolerance + 1, tolerance * 2)) return { status: 'PARTLY_CONFIRMED', explanation: 'The release happened close to, but outside, the predicted window.' };
-        return { status: 'REFUTED', explanation: 'The canonical release timing fell outside the predicted window.' };
+        return { status: 'REFUTED', explanation: 'The release timing fell outside the predicted window.' };
     }
     if (claim.category === 'PLATFORM_DESTINATION') {
         if (event.type === 'PROJECT_CANCELLED') return { status: 'SUPERSEDED', explanation: 'Cancellation superseded the platform-destination claim.' };
         if (!['RIGHTS_DEAL', 'RIGHTS_TRANSFER'].includes(event.type)) return null;
-        if (claim.target.platformId && event.platformId !== claim.target.platformId) return { status: 'REFUTED', explanation: 'The canonical rights deal named a different platform.' };
+        if (claim.target.platformId && event.platformId !== claim.target.platformId) return { status: 'REFUTED', explanation: 'The rights deal named a different platform.' };
         const expectedCountries = claim.target.expectedCountryIds || [];
-        if (!expectedCountries.length) return { status: 'CONFIRMED', explanation: 'The canonical rights deal matched the predicted platform.' };
+        if (!expectedCountries.length) return { status: 'CONFIRMED', explanation: 'The rights deal matched the predicted platform.' };
         const actualCountries = new Set(evidenceIds(event, 'COUNTRY'));
         const matches = expectedCountries.filter(countryId => actualCountries.has(countryId)).length;
         if (matches === expectedCountries.length) return { status: 'CONFIRMED', explanation: 'The platform and complete predicted market scope matched.' };
         if (matches > 0) return { status: 'PARTLY_CONFIRMED', explanation: 'The platform matched, but only part of the predicted market scope did.' };
-        return { status: 'REFUTED', explanation: 'The canonical rights scope did not match the prediction.' };
+        return { status: 'REFUTED', explanation: 'The rights scope did not match the prediction.' };
     }
     if (claim.category === 'PROJECT_STATUS') {
-        if (expected) return { status: 'CONFIRMED', explanation: 'The later canonical project status matched the report.' };
+        if (expected) return { status: 'CONFIRMED', explanation: 'The later project status matched the report.' };
         if (event.type === 'PROJECT_CANCELLED') return { status: 'REFUTED', explanation: 'The project was cancelled instead of reaching the predicted status.' };
         if (event.type === 'PROJECT_SOLD') return { status: 'SUPERSEDED', explanation: 'A project sale transferred the decision before the prediction could resolve.' };
         return null;
@@ -156,18 +156,18 @@ const decisionFor = (
         if (event.type === 'PROJECT_CANCELLED') return { status: 'SUPERSEDED', explanation: 'Cancellation superseded the expected franchise continuation.' };
         if (event.type !== 'FRANCHISE_DECISION') return null;
         const universes = evidenceIds(event, 'UNIVERSE');
-        if (claim.target.universeId && universes.length && !universes.includes(claim.target.universeId)) return { status: 'REFUTED', explanation: 'The canonical franchise decision concerned a different universe.' };
-        return { status: 'CONFIRMED', explanation: 'A canonical franchise decision matched the continuation report.' };
+        if (claim.target.universeId && universes.length && !universes.includes(claim.target.universeId)) return { status: 'REFUTED', explanation: 'The franchise decision concerned a different universe.' };
+        return { status: 'CONFIRMED', explanation: 'A franchise decision matched the continuation report.' };
     }
     if (claim.category === 'AWARDS') {
         if (event.type !== 'AWARD_WON') return null;
-        return { status: 'CONFIRMED', explanation: 'The canonical award result matched the prediction.' };
+        return { status: 'CONFIRMED', explanation: 'The award result matched the prediction.' };
     }
     if (claim.category === 'COMPANY_MOVE') {
         if (!event.type.startsWith('COMPANY_') || ['COMPANY_DISTRESS', 'COMPANY_PROMOTED', 'COMPANY_LAUNCHED'].includes(event.type)) return null;
         return expected
-            ? { status: 'CONFIRMED', explanation: 'The company took the predicted canonical action.' }
-            : { status: 'REFUTED', explanation: 'The company took a different canonical action.' };
+            ? { status: 'CONFIRMED', explanation: 'The company took the predicted action.' }
+            : { status: 'REFUTED', explanation: 'The company took a different action.' };
     }
     return null;
 };

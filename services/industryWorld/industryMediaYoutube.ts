@@ -17,6 +17,7 @@ import { createDeterministicId, createDeterministicRng } from '../deterministicR
 import { normalizeIndustryEventLedger } from './industryEventLedger';
 import { normalizeIndustryMediaWorld } from './industryMediaLedger';
 import { createIndustryMediaAvatar } from './industryMediaIdentities';
+import { fillCopy, pickCopy, pickFreshCopy, sentenceStart } from './mediaCopyVariety';
 
 export const INDUSTRY_MEDIA_YOUTUBE_VIDEO_LIMIT = 160;
 export const INDUSTRY_MEDIA_CREATOR_CHANNEL_LIMIT = 80;
@@ -24,6 +25,15 @@ export const INDUSTRY_MEDIA_CREATOR_RECENT_VIDEO_LIMIT = 16;
 export const INDUSTRY_MEDIA_YOUTUBE_COMMENT_LIMIT = 8;
 export const INDUSTRY_MEDIA_YOUTUBE_EVIDENCE_LIMIT = 12;
 export const INDUSTRY_MEDIA_YOUTUBE_PROCESSED_KEY_LIMIT = 640;
+/* 2026-11-09: a commentary channel's subscribers fed its views and its views fed its subscribers with no end,
+   so late careers showed "94541.2B subscribers" and "129595.7B views". Growth now slows toward a ceiling the size
+   of the biggest real film channels, and older saves are clamped. */
+export const INDUSTRY_MEDIA_CREATOR_SUBSCRIBER_CEILING = 24_000_000;
+export const INDUSTRY_MEDIA_VIDEO_VIEW_CEILING = 60_000_000;
+/** A number past its ceiling (an old save) lands between 45% and 100% of it, chosen by the record's own id. */
+export const softIndustryMediaCeiling = (value: number, ceiling: number, seed: string): number => (
+    value <= ceiling ? value : Math.round(ceiling * (0.45 + 0.55 * createDeterministicRng(`industry-media-ceiling:${seed}`)()))
+);
 
 const FORMATS = new Set<IndustryMediaYoutubeFormat>([
     'THEORY', 'EXPLAINED', 'BUSINESS_BREAKDOWN', 'REVIEW_AFTERMATH',
@@ -119,8 +129,11 @@ const normalizeYoutubeVideo = (
             Number.MAX_SAFE_INTEGER,
             publishedAbsoluteWeek,
         ),
-        views: safeInteger(source.views, 0),
-        likes: safeInteger(source.likes, 0),
+        views: softIndustryMediaCeiling(safeInteger(source.views, 0), INDUSTRY_MEDIA_VIDEO_VIEW_CEILING, `views:${String(source.id || '')}`),
+        likes: Math.min(
+            safeInteger(source.likes, 0),
+            softIndustryMediaCeiling(safeInteger(source.views, 0), INDUSTRY_MEDIA_VIDEO_VIEW_CEILING, `views:${String(source.id || '')}`),
+        ),
         comments: uniqueText(source.comments, INDUSTRY_MEDIA_YOUTUBE_COMMENT_LIMIT),
         outcome,
         subscriberDelta: safeInteger(source.subscriberDelta, -10_000_000, 10_000_000),
@@ -154,8 +167,8 @@ const normalizeCreatorChannel = (
         schemaVersion: 1,
         id,
         personalityId,
-        subscribers: safeInteger(source.subscribers, 0),
-        totalViews: safeInteger(source.totalViews, 0),
+        subscribers: softIndustryMediaCeiling(safeInteger(source.subscribers, 0), INDUSTRY_MEDIA_CREATOR_SUBSCRIBER_CEILING, `subscribers:${id}`),
+        totalViews: softIndustryMediaCeiling(safeInteger(source.totalViews, 0), INDUSTRY_MEDIA_CREATOR_SUBSCRIBER_CEILING * 600, `total:${id}`),
         credibility: safeInteger(source.credibility, 0, 100, 50),
         momentum: safeInteger(source.momentum, 0, 100, 50),
         sponsorAppeal: safeInteger(source.sponsorAppeal, 0, 100, 50),
@@ -258,7 +271,8 @@ export const calculateIndustryMediaYoutubePerformance = (
     );
     const variance = 0.25 + rng() * 1.55;
     const viewRatio = Math.max(0.03, expectedRatio * variance);
-    const views = Math.max(300, Math.round(Math.max(500, input.channel.subscribers) * viewRatio));
+    const views = Math.min(INDUSTRY_MEDIA_VIDEO_VIEW_CEILING,
+        Math.max(300, Math.round(Math.max(500, input.channel.subscribers) * viewRatio)));
     const engagementRate = 0.035 + rng() * 0.055;
     const likes = Math.min(views, Math.round(views * engagementRate));
     const outcome: IndustryMediaYoutubeOutcome = viewRatio >= 1.75 ? 'BREAKOUT'
@@ -267,7 +281,9 @@ export const calculateIndustryMediaYoutubePerformance = (
     const subscriberRate = outcome === 'BREAKOUT' ? 0.045
         : outcome === 'HIT' ? 0.022
             : outcome === 'NORMAL' ? 0.008 : -0.0015;
-    const subscriberDelta = Math.round(views * subscriberRate);
+    /* room left under the ceiling: the bigger the channel, the slower it grows */
+    const room = Math.max(0, 1 - input.channel.subscribers / INDUSTRY_MEDIA_CREATOR_SUBSCRIBER_CEILING);
+    const subscriberDelta = Math.round(views * subscriberRate * (subscriberRate > 0 ? room : 1));
     const estimatedRevenue = Math.max(0, Math.round((views / 1_000) * (1.8 + rng() * 2.4)));
     return { views, likes, subscriberDelta, estimatedRevenue, outcome };
 };
@@ -374,44 +390,69 @@ const displaySubject = (story: IndustryMediaStory, event: IndustryEventFact): st
     event.companyName || story.companyName || event.headline
 );
 
+/* 2026-11-09 (Zeesh: the same title came back with only the name changed): every format has several title frames
+   and summaries, picked by the video's own key, so two creators covering one story upload two different videos. */
+const YOUTUBE_TITLES: Record<IndustryMediaYoutubeFormat, readonly string[]> = {
+    THEORY: ['{headline} — What It Could Mean', '{headline}: My Theory', 'Here Is What I Think {subject} Does Next', 'The Theory Nobody Is Talking About: {headline}', 'Connecting the Dots on {subject}', 'What {headline} Really Tells Us'],
+    EXPLAINED: ['{headline} — Explained', '{headline}, Explained in 10 Minutes', 'What You Missed: {headline}', 'The Story Behind {headline}', 'Everything We Know: {headline}'],
+    BUSINESS_BREAKDOWN: ['{headline} — The Business Explained', 'Follow the Money: {headline}', 'Why {subject} Made This Move', 'The Numbers Behind {headline}', 'Is {subject} Making a Mistake?', 'The Big Bet at {subject}, Explained'],
+    REVIEW_AFTERMATH: ['{headline} — The Full Aftermath', '{headline}. So What Happened?', 'What Went Right and Wrong: {headline}', 'The Fallout From {headline}', '{headline} — My Honest Breakdown', 'Everyone Is Wrong About This: {headline}'],
+    RESPONSE_ANALYSIS: ['{subject} Responded — Did It Work?', 'Breaking Down the {subject} Statement', 'Did {subject} Just Fix It?', '{subject} Finally Speaks — My Take', 'That {subject} Response, Explained'],
+    CREATOR_REACTION: ['{headline} — Creator Reaction', 'Reacting to: {headline}', 'I Did Not Expect This — {headline}', '{headline}: My Honest Reaction', 'We Need to Talk About {subject}', 'Live Reaction: {headline}'],
+};
+const YOUTUBE_SUMMARIES: Record<IndustryMediaYoutubeFormat, readonly string[]> = {
+    THEORY: ['A theory-led breakdown of the confirmed {subject} development and what it may suggest next.', 'Separating what is confirmed about {subject} from where it could go next.', 'One creator connects the dots on {subject}, with the facts kept apart from the guesses.'],
+    EXPLAINED: ['The confirmed {subject} story, explained from the start.', 'A clear walk through what happened with {subject}.', 'Everything on the record about {subject}, in one place.'],
+    BUSINESS_BREAKDOWN: ['A numbers-first breakdown of the confirmed {subject} move and the strategy behind it.', 'Where the money goes in the {subject} move, and why it matters.', 'The business logic behind the confirmed {subject} decision.'],
+    REVIEW_AFTERMATH: ['A critical look at the confirmed outcome and what the public record shows so far.', 'What the result means for {subject}, now that the numbers are in.', 'A look back at how the {subject} story played out.'],
+    RESPONSE_ANALYSIS: ['A breakdown of the public statement and its {outcome} reception.', 'How the {subject} statement landed, and what it changed.', 'Did the {subject} response help? A look at the {outcome} reaction.'],
+    CREATOR_REACTION: ['A creator perspective on the confirmed {subject} development.', 'First thoughts on the {subject} news.', 'An honest reaction to the {subject} story.'],
+};
+
 const copyFor = (
     story: IndustryMediaStory,
     event: IndustryEventFact,
     format: IndustryMediaYoutubeFormat,
     response?: IndustryMediaPlayerResponse,
+    seed = `${event.id}:${format}`,
+    recentTitles: readonly string[] = [],
 ): Pick<IndustryMediaYoutubeVideo, 'title' | 'summary' | 'confirmedFacts' | 'interpretation' | 'claimMode'> => {
     const subject = displaySubject(story, event);
-    if (format === 'THEORY') return {
-        title: `${event.headline} — What It Could Mean`,
-        summary: `A theory-led breakdown of the confirmed ${subject} development and what it may suggest next.`,
+    const shape = format === 'RESPONSE_ANALYSIS' && !response ? 'CREATOR_REACTION' : format;
+    const vars = { headline: event.headline, subject, outcome: response?.outcome?.toLowerCase() || 'mixed' };
+    const title = sentenceStart(fillCopy(pickFreshCopy(`youtube-title:${seed}`, YOUTUBE_TITLES[shape], recentTitles), vars));
+    const summary = sentenceStart(fillCopy(pickCopy(`youtube-summary:${seed}`, YOUTUBE_SUMMARIES[shape]), vars));
+    if (shape === 'THEORY') return {
+        title,
+        summary,
         confirmedFacts: event.detail,
         interpretation: 'Theory: this could shape another connected story, but no further project has been confirmed.',
         claimMode: 'SPECULATION',
     };
-    if (format === 'BUSINESS_BREAKDOWN') return {
-        title: `${event.headline} — The Business Explained`,
-        summary: `A numbers-first breakdown of the confirmed ${subject} move and the strategy behind it.`,
+    if (shape === 'BUSINESS_BREAKDOWN') return {
+        title,
+        summary,
         confirmedFacts: event.detail,
         interpretation: 'Analysis: the move may change competitive positioning, though later results will decide its value.',
         claimMode: 'ANALYSIS',
     };
-    if (format === 'REVIEW_AFTERMATH') return {
-        title: `${event.headline} — The Full Aftermath`,
-        summary: `A critical look at the confirmed outcome and what the public record shows so far.`,
+    if (shape === 'REVIEW_AFTERMATH') return {
+        title,
+        summary,
         confirmedFacts: event.detail,
         interpretation: 'Analysis: the result strengthens one reading of the project, while its longer legacy remains unsettled.',
         claimMode: 'ANALYSIS',
     };
-    if (format === 'RESPONSE_ANALYSIS' && response) return {
-        title: `${subject} Responded — Did It Work?`,
-        summary: `A breakdown of the public statement and its saved ${response.outcome?.toLowerCase() || 'resolved'} reception.`,
+    if (shape === 'RESPONSE_ANALYSIS' && response) return {
+        title,
+        summary,
         confirmedFacts: `${event.detail} The recorded public response resolved as ${response.outcome || 'MIXED'}.`,
         interpretation: 'Analysis: the response changed the tone of the conversation, not the underlying industry facts.',
         claimMode: 'ANALYSIS',
     };
     return {
-        title: `${event.headline} — Creator Reaction`,
-        summary: `A creator perspective on the confirmed ${subject} development.`,
+        title,
+        summary,
         confirmedFacts: event.detail,
         interpretation: 'Opinion: the decision is worth watching, but its eventual result is not yet known.',
         claimMode: 'OPINION',
@@ -464,8 +505,8 @@ const advanceLongTail = (
         }
         return {
             ...video,
-            views: video.views + extraViews,
-            likes: Math.min(video.views + extraViews, video.likes + extraLikes),
+            views: Math.min(INDUSTRY_MEDIA_VIDEO_VIEW_CEILING, video.views + extraViews),
+            likes: Math.min(INDUSTRY_MEDIA_VIDEO_VIEW_CEILING, video.views + extraViews, video.likes + extraLikes),
             estimatedRevenue: video.estimatedRevenue + extraRevenue,
             lastPerformanceAbsoluteWeek: absoluteWeek,
         };
@@ -595,6 +636,8 @@ export const processIndustryMediaYoutube = (
             || left.story.id.localeCompare(right.story.id)
         ));
 
+    /* titles already out: a new upload takes a title frame none of the last 40 used */
+    const recentTitles = mediaState.youtubeVideos.slice(-40).map(video => video.title);
     for (const candidate of candidates) {
         if (createdVideos.length >= 2) break;
         const creator = selectCreator(mediaState, candidate.story, candidate.format, absoluteWeek, channels);
@@ -612,7 +655,8 @@ export const processIndustryMediaYoutube = (
         });
         const id = createDeterministicId('industry_youtube_video', candidate.publicationKey);
         const institution = mediaState.institutions.find(item => item.id === creator.institutionId);
-        const copy = copyFor(candidate.story, candidate.event, candidate.format, candidate.response);
+        const copy = copyFor(candidate.story, candidate.event, candidate.format, candidate.response, `${candidate.publicationKey}:${creator.id}`, recentTitles);
+        recentTitles.push(copy.title);
         const linkedClaim = [...mediaState.claims]
             .filter(claim => claim.anchorStoryId === candidate.story.id && claim.createdAbsoluteWeek < absoluteWeek)
             .sort((left, right) => right.createdAbsoluteWeek - left.createdAbsoluteWeek || left.id.localeCompare(right.id))[0];

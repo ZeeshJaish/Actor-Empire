@@ -1,6 +1,7 @@
 import { readCreatorWorld } from './creatorEconomy';
 import { GameLanguage, InstaPostType, Player, SponsorshipCategory } from '../types';
 import { getPlayerLanguage, t } from './i18n';
+import { limitSocialGain } from './socialAudienceLimits';
 
 export interface InstagramPostConfig {
     labelKey: string;
@@ -292,7 +293,7 @@ export const calculateInstagramPostOutcome = (player: Player, type: InstaPostTyp
     }
 
     const maxOrganicGain = publicFollowers < 1000 ? 120 : Math.max(100, Math.floor(publicFollowers * 0.12));
-    followerGain = Math.max(0, Math.min(remaining,maxOrganicGain, followerGain));
+    followerGain = Math.max(0, Math.min(remaining, maxOrganicGain, limitSocialGain('INSTAGRAM', player.stats.fame, publicFollowers, followerGain)));
 
     const commentCount = type === 'CONTROVERSIAL' ? 7 : 5;
     return {
