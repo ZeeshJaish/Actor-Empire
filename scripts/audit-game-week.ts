@@ -35,9 +35,9 @@ const raw = /\b(Week|week) (\$\{|\{)[^}]*(startsAt|expiresAt|readyAt|opensAt|com
 const offByOne = /\(\([A-Za-z.]*AbsoluteWeek - 1\) % 52\) \+ 1/;
 /* 1.0.26 beta (Zeesh's screenshot): the Audience chart read "WK 748 · WK 755 · WK 763", so a "WK" chip over an
    absolute week (a chart point's .week, an ...AtWeek, a campaign's resultsWeek, an ...AbsoluteWeek) counts as raw too */
-const rawWk = /\bWK (\$\{|\{)[^}]*(\.week|At(Absolute)?Week|resultsWeek)\b[^}]*\}/;
+const rawWk = /\bWK (\$\{|\{)[^}]*(\.week|[aA]bsoluteWeek|opensWeek|At(Absolute)?Week|resultsWeek)\b[^}]*\}/;
 const bad: string[] = [];
-for (const dir of ["components", "views", "services"]) {
+for (const dir of ["components", "views", "services", "content-market-exact"]) {
     for (const path of files(dir)) {
         readFileSync(path, "utf8").split("\n").forEach((line, index) => {
             if (raw.test(line) || rawWk.test(line) || offByOne.test(line)) bad.push(path + ":" + (index + 1));

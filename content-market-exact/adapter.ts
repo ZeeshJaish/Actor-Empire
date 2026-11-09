@@ -1,4 +1,5 @@
 import { getStreamingRightsContract } from '../services/streamingRightsCore';
+import { gameYearWeekShort } from '../services/gameWeek';
 import {getStreamingBuyerBackendCapability,streamingBackendPercentForBuyer} from '../services/streamingBackendPolicy';
 import { getContentMarketPrivateOfferDefaults, submitContentMarketPrivateOffer } from '../services/streamingContentMarket';
 import type { StreamingRightsTermsInput } from '../services/streamingRightsMarketplace';
@@ -296,7 +297,7 @@ export const buildExactContentMarketLots = (player: Player, sources: ContentMark
       avail: sale.status === 'LIVE' ? 'LIVE' : 'OPENS',
       opensWeek: sale.opensAtAbsoluteWeek,
       deliversWeek: sale.plannedAvailabilityAbsoluteWeek,
-      note: `Cannot be scheduled before week ${sale.plannedAvailabilityAbsoluteWeek}.`,
+      note: `Cannot be scheduled before ${gameYearWeekShort(sale.plannedAvailabilityAbsoluteWeek)}.`,
     };
   });
 

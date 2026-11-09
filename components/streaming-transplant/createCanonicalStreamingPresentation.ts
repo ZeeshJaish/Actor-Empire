@@ -558,7 +558,7 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
       price: latestQuote.close,
       changePct: latestQuote.changePercent,
       marketCap: latestQuote.marketCap,
-      history: platform.publicCompany.quoteHistory.slice(-24).map(quote => ({ label: `WK ${quote.absoluteWeek}`, value: quote.close })),
+      history: platform.publicCompany.quoteHistory.slice(-24).map(quote => ({ label: gameYearWeekShort(quote.absoluteWeek), value: quote.close })),
     } : undefined,
     successor: platform.legacy.successionPlan ? { name: platform.legacy.successionPlan.candidateName, role: platform.legacy.successionPlan.mandate.replaceAll('_', ' ') } : null,
     legacyTitle: platform.legacy.closedEras.at(-1)?.title,

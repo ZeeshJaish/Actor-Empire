@@ -1,3 +1,4 @@
+import { gameYearWeekShort } from './gameWeek';
 import type {
     OwnedStreamingRivalProfile,
     PlatformId,
@@ -582,7 +583,7 @@ const buildGlobalTrend = (
     const activeViewers = population * adoption / 100;
     const payingHouseholds = activeViewers / (2.42 - adoption / 235);
     return {
-        label: `WK ${Math.max(0, absoluteWeek - weeksBack)}`,
+        label: gameYearWeekShort(Math.max(0, absoluteWeek - weeksBack)),
         absoluteWeek: Math.max(0, absoluteWeek - weeksBack),
         population: round(population),
         streamingAdoptionPercent: round1(adoption),

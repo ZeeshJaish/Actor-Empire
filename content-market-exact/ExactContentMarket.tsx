@@ -28,6 +28,7 @@
  * cheque does not automatically lead — which is exactly how these rooms work.
  */
 import css from './ContentMarket.module.css';
+import { gameYearWeekShort } from '../services/gameWeek';
 import { OfferClauseHelp, OfferUsdInput } from './OfferControls';
 import { cx } from './cx';
 import { Poster } from './Poster';
@@ -251,7 +252,7 @@ const Chip: React.FC<{ lot: Lot }> = ({ lot }) => {
       {lot.avail === 'LIVE' && <i />}
       {a.label}
       {lot.avail === 'CLOSING' && lot.closesInDays ? ` · ${lot.closesInDays}D` : ''}
-      {lot.avail === 'OPENS' && lot.opensWeek ? ` · WK ${lot.opensWeek}` : ''}
+      {lot.avail === 'OPENS' && lot.opensWeek ? ` · ${gameYearWeekShort(lot.opensWeek)}` : ''}
     </span>
   );
 };
