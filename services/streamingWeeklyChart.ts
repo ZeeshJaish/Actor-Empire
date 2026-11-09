@@ -31,7 +31,7 @@ import type {
 } from '../types';
 import { getHistoricalCatalogueTitles } from './historicalCatalogue';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
-import { getAiCataloguePositions } from './worldEconomy/worldStreamingAiCatalogue';
+import { getAiCataloguePositions, readAiCatalogueHistoricalIndex } from './worldEconomy/worldStreamingAiCatalogue';
 import { streamingCampaignTitleFitAnywhere } from './campaigns/streamingCampaignEffects';
 
 export const STREAMING_WEEKLY_CHART_WEEKS = 12;
@@ -77,6 +77,10 @@ const byViews = (left: StreamingWeeklyChartRow, right: StreamingWeeklyChartRow) 
 
 /** One settled week's Top 10s, from the week's viewing settlement. */
 export const buildStreamingWeeklyChartWeek = (player: Player, absoluteWeek: number): StreamingWeeklyChartWeek => {
+    /* Lag round 2 (2026-11-09): the chart reads every rival's catalogue of this same player, which it never
+       changes, so the historical index is built once here, not once per platform. */
+    let historicalCache: ReturnType<typeof readAiCatalogueHistoricalIndex> | undefined;
+    const historicalIndex = () => historicalCache ?? (historicalCache = readAiCatalogueHistoricalIndex(player));
     const viewing = player.world.worldStreamingViewing;
     /* every title's hours by service; a title streamed on two services counts both */
     type Facts = { title: string; kind: StreamingWeeklyChartRow['kind']; genre: string };
@@ -131,7 +135,7 @@ export const buildStreamingWeeklyChartWeek = (player: Player, absoluteWeek: numb
             if (window.platformId !== platformId || window.startsAtAbsoluteWeek > absoluteWeek || window.expiresAtAbsoluteWeek <= absoluteWeek) return;
             consider(String(project.id), window.startsAtAbsoluteWeek, null, window.performance?.viewsMillions);
         }));
-        getAiCataloguePositions(player, platformId, catalogue).forEach(position => {
+        getAiCataloguePositions(player, platformId, catalogue, undefined, historicalIndex()).forEach(position => {
             if (position.status !== 'ACTIVE' || position.startsAtAbsoluteWeek > absoluteWeek || position.expiresAtAbsoluteWeek <= absoluteWeek) return;
             consider(String(position.titleId), position.startsAtAbsoluteWeek, position.contractId);
         });

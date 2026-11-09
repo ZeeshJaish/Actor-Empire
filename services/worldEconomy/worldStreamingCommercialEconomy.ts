@@ -40,9 +40,12 @@ export const allocateStreamingStoreUnits = (total:number,weights:number[]):numbe
     const exact=safe.map(weight=>units*weight/sum);
     const counts=exact.map(Math.floor);
     let remainder=units-counts.reduce((value,count)=>value+count,0);
-    exact.map((value,index)=>({index,fraction:value-counts[index]}))
-        .sort((a,b)=>b.fraction-a.fraction || a.index-b.index)
-        .forEach(row=>{if(remainder>0){counts[row.index]++;remainder--;}});
+    /* Lag round 2 (2026-11-09): the same largest-remainder order (larger fraction first, then lower index)
+       on plain indices instead of an object per row; when nothing is left to hand out, nothing is sorted. */
+    if(remainder<=0) return counts;
+    const fractions=exact.map((value,index)=>value-counts[index]);
+    const order=fractions.map((_,index)=>index).sort((a,b)=>fractions[b]-fractions[a] || a-b);
+    for(let rank=0;rank<order.length && remainder>0;rank++){counts[order[rank]]++;remainder--;}
     return counts;
 };
 

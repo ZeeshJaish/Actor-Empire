@@ -55,6 +55,24 @@ export const attachStreamingRoyaltyReceipts = (
                     expiresAtAbsoluteWeek: row.kind === 'PURCHASE' ? null : week + offer.commercialConfiguration.rentals.windowWeeks})),
             ]) : aiEntitlements;
         const titleMap = new Map(summary.titlePerformance.map(row => [row.projectId, row]));
+        /* Lag round 2 (2026-11-09): only receipts the closing filter keeps are built (the player's own,
+           and ones under a signed contract). The amounts are still allocated over every position, so
+           the kept receipts are exactly the same; the dropped ones were thousands of throwaway rows. */
+        const keepsReceipt = (contractId: string | undefined) => offer.platformId === 'PLAYER' || (!!contractId && signedContractIds.has(contractId));
+        /* Lag round 2 (2026-11-09): each title's country rows are indexed once per title object (the first
+           row per country, as find returned), instead of a find through ~200 countries for every title in
+           every country and plan. Rows are only changed in place here, never added or removed. */
+        type CountryRow = (typeof summary.titlePerformance)[number]['countryPerformance'][number];
+        const countryRowIndex = new Map<object, Map<string, CountryRow>>();
+        const countryRowOf = (title: (typeof summary.titlePerformance)[number], countryId: string): CountryRow | undefined => {
+            let rows = countryRowIndex.get(title);
+            if (!rows) {
+                rows = new Map();
+                for (const row of title.countryPerformance) if (!rows.has(row.countryId)) rows.set(row.countryId, row);
+                countryRowIndex.set(title, rows);
+            }
+            return rows.get(countryId);
+        };
         // Free/ad and store-only services legitimately have no subscription customer row.
         const countries = [...new Set([...Object.keys(state.countries),
             ...Object.keys(player.world.worldStreamingCustomers?.countries || {})])]
@@ -92,7 +110,7 @@ export const attachStreamingRoyaltyReceipts = (
             const countryId = country.countryId;
             const plans = customer!.planAllocations;
             const delivered = offer.isPlayer ? state.countries[countryId] : state.countries[countryId]?.platformPerformance?.[offer.platformId];
-            const countryTitle = (id: string) => titleMap.get(id)?.countryPerformance.find(row => row.countryId === countryId);
+            const countryTitle = (id: string) => { const title = titleMap.get(id); return title ? countryRowOf(title, countryId) : undefined; };
             const positionWeight = (position: ReturnType<typeof eligible>[number], route: StreamingTitleAccessRoute) => {
                 const row = countryTitle(position.projectId);
                 if (!offer.isPlayer) return (.15 + titleQuality(position.projectId) / 100)
@@ -129,7 +147,7 @@ export const attachStreamingRoyaltyReceipts = (
                 const allocations = allocateStreamingSubscriptionReceipts({weeklySubscriptionRevenueFullCurrency: planPools[planIndex] || 0, titles: signals});
                 for (const allocation of allocations) {
                     if (allocation.attributedSubscriptionRevenue <= 0) continue;
-                    receipts.push({receiptId: JSON.stringify([week, offer.platformId, countryId, plan.planId, allocation.projectId, 'SUBSCRIPTION']),
+                    if (keepsReceipt(allocation.contractId)) receipts.push({receiptId: JSON.stringify([week, offer.platformId, countryId, plan.planId, allocation.projectId, 'SUBSCRIPTION']),
                         platformId: offer.platformId, countryId, projectId: allocation.projectId, contractId: allocation.contractId,
                         planId: plan.planId, kind: 'SUBSCRIPTION', sourceKind: 'SUBSCRIPTION', grossReceipts: allocation.attributedSubscriptionRevenue});
                     if (offer.isPlayer) {
@@ -151,7 +169,7 @@ export const attachStreamingRoyaltyReceipts = (
                     const amounts = allocateStreamingStoreUnits(routePools[routeIndex] || 0, positions.map(row => positionWeight(row, route)));
                     positions.forEach((position, titleIndex) => {
                         if (!(amounts[titleIndex] > 0)) return;
-                        receipts.push({receiptId: JSON.stringify([week, offer.platformId, countryId, 'NON_STORE', index, routeIndex, position.projectId]),
+                        if (keepsReceipt(position.contractId)) receipts.push({receiptId: JSON.stringify([week, offer.platformId, countryId, 'NON_STORE', index, routeIndex, position.projectId]),
                             platformId: offer.platformId, countryId, projectId: position.projectId, contractId: position.contractId,
                             kind: 'NON_STORE', sourceKind, grossReceipts: amounts[titleIndex], ...(route.kind === 'SUBSCRIPTION' ? {planId: route.planId} : {})});
                     });
@@ -190,7 +208,7 @@ export const attachStreamingRoyaltyReceipts = (
         if (offer.isPlayer) {
             summary.revenue.attributedSubscriptionRevenue = totalWeekly;
             for (const country of Object.values(state.countries)) country.revenue.attributedSubscriptionRevenue = summary.titlePerformance.reduce((sum, title) => sum
-                + (title.countryPerformance.find(row => row.countryId === country.countryId)?.revenue.attributedSubscriptionRevenue || 0), 0);
+                + (countryRowOf(title, country.countryId)?.revenue.attributedSubscriptionRevenue || 0), 0);
         }
     }
     // Legacy AI catalogue placeholders have no signed financial obligation. They

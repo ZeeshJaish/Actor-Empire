@@ -212,17 +212,23 @@ export const seedLegacyAiCatalogue = (
 
 const historicalPositionsKey = {};
 
+/** The historical title index getAiCataloguePositions reads, by canonical id. */
+export const readAiCatalogueHistoricalIndex = (player: Player) => new Map(getHistoricalCatalogueTitles(player).map(title => [title.id, title]));
+
 export const getAiCataloguePositions = (
     player: Player, platformId: string, legacy: WorldStreamingAiCatalogueTitle[],
     context?: StreamingCatalogueReadContext,
+    /** Lag round 2 (2026-11-09): a caller reading every platform of this same unchanged player passes
+     *  readAiCatalogueHistoricalIndex(player) once, instead of each call rebuilding the whole saved list. */
+    historicalIndex?: ReturnType<typeof readAiCatalogueHistoricalIndex>,
 ): AiCataloguePosition[] => {
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const readHistorical = () => new Map(getHistoricalCatalogueTitles(player).map(title => [title.id, title]));
+    const readHistorical = () => readAiCatalogueHistoricalIndex(player);
     // Only the caller's immutable read batch can reuse this index. Public reads
     // without a context, and contexts for another player, always read fresh facts.
     const historicalById = context?.player === player
         ? readStreamingCatalogueDerivedView(context, historicalPositionsKey, readHistorical)
-        : readHistorical();
+        : historicalIndex ?? readHistorical();
     const projected = legacy.filter(title => title.platformId === platformId).filter(title => {
         const source = historicalById.get(title.titleId);
         if (!source) return true; // Preserve old synthetic save entries without fabricating missing rights.
