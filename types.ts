@@ -1229,6 +1229,8 @@ export interface TheatricalChainReceipt {
     screens: number;
     expectedFootfall: number;
     exhibitorCut: number;
+    /** On a rolled-up finished film: the cut of the last week this chain sold tickets. */
+    lastActiveExhibitorCut?: number;
 }
 
 export interface TheatricalRegionReceipt {
@@ -1259,6 +1261,8 @@ export interface TheatricalDistributionBreakdown {
     overscreeningPenalty: number;
     underReleasePenalty: number;
     regionReceipts: TheatricalRegionReceipt[];
+    /** First entry of a finished film: the region detail of this many weeks is summed here. */
+    rolledUpWeeks?: number;
 }
 
 export interface StreamingRegionBreakdown {
@@ -1279,6 +1283,8 @@ export interface StreamingDistributionBreakdown {
     primaryRegionId: BoxOfficeRegionId;
     globalReachScore: number;
     regionBreakdowns: StreamingRegionBreakdown[];
+    /** First entry of a finished title: the region detail of this many weeks is summed here. */
+    rolledUpWeeks?: number;
 }
 
 export interface CampaignFitSnapshot {

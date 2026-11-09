@@ -477,8 +477,43 @@ const getWeekProcessingDebugStorageKey = (saveSlot?: string | number | null) => 
   return normalizedSlot ? `${WEEK_PROCESSING_DEBUG_SLOT_PREFIX}${normalizedSlot}` : WEEK_PROCESSING_DEBUG_STORAGE_KEY;
 };
 
+/* Perf plan (2026-11-08): the running week's debug note lives in memory. It reaches the phone's
+   storage at about a dozen checkpoints a week, at once on any failure, and when the app is hidden,
+   instead of at every one of the week's 86 stages (about 95 KB a week). A week stopped by the phone
+   still leaves its last checkpoint for the next start to report. */
+let liveWeekDebugSnapshot: WeekProcessingDebugSnapshot | null = null;
+let liveWeekDebugSnapshotDirty = false;
+const WEEK_DEBUG_LOOP_CHECKPOINTS = new Set([
+  'loop_world_industry_start',
+  'loop_markets_start',
+  'loop_commitments_releases_start',
+  'loop_end_week_start',
+  'loop_owned_streaming_start',
+  'loop_weekly_events_start',
+  'loop_studio_funding_start',
+]);
+// App stages that sit within a millisecond of a written neighbour.
+const WEEK_DEBUG_QUIET_STAGES = new Set([
+  'game_loop_start',
+  'post_week_sync_start',
+  'post_week_sync_done',
+]);
+export const isWeekLoopCheckpointStage = (loopStage: string) => WEEK_DEBUG_LOOP_CHECKPOINTS.has(`loop_${loopStage}`);
+const isWeekDebugCheckpoint = (stage: string, context: Record<string, unknown>) => {
+  if (context.error || stage.includes('fail') || String(context.status || '') === 'failed') return true;
+  if (stage.startsWith('loop_')) return WEEK_DEBUG_LOOP_CHECKPOINTS.has(stage);
+  return !WEEK_DEBUG_QUIET_STAGES.has(stage);
+};
+
 const readWeekProcessingDebugSnapshot = (saveSlot?: string | number | null): WeekProcessingDebugSnapshot | null => {
   if (typeof window === 'undefined') return null;
+  const requestedLiveSlot = normalizeDebugSaveSlot(saveSlot);
+  if (
+    liveWeekDebugSnapshot
+    && (!requestedLiveSlot || normalizeDebugSaveSlot(liveWeekDebugSnapshot.save_slot) === requestedLiveSlot)
+  ) {
+    return liveWeekDebugSnapshot;
+  }
   try {
     const normalizedSlot = normalizeDebugSaveSlot(saveSlot);
     const raw = window.localStorage.getItem(getWeekProcessingDebugStorageKey(normalizedSlot));
@@ -497,10 +532,23 @@ const writeWeekProcessingDebugSnapshot = (snapshot: WeekProcessingDebugSnapshot)
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(getWeekProcessingDebugStorageKey(snapshot.save_slot), JSON.stringify(snapshot));
+    if (liveWeekDebugSnapshot === snapshot) liveWeekDebugSnapshotDirty = false;
   } catch {
     // Diagnostics must never block the save or week-processing path.
   }
 };
+
+const flushLiveWeekDebugSnapshot = () => {
+  if (liveWeekDebugSnapshot && liveWeekDebugSnapshotDirty) writeWeekProcessingDebugSnapshot(liveWeekDebugSnapshot);
+};
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  // A phone may close a hidden app without warning, so the latest stage is written first.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushLiveWeekDebugSnapshot();
+  });
+  window.addEventListener('pagehide', flushLiveWeekDebugSnapshot);
+}
 
 const getWeekProcessingDebugFields = (player?: Player | null) => {
   const reportSlot = getReportSaveSlot(player);
@@ -888,19 +936,38 @@ export const addBreadcrumb = (message: string, params: Record<string, unknown> =
   );
 };
 
+/* Perf plan (2026-11-08): a crash key crosses the native bridge only when its value changes.
+   A week used to send about 1,000 keys, almost all of them unchanged. A failed send is retried
+   the next time the key is set. */
+const lastSentCrashKeys = new Map<string, string>();
+let lastSentCrashUserId = '';
 export const setCrashKey = (key: string, value: unknown) => {
   if (!isNativeTelemetry()) return;
+  const safeKey = sanitizeName(key, 'key');
   const safeValue = sanitizeValue(value);
-  void runSafely(`crash-key:${key}`, () =>
-    FirebaseCrashlytics.setCustomKey({
-      key: sanitizeName(key, 'key'),
-      value: safeValue,
-      type: getCrashKeyType(safeValue),
-    })
-  );
+  const type = getCrashKeyType(safeValue);
+  const signature = `${type}:${String(safeValue)}`;
+  if (lastSentCrashKeys.get(safeKey) === signature) return;
+  lastSentCrashKeys.set(safeKey, signature);
+  void runSafely(`crash-key:${key}`, async () => {
+    try {
+      await FirebaseCrashlytics.setCustomKey({
+        key: safeKey,
+        value: safeValue,
+        type,
+      });
+    } catch (error) {
+      if (lastSentCrashKeys.get(safeKey) === signature) lastSentCrashKeys.delete(safeKey);
+      throw error;
+    }
+  });
 };
 
-export const markTraceAction = (action: string, context: Record<string, unknown> = {}) => {
+export const markTraceAction = (
+  action: string,
+  context: Record<string, unknown> = {},
+  options: { publishNative?: boolean } = {},
+) => {
   const updates: TraceContext = {
     last_action: sanitizeName(action, 'action'),
     updated_at: new Date().toISOString(),
@@ -944,7 +1011,7 @@ export const markTraceAction = (action: string, context: Record<string, unknown>
     ...updates,
   };
 
-  if (!isNativeTelemetry()) return;
+  if (!isNativeTelemetry() || options.publishNative === false) return;
   Object.entries(getCompactTraceParams()).forEach(([key, value]) => setCrashKey(key, value));
 };
 
@@ -966,9 +1033,16 @@ export const setCrashContext = (player?: Player | null, context: Record<string, 
 
   Object.entries(values).forEach(([key, value]) => setCrashKey(key, value));
   const userId = firebaseAuthUserId || player?.id;
-  if (userId) {
-    void runSafely('analytics-user-id', () => FirebaseAnalytics.setUserId({ userId: String(userId) }));
-    void runSafely('crashlytics-user-id', () => FirebaseCrashlytics.setUserId({ userId: String(userId) }));
+  // Perf plan (2026-11-08): the same user id is sent once, not at every checkpoint.
+  if (userId && String(userId) !== lastSentCrashUserId) {
+    const sentUserId = String(userId);
+    lastSentCrashUserId = sentUserId;
+    const sendAgainNextTime = (error: unknown): never => {
+      if (lastSentCrashUserId === sentUserId) lastSentCrashUserId = '';
+      throw error;
+    };
+    void runSafely('analytics-user-id', () => FirebaseAnalytics.setUserId({ userId: sentUserId }).catch(sendAgainNextTime));
+    void runSafely('crashlytics-user-id', () => FirebaseCrashlytics.setUserId({ userId: sentUserId }).catch(sendAgainNextTime));
   }
 };
 
@@ -1007,8 +1081,27 @@ export const markWeekProcessingStage = (
     ? 'EXPLICIT' : sampleSourceSize ? 'SOURCE_AT_WEEK_START'
       : isNewRun ? (previous?.save_size ? 'LAST_RECORDED' : 'UNKNOWN')
         : previous?.save_size_basis || (previous?.save_size ? 'LAST_RECORDED' : 'UNKNOWN');
-  const playerSnapshot = getPlayerSnapshot(player);
-  const productionSnapshot = getProductionHouseSnapshot(player);
+  const writesCheckpoint = isWeekDebugCheckpoint(safeStage, context);
+  const reusePreviousCounts = !writesCheckpoint && !isNewRun && Boolean(previous);
+  const playerSnapshot = reusePreviousCounts && previous
+    ? {
+        age: previous.age,
+        week: previous.week,
+        pending_events: previous.pending_events,
+        commitments: previous.commitments,
+        active_releases: previous.active_releases,
+        inbox_messages: previous.inbox_messages,
+      }
+    : getPlayerSnapshot(player);
+  const productionSnapshot = reusePreviousCounts && previous
+    ? {
+        production_house_projects: previous.production_house_projects,
+        studio_scripts: previous.studio_scripts,
+        studio_concepts: previous.studio_concepts,
+        pending_return_deals: previous.pending_return_deals,
+        studio_balance_m: previous.studio_balance_m,
+      }
+    : getProductionHouseSnapshot(player);
   const status = String(context.status || (safeStage.includes('fail') ? 'failed' : safeStage === 'success' ? 'success' : 'running'));
   const error = context.error ? getErrorMessage(context.error) : undefined;
   const screen = context.screen !== undefined ? String(context.screen).slice(0, 90) : previous?.screen;
@@ -1062,7 +1155,9 @@ export const markWeekProcessingStage = (
     interrupted_stage: previous?.interrupted_stage,
   };
 
-  writeWeekProcessingDebugSnapshot(snapshot);
+  liveWeekDebugSnapshot = snapshot;
+  liveWeekDebugSnapshotDirty = true;
+  if (writesCheckpoint) writeWeekProcessingDebugSnapshot(snapshot);
   markTraceAction(`week_${safeStage}`, {
     flow: 'process_week',
     save_slot: saveSlot,
@@ -1072,7 +1167,7 @@ export const markWeekProcessingStage = (
     week_process_run_id: runId,
     week_process_elapsed_ms: elapsedMs,
     week_process_error: error,
-  });
+  }, { publishNative: writesCheckpoint });
   // Keep detailed timing locally for the support report. Native bridge calls are
   // intentionally limited to lifecycle boundaries so tracing never causes a stutter.
   const shouldPublishNativeCheckpoint = [
@@ -1134,6 +1229,9 @@ export const recoverInterruptedWeekProcessingTrace = (
     save_slot: saveSlot || previous.save_slot,
     stage_timeline: `${String(previous.stage_timeline || '').slice(-760)}|interrupted_on_resume:0`.replace(/^\|/, ''),
   };
+  if (!liveWeekDebugSnapshot || normalizeDebugSaveSlot(liveWeekDebugSnapshot.save_slot) === normalizeDebugSaveSlot(snapshot.save_slot)) {
+    liveWeekDebugSnapshot = snapshot;
+  }
   writeWeekProcessingDebugSnapshot(snapshot);
   markTraceAction('week_interrupted_on_resume', {
     flow: 'process_week',

@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { APP_DISPLAY_VERSION } from './appVersion';
+import { BRIDGE_CHUNK_CHARS, splitForBridge } from './bridgeChunks';
 import { exportPublicGameData, replaceAllVerifiedGameData } from './storage';
 import { migratePlayerSave } from './saveMigration';
 import { grantMigrationCarePackageIfEligible, markSaveTransferImported } from './migrationCarePackage';
@@ -21,7 +22,36 @@ const ACTOR_EMPIRE_KEY_PREFIX = 'actorEmpire';
 
 interface AndroidSaveTransferPlugin {
   shareExport(options: { filename: string; content: string }): Promise<{ shared?: boolean }>;
+  beginExport(options: { filename: string }): Promise<{ id: string }>;
+  appendExport(options: { id: string; chunk: string }): Promise<void>;
+  finishExport(options: { id: string; chars: number }): Promise<{ shared?: boolean }>;
+  cancelExport(options: { id: string }): Promise<void>;
 }
+
+/* Perf plan (2026-11-08): a big career reaches the Android export file in pieces (see bridgeChunks).
+   A build whose native side cannot take pieces falls back to the single call. */
+const shareAndroidExport = async (filename: string, content: string) => {
+  if (content.length <= BRIDGE_CHUNK_CHARS) {
+    await AndroidSaveTransfer.shareExport({ filename, content });
+    return;
+  }
+  let exportId: string | null = null;
+  try {
+    exportId = (await AndroidSaveTransfer.beginExport({ filename })).id;
+  } catch {
+    await AndroidSaveTransfer.shareExport({ filename, content });
+    return;
+  }
+  try {
+    for (const chunk of splitForBridge(content)) {
+      await AndroidSaveTransfer.appendExport({ id: exportId, chunk });
+    }
+    await AndroidSaveTransfer.finishExport({ id: exportId, chars: content.length });
+  } catch (error) {
+    await AndroidSaveTransfer.cancelExport({ id: exportId }).catch(() => undefined);
+    throw error;
+  }
+};
 
 export interface SaveTransferEntry {
   key: string;
@@ -292,7 +322,7 @@ const downloadArchiveInBrowser = (filename: string, content: string) => {
 
 const shareArchive = async (filename: string, content: string) => {
   if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('AndroidSaveTransfer')) {
-    await AndroidSaveTransfer.shareExport({ filename, content });
+    await shareAndroidExport(filename, content);
     return;
   }
 

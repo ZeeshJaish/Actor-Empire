@@ -7,6 +7,7 @@
  * context of its own would stay silent on a phone. The context itself is made ahead of that tap: making one took 300 ms, the longest frame of the night.
  */
 import type { OwnedStreamingCustomIdentAudio } from '../types';
+import { pauseAudioWhileHidden } from './audioVisibility';
 import { IDENT_FILES, scheduleStreamingIdentNotes, type StreamingIdentPreviewId } from './streamingIdentAudio';
 
 export type NightStem = 'count' | 'zero' | 'world' | 'city' | 'room' | 'rise' | 'held' | 'just' | 'buckled' | 'flood' | 'floodBad';
@@ -47,7 +48,7 @@ export const openOpeningNightAudio = (ident?: StreamingIdentPreviewId | null): O
   if (!Context) return null;
   let context: AudioContext;
   try {
-    context = new Context();
+    context = pauseAudioWhileHidden(new Context());
   } catch {
     return null;
   }

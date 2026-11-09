@@ -87,8 +87,8 @@ const getPropertySearchText = (property: Property) => `${property.name} ${proper
 
 export const getPropertyNeighborhoodTier = (property: Property): RealEstateNeighborhoodTier => {
     const text = getPropertySearchText(property);
-    if (property.price >= 120_000_000 || /bel air|monaco|private island|central park tower|mayfair|royal atlantis|château|chateau|necker/.test(text)) return 'ULTRA';
-    if (property.price >= 25_000_000 || /beverly|malibu|tribeca|palm jumeirah|aspen|eiffel|harbour|tour odéon|odeon/.test(text)) return 'TROPHY';
+    if (property.price >= 120_000_000 || /bel air|monaco|private island|central park tower|mayfair|royal atlantis|ch\u00e2teau|chateau|necker/.test(text)) return 'ULTRA';
+    if (property.price >= 25_000_000 || /beverly|malibu|tribeca|palm jumeirah|aspen|eiffel|harbour|tour od\u00e9on|odeon/.test(text)) return 'TROPHY';
     if (property.price >= 5_000_000 || /hollywood hills|london|tokyo|seoul|sydney|dubai|miami|paris|manhattan|notting hill/.test(text)) return 'PRIME';
     if (property.price >= 1_000_000 || /venice|atlanta|austin|nashville|lisbon|marrakech|iceland|brooklyn/.test(text)) return 'SOLID';
     return 'EMERGING';

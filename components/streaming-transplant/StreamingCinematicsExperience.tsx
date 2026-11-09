@@ -28,6 +28,7 @@ const Counter: React.FC<{ to: number; ms: number }> = ({ to, ms }) => {
   useEffect(() => {
     const s = Date.now();
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const p = Math.min(1, (Date.now() - s) / ms);
       setV(Math.round(to * (1 - Math.pow(1 - p, 3))));
       if (p >= 1) window.clearInterval(iv);
@@ -208,7 +209,7 @@ export const MachineWakesUp: React.FC<{
   useEffect(() => {
     if (i !== 3) { setFiled(0); return; }
     if (held) { setFiled(FILINGS.length); return; }
-    const iv = window.setInterval(() => setFiled(f => Math.min(FILINGS.length, f + 1)), 1150);
+    const iv = window.setInterval(() => { if (document.visibilityState === 'hidden') return; setFiled(f => Math.min(FILINGS.length, f + 1)); }, 1150);
     setFiled(1);
     return () => window.clearInterval(iv);
   }, [i, held]);
@@ -447,7 +448,7 @@ export const Activation: React.FC<{
   useEffect(() => {
     if (i !== 3) { setAtk(0); return; }
     if (held) { setAtk(ATTACKS.length); return; }
-    const iv = window.setInterval(() => setAtk(a => Math.min(ATTACKS.length, a + 1)), 1500);
+    const iv = window.setInterval(() => { if (document.visibilityState === 'hidden') return; setAtk(a => Math.min(ATTACKS.length, a + 1)); }, 1500);
     setAtk(1);
     return () => window.clearInterval(iv);
   }, [i, held]);
@@ -463,7 +464,7 @@ export const Activation: React.FC<{
   useEffect(() => {
     if (i !== 4) { setStep(0); return; }
     if (held) { setStep(TOTAL); return; }
-    const iv = window.setInterval(() => setStep(v => Math.min(TOTAL, v + 1)), 230);
+    const iv = window.setInterval(() => { if (document.visibilityState === 'hidden') return; setStep(v => Math.min(TOTAL, v + 1)); }, 230);
     return () => window.clearInterval(iv);
   }, [i, held, TOTAL]);
   const devState = (n: number) => {

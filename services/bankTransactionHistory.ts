@@ -8,7 +8,7 @@ export const isOperatingBankTransaction = (transaction: Transaction): boolean =>
     // generated descriptions; ordinary external BUSINESS revenue remains bankable.
     if (/^(studio_treasury_tx_|tx_studio_sale_|tx_studio_acquisition_)/.test(transaction.id)) return false;
     if (/ (owner withdrawal|capital injection|sale proceeds)$/i.test(transaction.description)) return false;
-    if (/^(Acquisition Debt Paydown|Amortização da Dívida de Aquisição)$/.test(transaction.description)) return false;
+    if (/^(Acquisition Debt Paydown|Amortiza\u00e7\u00e3o da D\u00edvida de Aquisi\u00e7\u00e3o)$/.test(transaction.description)) return false;
     if (transaction.category === 'ASSET') return /^Rental income \(/i.test(transaction.description);
     return true;
 };

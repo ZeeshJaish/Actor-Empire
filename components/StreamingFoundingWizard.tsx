@@ -46,6 +46,7 @@ import {
   validateStreamingFoundingDraft,
 } from '../services/streamingFounding';
 import { markOwnedStreamingCinematicStatus } from '../services/ownedStreamingPlatform';
+import { pauseAudioWhileHidden } from '../services/audioVisibility';
 import { STREAMING_INCORPORATION_LABEL } from '../services/streamingEconomy';
 import AccessibleDialog from './AccessibleDialog';
 import StreamingVisualScene from './StreamingVisualScene';
@@ -112,7 +113,7 @@ const playSoundIdent = (sound: StreamingSoundIdentKey) => {
   if (!AudioContextClass) return;
 
   try {
-    const context = new AudioContextClass();
+    const context = pauseAudioWhileHidden(new AudioContextClass());
     const sequences: Record<Exclude<StreamingSoundIdentKey, 'SILENT'>, Array<[number, number, number]>> = {
       PULSE: [[196, 0, 0.15], [293.66, 0.17, 0.25]],
       ASCENT: [[220, 0, 0.12], [329.63, 0.12, 0.14], [493.88, 0.26, 0.25]],

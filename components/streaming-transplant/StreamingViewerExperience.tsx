@@ -655,7 +655,7 @@ const TitlePage: React.FC<{
   const [react, setReact] = useState(0);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    const iv = window.setInterval(() => setReact(r => (r + 1) % REACTIONS.length), 2600);
+    const iv = window.setInterval(() => { if (document.visibilityState === 'hidden') return; setReact(r => (r + 1) % REACTIONS.length); }, 2600);
     return () => window.clearInterval(iv);
   }, []);
 
@@ -840,7 +840,7 @@ const Player: React.FC<{
   /* an ad break counts its seconds down (waiting while the plan picker is open) */
   useEffect(() => {
     if (phase !== 'AD' || paused) return;
-    const iv = window.setInterval(() => setAdLeft(left => Math.max(0, left - 1)), AD_SPOT_MS / 30);
+    const iv = window.setInterval(() => { if (document.visibilityState === 'hidden') return; setAdLeft(left => Math.max(0, left - 1)); }, AD_SPOT_MS / 30);
     return () => window.clearInterval(iv);
   }, [phase, paused]);
 
@@ -861,7 +861,7 @@ const Player: React.FC<{
 
   useEffect(() => {
     if (phase !== 'PLAYING' || paused) return;
-    const iv = window.setInterval(() => setPos(p => Math.min(100, p + 0.7)), 90);
+    const iv = window.setInterval(() => { if (document.visibilityState === 'hidden') return; setPos(p => Math.min(100, p + 0.7)); }, 90);
     return () => window.clearInterval(iv);
   }, [phase, paused]);
 

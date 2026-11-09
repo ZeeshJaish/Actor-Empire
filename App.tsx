@@ -1,9 +1,11 @@
+import { isQuietPlayerUpdate, markQuietPlayerUpdate } from './services/quietPlayerUpdates';
 import { claimCreatorAction } from './services/creatorEconomy';
 import { acknowledgeStockControlNotice } from './services/stockControlNotices';
 import { isStockSaveRecoveryError } from './services/stockSaveCompatibility';
 import {applyCareerAuditionApplication,acceptCareerPartTimeJob} from './services/careerApplicationActions';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent, SponsorshipOffer } from './types';
 import './components/layout-adapters/actorEmpireShell.css';
 import { isKeyboardOccludingViewport } from './components/layout-adapters/shellGeometry';
@@ -32,7 +34,8 @@ import { CreationMenu } from './views/CreationMenu';
 import { DeathScreen } from './views/DeathScreen';
 import { RedCarpetEvent } from './views/RedCarpetEvent';
 import { PressConferenceEvent } from './views/PressConferenceEvent';
-import { ActorEmpireIntroStyle, ActorEmpireLoadingScreen } from './components/ActorEmpireIntro';
+import { ActorEmpireIntroStyle } from './components/ActorEmpireIntro';
+import { StartupLoadingBar } from './components/StartupLoadingBar';
 import ZedburyStudiosIntro from './components/ZedburyStudiosIntro';
 import type { NewCareerData } from './components/types';
 import { processGameWeek } from './services/gameLoop';
@@ -82,7 +85,7 @@ import { describeWeekProcessingFailure } from './services/weekProcessingRecovery
 import { checkpointNativeMemoryPressure } from './services/nativeMemoryCheckpoint';
 import { exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
-import { externalizeCustomPostersInPlayer } from './services/customPosterMedia';
+import { externalizeCustomPostersInPlayer, hasEmbeddedCustomPosters } from './services/customPosterMedia';
 import { compactPlayerForPersistence } from './services/saveCompaction';
 import { prepareLocalStorageMirror } from './services/saveMirror';
 import { estimateSaveJsonBytes, prepareVerifiedPlayerForPersistence } from './services/savePreparation';
@@ -181,6 +184,101 @@ const STARTUP_LOADING_LINE_KEYS = [
   'startup.loadingLine.redCarpet',
   'startup.loadingLine.saves',
 ];
+/* Perf plan (2026-11-08): the bar's fill time is unchanged. Start-up may wait up to 3 seconds past
+   its usual end for the last-played career to finish reading; after that the title shows and the
+   read finishes behind it. */
+const STARTUP_LOADING_BAR_MS = Math.max(1400, STARTUP_LOADING_MIN_MS - STARTUP_STUDIO_BUMPER_MS - 260);
+const STARTUP_CAREER_EXTRA_WAIT_MS = 3000;
+// Not an 'actorEmpire' key: save transfers copy those to other phones, and this belongs to this phone.
+const STARTUP_SLOT_PRELOAD_GUARD_KEY = 'aeStartupSlotPreloadGuardV1';
+
+/* Perf plan (2026-11-08): the last-played career is read and checked while the start-up bar fills,
+   so tapping it opens Home at once instead of reading the save after the tap. This read only reads
+   and migrates, which writes nothing: posters, a care package, purchases and any save they need still
+   happen on the tap, exactly as before, and so do recovery choices and damaged saves. If a start ever
+   dies during this read, the next start skips it, and a second time turns it off on this phone, so a
+   career too big for the phone can never keep the game from reaching the title. */
+type StartupSlotPreloadResult =
+  | {
+      kind: 'MIGRATED';
+      migrated: Player;
+      migratedFromVersion: unknown;
+      needsRecoveryCheckpoint: boolean;
+      // anything that makes the tap write to the disk, which needs the loading screen as before
+      diskWorkOnTap: boolean;
+    }
+  | { kind: 'VERIFIED'; verifiedLoad: Awaited<ReturnType<typeof loadVerifiedGameData>> }
+  | { kind: 'FAILED' };
+type StartupSlotPreload = {
+  slot: number;
+  summaryKey: string;
+  settled: boolean;
+  result: StartupSlotPreloadResult | null;
+  promise: Promise<StartupSlotPreloadResult>;
+};
+
+// The same save: any later save of that slot changes its saved time, so a stale read is never used.
+const getStartupSummaryKey = (summary: SaveSlotSummary | null | undefined) => (summary
+  ? [summary.storageKey || '', summary.savedAt || 0, summary.age, summary.week, summary.name].join('|')
+  : '');
+
+const pickStartupPreloadSlot = (summaries: Record<number, SaveSlotSummary | null>) => {
+  let best: { slot: number; summary: SaveSlotSummary } | null = null;
+  for (const slot of [1, 2, 3]) {
+    const summary = summaries[slot];
+    if (!summary || summary.isPendingSummary) continue;
+    if ((summary.storageKind || 'indexeddb') !== 'indexeddb') continue;
+    if (summary.storageKey && summary.storageKey !== `actorEmpireSave_${slot}`) continue;
+    if (!best || (summary.savedAt || 0) > (best.summary.savedAt || 0)) best = { slot, summary };
+  }
+  return best;
+};
+
+type StartupSlotPreloadGuard = { state?: 'running' | 'idle'; slot?: number; deadStarts?: number; skipOnce?: boolean };
+const readStartupSlotPreloadGuard = (): StartupSlotPreloadGuard => {
+  try {
+    const raw = localStorage.getItem(STARTUP_SLOT_PRELOAD_GUARD_KEY);
+    return raw ? JSON.parse(raw) as StartupSlotPreloadGuard : {};
+  } catch {
+    return {};
+  }
+};
+const writeStartupSlotPreloadGuard = (guard: StartupSlotPreloadGuard) => {
+  try {
+    localStorage.setItem(STARTUP_SLOT_PRELOAD_GUARD_KEY, JSON.stringify(guard));
+  } catch {
+    // The guard is only a safety net for the next start.
+  }
+};
+// A start that ended during the read (the phone closed the game, or the player did) skips the next
+// read; a second one turns the read off on this phone for good. Continue then works as before.
+const claimStartupSlotPreload = (slot: number): boolean => {
+  const guard = readStartupSlotPreloadGuard();
+  const deadStarts = Math.max(0, Math.round(Number(guard.deadStarts) || 0));
+  if (guard.state === 'running') {
+    writeStartupSlotPreloadGuard({ state: 'idle', slot: guard.slot, deadStarts: deadStarts + 1, skipOnce: true });
+    trackGameEvent('startup_slot_preload_skipped', { save_slot: guard.slot ?? 0, dead_starts: deadStarts + 1 });
+    return false;
+  }
+  if (guard.skipOnce || deadStarts >= 2) return false;
+  writeStartupSlotPreloadGuard({ state: 'running', slot, deadStarts });
+  // no read without its safety net: a phone that could not store the mark gets no read
+  return readStartupSlotPreloadGuard().state === 'running';
+};
+
+// The read finished: keep the count of dead starts only.
+const releaseStartupSlotPreload = () => {
+  const guard = readStartupSlotPreloadGuard();
+  const deadStarts = Math.max(0, Math.round(Number(guard.deadStarts) || 0));
+  if (guard.state === undefined && !deadStarts) return;
+  writeStartupSlotPreloadGuard({ state: 'idle', deadStarts });
+};
+// A career opened the normal way after a skipped read: the next start may read again.
+const clearStartupSlotPreloadSkip = () => {
+  const guard = readStartupSlotPreloadGuard();
+  if (!guard.skipOnce) return;
+  writeStartupSlotPreloadGuard({ ...guard, skipOnce: false });
+};
 
 const dedupeAwards = <T extends { type: string; year: number; category: string; projectId: string; outcome: 'WON' | 'NOMINATED' }>(awards: T[] = []): T[] => {
   return sanitizeAwardRecords(awards);
@@ -511,6 +609,21 @@ export const App: React.FC = () => {
   const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | 'MESSAGES' | 'BANK' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const weekProcessingLockRef = useRef(false);
+  /* Perf plan Phase 3 (2026-11-09): from the tap on Age Up Week until the processed week reaches the game,
+     a tap that changes the career would be overwritten when the week lands. Those taps wait; the main
+     navigation still answers, since changing tabs changes no save. Ends before any popup or ad. */
+  const weekTapGuardRef = useRef(false);
+  useEffect(() => {
+    const holdTap = (event: Event) => {
+      if (!weekTapGuardRef.current) return;
+      const target = event.target as Element | null;
+      if (target && typeof target.closest === 'function' && target.closest('nav[aria-label="Primary game navigation"]')) return;
+      event.stopPropagation();
+      event.preventDefault();
+    };
+    document.addEventListener('click', holdTap, true);
+    return () => document.removeEventListener('click', holdTap, true);
+  }, []);
   const activeWeekRunIdRef = useRef<string | null>(null);
   const activeWeekStageRef = useRef('idle');
   const lastWeekProcessSettledAtRef = useRef(0);
@@ -534,8 +647,10 @@ export const App: React.FC = () => {
   const [startupStudioBumperElapsed, setStartupStudioBumperElapsed] = useState(false);
   const [startupStudioBumperExiting, setStartupStudioBumperExiting] = useState(false);
   const [startupMinimumElapsed, setStartupMinimumElapsed] = useState(false);
-  const [startupLoadingLineIndex, setStartupLoadingLineIndex] = useState(0);
-  const [startupLoadingProgress, setStartupLoadingProgress] = useState(0);
+  const [startupCareerSettled, setStartupCareerSettled] = useState(false);
+  const [startupSavesListed, setStartupSavesListed] = useState(false);
+  const startupSlotPreloadRef = useRef<StartupSlotPreload | null>(null);
+  const slotOpenInProgressRef = useRef(false);
 
   // UI States
   const [toastMessage, setToastMessage] = useState<{title: string, subtext: string} | null>(null);
@@ -557,7 +672,7 @@ export const App: React.FC = () => {
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const latestChangelogEntry = getLatestChangelogEntry();
   const previousChangelogEntries = CHANGELOG_ENTRIES.filter(entry => entry.version !== latestChangelogEntry.version);
-  const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed;
+  const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed || !startupCareerSettled;
   const isUiOverhaulSurface = gameStatus === 'PLAYING'
     && (
       activePage === Page.HOME
@@ -577,6 +692,7 @@ export const App: React.FC = () => {
   const [adStep, setAdStep] = useState(0);
   const [adTotalSteps, setAdTotalSteps] = useState(1);
   const autosaveTimerRef = useRef<number | null>(null);
+  const autosaveDueRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
   /* iOS purchases StoreKit hands over outside a purchase tap (Ask to Buy approved later, a purchase finished while the
@@ -655,40 +771,13 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Perf plan (2026-11-08): the bar's clock lives in StartupLoadingBar. Start-up waits at most
+  // STARTUP_CAREER_EXTRA_WAIT_MS past its usual end for the last-played career.
   useEffect(() => {
-    if (!isStartupLoadingVisible) return;
-    const interval = window.setInterval(() => {
-      setStartupLoadingLineIndex(prev => (prev + 1) % STARTUP_LOADING_LINE_KEYS.length);
-    }, 420);
-    return () => window.clearInterval(interval);
-  }, [isStartupLoadingVisible]);
-
-  useEffect(() => {
-    if (!isStartupLoadingVisible) {
-      setStartupLoadingProgress(100);
-      return;
-    }
-
-    if (!startupStudioBumperElapsed) {
-      setStartupLoadingProgress(0);
-      return;
-    }
-
-    const startedAt = performance.now();
-    const duration = Math.max(1400, STARTUP_LOADING_MIN_MS - STARTUP_STUDIO_BUMPER_MS - 260);
-    let frame = 0;
-
-    const tick = (now: number) => {
-      const elapsed = now - startedAt;
-      const ratio = Math.min(0.985, elapsed / duration);
-      const eased = 1 - Math.pow(1 - ratio, 1.45);
-      setStartupLoadingProgress(Math.min(99, Math.round(eased * 100)));
-      frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [isStartupLoadingVisible, startupStudioBumperElapsed]);
+    if (!startupMinimumElapsed || startupCareerSettled) return;
+    const timer = window.setTimeout(() => setStartupCareerSettled(true), STARTUP_CAREER_EXTRA_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [startupMinimumElapsed, startupCareerSettled]);
 
   const preparePlayerForPersistence = (nextPlayer: Player): Player => compactPlayerForPersistence(nextPlayer);
   const writeLocalStorageMirror = (slot: number, playerToSave: Player) => {
@@ -823,6 +912,7 @@ export const App: React.FC = () => {
           return nextPlayer;
       }
       setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(playerToSave) }));
+      if (startupSlotPreloadRef.current?.slot === slot) startupSlotPreloadRef.current = null;
       if (prepared.needsRecoveryCheckpoint) {
           setToastMessage({
               title: 'Backup Recommended',
@@ -895,8 +985,10 @@ export const App: React.FC = () => {
       slot: number,
       savedData: Player,
       source: 'indexeddb-slot' | 'legacy-indexeddb' | 'legacy-localstorage' | 'legacy-single-localstorage' = 'indexeddb-slot',
+      premigrated?: { player: Player; migratedFromVersion: unknown },
   ): Promise<{ player: Player; shouldPersist: boolean; carePackageGranted: boolean }> => {
-      const migrated = migratePlayerSave(savedData);
+      const migrated = premigrated ? premigrated.player : migratePlayerSave(savedData);
+      const migratedFromVersion = premigrated ? premigrated.migratedFromVersion : (savedData as Player)?.flags?.saveMigrationVersion;
       let optimized = migrated;
       let posterMediaMigrated = false;
       let carePackageGranted = false;
@@ -929,10 +1021,55 @@ export const App: React.FC = () => {
 
       return {
           player: optimized,
-          shouldPersist: ((savedData as Player)?.flags?.saveMigrationVersion !== optimized.flags?.saveMigrationVersion) || posterMediaMigrated || carePackageGranted || entitlementResult.changed,
+          shouldPersist: (migratedFromVersion !== optimized.flags?.saveMigrationVersion) || posterMediaMigrated || carePackageGranted || entitlementResult.changed,
           carePackageGranted,
       };
   };
+
+  // Perf plan (2026-11-08): read the last-played career while the start-up bar fills.
+  useEffect(() => {
+      if (isInitializing) return;
+      setStartupSavesListed(true);
+      if (startupCareerSettled || startupSlotPreloadRef.current) return;
+      if (safeBootRequested || gameStatus !== 'START_MENU') {
+          setStartupCareerSettled(true);
+          return;
+      }
+      const candidate = pickStartupPreloadSlot(saveSlotSummaries);
+      if (!candidate || !claimStartupSlotPreload(candidate.slot)) {
+          setStartupCareerSettled(true);
+          return;
+      }
+      const { slot, summary } = candidate;
+      const entry: StartupSlotPreload = {
+          slot,
+          summaryKey: getStartupSummaryKey(summary),
+          settled: false,
+          result: null,
+          promise: Promise.resolve<StartupSlotPreloadResult>({ kind: 'FAILED' }),
+      };
+      entry.promise = (async (): Promise<StartupSlotPreloadResult> => {
+          const verifiedLoad = await loadVerifiedGameData(`actorEmpireSave_${slot}`);
+          if (verifiedLoad.status !== 'CURRENT') return { kind: 'VERIFIED', verifiedLoad };
+          const migratedFromVersion = verifiedLoad.player.flags?.saveMigrationVersion;
+          const migrated = migratePlayerSave(verifiedLoad.player);
+          const diskWorkOnTap = migratedFromVersion !== migrated.flags?.saveMigrationVersion
+              || await hasEmbeddedCustomPosters(migrated);
+          return { kind: 'MIGRATED', migrated, migratedFromVersion, needsRecoveryCheckpoint: verifiedLoad.needsRecoveryCheckpoint, diskWorkOnTap };
+      })()
+          .catch((error): StartupSlotPreloadResult => {
+              recordNonFatal(error, 'startup_slot_preload_failed', { save_slot: slot });
+              return { kind: 'FAILED' };
+          })
+          .then(result => {
+              entry.settled = true;
+              entry.result = result;
+              releaseStartupSlotPreload();
+              setStartupCareerSettled(true);
+              return result;
+          });
+      startupSlotPreloadRef.current = entry;
+  }, [isInitializing, startupCareerSettled]);
 
   useEffect(() => {
     if (activePage !== Page.MOBILE) {
@@ -1363,8 +1500,13 @@ export const App: React.FC = () => {
         suppressNextAutosaveRef.current = false;
         return;
     }
+    // Lag round (2026-11-09): no full save for a change that only remembers a visit. A real
+    // change still waiting for its save (the cleanup above cleared its timer) is saved as usual.
+    if (isQuietPlayerUpdate(player) && !autosaveDueRef.current) return;
+    autosaveDueRef.current = true;
 
     autosaveTimerRef.current = window.setTimeout(() => {
+        autosaveDueRef.current = false;
         setSaveSlots(prev => ({ ...prev, [currentSlot]: player }));
         void persistSlotSave(currentSlot, player);
         autosaveTimerRef.current = null;
@@ -1404,6 +1546,10 @@ export const App: React.FC = () => {
       };
 
       playerRef.current = updatedPlayer;
+      // Lag round (2026-11-09): the once-a-minute play-time count rides with the next real save
+      // instead of starting a full save every minute (seconds of freeze on a late career).
+      // Leaving or hiding the app still saves it at once (persistImmediately).
+      if (!persistImmediately) markQuietPlayerUpdate(updatedPlayer);
       setPlayer(updatedPlayer);
       setSaveSlots(prev => ({ ...prev, [currentSlot]: updatedPlayer }));
       if (persistImmediately) void persistSlotSave(currentSlot, updatedPlayer);
@@ -1432,13 +1578,39 @@ export const App: React.FC = () => {
     };
   }, [gameStatus, currentSlot]);
 
+  // Perf plan (2026-11-08): one career opens at a time; a second tap while one opens does nothing.
   const handleSelectSlot = async (slot: number) => {
+    if (slotOpenInProgressRef.current) return;
+    slotOpenInProgressRef.current = true;
+    try {
+      await openSelectedSlot(slot);
+    } finally {
+      slotOpenInProgressRef.current = false;
+    }
+  };
+
+  const openSelectedSlot = async (slot: number) => {
     setCurrentSlot(slot);
     let existingSave = saveSlots[slot];
+    const startupPreload = startupSlotPreloadRef.current;
+    startupSlotPreloadRef.current = null;
     if (!existingSave && saveSlotSummaries[slot]) {
-        setIsInitializing(true);
+        const usablePreload = startupPreload && startupPreload.slot === slot && startupPreload.summaryKey === getStartupSummaryKey(saveSlotSummaries[slot])
+            ? startupPreload
+            : null;
+        // Home opens at once only when the career is read and migrated and nothing on this tap needs
+        // the disk; anything else covers the menu with the loading screen at once, as before.
+        const readyResult = usablePreload?.settled ? usablePreload.result : null;
+        const instantOpen = readyResult?.kind === 'MIGRATED' && !readyResult.diskWorkOnTap;
+        if (!instantOpen) setIsInitializing(true);
         markTraceAction('selected_save_load_started', { flow: 'save_select', save_slot: slot });
         try {
+            // a read of another career still running finishes first: two careers are never loaded at once
+            if (startupPreload && startupPreload !== usablePreload && !startupPreload.settled) {
+                await startupPreload.promise.catch(() => null);
+            }
+            const preloaded = usablePreload ? await usablePreload.promise : null;
+            if (import.meta.env.DEV) console.info('[perf] slot open', { slot, preloaded: preloaded?.kind || 'none' });
             const summary = saveSlotSummaries[slot];
             const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
             const storageKind = summary?.storageKind || 'indexeddb';
@@ -1449,8 +1621,10 @@ export const App: React.FC = () => {
             if (storageKind === 'localstorage') {
                 const raw = localStorage.getItem(storageKey);
                 savedData = raw ? JSON.parse(raw) as Player : null;
+            } else if (preloaded?.kind === 'MIGRATED') {
+                needsRecoveryCheckpoint = preloaded.needsRecoveryCheckpoint;
             } else {
-                const verifiedLoad = await loadVerifiedGameData(storageKey);
+                const verifiedLoad = preloaded?.kind === 'VERIFIED' ? preloaded.verifiedLoad : await loadVerifiedGameData(storageKey);
                 if (verifiedLoad.status === 'RECOVERY_AVAILABLE') {
                     setPendingSaveRecovery({
                         slot,
@@ -1469,16 +1643,21 @@ export const App: React.FC = () => {
                 currentIsUnverified = verifiedLoad.status === 'LEGACY_UNVERIFIED';
                 needsRecoveryCheckpoint = verifiedLoad.status === 'CURRENT' && verifiedLoad.needsRecoveryCheckpoint;
             }
-            if (!savedData) throw new Error(`Save slot ${slot} could not be loaded.`);
-            if (currentIsUnverified) sourceByteEstimate = estimateSaveJsonBytes(savedData);
+            const premigrated = storageKind !== 'localstorage' && preloaded?.kind === 'MIGRATED' ? preloaded : null;
+            if (currentIsUnverified && savedData) sourceByteEstimate = estimateSaveJsonBytes(savedData);
             const source = storageKind === 'localstorage'
                 ? (storageKey === 'actorEmpireSave' ? 'legacy-single-localstorage' : 'legacy-localstorage')
                 : (storageKey === 'actorEmpireSave' ? 'legacy-indexeddb' : 'indexeddb-slot');
-            const prepared = await prepareLoadedPlayerSave(slot, savedData, source);
+            const prepared = premigrated
+                ? await prepareLoadedPlayerSave(slot, premigrated.migrated, source, { player: premigrated.migrated, migratedFromVersion: premigrated.migratedFromVersion })
+                : savedData ? await prepareLoadedPlayerSave(slot, savedData, source) : null;
+            if (!prepared) throw new Error(`Save slot ${slot} could not be loaded.`);
             existingSave = prepared.player;
             setSaveSlots(prev => ({ ...prev, [slot]: prepared.player }));
             setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(prepared.player) }));
             if (currentIsUnverified || prepared.shouldPersist || source !== 'indexeddb-slot') {
+                // the tap found disk work after all (a care package, a purchase): cover the menu first
+                if (instantOpen) flushSync(() => setIsInitializing(true));
                 await persistSlotSave(slot, prepared.player, {
                     rethrow: true,
                     reason: 'MIGRATION',
@@ -1498,6 +1677,7 @@ export const App: React.FC = () => {
                 });
             }
             markTraceAction('selected_save_load_completed', { flow: 'save_select', save_slot: slot });
+            clearStartupSlotPreloadSkip();
         } catch (error) {
             if (isStockSaveRecoveryError(error)) {
                 const storageKey = saveSlotSummaries[slot]?.storageKey || `actorEmpireSave_${slot}`;
@@ -1570,6 +1750,7 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteSlot = async (slot: number) => {
+    startupSlotPreloadRef.current = null;
     const summary = saveSlotSummaries[slot];
     const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
     if (summary?.storageKind !== 'localstorage') {
@@ -1618,6 +1799,7 @@ export const App: React.FC = () => {
   const handleImportGameData = async () => {
     const confirmed = window.confirm('Importing a transfer file will replace the local Play Store saves on this device. Continue?');
     if (!confirmed) return;
+    startupSlotPreloadRef.current = null;
 
     try {
       const result = await importSignedSaveArchiveFromFile({
@@ -1980,7 +2162,10 @@ export const App: React.FC = () => {
   };
 
   const handleTrustedMarketUpdate = (updatedPlayer: Player) => {
-      setPlayer(prepareTrustedMarketUpdateForUi(updatedPlayer));
+      const prepared = prepareTrustedMarketUpdateForUi(updatedPlayer);
+      // Lag round (2026-11-09): a UI-memory change (a room visited) keeps its quiet mark.
+      if (isQuietPlayerUpdate(updatedPlayer)) markQuietPlayerUpdate(prepared);
+      setPlayer(prepared);
   };
 
   const commitProcessedWeekPlayer = (processedPlayer: Player) => {
@@ -2136,6 +2321,7 @@ export const App: React.FC = () => {
         .filter(Boolean),
     );
     weekProcessingLockRef.current = true;
+    weekTapGuardRef.current = true;
     activeWeekRunIdRef.current = weekRunId;
     activeWeekStageRef.current = 'paint_wait';
     setPendingWeekProcessingFailure(null);
@@ -2304,6 +2490,7 @@ export const App: React.FC = () => {
         activeWeekStageRef.current = 'commit_verified_week';
         suppressNextAutosaveRef.current = true;
         commitProcessedWeekPlayer(persistedPlayerState);
+        weekTapGuardRef.current = false;
         addBreadcrumb('process_week:persisted', {
             age: syncedPlayerState.age,
             week: syncedPlayerState.currentWeek,
@@ -2432,6 +2619,7 @@ export const App: React.FC = () => {
       activeWeekRunIdRef.current = null;
       activeWeekStageRef.current = 'idle';
       weekProcessingLockRef.current = false;
+      weekTapGuardRef.current = false;
       setIsProcessing(false);
       try {
         stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
@@ -3006,6 +3194,7 @@ export const App: React.FC = () => {
   };
 
   const handleStartGameFromIntro = (data: NewCareerData, slot: number) => {
+    startupSlotPreloadRef.current = null;
       const name = data.stageName.trim() || 'Rising Star';
       const introGender = data.gender === 'Female' ? 'FEMALE' : data.gender === 'Non-Binary' ? 'NON_BINARY' : 'MALE';
       const rawHandle = data.handle.trim() || name.toLowerCase().replace(/\s+/g, '');
@@ -3339,7 +3528,6 @@ export const App: React.FC = () => {
   };
 
   if (isStartupLoadingVisible) {
-      const loadingLineKey = STARTUP_LOADING_LINE_KEYS[startupLoadingLineIndex % STARTUP_LOADING_LINE_KEYS.length];
       const showStudioBumper = !startupStudioBumperElapsed;
       return (
           <div className="relative h-screen overflow-hidden bg-[#050505] text-white">
@@ -3347,9 +3535,12 @@ export const App: React.FC = () => {
               {showStudioBumper ? (
                   <ZedburyStudiosIntro state={startupStudioBumperExiting ? 'on exit' : 'on'} />
               ) : (
-                  <ActorEmpireLoadingScreen
-                      progress={startupLoadingProgress}
-                      status={tr(loadingLineKey)}
+                  <StartupLoadingBar
+                      durationMs={STARTUP_LOADING_BAR_MS}
+                      savesReady={startupSavesListed}
+                      careerReady={startupCareerSettled}
+                      lineKeys={STARTUP_LOADING_LINE_KEYS}
+                      translate={tr}
                   />
               )}
           </div>

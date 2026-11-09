@@ -18,9 +18,9 @@ const ratingsOf = (row: any): SeasonEpisodeRatings[] => {
 
 /** The show's name, without the season: "Harrow Lane: Season 2", "Harrow Lane Season 2" and "Harrow Lane S2" are "Harrow Lane" */
 export const getSeriesBaseTitle = (title: unknown): string => String(title || '')
-    .replace(/\s*[:\-–]?\s*\bseason\s+\d+\b/gi, '')
+    .replace(/\s*[:\-\u2013]?\s*\bseason\s+\d+\b/gi, '')
     .replace(/\s+s\d+\s*$/gi, '')
-    .replace(/[\s:\-–]+$/g, '')
+    .replace(/[\s:\-\u2013]+$/g, '')
     .trim();
 
 const titleKeyOf = (row: any) => getSeriesBaseTitle(titleOf(row)).replace(/[^\p{L}\p{N}]+/gu, ' ').trim().toLowerCase();

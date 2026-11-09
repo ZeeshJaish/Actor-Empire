@@ -309,7 +309,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                   current.screens = Math.max(current.screens, chain.screens);
                   current.expectedFootfall += chain.expectedFootfall;
                   current.exhibitorCut = chain.gross > 0
-                      ? chain.exhibitorReceipts / Math.max(1, chain.gross)
+                      ? (typeof chain.lastActiveExhibitorCut === 'number' ? chain.lastActiveExhibitorCut : chain.exhibitorReceipts / Math.max(1, chain.gross))
                       : current.exhibitorCut;
                   totals.set(chain.chainId, current);
               });

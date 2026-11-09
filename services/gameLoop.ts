@@ -142,7 +142,7 @@ import {
     generateReleaseSocialReactions,
     generateRoleAwareCriticReview,
 } from './releaseMediaNarrative';
-import { addBreadcrumb, setCrashContext, trackGameEvent } from './firebaseService';
+import { addBreadcrumb, isWeekLoopCheckpointStage, setCrashContext, trackGameEvent } from './firebaseService';
 import { applyOpportunityIdentityToProject, enrichAuditionOpportunity, getCharacterIdentityLabels, inferStoryCompass, suggestCharacterIdentity } from './characterIdentityLogic';
 import { formatCharacterStoryFitLabel } from './characterStoryFit';
 import { getRoleOfferMessageLine } from './roleMarketDemand';
@@ -230,6 +230,7 @@ import {
 } from './worldEconomy/worldEconomyIntegrity';
 import type { WorldEconomyValidationResult } from '../types';
 import { createWeekSimulationSeed } from './weekProcessingDeterminism';
+import { rollUpStreamingBreakdowns, rollUpTheatricalBreakdowns } from './boxOffice/pastProjectBreakdownRollup';
 import { settleSocialAudiences } from './socialAudienceLimits';
 
 // --- CONSTANTS ---
@@ -660,9 +661,30 @@ const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback:
     }
 };
 
-const yieldWeekProcessingFrame = () => new Promise<void>(resolve => {
-    globalThis.setTimeout(resolve, 0);
-});
+/* Perf plan Phase 3 (2026-11-09): a late-game week stops briefly at each big step so the screen keeps
+   painting and answering. In a browser it uses scheduler.yield, else a message-channel task opened on
+   first use (setTimeout(0) is clamped to 4 ms after a few nested calls and throttled hard in a hidden
+   tab). Node (audits and tools, even with a test window) uses setImmediate: no 1 ms timer floor, and
+   nothing left open that would keep the process alive. */
+let weekYieldChannel: MessageChannel | null = null;
+const weekYieldWaiting: Array<() => void> = [];
+const yieldWeekProcessingFrame = (): Promise<void> => {
+    const host = globalThis as {
+        scheduler?: { yield?: () => Promise<void> };
+        setImmediate?: (callback: () => void) => unknown;
+    };
+    if (typeof window !== 'undefined' && typeof host.scheduler?.yield === 'function') return host.scheduler.yield();
+    if (typeof host.setImmediate === 'function') return new Promise<void>(resolve => { host.setImmediate!(resolve); });
+    if (typeof window !== 'undefined' && typeof MessageChannel === 'function') {
+        if (!weekYieldChannel) {
+            weekYieldChannel = new MessageChannel();
+            weekYieldChannel.port1.onmessage = () => { weekYieldWaiting.shift()?.(); };
+        }
+        const channel = weekYieldChannel;
+        return new Promise<void>(resolve => { weekYieldWaiting.push(resolve); channel.port2.postMessage(0); });
+    }
+    return new Promise<void>(resolve => { globalThis.setTimeout(resolve, 0); });
+};
 
 const ensureFiniteNumber = (value: any, fallback = 0): number => {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -1293,8 +1315,9 @@ const createPastProjectArchiveSnapshot = (
     const weeklyStudioReceipts = ensureMoneyArray(release.weeklyStudioReceipts);
     const weeklyExhibitorReceipts = ensureMoneyArray(release.weeklyExhibitorReceipts);
     const weeklyViews = ensureMoneyArray(options.weeklyViews || release.streaming?.weeklyViews);
-    const weeklyDistributionBreakdowns = ensureObjectArray<TheatricalDistributionBreakdown>(release.weeklyDistributionBreakdowns);
-    const weeklyStreamingBreakdowns = ensureObjectArray<StreamingDistributionBreakdown>(options.weeklyStreamingBreakdowns || release.weeklyStreamingBreakdowns);
+    // Lag round (2026-11-09): a finished run keeps its weekly numbers; older weeks' region detail is summed.
+    const weeklyDistributionBreakdowns = rollUpTheatricalBreakdowns(ensureObjectArray<TheatricalDistributionBreakdown>(release.weeklyDistributionBreakdowns));
+    const weeklyStreamingBreakdowns = rollUpStreamingBreakdowns(ensureObjectArray<StreamingDistributionBreakdown>(options.weeklyStreamingBreakdowns || release.weeklyStreamingBreakdowns));
     const totalGross = ensureFiniteNumber(release.totalGross, weeklyGross.reduce((sum, value) => sum + value, 0));
     const streamingRevenue = ensureFiniteNumber(options.streamingRevenue ?? release.streamingRevenue);
     const soundtrackRevenue = ensureFiniteNumber(release.soundtrackRevenue);
@@ -1530,6 +1553,8 @@ export const processGameWeek = async (
             ...context,
         };
         diagnostics.onStage?.(stage, stageContext);
+        // Perf plan (2026-11-08): the native crash context and log follow the week's checkpoints only.
+        if (!isWeekLoopCheckpointStage(stage)) return;
         setCrashContext(nextPlayer, {
             flow: 'game_loop',
             loop_stage: stage,
@@ -2251,6 +2276,7 @@ export const processGameWeek = async (
     });
 
     // --- 3. YOUTUBE & TALENT SIMULATION ---
+    await yieldWeekProcessingFrame();
     emitLoopStage('creator_talent_start');
     try {
         const identityTuning = getYoutubeIdentityTuning(nextPlayer.youtube?.creatorIdentity);
@@ -3319,6 +3345,7 @@ export const processGameWeek = async (
     });
 
     // --- NEW: BUSINESS SIMULATION ---
+    await yieldWeekProcessingFrame();
     emitLoopStage('business_sim_start');
     if (nextPlayer.businesses && nextPlayer.businesses.length > 0) {
         const updatedBusinesses: Business[] = [];
@@ -3535,6 +3562,7 @@ export const processGameWeek = async (
 
     const BASE_DECAY = 1.0 * difficultyMult;
     const HEALTH_DECAY = 0.5 * difficultyMult;
+    await yieldWeekProcessingFrame();
     emitLoopStage('health_social_start');
     const healthBeforeWeeklyChanges = Number(nextPlayer.stats.health || 0);
 
@@ -3919,6 +3947,7 @@ export const processGameWeek = async (
     });
     nextPlayer.youtube.activeBrandDeals = remainingYoutubeBrandDeals;
 
+    await yieldWeekProcessingFrame();
     emitLoopStage('commitments_releases_start');
 
     // --- 7. APPLICATIONS ---
@@ -6084,6 +6113,7 @@ export const processGameWeek = async (
     });
 
     // --- 10. AWARD SEASON LOGIC ---
+    await yieldWeekProcessingFrame();
     emitLoopStage('awards_start');
     Object.entries(AWARD_CALENDAR).forEach(([weekStr, def]) => {
         if (nextPlayer.currentWeek === def.inviteWeek) {
@@ -6193,6 +6223,7 @@ export const processGameWeek = async (
     });
 
     // --- 11. END OF WEEK UPDATES ---
+    await yieldWeekProcessingFrame();
     emitLoopStage('end_week_start');
     nextPlayer.currentWeek += 1;
     nextPlayer = resolveStudioAcquisitionResponses(nextPlayer);
@@ -6440,6 +6471,7 @@ export const processGameWeek = async (
     }
 
     const enteredStreamingAbsoluteWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
+    await yieldWeekProcessingFrame();
     emitLoopStage('world_population_start', { absolute_week: enteredStreamingAbsoluteWeek });
     nextPlayer.world.worldPopulation = normalizeWorldPopulationState(
         nextPlayer.world.worldPopulation,
@@ -6473,6 +6505,7 @@ export const processGameWeek = async (
         streaming_reachable_households: nextPlayer.world.worldAudienceParticipation.global.streamingReachableHouseholds,
         cinema_reachable_households: nextPlayer.world.worldAudienceParticipation.global.cinemaReachableHouseholds,
     });
+    await yieldWeekProcessingFrame();
     emitLoopStage('streaming_rights_calendar_start', { absolute_week: enteredStreamingAbsoluteWeek });
     const streamingRightsCalendarResult = processStreamingRightsCalendarWeek(
         nextPlayer,
@@ -6532,6 +6565,7 @@ export const processGameWeek = async (
         delegated_decisions: streamingRightsOfficeResult.digest?.delegatedDecisions || 0,
     });
 
+    await yieldWeekProcessingFrame();
     emitLoopStage('streaming_industry_start');
     const industryPhases: Record<string, number> = {};
     const industryWorldStarted = performance.now();
@@ -6544,6 +6578,7 @@ export const processGameWeek = async (
     nextPlayer = streamingIndustryResult.player;
     nextPlayer.world = streamingIndustryResult.world;
     const industryWorldMs = performance.now() - industryWorldStarted;
+    await yieldWeekProcessingFrame();
     const cinemaStarted = performance.now();
     const cinemaDiagnostics={onPhase:(name:string,ms:number)=>{industryPhases[name]=ms}};
     const cinemaWeek=diagnostics.onCinemaResult ? processCinemaMarketWeek(nextPlayer,enteredStreamingAbsoluteWeek,cinemaDiagnostics,{reuseDetachedWeekCandidate:true}) : null;
@@ -6661,6 +6696,7 @@ export const processGameWeek = async (
         world_news: streamingIndustryResult.news.length,
     });
 
+    await yieldWeekProcessingFrame();
     emitLoopStage('owned_streaming_start');
     const openingProgrammeBeforeWeek = nextPlayer;
     try {
@@ -6675,6 +6711,7 @@ export const processGameWeek = async (
     nextPlayer = advanceStreamingTitleLocalization(nextPlayer).player;
     /* #145: the campaigns spend and build awareness before the world chooses, so this week's counts this week */
     nextPlayer = runStreamingCampaignsWeek(nextPlayer, enteredStreamingAbsoluteWeek);
+    await yieldWeekProcessingFrame();
     emitLoopStage('world_streaming_competition_start', { absolute_week: enteredStreamingAbsoluteWeek });
     nextPlayer.world.worldStreamingCompetition = normalizeWorldStreamingCompetitionState(
         nextPlayer.world.worldStreamingCompetition,
@@ -6709,6 +6746,7 @@ export const processGameWeek = async (
         external_shared_households: nextPlayer.world.worldStreamingCustomers.global.externalSharedHouseholds,
         piracy_reach: nextPlayer.world.worldStreamingCustomers.global.piracyReach,
     });
+    await yieldWeekProcessingFrame();
     emitLoopStage('world_streaming_viewing_start', { absolute_week: enteredStreamingAbsoluteWeek });
     nextPlayer.world.worldStreamingViewing = normalizeWorldStreamingViewingState(
         nextPlayer.world.worldStreamingViewing,
@@ -6734,6 +6772,7 @@ export const processGameWeek = async (
         hours_viewed: nextPlayer.world.worldStreamingViewing.global.totalHoursViewed,
         incremental_revenue: nextPlayer.world.worldStreamingViewing.global.revenue.totalIncrementalRevenue,
     });
+    await yieldWeekProcessingFrame();
     emitLoopStage('world_streaming_platform_economy_start', { absolute_week: enteredStreamingAbsoluteWeek });
     nextPlayer = settleWorldStreamingPlatformEconomyWeek(nextPlayer, enteredStreamingAbsoluteWeek);
     emitLoopStage('world_streaming_platform_economy_done', {
@@ -6824,6 +6863,7 @@ export const processGameWeek = async (
     });
 
     // --- 12. GENERATE EVENTS ---
+    await yieldWeekProcessingFrame();
     emitLoopStage('weekly_events_start');
     emitLoopStage('weekly_event_text_start');
     const eventText = await withTimeout(
@@ -7167,6 +7207,7 @@ export const processGameWeek = async (
         weekly_auditions: nextPlayer.weeklyOpportunities?.auditions?.length || 0,
     });
 
+    await yieldWeekProcessingFrame();
     emitLoopStage('studio_funding_start');
 		nextPlayer.businesses.forEach(business => {
 		    if (business.type !== 'PRODUCTION_HOUSE' || !business.studioState) return;
@@ -7288,6 +7329,7 @@ export const processGameWeek = async (
 	    });
     emitLoopStage('studio_funding_done');
 
+    await yieldWeekProcessingFrame();
     emitLoopStage('subsidiaries_start');
     nextPlayer = processSubsidiaryAutonomousOperations(nextPlayer);
     nextPlayer = processSubsidiaryDecisionEngine(nextPlayer);
@@ -7349,6 +7391,7 @@ export const processGameWeek = async (
     const integrityWeek = getAbsoluteWeek(nextPlayer.age, nextPlayer.currentWeek);
     const validateIntegrity = diagnostics.validateWorldEconomy || validateWorldEconomyCandidate;
     const repairIntegrity = diagnostics.repairWorldEconomy || repairDerivedWorldEconomyState;
+    await yieldWeekProcessingFrame();
     emitLoopStage('world_integrity_start', { absolute_week: integrityWeek });
     let integrity = validateIntegrity(nextPlayer, integrityWeek);
     let integrityWarningCodes: string[] = [];

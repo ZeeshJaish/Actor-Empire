@@ -86,6 +86,7 @@ export const TheFlood: React.FC<{
       if (seconds < FLOOD_CARD_SECONDS + 1.2) raf = requestAnimationFrame(run);
       else ticking = window.setInterval(() => {
         /* the count never quite stops */
+        if (document.visibilityState === 'hidden') return;
         if (counter.current) counter.current.textContent = whole(flood.postCount + (performance.now() - started) * 0.9);
       }, 240);
     };

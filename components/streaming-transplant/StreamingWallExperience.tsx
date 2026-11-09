@@ -306,6 +306,7 @@ export const WallOfScreens: React.FC<WallProps> = ({
   useEffect(() => {
     if (beat === 0) return;
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       setFlash(true);
       window.setTimeout(() => { setGi(g => (g + 1) % GLIMPSES.length); setFlash(false); }, 150);
     }, 1250);

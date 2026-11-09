@@ -31,6 +31,7 @@ export const RehearsalMonitor: React.FC<{
   useEffect(() => {
     if (state !== 'PLAYING') return undefined;
     const timer = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       setSeconds(value => value + 1);
       setDrift(1 + (Math.random() - .5) * .006);
     }, 1000);

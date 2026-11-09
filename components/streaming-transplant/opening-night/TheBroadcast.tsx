@@ -164,7 +164,7 @@ export const TheBroadcast: React.FC<{
   const [noEngine, setNoEngine] = useState(false);
 
   useEffect(() => {
-    const started = performance.now();
+    let started = performance.now();
     const calm = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
     /* A canvas of its own each time this runs: a WebGL context that has been given up cannot be had again from the same canvas, and React's development mode runs this twice. */
     const canvas = night && lightsHolder.current ? document.createElement('canvas') : null;
@@ -456,11 +456,33 @@ export const TheBroadcast: React.FC<{
       raf = requestAnimationFrame(render);
     };
     raf = requestAnimationFrame(render);
-    /* a hidden tab stops its frames: the night still ends */
-    const guard = window.setTimeout(() => toFlood.current(), (at.end + 2) * 1000);
+    /* a hidden tab stops its frames: the night still ends. Perf plan (2026-11-08): the night waits while
+       the app is hidden, and so does its sound (audioVisibility), so on return picture and music go on
+       together from the same second; this guard counts only the time the night was on screen. */
+    let guard = 0;
+    let hiddenAt: number | null = null;
+    const armGuard = () => {
+      window.clearTimeout(guard);
+      const remaining = Math.max(0, (at.end + 2) * 1000 - (performance.now() - started));
+      guard = window.setTimeout(() => toFlood.current(), remaining);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (hiddenAt !== null) return;
+        hiddenAt = performance.now();
+        window.clearTimeout(guard);
+      } else if (hiddenAt !== null) {
+        started += performance.now() - hiddenAt;
+        hiddenAt = null;
+        armGuard();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    armGuard();
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(guard);
+      document.removeEventListener('visibilitychange', onVisibility);
       engine?.dispose();
       canvas?.remove();
     };

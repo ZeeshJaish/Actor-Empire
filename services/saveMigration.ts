@@ -1,4 +1,5 @@
 import {migrateBuiltinNames} from './builtinNameMigration';
+import { rollUpStreamingBreakdowns, rollUpTheatricalBreakdowns } from './boxOffice/pastProjectBreakdownRollup';
 import { ensureActorCareerBalance } from './actorCareerBalance';
 import { syncLinkedNpcRelationships } from './relationshipBond';
 import { initializeRecentProjectTitles } from './projectTitleGeneration';
@@ -607,7 +608,7 @@ const migratePastProject = (project: any, index: number): any => {
     next.totalViews = clampMoney(Number(next.totalViews || 0));
     next.weeklyViews = toMoneySeries(next.weeklyViews);
     next.streamingRevenue = clampMoney(Number(next.streamingRevenue || 0));
-    next.weeklyStreamingBreakdowns = toObjectSeries(next.weeklyStreamingBreakdowns);
+    next.weeklyStreamingBreakdowns = rollUpStreamingBreakdowns(toObjectSeries(next.weeklyStreamingBreakdowns));
     next.soundtrackRevenue = clampMoney(Number(next.soundtrackRevenue || 0));
     next.weeklySoundtrackRevenue = toMoneySeries(next.weeklySoundtrackRevenue);
     next.soundtrackRevenueBreakdown = normalizeSoundtrackBreakdown(next.soundtrackRevenueBreakdown);
@@ -633,7 +634,8 @@ const migratePastProject = (project: any, index: number): any => {
     next.weeklyStudioReceipts = toMoneySeries(next.weeklyStudioReceipts);
     next.weeklyExhibitorReceipts = toMoneySeries(next.weeklyExhibitorReceipts);
     next.totalExhibitorReceipts = clampMoney(Number(next.totalExhibitorReceipts || next.weeklyExhibitorReceipts.reduce((sum: number, value: number) => sum + value, 0)));
-    next.weeklyDistributionBreakdowns = toObjectSeries(next.weeklyDistributionBreakdowns);
+    // Lag round (2026-11-09): finished films keep their weekly numbers; older weeks' region detail is summed.
+    next.weeklyDistributionBreakdowns = rollUpTheatricalBreakdowns(toObjectSeries(next.weeklyDistributionBreakdowns));
     next.releaseRegionIds = toArray<string>(next.releaseRegionIds).map(String);
     next.releaseChainSelections = next.releaseChainSelections && typeof next.releaseChainSelections === 'object' ? next.releaseChainSelections : {};
     next.boxOfficeArchiveVersion = Math.max(1, Math.round(Number(next.boxOfficeArchiveVersion || 1)));

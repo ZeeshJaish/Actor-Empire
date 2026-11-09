@@ -1,6 +1,6 @@
 import { INITIAL_PLAYER, type Player } from '../../types';
 import { createIndexedDbSaveGenerationStore } from '../../services/indexedDbSaveGenerations';
-import { saveVerifiedGameData, loadVerifiedGameData, getSaveGenerationKeys } from '../../services/saveGenerations';
+import { saveVerifiedGameData, loadVerifiedGameData, getSaveGenerationKeys, recoverPreviousGameData } from '../../services/saveGenerations';
 import { createSaveIntegrityManifest, verifySaveIntegrity } from '../../services/saveIntegrity';
 
 const dbName = 'ActorEmpireAtomicSaveQA';
@@ -32,10 +32,22 @@ const seed = async (key: string, p: Player, manifest: unknown = sign(p)) => {
         const tx = db.transaction('saves', 'readwrite'), objectStore = tx.objectStore('saves');
         objectStore.put(p, key);
         if (manifest) objectStore.put(manifest, key + '__integrity'); else objectStore.delete(key + '__integrity');
+        // A raw seed makes this copy the live one (A/B saves, 2026-11-09).
+        objectStore.delete(key + '__head');
         tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error);
     }); } finally { db.close(); }
 };
-const snapshot = async (key: string) => ({ current: await raw(key), integrity: await raw(key + '__integrity'), previous: await raw(key + '__previous') });
+/** The logical generations: with an A/B head pointing at PREVIOUS, the newest copy is that record. */
+const snapshot = async (key: string) => {
+    const physical = { current: await raw(key), integrity: await raw(key + '__integrity'), previous: await raw(key + '__previous') };
+    const head = await raw(key + '__head');
+    if (head?.kind === 'ACTOR_EMPIRE_SAVE_HEAD' && head.newest === 'PREVIOUS' && physical.previous?.kind === 'ACTOR_EMPIRE_SAVE_GENERATION') {
+        return { current: physical.previous.player, integrity: physical.previous.manifest, previous: { kind: 'ACTOR_EMPIRE_SAVE_GENERATION', player: physical.current, manifest: physical.integrity } };
+    }
+    return physical;
+};
+/** The backup copy on disk right now, wherever the head put it; a raw seed of `key` never touches it. */
+const backupMoney = async (key: string) => (await raw(key + '__previous'))?.player?.money;
 const verifySnapshot = (value: Awaited<ReturnType<typeof snapshot>>) => {
     assert(verifySaveIntegrity(value.current, value.integrity).ok, 'Current signature must verify');
     if (value.previous) assert(verifySaveIntegrity(value.previous.player, value.previous.manifest).ok, 'Previous signature must verify');
@@ -99,22 +111,25 @@ const verifySnapshot = (value: Awaited<ReturnType<typeof snapshot>>) => {
     assert(rejected && saved.current.money === 125 && saved.previous.player.money === 100, 'A valid but different stored generation must not replace the requested generation');
     rows.push('matching foreign player/signature pair rejected by requested digest');
 
+    let goodBackup = await backupMoney(key);
     await seed(key, { ...second, money: 126 }, secondManifest);
     const third = { ...second, money: 150 }; await saveVerifiedGameData(store, key, third, sign(third));
     saved = await snapshot(key); verifySnapshot(saved);
-    assert(saved.current.money === 150 && saved.previous.player.money === 100, 'Corrupt old current must not poison the good backup');
+    assert(saved.current.money === 150 && saved.previous.player.money === goodBackup && goodBackup !== 126, 'Corrupt old current must not poison the good backup');
     rows.push('corrupt old current cannot overwrite previous-good backup');
 
+    goodBackup = await backupMoney(key);
     await seed(key, first, null);
     assert((await loadVerifiedGameData(store, key)).status === 'LEGACY_UNVERIFIED', 'Unsigned old save remains readable');
     await saveVerifiedGameData(store, key, third, sign(third));
     saved = await snapshot(key); verifySnapshot(saved);
-    assert(saved.current.money === 150 && saved.previous.player.money === 100, 'Unsigned legacy promotion preserves existing good backup');
+    assert(saved.current.money === 150 && saved.previous.player.money === goodBackup, 'Unsigned legacy promotion preserves existing good backup');
     rows.push('unsigned legacy save path and good backup preserved');
 
+    goodBackup = (await snapshot(key)).previous?.player?.money;
     const fourth = { ...third, money: 175 }; await saveVerifiedGameData(store, key, fourth, sign(fourth), { retainPrevious: false });
     saved = await snapshot(key); verifySnapshot(saved);
-    assert(saved.current.money === 175 && saved.previous.player.money === 100, 'Explicit non-retention must leave existing good backup alone');
+    assert(saved.current.money === 175 && saved.previous.player.money === goodBackup, 'Explicit non-retention must leave existing good backup alone');
     rows.push('large unverified recovery-checkpoint retention policy preserved');
 
     const frozen = await (await fetch('/legacy.json')).json();
@@ -135,5 +150,44 @@ const verifySnapshot = (value: Awaited<ReturnType<typeof snapshot>>) => {
     saved = await snapshot(key); verifySnapshot(saved);
     assert(new Set([saved.current.money, saved.previous.player.money]).size === 2 && [200, 225].includes(saved.current.money) && [200, 225].includes(saved.previous.player.money), 'Independent writers serialize complete generations');
     rows.push('independent store instances preserve coherent current/previous generations');
+
+    // A/B copies (2026-11-09): once this session has verified the live copy, a week writes one
+    // slot and reads back only that slot; the other copy is never read or rewritten.
+    const abKey = 'actorEmpireSave_2', p0 = { ...fresh(), money: 1000 };
+    await seed(abKey, p0);
+    const abStore = createIndexedDbSaveGenerationStore(open, 'saves');
+    assert((await loadVerifiedGameData(abStore, abKey)).status === 'CURRENT', 'A/B seed loads as verified');
+    const nativeGet = IDBObjectStore.prototype.get;
+    const countGets = async (work: () => Promise<void>) => {
+        const keysRead: string[] = [];
+        IDBObjectStore.prototype.get = function (k: any) { if (this.transaction.db.name === dbName && typeof k === 'string' && k.startsWith(abKey)) keysRead.push(k); return nativeGet.call(this, k); };
+        try { await work(); } finally { IDBObjectStore.prototype.get = nativeGet; }
+        return keysRead;
+    };
+    const p1 = { ...p0, money: 1001 }, p2 = { ...p0, money: 1002 };
+    const firstWeek = await countGets(() => saveVerifiedGameData(abStore, abKey, p1, sign(p1)));
+    assert(!firstWeek.includes(abKey) && firstWeek.filter(k => k === abKey + '__previous').length === 1, 'A trusted week reads back only the slot it wrote: ' + firstWeek.join(','));
+    const secondWeek = await countGets(() => saveVerifiedGameData(abStore, abKey, p2, sign(p2)));
+    assert(!secondWeek.includes(abKey + '__previous') && secondWeek.filter(k => k === abKey).length === 1, 'The next week writes the other slot: ' + secondWeek.join(','));
+    saved = await snapshot(abKey); verifySnapshot(saved);
+    assert(saved.current.money === 1002 && saved.previous.player.money === 1001, 'A/B keeps the newest and the week before');
+    const reloaded = await loadVerifiedGameData(createIndexedDbSaveGenerationStore(open, 'saves'), abKey);
+    assert(reloaded.status === 'CURRENT' && reloaded.player!.money === 1002, 'A fresh session loads the newest A/B copy');
+    rows.push('A/B: trusted weeks write one slot and read back only that slot; reload sees the newest');
+
+    // The live copy goes bad on disk: recovery brings back the week before, and the next week
+    // from a fresh session does not trust a copy it never verified.
+    const corruptKey = (await raw(abKey + '__head'))?.newest === 'PREVIOUS' ? abKey + '__previous' : abKey;
+    assert(corruptKey === abKey, 'After two weeks the newest copy is back in the CURRENT slot');
+    const db2 = await open();
+    await new Promise<void>((resolve, reject) => { const tx = db2.transaction('saves', 'readwrite'); tx.objectStore('saves').put({ ...p2, money: 5000 }, abKey); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+    db2.close();
+    const afterRot = await loadVerifiedGameData(createIndexedDbSaveGenerationStore(open, 'saves'), abKey);
+    assert(afterRot.status === 'RECOVERY_AVAILABLE' && afterRot.previous!.money === 1001, 'A tampered live copy offers the week before');
+    const recovered = await recoverPreviousGameData(createIndexedDbSaveGenerationStore(open, 'saves'), abKey);
+    assert(recovered.money === 1001, 'Recovery restores the week before');
+    saved = await snapshot(abKey); verifySnapshot(saved);
+    assert(saved.current.money === 1001 && saved.previous.player.money === 1001, 'After recovery both copies hold the recovered week');
+    rows.push('A/B: a bad live copy recovers to the week before, both copies then hold it');
     return rows;
 } };

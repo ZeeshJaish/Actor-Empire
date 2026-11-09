@@ -5,6 +5,7 @@ import {
     SAVE_INTEGRITY_FORMAT_VERSION,
     type SaveIntegrityManifest,
     verifySaveIntegrity,
+    wasManifestIssuedFor,
 } from './saveIntegrity';
 
 export interface SaveGenerationKeys {
@@ -54,6 +55,9 @@ export interface SaveGenerationStore {
      * committing either current or previous; reject a different requested digest.
      * Older backends retain the independently staged/read-back/promoted path. */
     writeVerifiedGeneration?(input: WriteVerifiedGenerationInput): Promise<void>;
+    /** Optional: tells an A/B backend that this session just verified the live copy on load,
+     * so its next write need not read that copy back and check it again. */
+    rememberVerifiedCurrent?(currentKey: string, digest: string): void;
     remove(key: string): Promise<void>;
     promoteGeneration(input: PromoteSaveGenerationInput): Promise<void>;
     recoverGeneration(input: RecoverSaveGenerationInput): Promise<void>;
@@ -153,9 +157,13 @@ export const saveVerifiedGameData = async (
     manifest: SaveIntegrityManifest,
     options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean } = {},
 ): Promise<void> => runExclusiveSave(store, currentKey, async () => {
-    const initialVerification = verifySaveIntegrity(player, manifest);
-    if ('violations' in initialVerification) {
-        throw new Error(`Candidate integrity failed before write: ${initialVerification.violations.join('; ')}`);
+    // Lag round (2026-11-09): a manifest just issued for this exact object needs no second hash
+    // here; the copy actually stored is read back and verified before it can become current.
+    if (!wasManifestIssuedFor(player, manifest)) {
+        const initialVerification = verifySaveIntegrity(player, manifest);
+        if ('violations' in initialVerification) {
+            throw new Error(`Candidate integrity failed before write: ${initialVerification.violations.join('; ')}`);
+        }
     }
     const keys = getSaveGenerationKeys(currentKey);
     const candidate: StoredSaveGeneration = {
@@ -214,6 +222,7 @@ export const loadVerifiedGameData = async (
     }
     const currentVerification = verifySaveIntegrity(current, manifest);
     if (!('violations' in currentVerification)) {
+        store.rememberVerifiedCurrent?.(currentKey, manifest.digest);
         let player = restoreContractActorProfiles(current);
         const missingIds = getMissingContractActorIds(player, databaseNpcIds);
         if (missingIds.size > 0) {

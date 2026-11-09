@@ -19,10 +19,12 @@ export default function UpcomingPacksBanner({ onOpen }: UpcomingPacksBannerProps
   useEffect(() => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       tick.current = setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
         set({ cur: (latest.current.cur + 1) % PK_IDS.length });
       }, PK_EVERY_STILL);
     } else {
       tick.current = setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
         const prev = latest.current.cur;
         set({ cur: (prev + 1) % PK_IDS.length, prev });
         clearTimeout(clean.current);

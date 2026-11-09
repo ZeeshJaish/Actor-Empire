@@ -1090,7 +1090,7 @@ export default function ActorEmpireHome({
           disabled={isProcessing}
           data-tutorial-id="home-next-week"
         >
-          <span>{isProcessing ? "Processing Week" : "Age Up Week"}</span>
+          <span className={isProcessing ? "animate-pulse" : undefined}>{isProcessing ? "Processing Week" : "Age Up Week"}</span>
           <span className="ae-next">W {nextWeek}</span>
         </button>
 

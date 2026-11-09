@@ -1,3 +1,4 @@
+import { markQuietPlayerUpdate } from '../services/quietPlayerUpdates';
 import { hasStreamingPlus } from '../services/streamingPlusPack';
 import { runTaskAd } from '../services/forcedAds';
 import { getStreamingTitleOpening } from '../services/streamingEarlyAccess';
@@ -2036,7 +2037,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   const selectSection = (section: StreamingHqSection) => {
     setActiveSection(section);
     /* #219: walking between rooms changes nothing about the company, so the chair's note has nothing to say */
-    chairAllow(() => persistCanonical(visitStreamingHqSection(player, section)));
+    /* Lag round (2026-11-09): the visit is remembered in memory and saved with the next real change. */
+    chairAllow(() => persistCanonical(markQuietPlayerUpdate(visitStreamingHqSection(player, section))));
     mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

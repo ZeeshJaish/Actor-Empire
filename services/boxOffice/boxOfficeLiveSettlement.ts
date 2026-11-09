@@ -15,6 +15,8 @@ import { makeCinemaSettledTitle } from './boxOfficeMigration';
 import { compactCinemaMarketState } from './boxOfficeHistory';
 import { dollarsToCinemaCents, classifyCinemaProfit } from './boxOfficeSettlement';
 import type { CinemaWeekInput, CinemaWeekResult, CinemaCommitResult, CinemaCommittedTitle } from './boxOfficeTypes';
+/** Weekly cinema receipts kept in the save (lag round 2026-11-09; was 52). */
+export const CINEMA_RECEIPT_WEEKS_KEPT = 12;
 const sum = (ns: number[]) => ns.reduce((a, b) => { const n = a + b; if (!Number.isSafeInteger(n))
     throw new RangeError('Cinema money overflow'); return n; }, 0);
 const amount = (n: number) => { if (!Number.isSafeInteger(n) || n < 0)
@@ -218,7 +220,9 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
     // copy remains mandatory even when settlement reused the weekly candidate.
     const market = consumePrivateMarket ? result.nextState : structuredClone(result.nextState);
     state.market = compactCinemaMarketState(market, new Set(Object.values(state.titles).filter(t => !t.closed).map(t => t.titleId)));
-    state.weeks = [...state.weeks, receipt].slice(-52);
+    // Lag round (2026-11-09): 12 weekly receipts, not 52. The chart reads this week and last week,
+    // and a repeated commit only meets the latest; every title's lifetime totals live in state.titles.
+    state.weeks = [...state.weeks, receipt].slice(-CINEMA_RECEIPT_WEEKS_KEPT);
     next.world.cinemaMarket = state;
     return { player: next, applied: true, receipt };
 };

@@ -80,6 +80,7 @@ export default function StreamingBuyerAuctionRoom({ player, session, onUpdatePla
         if (restored.changed) updateRef.current(restored.player);
         if (restored.session?.status !== 'LIVE') return;
         const timer = window.setInterval(() => {
+            if (document.visibilityState === 'hidden') return;
             const result = advanceStreamingBuyerAuction(playerRef.current, session.id, 1, Date.now());
             if (result.changed) updateRef.current(result.player);
             if (result.session?.status !== 'LIVE') window.clearInterval(timer);

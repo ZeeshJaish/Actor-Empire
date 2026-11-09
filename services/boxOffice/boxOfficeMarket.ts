@@ -89,6 +89,24 @@ const fingerprint = (value:unknown):string => {
         const text=JSON.stringify(key);if(key.length<=128 && keysQuoted.size<2048)keysQuoted.set(key,text);return text;
     };
     const isIndex=(key:string):boolean=>{const n=Number(key);return Number.isInteger(n)&&n>=0&&n<4294967295&&String(n)===key;};
+    /* Perf plan Phase 3 (2026-11-09): tens of thousands of rows share a key list, so the ordered keys are
+       kept per exact key sequence (a trie, no delimiter) for this invocation; same order, same text. */
+    type KeyNode={next:Map<string,KeyNode>;ordered?:readonly string[]};
+    const keyRoot:KeyNode={next:new Map()};let keyNodes=0;
+    const orderKeys=(keys:string[]):readonly string[]=>{
+        let firstNamed=0;while(firstNamed<keys.length && isIndex(keys[firstNamed]))firstNamed++;
+        return firstNamed?keys.slice(0,firstNamed).concat(keys.slice(firstNamed).sort((a,b)=>a.localeCompare(b))):keys.sort((a,b)=>a.localeCompare(b));
+    };
+    const orderedKeys=(keys:string[]):readonly string[]=>{
+        if(keys.length>32)return orderKeys(keys);
+        let node=keyRoot;
+        for(const key of keys){
+            let next=node.next.get(key);
+            if(!next){if(keyNodes>=4096)return orderKeys(keys);next={next:new Map()};node.next.set(key,next);keyNodes++;}
+            node=next;
+        }
+        return node.ordered || (node.ordered=orderKeys(keys.slice()));
+    };
     const canonical=(v:unknown):string|undefined=>{
         if(Array.isArray(v)) {
             const rows=Array.from({length:v.length},(_,index)=>canonical(v[index]));
@@ -100,8 +118,7 @@ const fingerprint = (value:unknown):string => {
             // JSON.stringify(Object.fromEntries(sortedEntries)) still emits
             // integer-index keys first, in numeric order. Object.keys has that
             // order already; only the following named keys use locale ordering.
-            let firstNamed=0;while(firstNamed<keys.length && isIndex(keys[firstNamed]))firstNamed++;
-            const ordered=firstNamed?keys.slice(0,firstNamed).concat(keys.slice(firstNamed).sort((a,b)=>a.localeCompare(b))):keys.sort((a,b)=>a.localeCompare(b));
+            const ordered=orderedKeys(keys);
             const fields:string[]=[];
             for(const key of ordered){const text=canonical(record[key]);if(text!==undefined)fields.push(`${quoteKey(key)}:${text}`)}
             return `{${fields.join(',')}}`;

@@ -1,4 +1,5 @@
 import type { OwnedStreamingCustomIdentAudio, StreamingSoundIdentKey } from '../types';
+import { pauseAudioWhileHidden } from './audioVisibility';
 
 export type StreamingIdentPreviewId = Lowercase<StreamingSoundIdentKey> | 'custom';
 
@@ -127,7 +128,7 @@ export const playStreamingIdentPreview = async (
 
   const AudioContextClass = audioContextConstructor();
   if (!AudioContextClass) return;
-  const context = new AudioContextClass();
+  const context = pauseAudioWhileHidden(new AudioContextClass());
   activeContext = context;
   await context.resume();
 

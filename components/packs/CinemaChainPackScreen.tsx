@@ -24,7 +24,7 @@ const CARD_ROOM = 27.5; // the widest a card may be, in ems of its full-size typ
 /* Archivo 800 capitals and name marks in em, as measured. A space is its .19 plus the word gap a card always keeps, whatever its tracking. */
 const CARD_GLYPHS: Record<string, number> = { A: .746, B: .745, C: .752, D: .755, E: .699, F: .641, G: .815, H: .787, I: .329, J: .63, K: .77, L: .623, M: .914, N: .787, O: .81, P: .698, Q: .81, R: .75, S: .697, T: .675, U: .783, V: .729, W: .979, X: .736, Y: .732, Z: .682, ' ': .489, '-': .333, '.': .318, "'": .263, '’': .279, 'Æ': 1.01, 'Œ': 1.204 };
 /* An accent sits on its capital. Emoji print at about 1.35 at this size, wide letters and wide scripts (CJK, Hangul) take 1.1, scripts with joins and marks average .62 a character, anything else takes .82, the top of the ordinary capitals. */
-const glyphEm = (ch: string) => CARD_GLYPHS[ch] ?? CARD_GLYPHS[ch.normalize('NFD')[0]] ?? (/\p{Extended_Pictographic}/u.test(ch) ? 1.4 : /[%@ЖЉЊШЩЫЮ\u1100-\u{10FFFF}]/u.test(ch) ? 1.1 : /[\u0590-\u10FF]/.test(ch) ? .62 : .82);
+const glyphEm = (ch: string) => CARD_GLYPHS[ch] ?? CARD_GLYPHS[ch.normalize('NFD')[0]] ?? (/\p{Extended_Pictographic}/u.test(ch) ? 1.4 : /[%@\u0416\u0409\u040A\u0428\u0429\u042B\u042E\u1100-\u{10FFFF}]/u.test(ch) ? 1.1 : /[\u0590-\u10FF]/.test(ch) ? .62 : .82);
 /* All four cards print at one size, so the widest decides. A long name gives way in order: the type down to .9, then the tracking down to 0, then the type again. A name that fits sets nothing, so it renders as the mockup does. */
 const fitCards = (cards: string[]) => {
   const lines = cards.map((card) => {

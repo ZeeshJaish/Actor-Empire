@@ -1,4 +1,4 @@
-import {stableSaveHash} from './stableSaveHash';
+import {stableSaveHash, stableSaveHashJson} from './stableSaveHash';
 import { inspectCinemaSavedState } from './boxOffice/boxOfficeMigration';
 import type { Player } from '../types';
 import { compactIndustryIntelligenceState } from './industryIntelligence/industryIntelligenceState';
@@ -111,6 +111,69 @@ const stableSerialize = (value: unknown): string => {
 
 const stableHash = stableSaveHash;
 
+/* Lag round (2026-11-09): a save is checked several times a week, and most of each check walks
+   data that has not changed. Two exact shortcuts, no weaker check:
+   - The manifest a preparation just issued is remembered for that exact object, so the candidate
+     check before the write does not hash it again. The stored copy is still read back and verified
+     inside the write transaction, which is the independent check.
+   - The "before compaction" projection reuses a field of the "after" projection only when the
+     field's whole input is the same value (sameSaveValue), so its hash is the same by construction. */
+const issuedManifestDigests = new WeakMap<object, string>();
+const rememberIssuedManifest = (player: Player, manifest: SaveIntegrityManifest) => {
+    if (player && typeof player === 'object') issuedManifestDigests.set(player, manifest.digest);
+    return manifest;
+};
+/** True when this exact object was just signed with this manifest by createSaveIntegrityManifest
+ *  or createCheckedSaveIntegrityManifest. Verification after the write is never skipped. */
+export const wasManifestIssuedFor = (player: Player, manifest: SaveIntegrityManifest): boolean => Boolean(
+    player && typeof player === 'object' && manifest && issuedManifestDigests.get(player) === manifest.digest,
+);
+
+const isPlainSaveRecord = (value: object): boolean => {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+};
+/** Conservative: true only when both values serialize identically under stableSaveHash and under
+ *  JSON (plain objects and arrays, same keys, same holes, strictly equal primitives). Anything
+ *  else answers false, and the caller then hashes it. */
+export const sameSaveValue = (left: unknown, right: unknown): boolean => {
+    if (typeof left === 'function' || typeof left === 'symbol' || typeof left === 'bigint') return false;
+    if (left === right) return true;
+    if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+    if (Array.isArray(left)) {
+        if (!Array.isArray(right) || left.length !== right.length) return false;
+        for (let index = 0; index < left.length; index++) {
+            const inLeft = index in left;
+            if (inLeft !== (index in right)) return false;
+            if (inLeft && !sameSaveValue(left[index], right[index])) return false;
+        }
+        return true;
+    }
+    if (Array.isArray(right) || !isPlainSaveRecord(left) || !isPlainSaveRecord(right)) return false;
+    const leftRecord = left as Record<string, unknown>, rightRecord = right as Record<string, unknown>;
+    const keys = Object.keys(leftRecord);
+    if (keys.length !== Object.keys(rightRecord).length) return false;
+    for (const key of keys) {
+        if (!Object.prototype.hasOwnProperty.call(rightRecord, key)) return false;
+        if (!sameSaveValue(leftRecord[key], rightRecord[key])) return false;
+    }
+    return true;
+};
+
+interface ProtectedFieldScope { reuse: boolean; inputs: Map<string, unknown>; values: Map<string, unknown> }
+/** Records the input of each heavy field while projecting "after"; reuses it for "before" only
+ *  when the input is the same value. The compute reads only that input. */
+const protectedField = <T,>(scope: ProtectedFieldScope | undefined, name: string, input: unknown, compute: (input: any) => T): T => {
+    if (!scope) return compute(input);
+    if (scope.reuse) {
+        if (scope.inputs.has(name) && sameSaveValue(input, scope.inputs.get(name))) return scope.values.get(name) as T;
+        return compute(input);
+    }
+    const value = compute(input);
+    scope.inputs.set(name, input); scope.values.set(name, value);
+    return value;
+};
+
 const identityToken = (value: unknown, index: number, fallbackPrefix: string): string => {
     if (typeof value === 'string' || typeof value === 'number') return String(value);
     const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
@@ -198,19 +261,31 @@ const studioCompanyState = (player: Player): string => stableHash(
         })),
 );
 
-const industryIntelligenceState = (player: Player): string => {
-    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const acquiredPlatformIds = new Set<string>(
-        player.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds || [],
-    );
+interface IndustryIntelligenceInput {
+    studios: NonNullable<Player['world']>['studios'] | Record<string, never>;
+    platforms: NonNullable<Player['world']>['platforms'] | Record<string, never>;
+    acquiredPlatformIds: unknown;
+    playerId: string;
+    absoluteWeek: number;
+}
+const industryIntelligenceInput = (player: Player): IndustryIntelligenceInput => ({
+    studios: player.world?.studios || {},
+    platforms: player.world?.platforms || {},
+    acquiredPlatformIds: player.ownedStreamingPlatform?.corporateDevelopment?.acquiredPlatformIds || [],
+    playerId: player.id,
+    absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
+});
+const industryIntelligenceStateOf = (input: IndustryIntelligenceInput): string => {
+    const absoluteWeek = input.absoluteWeek;
+    const acquiredPlatformIds = new Set<string>(Array.isArray(input.acquiredPlatformIds) ? input.acquiredPlatformIds as string[] : []);
     const states = [
-        ...Object.values(player.world?.studios || {}).map(studio => (
+        ...Object.values(input.studios || {}).map(studio => (
             studio.ai ? readNormalizedStudioAiIntelligence(studio, { absoluteWeek }) : undefined
         )),
-        ...Object.entries(player.world?.platforms || {}).map(([platformId, platform]) => {
+        ...Object.entries(input.platforms || {}).map(([platformId, platform]) => {
             if (!platform.ai?.intelligence) return undefined;
             if (acquiredPlatformIds.has(platformId)) return platform.ai.intelligence;
-            return readNormalizedPlatformAiIntelligence(platform, player.id, absoluteWeek);
+            return readNormalizedPlatformAiIntelligence(platform, input.playerId, absoluteWeek);
         }),
     ];
     return stableHash(states
@@ -256,7 +331,7 @@ const industryIntelligenceState = (player: Player): string => {
     .sort((left, right) => left.companyId.localeCompare(right.companyId)));
 };
 
-const worldEconomyState = (player: Player): string => {
+const worldEconomyInput = (player: Player): unknown[] => {
     const world = player.world;
     const states = [
         world?.worldPopulation,
@@ -268,7 +343,7 @@ const worldEconomyState = (player: Player): string => {
         world?.worldStreamingViewing,
         world?.worldStreamingPlatformEconomy,
     ];
-    return stableHash(states.map(state => state ? ({
+    return states.map(state => state ? ({
         schemaVersion: state.schemaVersion,
         lastProcessedAbsoluteWeek: state.lastProcessedAbsoluteWeek,
         sourceFingerprint: 'sourceFingerprint' in state ? state.sourceFingerprint : undefined,
@@ -276,7 +351,7 @@ const worldEconomyState = (player: Player): string => {
         countries: 'entitlements' in state ? state.countries : undefined,
         platforms: 'entitlements' in state ? state.platforms : undefined,
         entitlements: 'entitlements' in state ? state.entitlements : undefined,
-    }) : null));
+    }) : null);
 };
 
 // Saves signed before audience choice became protected used this seven-state
@@ -350,7 +425,9 @@ const nonFiniteCanonicalMoneyPaths = (player: Player): string[] => {
 
 /** Schema5 protects content, not merely record IDs. JSON semantics keep
  * optional undefined fields and export/import compatible without rewriting old signatures. */
-const userCareerRecordsState = (player: Player): string => stableHash(JSON.parse(JSON.stringify({
+/* Perf plan Phase 3 (2026-11-09): the same digest as hashing the JSON round trip of these records, in one
+   walk (stableSaveHashJson) instead of building the JSON text and a parsed copy on every integrity check. */
+const userCareerRecordsInput = (player: Player) => ({
     commitments: player.commitments || [],
     activeReleases: player.activeReleases || [],
     pastProjects: player.pastProjects || [],
@@ -366,16 +443,20 @@ const userCareerRecordsState = (player: Player): string => stableHash(JSON.parse
     instagramPosts: player.instagram?.posts || [],
     xPosts: player.x?.posts || [],
     youtubeVideos: player.youtube?.videos || [],
-})));
+});
 
-const createProtectedState = (player: Player, schema = SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION): SaveProtectedState => {
+const cinemaStateInput = (player: Player) => ({market:player.world.cinemaMarket,
+    active:(player.activeReleases || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED' && !player.world.cinemaMarket!.titles[r.id]?.closed).map(r=>({id:r.id,cinema:r.cinema,gross:r.totalGross,receipts:r.totalStudioReceipts})),
+    projects:(player.world.projects || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED' && !player.world.cinemaMarket!.titles[r.id]?.closed).map(r=>({id:r.id,cinema:r.cinema,gross:r.boxOffice}))});
+
+const createProtectedState = (player: Player, schema = SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION, scope?: ProtectedFieldScope): SaveProtectedState => {
     const platform = player.ownedStreamingPlatform as unknown as Record<string, unknown>;
     const licences = Array.isArray(platform?.catalogLicenses) ? platform.catalogLicenses : [];
     const treasury = finiteNumber(platform?.treasuryCash || 0);
     const stats = player.stats && typeof player.stats === 'object' ? player.stats as unknown as Record<string, unknown> : {};
 
     return {
-        ...(schema >= 5 ? { userCareerRecords: userCareerRecordsState(player) } : {}),
+        ...(schema >= 5 ? { userCareerRecords: protectedField(scope, 'userCareerRecords', userCareerRecordsInput(player), stableSaveHashJson) } : {}),
         ...(typeof player.flags?.careerArchiveRootDigest === 'string'
             ? { archiveRootDigest: player.flags.careerArchiveRootDigest }
             : {}),
@@ -420,7 +501,7 @@ const createProtectedState = (player: Player, schema = SAVE_INTEGRITY_DIGEST_SCH
         } : {}),
         studioCompanies: fingerprintRecord(player.world?.studios, 'studio-company'),
         studioCompanyState: studioCompanyState(player),
-        industryIntelligenceState: industryIntelligenceState(player),
+        industryIntelligenceState: protectedField(scope, 'industryIntelligence', industryIntelligenceInput(player), industryIntelligenceStateOf),
         streamingLicences: fingerprintArray(licences, 'streaming-licence'),
         assets: fingerprintArray(player.assets, 'asset'),
         customItems: fingerprintArray(player.customItems, 'custom-item'),
@@ -431,10 +512,8 @@ const createProtectedState = (player: Player, schema = SAVE_INTEGRITY_DIGEST_SCH
             lifecycle: cleanText(platform?.lifecycle),
         }),
         ownedStreamingTreasury: treasury,
-        worldEconomy: worldEconomyState(player),
-        ...(player.world?.cinemaMarket ? {cinemaState:stableHash({market:player.world.cinemaMarket,
-            active:(player.activeReleases || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED' && !player.world.cinemaMarket!.titles[r.id]?.closed).map(r=>({id:r.id,cinema:r.cinema,gross:r.totalGross,receipts:r.totalStudioReceipts})),
-            projects:(player.world.projects || []).filter(r=>r.cinema && r.cinema.settlementBasis!=='LEGACY_FULLY_SETTLED' && !player.world.cinemaMarket!.titles[r.id]?.closed).map(r=>({id:r.id,cinema:r.cinema,gross:r.boxOffice}))})} : {}),
+        worldEconomy: protectedField(scope, 'worldEconomy', worldEconomyInput(player), stableHash),
+        ...(player.world?.cinemaMarket ? {cinemaState:protectedField(scope, 'cinemaState', cinemaStateInput(player), stableHash)} : {}),
     };
 };
 
@@ -474,9 +553,9 @@ export const createSaveIntegrityManifest = (
     reason: SaveIntegrityReason,
     createdAt = Date.now(),
     needsRecoveryCheckpoint = false,
-): SaveIntegrityManifest => manifestWithProtectedState(
+): SaveIntegrityManifest => rememberIssuedManifest(player, manifestWithProtectedState(
     player, reason, createdAt, needsRecoveryCheckpoint, createProtectedState(player),
-);
+));
 
 const compareFingerprint = (
     label: string,
@@ -545,12 +624,15 @@ export const createCheckedSaveIntegrityManifest = (
     before: Player, after: Player, reason: SaveIntegrityReason,
     createdAt = Date.now(), needsRecoveryCheckpoint = false,
 ) => {
-    const original = createProtectedState(before), prepared = createProtectedState(after);
+    const scope: ProtectedFieldScope = { reuse: false, inputs: new Map(), values: new Map() };
+    const prepared = createProtectedState(after, SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION, scope);
+    scope.reuse = true;
+    const original = before === after ? prepared : createProtectedState(before, SAVE_INTEGRITY_DIGEST_SCHEMA_VERSION, scope);
     const comparison = compareProtectedProjections(original, prepared);
     if ('violations' in comparison) {
         throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);
     }
-    return { comparison, manifest: manifestWithProtectedState(after, reason, createdAt, needsRecoveryCheckpoint, prepared) };
+    return { comparison, manifest: rememberIssuedManifest(after, manifestWithProtectedState(after, reason, createdAt, needsRecoveryCheckpoint, prepared)) };
 };
 
 export const verifySaveIntegrity = (

@@ -397,6 +397,8 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
      box for one shape and the SVG sliced it to another, so a region flight
      quietly cropped the coasts it had just been asked to show. */
   const frame = useRef<SVGSVGElement>(null);
+  /* Lag round (2026-11-09): the moving layer, see the second <svg> below. */
+  const motion = useRef<SVGSVGElement>(null);
   const [frameSize, setFrameSize] = useState({ w: 375, h: 234 });
   useEffect(() => {
     const element = frame.current;
@@ -716,7 +718,9 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
       }));
     };
     svg.addEventListener('wheel', onWheel, { passive: false });
-    return () => svg.removeEventListener('wheel', onWheel);
+    const layer = motion.current;
+    layer?.addEventListener('wheel', onWheel, { passive: false });
+    return () => { svg.removeEventListener('wheel', onWheel); layer?.removeEventListener('wheel', onWheel); };
   }, [clientToMap]);
 
   /* Detail scales with the zoom, so a pin is the same size on the screen
@@ -868,6 +872,7 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
 
 
   return (
+    <>
     <svg
       ref={frame}
       className="bw-atlas"
@@ -1170,6 +1175,28 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
           {links.map(link => (
             <path key={`route-${link.id}`} d={link.d} strokeWidth={hair * 1.4} className={link.planned ? 'bw-atlas-route is-planned' : 'bw-atlas-route'} />
           ))}
+        </g>
+      )}
+    </svg>
+
+    {/* Lag round (2026-11-09): everything that moves, and everything drawn after it, on a
+        second <svg> of the same size and camera. It has its own compositor layer, so the
+        crawling traffic and the pulsing rings repaint only this thin layer, not the blurred
+        fields, the coastlines and the sea under it (that full repaint ran the page at about
+        12 fps on a mid-range phone). The drawing order is the same as before: routes, then
+        traffic, then rings, pins and names. */}
+    <svg
+      ref={motion}
+      className="bw-atlas bw-atlas-motion"
+      viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+      preserveAspectRatio="xMidYMid slice"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endPointer}
+      onPointerCancel={endPointer}
+    >
+      {links.length > 0 && (
+        <g className="bw-atlas-routes">
           {links.map((link, index) => (
             <path
               key={`traffic-${link.id}`}
@@ -1280,6 +1307,7 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
 
       </g>
     </svg>
+    </>
   );
 });
 

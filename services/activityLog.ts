@@ -17,9 +17,9 @@ export const inActivityOrder = <T extends { week?: number; year?: number }>(logs
     .map(row => row.log);
 
 /* a line about the world, not about the player */
-const WORLD_LINE = /^(📚|🗂️|📅)/u;
+const WORLD_LINE = /^(\u{1F4DA}|\u{1F5C2}\u{FE0F}|\u{1F4C5})/u;
 /* #254: what the other companies did, written before it moved to the News app: an older save still holds these */
-const OLD_WORLD_LINE = /^(🏢|🌟)/u;
+const OLD_WORLD_LINE = /^(\u{1F3E2}|\u{1F31F})/u;
 export const isOldWorldLine = (message: string): boolean => OLD_WORLD_LINE.test(message);
 
 const feedRank = (log: { type?: string; message?: string }) => (

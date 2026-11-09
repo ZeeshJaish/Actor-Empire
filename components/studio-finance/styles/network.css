@@ -80,6 +80,13 @@
 .sf .bw-atlas-sea-hit,
 .sf .bw-atlas-hit path,
 .sf .bw-atlas-pin { pointer-events: auto; }
+/* Lag round (2026-11-09): the moving layer sits exactly on the map and is its own compositor
+   layer, so its animations never repaint the map under it. */
+.sf .bw-atlas-motion {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
 
 /* --- the world -------------------------------------------------------------
    This is the game's own map. The ocean, its vignette, the continental shelf,

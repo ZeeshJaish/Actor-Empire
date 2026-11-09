@@ -65,6 +65,7 @@ export default function FollyPackScreen({ onBack }: FollyPackScreenProps) {
   useEffect(() => {
     teaseAt.current = Date.now() - 2800;
     const tick = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       if (latest.current.step >= 8 || racing.current) return;
       const now = Date.now(), quiet = now - last.current > 5600 && now - teaseAt.current > 5600;
       if (quiet) teaseAt.current = now;
@@ -86,6 +87,7 @@ export default function FollyPackScreen({ onBack }: FollyPackScreenProps) {
     racing.current = true;
     clearInterval(race.current);
     race.current = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const t = Math.min(1, (Date.now() - start) / dur), e = 1 - Math.pow(1 - t, 3);
       set({ budget: Math.round(from + amount * e) });
       if (t >= 1) { clearInterval(race.current); racing.current = false; }

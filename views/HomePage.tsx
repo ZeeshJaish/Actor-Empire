@@ -76,9 +76,13 @@ type HomeProductionPhase = NonNullable<Commitment['projectPhase']>;
 type CheatMenuMode = 'NONE' | 'DEV' | 'EDITOR';
 
 const CHEAT_GENRES: Genre[] = ALL_GENRES;
-const DEV_TOOLS_PASSCODE = import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
-const EDITOR_TOOLS_PASSCODE = 'editor@123';
-const LEGACY_DEV_TOOLS_PASSCODES = ['actor-dev'];
+/* Perf plan (2026-11-08): Developer Tools, the Promo Control Room, the cheat buttons and the QA helpers
+   exist only on the dev server. A production build (the store and TestFlight build) leaves all of
+   them out, passcodes included, because every use sits behind import.meta.env.DEV. */
+const qaActionsOff = (): any => new Proxy({}, { get: () => () => undefined });
+const DEV_TOOLS_PASSCODE = !import.meta.env.DEV ? '' : import.meta.env.VITE_DEV_TOOLS_PASSCODE || 'Kzign@420';
+const EDITOR_TOOLS_PASSCODE = !import.meta.env.DEV ? '' : 'editor@123';
+const LEGACY_DEV_TOOLS_PASSCODES = !import.meta.env.DEV ? [] as string[] : ['actor-dev'];
 const HOME_AVATAR_PRESET_SEEDS = [
   'Opening Night',
   'Casting Call',
@@ -129,6 +133,11 @@ const safeExportHomePortrait = (selection: ProfileBuilderSelection, exportScale 
   if (typeof document === 'undefined') return '';
   return exportProfilePortrait(selection, exportScale);
 };
+
+/* Perf plan Phase 3 (2026-11-09): the avatar presets are the same pictures every time for a gender
+   (seeded selections), so they are drawn once per session instead of on every return to Home; each
+   one is a canvas drawing plus a PNG encode, about 0.4 s on a mid-range phone for the whole set. */
+const homeAvatarPresetCache = new Map<ProfileBuilderGender, HomeAvatarPreset[]>();
 
 /* #263: the dev menu's replay of the opening night. Loaded when asked for, and nowhere else. */
 const NightReplay = React.lazy(() => import('../components/streaming-transplant/opening-night/NightReplay'));
@@ -223,7 +232,9 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
 
   const currentAvatarList = useMemo<HomeAvatarPreset[]>(() => {
       const profileGender = toHomeProfileGender(player.gender);
-      return HOME_AVATAR_PRESET_SEEDS.map((seed, index) => {
+      const cached = homeAvatarPresetCache.get(profileGender);
+      if (cached) return cached;
+      const presets = HOME_AVATAR_PRESET_SEEDS.map((seed, index) => {
           const selection = createSeededProfileSelection(profileGender, `${profileGender}:home-avatar:${seed}:${index}`);
           return {
               id: `${profileGender}-${seed}-${index}`,
@@ -232,6 +243,8 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               thumbnail: safeExportHomePortrait(selection, 2),
           };
       });
+      if (presets.every(preset => preset.thumbnail)) homeAvatarPresetCache.set(profileGender, presets);
+      return presets;
   }, [player.gender]);
 
   const applyAvatarPreset = (preset: HomeAvatarPreset) => {
@@ -253,7 +266,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     }
     lastClickRef.current = now;
 
-    if (clickCountRef.current === 3) {
+    if (import.meta.env.DEV && clickCountRef.current === 3) {
         if (avatarClickTimeoutRef.current) {
             window.clearTimeout(avatarClickTimeoutRef.current);
             avatarClickTimeoutRef.current = null;
@@ -585,11 +598,11 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     triggerCheatPostProd,
     triggerProductionCrisis,
     triggerDirectorDecision,
-  } = createHomeProductionQaActions({
+  } = import.meta.env.DEV ? createHomeProductionQaActions({
     player,
     onUpdatePlayer,
     closeMenu: () => setActiveCheatMenu('NONE'),
-  });
+  }) : (qaActionsOff() as ReturnType<typeof createHomeProductionQaActions>);
   const triggerCheatLifeEvent = () => {
     if (!onUpdatePlayer) return;
 
@@ -760,11 +773,11 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     triggerXBootstrap,
     triggerXDramaPost,
     triggerXSmallCreatorReset,
-  } = createHomeSocialQaActions({
+  } = import.meta.env.DEV ? createHomeSocialQaActions({
     player,
     onUpdatePlayer,
     closeMenu: () => setActiveCheatMenu('NONE'),
-  });
+  }) : (qaActionsOff() as ReturnType<typeof createHomeSocialQaActions>);
   const ensureCheatStudio = () => {
       const safeBusinesses = Array.isArray(player.businesses) ? player.businesses : [];
       const existingStudio = safeBusinesses.find(b => b.type === 'PRODUCTION_HOUSE');
@@ -1320,28 +1333,28 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     triggerBoxOfficeArchiveQa,
     triggerAudiencePulseQa,
     triggerSoundtrackRevenueQa,
-  } = createHomeBoxOfficeQaActions({
+  } = import.meta.env.DEV ? createHomeBoxOfficeQaActions({
     player,
     onUpdatePlayer,
     closeMenu: () => setActiveCheatMenu('NONE'),
     ensureCheatStudio,
     onOpenBoxOfficeCheat,
     setPage,
-  });
+  }) : (qaActionsOff() as ReturnType<typeof createHomeBoxOfficeQaActions>);
   const {
     triggerStudioAcquisitionSigningCheat,
     triggerPrivateEquityQa,
     triggerVaultSortingQa,
     triggerFullStudioSlateQa,
     triggerLegacyProductionHouseMigrationQa,
-  } = createHomeStudioOwnershipQaActions({
+  } = import.meta.env.DEV ? createHomeStudioOwnershipQaActions({
     player,
     onUpdatePlayer,
     closeMenu: () => setActiveCheatMenu('NONE'),
     ensureCheatStudio,
     onOpenProductionHouseCheat,
     onOpenStudioAcquisitionCheat,
-  });
+  }) : (qaActionsOff() as ReturnType<typeof createHomeStudioOwnershipQaActions>);
   const {
     triggerLowConditionRestQa,
     sanitizeProductionHouseReturnDealsQa,
@@ -1352,14 +1365,14 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     triggerEpisodeRatingsProductionHouseQa,
     triggerProductionRiskQa,
     triggerRareHollywoodChaosQa,
-  } = createHomeStudioProductionQaActions({
+  } = import.meta.env.DEV ? createHomeStudioProductionQaActions({
     player,
     onUpdatePlayer,
     closeMenu: () => setActiveCheatMenu('NONE'),
     ensureCheatStudio,
     onOpenProductionHouseCheat,
     setPage,
-  });
+  }) : (qaActionsOff() as ReturnType<typeof createHomeStudioProductionQaActions>);
   const triggerStreamingRightsPhase8Qa = () => {
       if (!onUpdatePlayer) return;
       const { updatedPlayer: basePlayer, studio } = ensureCheatStudio();
@@ -1983,7 +1996,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
               talent: Number((npc as any).stats?.talent || (npc as any).talent || 75),
               fame: Number((npc as any).stats?.fame || (npc as any).fame || (npc.tier === 'A_LIST' ? 88 : 28)),
           }));
-      const nextPlayer = buildCanonStoryQaFixture(basePlayer, studio, qaActors);
+      const nextPlayer = import.meta.env.DEV ? buildCanonStoryQaFixture(basePlayer, studio, qaActors) : basePlayer;
 
       onUpdatePlayer(nextPlayer);
       setActiveCheatMenu('NONE');
@@ -3202,7 +3215,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
     <div className="relative h-full">
 
       {/* PASSWORD PROMPT OVERLAY */}
-      {showPasswordPrompt && (
+      {import.meta.env.DEV && showPasswordPrompt && (
           <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
               <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-xs p-6 shadow-2xl flex flex-col items-center text-center">
                   <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4 text-zinc-400">
@@ -3243,7 +3256,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       )}
 
       {/* CHEAT MENU OVERLAY */}
-      {activeCheatMenu !== 'NONE' && (
+      {import.meta.env.DEV && activeCheatMenu !== 'NONE' && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
               <div className={`border rounded-3xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl ${
                   activeCheatMenu === 'EDITOR'

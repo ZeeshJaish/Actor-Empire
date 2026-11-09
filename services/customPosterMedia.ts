@@ -160,6 +160,16 @@ const visitCustomPosterHolders = async (player: any, visitor: PosterVisitor) => 
     }
 };
 
+/* Perf plan (2026-11-08): does this career still carry a picture inside the save, one that
+   externalizeCustomPostersInPlayer would move out (and so write)? Reads only. */
+export const hasEmbeddedCustomPosters = async (player: Player): Promise<boolean> => {
+    let found = false;
+    await visitCustomPosterHolders(player, async (poster) => {
+        if (poster.imageData) found = true;
+    });
+    return found;
+};
+
 export const externalizeCustomPostersInPlayer = async <T extends Player>(player: T): Promise<CustomPosterExternalizeResult<T>> => {
     let migratedCount = 0;
     let bytesRemoved = 0;

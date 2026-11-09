@@ -438,16 +438,27 @@ const compactPlatformAiSlate = (
     .filter((deal: any) => deal?.status === 'PENDING_PAYMENT' && deal?.buyerPlatformId === platform?.id)
     .forEach((deal: any) => protectedPlanIds.add(stableHistoryId(deal?.buyerPlanId)));
 
+  /* Perf plan Phase 3 (2026-11-09): the productions that carry a retained award are worked out once for
+     this platform, not by scanning every industry production again for each plan (the same answer). */
+  let awardProductionIds: Set<unknown> | null = null;
+  const isAwardProduction = (productionId: unknown): boolean => {
+    if (!awardProductionIds) {
+      awardProductionIds = new Set<unknown>();
+      for (const production of Object.values(world?.industryProductions || {}) as any[]) {
+        const id = production?.id;
+        // the scan compared with ===, which never matches NaN, so a NaN id never counts here either
+        if (id === id && retainedAwardProjectIds.has(stableHistoryId(production?.canonicalProjectId))) awardProductionIds.add(id);
+      }
+    }
+    return awardProductionIds.has(productionId);
+  };
   const planTouchesAwards = (plan: any): boolean => (
     (Array.isArray(plan?.sourceProjectIds) ? plan.sourceProjectIds : []).some((id: unknown) => retainedAwardProjectIds.has(stableHistoryId(id)))
     || (Array.isArray(plan?.releaseEntries) ? plan.releaseEntries : []).some((entry: any) => (
       retainedAwardProjectIds.has(stableHistoryId(entry?.sourceProjectId))
       || retainedAwardProjectIds.has(stableHistoryId(entry?.canonicalProjectId))
     ))
-    || Object.values(world?.industryProductions || {}).some((production: any) => (
-      production?.id === plan?.industryProductionId
-      && retainedAwardProjectIds.has(stableHistoryId(production?.canonicalProjectId))
-    ))
+    || isAwardProduction(plan?.industryProductionId)
   );
   const terminalStatuses = new Set(['RELEASED', 'CANCELLED', 'SOLD']);
   return retainBoundedHistory({

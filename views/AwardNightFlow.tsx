@@ -247,12 +247,45 @@ const Avatar: React.FC<{ url?: string }> = ({ url }) => {
    TIMER HOOK — every timeout auto-cleans on unmount
    ============================================================ */
 function useTimers() {
-  const timers = useRef<number[]>([]);
-  useEffect(() => () => { timers.current.forEach(t => window.clearTimeout(t)); }, []);
+  /* Perf plan (2026-11-08): the night waits while the app is hidden and goes on from the same moment,
+     so a player who takes a call does not come back to a finished ceremony. */
+  type PendingStep = { fn: () => void; due: number; remaining: number; handle: number | null };
+  const timers = useRef(new Map<number, PendingStep>());
+  const nextId = useRef(0);
+  useEffect(() => {
+    const start = (id: number, step: PendingStep) => {
+      step.due = performance.now() + step.remaining;
+      step.handle = window.setTimeout(() => { timers.current.delete(id); step.fn(); }, step.remaining);
+    };
+    const onVisibility = () => {
+      const now = performance.now();
+      timers.current.forEach((step, id) => {
+        if (document.visibilityState === 'hidden') {
+          if (step.handle === null) return;
+          window.clearTimeout(step.handle);
+          step.handle = null;
+          step.remaining = Math.max(0, step.due - now);
+        } else if (step.handle === null) {
+          start(id, step);
+        }
+      });
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      timers.current.forEach(step => { if (step.handle !== null) window.clearTimeout(step.handle); });
+      timers.current.clear();
+    };
+  }, []);
   return useCallback((fn: () => void, ms: number) => {
-    const t = window.setTimeout(fn, ms);
-    timers.current.push(t);
-    return t;
+    nextId.current += 1;
+    const id = nextId.current;
+    const step: PendingStep = { fn, due: performance.now() + ms, remaining: ms, handle: null };
+    timers.current.set(id, step);
+    if (document.visibilityState !== 'hidden') {
+      step.handle = window.setTimeout(() => { timers.current.delete(id); fn(); }, ms);
+    }
+    return id;
   }, []);
 }
 
@@ -448,6 +481,7 @@ const ArrivalScene: React.FC<{
   useEffect(() => {
     if (beat !== 'door') return;
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const layer = flashRef.current;
       if (!layer) return;
       const f = document.createElement('div');
@@ -614,6 +648,7 @@ const EntranceScene: React.FC<{
   // paparazzi flashes + viewer creep + the walk
   useEffect(() => {
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       setViewers(v => v + Math.random() * 0.05);
       const layer = flashRef.current;
       if (layer && Math.random() < .75) {
@@ -719,6 +754,7 @@ const MoneyShotScene: React.FC<{
 
   useEffect(() => {
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const layer = vfFlashRef.current;
       if (!layer) return;
       const f = document.createElement('div'); f.className = 'vf-flash';
@@ -798,6 +834,7 @@ const NewspaperScene: React.FC<{
   useEffect(() => {
     let v = 0;
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       v += 2;
       if (v >= buzz) { v = buzz; window.clearInterval(iv); }
       setVal(v);
@@ -884,6 +921,7 @@ const PressScene: React.FC<{
     const start = Date.now();
     const len = QA[qi].q.length;
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const n = Math.min(len, Math.floor((Date.now() - start) / 26));
       setTyped(n);
       if (n >= len) window.clearInterval(iv);
@@ -894,6 +932,7 @@ const PressScene: React.FC<{
   // ambient flashes
   useEffect(() => {
     const iv = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const layer = flashRef.current;
       if (layer && Math.random() < .6) {
         const f = document.createElement('div'); f.className = 'pc-flash';
@@ -1088,6 +1127,7 @@ const CeremonyScene: React.FC<{ cfg: AwardNightConfig; onDone: () => void }> = (
       // quick pacing: rows pop fast, winner flashes, auto-advance
       let n = 0;
       const iv = window.setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
         n += 1; setRevealed(n);
         if (n >= step.noms.length) window.clearInterval(iv);
       }, 90);
@@ -1100,6 +1140,7 @@ const CeremonyScene: React.FC<{ cfg: AwardNightConfig; onDone: () => void }> = (
       setSub('reveal');
       let n = 0;
       const iv = window.setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
         n += 1; setRevealed(n);
         if (n >= step.noms.length) window.clearInterval(iv);
       }, 1000);
