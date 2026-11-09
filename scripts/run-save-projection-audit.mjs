@@ -15,7 +15,7 @@ await build({ entryPoints: [process.argv[2] || 'scripts/audit-save-projection-wo
             if (source.includes('let sortKeyNodes')) source = source.replace('return (first >>> 0)', '(globalThis as any).__hashSortKeyNodes=sortKeyNodes;return (first >>> 0)');
             return { contents: source, loader: 'ts', resolveDir: dirname(args.path) };
         });
-        api.onLoad({ filter: /\/saveIntegrity\.ts$/ }, args => ({ contents: readFileSync(args.path, 'utf8') + '\n(globalThis as any).__industryIntegrityProbe=industryIntelligenceState;\n', loader: 'ts', resolveDir: dirname(args.path) }));
+        api.onLoad({ filter: /\/saveIntegrity\.ts$/ }, args => ({ contents: readFileSync(args.path, 'utf8') + '\n(globalThis as any).__industryIntegrityProbe=(player:any)=>industryIntelligenceStateOf(industryIntelligenceInput(player));\n', loader: 'ts', resolveDir: dirname(args.path) }));
         api.onLoad({ filter: /\/industryIntelligenceState\.ts$/ }, args => ({ contents: readFileSync(args.path, 'utf8').replace('export const compactIndustryIntelligenceState =', 'const compactIndustryIntelligenceStateImplementation =') + `
 export const compactIndustryIntelligenceState=(state:Parameters<typeof compactIndustryIntelligenceStateImplementation>[0])=>{
  if((globalThis as any).__captureIndustryWork){
