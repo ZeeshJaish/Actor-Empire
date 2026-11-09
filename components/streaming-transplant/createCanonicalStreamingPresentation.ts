@@ -21,6 +21,7 @@ import type { AppState } from './StreamingViewerExperience';
 import { readNetworkSignals } from '../../services/streamingNetworkSignals';
 import { normalizeStreamingRightsCalendarState } from '../../services/streamingRightsCalendar';
 import { getOwnedStreamingProgramEntries } from '../../services/streamingOriginals';
+import { streamingLicenceWaitsForSlate } from '../../services/streamingCatalog';
 import { originalOnTheShelf, planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
 import { getStreamingViewerPersonal, getStreamingViewerPlans, getStreamingViewerQuality, streamingNetworkPictureTier } from '../../services/streamingViewerQuality';
 import { getStreamingViewerOutage } from '../../services/streamingViewerOutage';
@@ -74,6 +75,44 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
   const launchedAt = platform.launchCommit?.committedAtAbsoluteWeek ?? null;
   const live = platform.lifecycle === 'ACTIVE';
   const programme = new Map(launchedAt === null ? [] : getOwnedStreamingProgramEntries(player, context).map(entry => [entry.projectId, entry] as const));
+  /* What was bought, week by week, and when each title joined the catalogue (Zeesh, 2026-11-09): every licence by its
+     signing week, every Original by its commission week, every studio title by the week it was linked. */
+  const HOW: Record<string, string> = {
+    STARTER: 'Opening catalogue', STUDIO_MARKET: 'Market', PLATFORM_TRADE: 'From a platform',
+    CATALOGUE_ACQUISITION: 'Collection', RENEWAL: 'Renewal', OWNED_STUDIO_TRANSFER: 'Your studio',
+  };
+  const history: NonNullable<ContentDeskState['history']> = [];
+  const addedAt = new Map<string, number>();
+  const noteAdded = (projectId: string, at: number) => {
+    const known = addedAt.get(projectId);
+    if (known === undefined || at < known) addedAt.set(projectId, at);
+  };
+  platform.catalogLicenses.forEach(licence => {
+    const kept = licence.windowType === 'PERMANENT' || Boolean(licence.permanentPurchase);
+    history.push({
+      id: licence.id, projectId: licence.sourceProjectId, title: licence.titleAtSigning, at: licence.signedAtAbsoluteWeek,
+      how: licence.upcomingRightsSaleId ? 'Upcoming sale' : HOW[licence.origin || 'STARTER'] || 'Market',
+      paid: Math.max(0, licence.minimumGuarantee || 0), weeks: kept ? undefined : licence.durationWeeks, kept,
+    });
+    if (licence.origin !== 'RENEWAL') noteAdded(licence.sourceProjectId, licence.signedAtAbsoluteWeek);
+  });
+  platform.originalCommissions.forEach(commission => {
+    if (!commission.canonicalProjectId) return;
+    history.push({ id: commission.id, projectId: commission.canonicalProjectId, title: commission.title,
+      at: commission.commissionedAtAbsoluteWeek, how: 'Original', paid: Math.max(0, commission.fee || 0) });
+    noteAdded(commission.canonicalProjectId, commission.commissionedAtAbsoluteWeek);
+  });
+  platform.eventLedger.forEach(entry => {
+    if (entry.type !== 'CATALOG_IMPORTED') return;
+    const linked = (entry.metadata as Record<string, unknown> | undefined)?.projectIds;
+    (Array.isArray(linked) ? linked : []).forEach(raw => {
+      const projectId = String(raw);
+      history.push({ id: `${entry.id}:${projectId}`, projectId, title: resolveStreamingCatalogueReadTitle(context, projectId)?.title || 'Studio title',
+        at: entry.absoluteWeek, how: 'Your studio', paid: 0 });
+      noteAdded(projectId, entry.absoluteWeek);
+    });
+  });
+  history.sort((left, right) => right.at - left.at || left.title.localeCompare(right.title));
   const titles = projectIds.flatMap(projectId => {
     const title = resolveStreamingCatalogueReadTitle(context, projectId);
     if (!title) return [];
@@ -113,6 +152,7 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       year: title.releaseYear,
       poster: posterById.get(projectId),
       schedulable,
+      addedAt: addedAt.get(projectId),
       /* Window: any title on a licence that runs out (an Original's own
          window included — it leaves when it ends). Kept: no licence end at
          all. Lapsed: a licensed title with no active licence — it was listed
@@ -200,10 +240,11 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       });
       scheduled.add(projectId);
     });
-    /* a licence bought after setup goes on the service by itself when its rights
-       start (a renewal of a title already on the service is not a premiere) */
+    /* an older licence bought after setup goes on the service by itself when its rights
+       start (a renewal of a title already on the service is not a premiere); a market
+       purchase that waits for the Slate does not */
     platform.catalogLicenses.forEach(licence => {
-      if (licence.status !== 'ACTIVE' || licence.origin === 'STARTER' || licence.startsAtAbsoluteWeek <= absoluteWeek
+      if (licence.status !== 'ACTIVE' || streamingLicenceWaitsForSlate(licence) || licence.startsAtAbsoluteWeek <= absoluteWeek
         || scheduled.has(licence.sourceProjectId) || programme.has(licence.sourceProjectId)) return;
       items.push({
         id: `licence-${licence.id}`, projectId: licence.sourceProjectId, title: licence.titleAtSigning, kind: 'LICENSED',
@@ -231,7 +272,7 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
     };
   });
   return {
-    live, titles, slate, calendar: launchedAt === null ? 'PROGRAMME' : 'WEEKS',
+    live, titles, slate, calendar: launchedAt === null ? 'PROGRAMME' : 'WEEKS', now: absoluteWeek, history,
     /* the auto-fill plans: around the premieres already planned (only when the shelves
        hold something), and fresh (only when something is planned to replace) */
     ...(launchedAt !== null && live ? {

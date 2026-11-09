@@ -20,7 +20,7 @@ import { getScriptGapFit } from '../originalsAudienceReport';
 import type { Genre, OwnedStreamingPlatformState, Player, StreamingExecutiveStrategy, StreamingOriginalGapId } from '../../types';
 import { PHASE_ONE_ENERGY_COSTS } from '../energyCosts';
 import { getAbsoluteWeek } from '../legacyLogic';
-import { resolveStreamingCatalogTitle } from '../streamingCatalog';
+import { releaseSlateHoldOnNewLicences, resolveStreamingCatalogTitle } from '../streamingCatalog';
 import {
     evaluateOwnedStreamingRenewalReturn,
     normalizeStreamingRightsCalendarState,
@@ -269,7 +269,8 @@ export const runMarketBuys: StreamingTeamJobRunner = (context) => {
 export const executeCatalogueSign: StreamingTeamExecutor = (player, action) => {
     if (action.kind !== 'CATALOGUE_SIGN') return { player, changed: false };
     const result = signOwnedStreamingCataloguePackage(player, action.packageId);
-    if (result.changed) return { player: result.player, changed: true };
+    /* the team's own buy goes on the service by itself: only the player's purchases wait for the Slate */
+    if (result.changed) return { player: releaseSlateHoldOnNewLicences(player, result.player), changed: true };
     return {
         player,
         changed: false,
@@ -287,7 +288,8 @@ export const executeTitleLicense: StreamingTeamExecutor = (player, action) => {
     if (!listing) return { player, changed: false, reason: 'That title has left the market.' };
     if (listing.terms.minimumGuarantee > action.price) return { player, changed: false, reason: `Its price rose to ${money(listing.terms.minimumGuarantee)}.` };
     const result = purchaseContentMarketListing(player, listing.id, listing.signature);
-    return result.changed ? { player: result.player, changed: true } : { player, changed: false, reason: result.detail };
+    /* the team's own buy goes on the service by itself: only the player's purchases wait for the Slate */
+    return result.changed ? { player: releaseSlateHoldOnNewLicences(player, result.player), changed: true } : { player, changed: false, reason: result.detail };
 };
 
 /* ── the Original pitch ── */

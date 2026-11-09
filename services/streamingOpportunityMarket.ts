@@ -254,7 +254,8 @@ export const purchaseStreamingOpportunityOffer = (
     const eventKey = `market-package:${offer.id}`;
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({ ...platform,
         treasuryCash: platform.treasuryCash - offer.askingPrice,
-        catalogLicenses: [...platform.catalogLicenses, license],
+        /* bought once the service is live: it waits on the shelves for the Slate */
+        catalogLicenses: [...platform.catalogLicenses, platform.launchCommit ? { ...license, holdForSlate: true } : license],
         catalogProjectIds: [...new Set([...platform.catalogProjectIds, offer.projectId])],
         eventLedger: [...platform.eventLedger, {
             id: createDeterministicId('streaming_event', platform.simulationSeed, eventKey),

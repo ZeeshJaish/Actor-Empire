@@ -33,6 +33,7 @@ import {normalizeOwnedStreamingPlatformState} from './ownedStreamingPlatform';
 import {contributeStreamingFounderCapital} from './streamingCompany';
 import {prepareContentMarketDiscovery,getContentMarketCollections,getContentMarketListings,purchaseContentMarketCollection,isContentMarketAuctionListing,establishContentMarketCatalogue} from './streamingContentMarket';
 import {openStreamingRightsNegotiation,signStreamingRightsDeal} from './streamingRightsMarketplace';
+import {releaseSlateHoldOnNewLicences} from './streamingCatalog';
 import {commitOwnedStreamingLaunch} from './streamingLaunch';
 import {getStreamingBuildQaTargetWeek} from './streamingLaunchQa';
 import {appointStreamingExternalExecutive,appointStreamingIndependentDirector,acceptStreamingCelebrityInvestment} from './streamingLeadershipGovernance';
@@ -389,7 +390,9 @@ const operateWeek=(source:Player,liveWeek:number):Player=>{
   /* #186: the founding offers no longer stand in the game; the full test company still signs two of them */
   INVESTORS.forEach(id=>apply(acceptStreamingCelebrityInvestment(player,id,{founding:true})));
   const licences=signLaunchLicences(player);
-  player=licences.player;
+  /* the test company's own history: what it signed in its first live week went on the service, as if the Slate had
+     programmed it (a player's purchase now waits on the shelves for the Slate) */
+  player=releaseSlateHoldOnNewLicences(player,licences.player);
   player=ledger(player,`${PREFIX}:licences:${week}`,`${licences.signed} licences signed on short and permanent windows.`);
  }
  const plan=liveWeek===0?'AUDIENCE_PUSH':liveWeek===6?'RETENTION_SPOTLIGHT':liveWeek===11?'RELIABILITY_GUARD':null;

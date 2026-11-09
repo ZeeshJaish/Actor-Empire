@@ -923,7 +923,8 @@ export const signOwnedStreamingCataloguePackage = (
         ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
             ...platform,
             treasuryCash: platform.treasuryCash - totalGuarantee,
-            catalogLicenses: [...platform.catalogLicenses, ...contracts],
+            /* bought once the service is live: the collection's titles wait on the shelves for the Slate */
+            catalogLicenses: [...platform.catalogLicenses, ...(platform.launchCommit ? contracts.map(contract => ({ ...contract, holdForSlate: true })) : contracts)],
             catalogProjectIds: Array.from(new Set([...platform.catalogProjectIds, ...contracts.map(contract => contract.sourceProjectId)])),
             eventLedger: platform.eventLedger.some(entry => entry.idempotencyKey === ledger.idempotencyKey)
                 ? platform.eventLedger
@@ -2018,7 +2019,9 @@ export const signStreamingRightsDeal = (
             ...platform,
             treasuryCash: platform.treasuryCash - negotiation.minimumGuarantee,
             rightsNegotiations: platform.rightsNegotiations.map(item => item.id === negotiationId ? signedNegotiation : item),
-            catalogLicenses: [...platform.catalogLicenses, license],
+            /* bought once the service is live (not a renewal): it waits on the shelves for the Slate */
+            catalogLicenses: [...platform.catalogLicenses,
+                platform.launchCommit && negotiation.kind !== 'RENEW' ? { ...license, holdForSlate: true } : license],
             rightsObligations: [...platform.rightsObligations, ...createObligations(platform, negotiation, licenseId, startsAtAbsoluteWeek)],
             catalogProjectIds: Array.from(new Set([...platform.catalogProjectIds, negotiation.sourceProjectId])),
         };

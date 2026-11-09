@@ -22,6 +22,8 @@ import {
     STREAMING_SLATE_HORIZON_WEEKS,
 } from '../services/streamingSlateProgramming';
 import { createCanonicalContentDeskState } from '../components/streaming-transplant/createCanonicalStreamingPresentation';
+import { getContentMarketFunds, getContentMarketListings, isContentMarketAuctionListing, prepareContentMarketDiscovery, purchaseContentMarketListing } from '../services/streamingContentMarket';
+import { executeTitleLicense } from '../services/team/teamContent';
 
 const fresh = (id: string): Player => {
     const player = migratePlayerSave({ ...structuredClone(INITIAL_PLAYER), id, name: 'Slate Audit', age: 15, currentWeek: 1 });
@@ -238,6 +240,41 @@ async function main() {
     }
     assert.ok(watched > 0, 'The premiere week was reached and watched');
     console.log(`PASS ${title.title} was not streamed before week ${premiereWeek} and was watched by ${watched.toLocaleString()} accounts in it`);
+
+    /* 2026-11-09 (Zeesh): a title bought in the Content Market once the service is live waits on the shelves for the
+       Slate instead of going on the service by itself; the Head of Content's own market buys still go on by themselves. */
+    const market = prepareContentMarketDiscovery(base);
+    const affordable = getContentMarketListings(market).filter(row => !row.unavailableReason && !isContentMarketAuctionListing(market, row.id)
+        && row.terms.minimumGuarantee <= getContentMarketFunds(market) && !market.ownedStreamingPlatform.catalogProjectIds.includes(row.title.id));
+    assert.ok(affordable.length >= 2, 'The market offers two titles the test company can afford');
+    const [toBuy, forTeam] = affordable;
+    const bought = purchaseContentMarketListing(market, toBuy.id, toBuy.signature);
+    assert.ok(bought.changed, `bought: ${bought.detail}`);
+    assert.match(bought.detail, /Slate/, 'The purchase message points at the Slate');
+    const heldLicence = bought.player.ownedStreamingPlatform.catalogLicenses.find(row => row.sourceProjectId === toBuy.title.id && row.status === 'ACTIVE');
+    assert.equal(heldLicence?.holdForSlate, true, 'A purchase on a live service is held for the Slate');
+    const held = (player: Player) => !getOwnedStreamingProgramEntries(player).some(entry => entry.projectId === toBuy.title.id);
+    assert.ok(held(bought.player), 'The purchase is not on the programme');
+    assert.equal(deskTitle(bought.player, toBuy.title.id)?.schedulable, true, 'The Library offers it to the Slate');
+    assert.equal(deskTitle(bought.player, toBuy.title.id)?.status, 'READY TO SCHEDULE');
+    const reloaded = normalizeOwnedStreamingPlatformState(JSON.parse(JSON.stringify(bought.player.ownedStreamingPlatform)), bought.player.id);
+    assert.equal(reloaded.catalogLicenses.find(row => row.id === heldLicence!.id)?.holdForSlate, true, 'The hold survives a save and a load');
+    const weekLater = (await processGameWeek(bought.player)).player;
+    const watchedHeld = weekLater.ownedStreamingPlatform.weeklyHistory.at(-1)!.operations!.titlePerformance.find(item => item.projectId === toBuy.title.id);
+    assert.ok(!watchedHeld || watchedHeld.viewingAccounts === 0, 'A held title is not streamed while it waits');
+    assert.ok(held(weekLater) && deskTitle(weekLater, toBuy.title.id)?.schedulable, 'A week later it still waits on the shelves');
+    const programmed = scheduleStreamingSlateTitle(weekLater, { projectId: toBuy.title.id, absoluteWeek: weekOf(weekLater) + 6, marketingPlan: 'STANDARD' });  // past the premium plan's early access
+    assert.ok(programmed.changed, `scheduled: ${programmed.reason}`);
+    assert.ok(!held(programmed.player), 'Once scheduled it is on the programme');
+    assert.equal(status(programmed.player, toBuy.title.id), 'SCHEDULED');
+    console.log(`PASS ${toBuy.title.title}, bought on the live service, waited on the shelves (not streamed, kept through a save) until the Slate scheduled it`);
+    const teamBuy = executeTitleLicense(market, { kind: 'TITLE_LICENSE', listingId: forTeam.id, price: forTeam.terms.minimumGuarantee } as Parameters<typeof executeTitleLicense>[1],
+        { absoluteWeek: weekOf(market), executiveName: 'Head of Content' });
+    assert.ok(teamBuy.changed, `team buy: ${teamBuy.reason}`);
+    const teamLicence = teamBuy.player.ownedStreamingPlatform.catalogLicenses.find(row => row.sourceProjectId === forTeam.title.id && row.status === 'ACTIVE');
+    assert.ok(teamLicence && !teamLicence.holdForSlate, 'The Head of Content\'s own buy is not held');
+    assert.ok(getOwnedStreamingProgramEntries(teamBuy.player).some(entry => entry.projectId === forTeam.title.id), 'and goes on the programme by itself');
+    console.log(`PASS ${forTeam.title.title}, bought by the Head of Content, went on the service by itself`);
     console.log(`done in ${Math.round((performance.now() - started) / 1000)} s`);
 }
 

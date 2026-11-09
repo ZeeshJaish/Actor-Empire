@@ -27,6 +27,7 @@ import {
 import {
     getStreamingCatalogLicenseStatus,
     resolveStreamingCatalogTitle,
+    streamingLicenceWaitsForSlate,
 } from './streamingCatalog';
 import { resolveOwnedStreamingReach } from './streamingProgression';
 
@@ -556,7 +557,8 @@ const buildOwnedStreamingProgramEntries = (player: Player, context: StreamingCat
     const laterLicensedEntries = launchAbsoluteWeek === null
         ? []
         : activeLicenses.flatMap((license): OwnedStreamingSlateEntry[] => {
-            if (license.origin === 'STARTER') return [];
+            /* a setup title, or one bought in the market since 2026-11-09, waits on the shelves for the Slate */
+            if (streamingLicenceWaitsForSlate(license)) return [];
             const projectType = license.projectType || 'MOVIE';
             return [{
                 id: createDeterministicId(

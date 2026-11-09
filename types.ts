@@ -5832,6 +5832,10 @@ export interface OwnedStreamingCatalogLicense {
     expiresAtAbsoluteWeek: number;
     status: StreamingCatalogLicenseStatus;
     origin?: 'STARTER' | 'STUDIO_MARKET' | 'PLATFORM_TRADE' | 'RENEWAL' | 'OWNED_STUDIO_TRANSFER' | 'CATALOGUE_ACQUISITION';
+    /** Bought in the Content Market or the Rights Exchange (Zeesh, 2026-11-09): it waits on the shelves, as a setup
+        (STARTER) title does, until the player schedules it on the Slate, instead of going on the service by itself
+        when its rights start. Older licences have no mark and keep going on by themselves. */
+    holdForSlate?: boolean;
     buyerPlatformId?: string | null;
     platformContentPlanId?: string | null;
     cataloguePackageId?: string | null;

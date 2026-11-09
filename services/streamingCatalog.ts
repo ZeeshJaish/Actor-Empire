@@ -771,6 +771,30 @@ export const acceptStreamingCatalogCounter = (
     };
 };
 
+/** A licence that waits on the shelves until the Slate schedules it: a setup (STARTER) title, or one bought in the
+    Content Market or the Rights Exchange (holdForSlate). Any other goes on the service by itself when its rights start. */
+export const streamingLicenceWaitsForSlate = (license: Pick<OwnedStreamingCatalogLicense, 'origin' | 'holdForSlate'>): boolean =>
+    license.origin === 'STARTER' || license.holdForSlate === true;
+
+/** Purchases the player's team makes on its own (the Head of Content's market buys) go on the service by themselves,
+    as they always did: only what the player buys waits for the Slate. Clears the hold on every licence `after` added. */
+export const releaseSlateHoldOnNewLicences = (before: Player, after: Player): Player => {
+    const known = new Set(before.ownedStreamingPlatform.catalogLicenses.map(license => license.id));
+    const licences = after.ownedStreamingPlatform.catalogLicenses;
+    if (!licences.some(license => license.holdForSlate && !known.has(license.id))) return after;
+    return {
+        ...after,
+        ownedStreamingPlatform: {
+            ...after.ownedStreamingPlatform,
+            catalogLicenses: licences.map(license => {
+                if (!license.holdForSlate || known.has(license.id)) return license;
+                const { holdForSlate: _released, ...rest } = license;
+                return rest;
+            }),
+        },
+    };
+};
+
 export const getStreamingCatalogLicenseStatus = (
     license: OwnedStreamingCatalogLicense,
     absoluteWeek: number,

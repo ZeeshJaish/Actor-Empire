@@ -3310,6 +3310,8 @@ const normalizeCatalogLicense = (value: unknown): OwnedStreamingCatalogLicense |
         expiresAtAbsoluteWeek,
         status: isOneOf(source.status, CATALOG_LICENSE_STATUSES, 'ACTIVE'),
         origin: isOneOf(source.origin, ['STARTER', 'STUDIO_MARKET', 'PLATFORM_TRADE', 'RENEWAL', 'OWNED_STUDIO_TRANSFER', 'CATALOGUE_ACQUISITION'] as const, 'STARTER'),
+        /* kept through every save and load: a market purchase that waits on the shelves for the Slate */
+        ...(source.holdForSlate === true ? { holdForSlate: true } : {}),
         buyerPlatformId: isOneOf(source.buyerPlatformId, PLATFORM_IDS, null),
         platformContentPlanId: cleanText(source.platformContentPlanId, '', 180) || null,
         cataloguePackageId: cleanText(source.cataloguePackageId, '', 180) || null,

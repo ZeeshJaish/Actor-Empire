@@ -31,7 +31,7 @@ import type {
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle } from './streamingCatalog';
+import { getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle, streamingLicenceWaitsForSlate } from './streamingCatalog';
 import { getOwnedStreamingProgramEntries, getStreamingSlateCandidates } from './streamingOriginals';
 import { ORIGINAL_LICENCE_WEEKS } from './originalsDeal';
 
@@ -95,16 +95,17 @@ const currentLicence = (player: Player, projectId: string, absoluteWeek: number)
         .sort((left, right) => right.startsAtAbsoluteWeek - left.startsAtAbsoluteWeek || left.id.localeCompare(right.id))[0] || null;
 };
 
-/* Has this title premiered? On the slate: its week has come. Off the slate: a
-   licence bought after setup goes on the service when its rights start (the
-   programme adds it by itself); a setup (STARTER) licence or a studio title
-   waits on the shelves until it is scheduled. */
+/* Has this title premiered? On the slate: its week has come. Off the slate: an
+   older licence bought after setup went on the service when its rights started
+   (the programme adds it by itself); a setup (STARTER) licence, one bought in the
+   market since 2026-11-09 (holdForSlate) or a studio title waits on the shelves
+   until it is scheduled. */
 const hasPremiered = (player: Player, projectId: string, source: OwnedStreamingSlateEntry['source'], now: number, launchAt: number) => {
     const entry = player.ownedStreamingPlatform.launchSlate?.entries.find(item => item.projectId === projectId);
     if (entry) return launchAt + entry.launchWeek - 1 <= now;
     if (source !== 'LICENSED_WINDOW') return false;
     const licence = currentLicence(player, projectId, now);
-    return Boolean(licence && licence.origin !== 'STARTER');
+    return Boolean(licence && !streamingLicenceWaitsForSlate(licence));
 };
 
 const withSlate = (player: Player, entries: OwnedStreamingSlateEntry[], now: number, ledgerKey: string, summary: string, metadata: Record<string, string | number>): Player => {
@@ -299,10 +300,11 @@ export const scheduleStreamingSlateTitle = (
     };
 };
 
-/** Where a title off the slate goes: a licence bought after setup still goes live when its rights start. */
+/** Where a title off the slate goes: an older licence bought after setup still goes live when its rights start;
+    a market purchase that waits for the Slate goes back to the shelves. */
 export const getStreamingSlateFallback = (player: Player, projectId: string): StreamingSlateFallback => (
     player.ownedStreamingPlatform.catalogLicenses.some(licence => licence.sourceProjectId === projectId
-        && licence.status === 'ACTIVE' && licence.origin !== 'STARTER') ? 'LICENCE_START' : 'SHELF'
+        && licence.status === 'ACTIVE' && !streamingLicenceWaitsForSlate(licence)) ? 'LICENCE_START' : 'SHELF'
 );
 
 /** Take a title that has not premiered yet off the slate: back to the shelves, or (a
@@ -410,7 +412,7 @@ export const planStreamingSlateAutoFill = (player: Player, options: { fresh?: bo
     getOwnedStreamingProgramEntries(player).forEach(entry => busy.add(launchAt + entry.launchWeek - 1));
     platform.originalCommissions.forEach(commission => { if (commission.releasePlan) busy.add(commission.releasePlan.premiereAtAbsoluteWeek); });
     platform.catalogLicenses.forEach(licence => {
-        if (licence.status === 'ACTIVE' && licence.origin !== 'STARTER' && licence.startsAtAbsoluteWeek > now) busy.add(licence.startsAtAbsoluteWeek);
+        if (licence.status === 'ACTIVE' && !streamingLicenceWaitsForSlate(licence) && licence.startsAtAbsoluteWeek > now) busy.add(licence.startsAtAbsoluteWeek);
     });
     const covered = (week: number) => busy.has(week) || busy.has(week + 1) || busy.has(week + 2);
     const distance = (week: number) => Math.min(Number.POSITIVE_INFINITY, ...[...busy].map(other => Math.abs(other - week)));

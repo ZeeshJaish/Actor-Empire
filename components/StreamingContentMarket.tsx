@@ -493,6 +493,7 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
         <ExactContentMarket
             brand={brand}
             ownsStudio={ownsStudio}
+            live={Boolean(platform.launchCommit)}
             state={{ treasury: platform.treasuryCash, committed: Math.max(0, platform.treasuryCash - funds), week: player.currentWeek, subs: platform.metrics.subscribers || 0 }}
             catalogue={exactLots}
             supplySummary={supplySummary || undefined}

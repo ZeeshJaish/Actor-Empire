@@ -18,7 +18,8 @@ import s from './presentation/screens/ContentDesk/ContentDesk.module.css';
 import { cx } from './presentation/cx';
 import { brandVars } from './presentation/brand';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ChevronRight, Film, LibraryBig, LockKeyhole, Sparkles, X } from 'lucide-react';
+import { Archive, ArrowDownUp, ChevronRight, Film, LibraryBig, LockKeyhole, Sparkles, X } from 'lucide-react';
+import { gameWeekLabel, gameWeekText } from '../../services/gameWeek';
 import { Brand, Mark, brandColor, brandDeep } from './StreamingBrandVisuals';
 import room from './presentation/screens/ContentDesk/ContentRoom.module.css';
 import {
@@ -29,6 +30,18 @@ import { LocalizationDesk, type LocalizationDeskActions } from './LocalizationDe
 import type { StreamingLocalizationDeskView } from '../../services/streamingLocalizationDesk';
 
 const LIST_PAGE = 10;
+
+/** $1.2B · $45M · $850K · $900 */
+const moneyShort = (value: number) => (value >= 1e9 ? `$${(value / 1e9).toFixed(1).replace(/\.0$/, '')}B`
+  : value >= 1e6 ? `$${(value / 1e6).toFixed(value >= 1e8 ? 0 : 1).replace(/\.0$/, '')}M`
+  : value >= 1e3 ? `$${Math.round(value / 1e3)}K` : `$${Math.round(value)}`);
+
+/** the year under a week in the purchase record: blank this year, then "last yr", "2 yrs ago" */
+const yearsAgo = (absoluteWeek: number, now?: number) => {
+  if (now === undefined) return '';
+  const years = Math.floor(now / 52) - Math.floor(absoluteWeek / 52);
+  return years <= 0 ? '' : years === 1 ? 'last yr' : `${years} yrs ago`;
+};
 import type { CustomPoster } from '../../types';
 import { RoomSubtitle } from './RoomSubtitle';
 
@@ -82,6 +95,25 @@ export interface CatalogueTitle {
   renewal?: RenewalCase;
   /** on the shelves but not on the service yet: the slate can give it a premiere week */
   schedulable?: boolean;
+  /** the absolute week it joined the catalogue: a licence's first signing (not a renewal), an Original's commission,
+      a studio title's link (Zeesh, 2026-11-09: the Library shows it and sorts by it) */
+  addedAt?: number;
+}
+
+/** One acquisition, for the Rights tab's week-by-week record of what was bought (Zeesh, 2026-11-09). */
+export interface ContentHistoryEntry {
+  id: string;
+  projectId: string;
+  title: string;
+  /** the absolute week it was signed, commissioned or linked */
+  at: number;
+  /** how it came in: Market, Collection, From a platform, Upcoming sale, Renewal, Original, Your studio, Opening catalogue */
+  how: string;
+  /** paid up front: a licence's guarantee or an Original's fee (0 for a studio title) */
+  paid: number;
+  /** a licence's length in weeks, or kept for good */
+  weeks?: number;
+  kept?: boolean;
 }
 
 export interface SlateRelease {
@@ -125,6 +157,10 @@ export interface ContentDeskState {
   autoFill?: Array<{ projectId: string; title: string; absoluteWeek: number; marketingPlan: 'LEAN' | 'STANDARD' | 'EVENT' }>;
   /** once live: the same, starting fresh (the planned premieres taken off first) */
   autoFillFresh?: Array<{ projectId: string; title: string; absoluteWeek: number; marketingPlan: 'LEAN' | 'STANDARD' | 'EVENT' }>;
+  /** the absolute week now, for "added week 14 last year" */
+  now?: number;
+  /** everything bought, newest first */
+  history?: ContentHistoryEntry[];
 }
 
 export type ContentEntryRouteId = 'LICENSE' | 'ORIGINAL' | 'OWNED' | 'CATALOGUE';
@@ -224,6 +260,9 @@ export const ContentDesk: React.FC<{
   /* a console chip can open this page straight on the tab it names */
   const [tab, setTab] = useState<Tab>(initialTab ?? 'LIBRARY');
   const [filter, setFilter] = useState<'ALL' | 'ORIGINAL' | 'LICENSED' | 'OWNED' | 'EXPIRING'>('ALL');
+  /* Zeesh, 2026-11-09: the Library in the order titles joined it, newest first unless turned round */
+  const [librarySort, setLibrarySort] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
+  const [historyLimit, setHistoryLimit] = useState(12);
   // Keep the approved cards intact while bounding poster/SVG work for large libraries.
   const [listPages, setListPages] = useState<Record<string, number>>({});
   useEffect(() => { setListPages(current => ({ ...current, library: 0 })); }, [filter]);
@@ -278,11 +317,17 @@ export const ContentDesk: React.FC<{
   const planning = state.calendar === 'WEEKS' && state.live && state.scheduleFrom !== undefined;
   const byViews = useMemo(() => [...state.titles].sort((a, b) => (b.views ?? -1) - (a.views ?? -1)), [state.titles]);
   const titleById = useMemo(() => new Map(state.titles.map(t => [t.id, t])), [state.titles]);
+  const history = state.history ?? [];
 
   const shown = useMemo(() => state.titles.filter(t =>
     filter === 'ALL' ? true
       : filter === 'EXPIRING' ? t.rights?.endsInWeeks !== undefined && t.rights.endsInWeeks <= 6
-        : t.kind === filter), [state.titles, filter]);
+        : t.kind === filter)
+    /* a title with no known week (an old save's trimmed record) goes to the end either way */
+    .sort((a, b) => {
+      if (a.addedAt === undefined || b.addedAt === undefined) return (a.addedAt === undefined ? 1 : 0) - (b.addedAt === undefined ? 1 : 0);
+      return librarySort === 'NEWEST' ? b.addedAt - a.addedAt : a.addedAt - b.addedAt;
+    }), [state.titles, filter, librarySort]);
 
   const counts = {
     titles: state.titles.length,
@@ -374,7 +419,16 @@ export const ContentDesk: React.FC<{
                 </div>
               ) : shown.length === 0 ? <div className={s.empty}>Nothing matches that filter.</div> : null}
 
-              {shown.length > LIST_PAGE && <small className={room.listCount}>Showing {Math.min(listLimit, shown.length)} of {shown.length}</small>}
+              {/* the count on the left, the order (newest or oldest first) on the right: always in sight, not at the end of the scrolling chips */}
+              {shown.length > 0 && (
+                <div className={s.listbar}>
+                  <small className={room.listCount}>{shown.length > LIST_PAGE ? `Showing ${Math.min(listLimit, shown.length)} of ${shown.length}` : `${shown.length} title${shown.length === 1 ? '' : 's'}`}</small>
+                  <button type="button" className={s.sortchip} aria-label={`Sorted ${librarySort === 'NEWEST' ? 'newest first' : 'oldest first'}. Change the order`}
+                    onClick={() => { setLibrarySort(order => (order === 'NEWEST' ? 'OLDEST' : 'NEWEST')); setListLimit(LIST_PAGE); }}>
+                    <ArrowDownUp size={11} aria-hidden="true" />{librarySort === 'NEWEST' ? 'Newest first' : 'Oldest first'}
+                  </button>
+                </div>
+              )}
               {shown.slice(0, listLimit).map(t => (
                 <button className={s.trow} key={t.id} onClick={() => onOpenTitle?.(t)}>
                   <span className={cx(s.tposter, room.thumb, formatTone(t))}><TitleArt title={t} size="xs" /></span>
@@ -382,6 +436,7 @@ export const ContentDesk: React.FC<{
                     <b>{t.title}</b>
                     <span className={cx(s.tmeta, room.metaLine)}>
                       <SourceBadge kind={t.kind} />{t.format} · {genreLabel(t.genre)}
+                      {t.addedAt !== undefined && <span className={s.tadded}>added {gameWeekText(t.addedAt, state.now)}</span>}
                     </span>
                     <div className={s.tpills}>
                       <i className={cx(s.pill, statusClass(t.status))}>{t.status}</i>
@@ -474,6 +529,33 @@ export const ContentDesk: React.FC<{
                 ))}
                 {pagination('lapsed', lapsed.length)}
                 {onAddContent && <button type="button" className={room.link} onClick={openContent}>Look for new windows in the Content Market →</button>}
+              </section>
+            )}
+
+            {/* Zeesh, 2026-11-09: what was bought, in which week, and how */}
+            {history.length > 0 && (
+              <section className={s.cdsec}>
+                <div className={s.cdhead}><h2>Bought, week by week</h2><span>{history.length} deal{history.length === 1 ? '' : 's'} · newest first</span></div>
+                {history.slice(0, historyLimit).map(entry => {
+                  const title = titleById.get(entry.projectId);
+                  return (
+                    <button type="button" className={s.trow} key={entry.id} onClick={() => title && onOpenTitle?.(title)} disabled={!title}>
+                      <span className={s.hweek}><b>{gameWeekLabel(entry.at).replace(/^Week /, 'W')}</b><i>{yearsAgo(entry.at, state.now)}</i></span>
+                      <div className={s.tinfo}>
+                        <b>{entry.title}</b>
+                        <span className={s.tmeta}>{entry.how}{entry.kept ? ' · kept for good' : entry.weeks ? ` · ${entry.weeks} weeks` : ''}</span>
+                      </div>
+                      <div className={s.tnums}>
+                        <b>{entry.paid > 0 ? moneyShort(entry.paid) : '—'}</b><span>{entry.paid > 0 ? 'PAID' : 'NO FEE'}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+                {history.length > historyLimit && (
+                  <button type="button" className={room.more} onClick={() => setHistoryLimit(limit => limit + 12)}>
+                    Load more <small>{Math.min(12, history.length - historyLimit)} of {history.length - historyLimit} left</small>
+                  </button>
+                )}
               </section>
             )}
           </>

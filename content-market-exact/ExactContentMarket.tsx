@@ -1255,7 +1255,9 @@ export const ContentMarket: React.FC<{
   initialLotId?: string | null;
   /** Distinguishes "no production house" from "a studio with nothing released". */
   ownsStudio?: boolean;
-}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, onAcquired, onBroughtAcross, onPrepareOffer, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, feedback, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
+  /** the service is live: what is bought now waits on the Slate for its premiere week (Zeesh, 2026-11-09) */
+  live?: boolean;
+}> = ({ brand, state, supplySummary, catalogue, onBack, onCommission, ownsStudio, live, onAcquired, onBroughtAcross, onPrepareOffer, onOfferSent, onEnterRoom, onFollow, offerCount = 0, onOpenOffers, feedback, onNavigation, initialQuery = '', onQueryChange, searchLibrary, libraryOptions, firstLook, paidScout, initialScene = 'GATE', initialLotId = null }) => {
   const c = brandColor(brand);
   const [scene, setScene] = useState<MarketScene>(initialScene);
   const [back, setBack] = useState<MarketScene>(initialScene === 'STUDIO' ? 'STUDIO' : 'MARKET');
@@ -1394,6 +1396,7 @@ export const ContentMarket: React.FC<{
           {flash.kind === 'SIGNED' && (
             <p className={css.mksignnote}>{flash.lot?.sourceKind === 'STUDIO'
               ? 'Your title is linked to the catalogue in its eligible streaming markets.'
+              : live ? 'The contract is registered. It waits on the Slate: give it a premiere week there.'
               : 'The contract is registered and it is in your catalogue.'}</p>
           )}
           </div>

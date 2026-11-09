@@ -392,7 +392,9 @@ export const purchaseContentMarketListing = (player: Player, id: string, signatu
             ? { ...n, status: 'READY_TO_SIGN' as const } : n) } };
     const signed = signStreamingRightsDeal(prepared, opened.negotiation.id);
     if (!signed.changed) return fail(signed.detail || 'The agreement could not be completed. No money was charged.');
-    return { player: establishContentMarketCatalogue(signed.player), changed: true, detail: `${listing.title.title} added to your catalogue.` };
+    /* once the service is live a purchase waits on the Slate for its premiere week */
+    return { player: establishContentMarketCatalogue(signed.player), changed: true, detail: player.ownedStreamingPlatform.launchCommit
+        ? `${listing.title.title} is on your shelves. Give it a premiere week on the Slate.` : `${listing.title.title} added to your catalogue.` };
 };
 
 export const purchaseContentMarketCollection = (player: Player, id: string, signature: string) => {
@@ -406,5 +408,6 @@ export const purchaseContentMarketCollection = (player: Player, id: string, sign
     if (getContentMarketFunds(player) < listing.totalGuarantee) return fail('Available funds cannot cover this collection. Open Studio Finance.');
     const result = signOwnedStreamingCataloguePackage(player, id);
     if (!result.changed) return fail(result.detail || (result.reason === 'INSUFFICIENT_ENERGY' ? 'Not enough energy to sign this collection.' : 'The collection could not be purchased. No money was charged.'));
-    return { player: establishContentMarketCatalogue(result.player), changed: true, detail: `${listing.package.name} added to your catalogue.` };
+    return { player: establishContentMarketCatalogue(result.player), changed: true, detail: player.ownedStreamingPlatform.launchCommit
+        ? `${listing.package.name} is on your shelves. Give its titles premiere weeks on the Slate.` : `${listing.package.name} added to your catalogue.` };
 };
