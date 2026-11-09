@@ -138,7 +138,7 @@ export const DevelopmentLab: React.FC<DevelopmentLabProps> = ({ player, studio, 
         <div className="fixed inset-0 z-[70] bg-[#050505] text-white flex flex-col font-sans animate-in fade-in duration-300">
             {/* Header */}
             <div className="relative shrink-0 z-20 bg-zinc-950 border-b border-zinc-800">
-                <div className="flex items-center justify-between px-4 pt-12 pb-4">
+                <div className="flex items-center justify-between px-4 pt-[max(3rem,calc(env(safe-area-inset-top)+10px))] pb-4">
                     <div className="flex items-center gap-3">
                         <button onClick={onBack} className="grid h-11 w-11 shrink-0 place-items-center hover:bg-zinc-800/50 rounded-full text-zinc-400 hover:text-white transition-colors" aria-label="Back to studio dashboard">
                             <ArrowLeft size={20} />

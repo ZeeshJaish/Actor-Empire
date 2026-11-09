@@ -4,7 +4,7 @@
 @keyframes epx-dosin{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 .dos :where(*){margin:0;padding:0;box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
 .dos :where(button){font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;text-align:inherit}
-.dos .dosx{position:fixed;top:max(14px,env(safe-area-inset-top));right:14px;z-index:90;width:38px;height:38px;
+.dos .dosx{position:fixed;top:max(14px,calc(10px + env(safe-area-inset-top)));right:14px;z-index:90;width:38px;height:38px;
   border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:15px;
   display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
 .dos .dosscroll{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -12,10 +12,10 @@
 .dos .dosfoot{height:40px}
 
 /* header */
-.dos .doshead{position:relative;padding:max(16px,env(safe-area-inset-top)) 16px 20px;min-height:270px;
+.dos .doshead{position:relative;padding:max(16px,calc(10px + env(safe-area-inset-top))) 16px 20px;min-height:270px;
   display:flex;flex-direction:column;justify-content:flex-end;
   background:linear-gradient(165deg,hsl(var(--epx-dos-h) 55% 26%),hsl(var(--epx-dos-h) 50% 10%) 62%,#07080c)}
-.dos .dospills{position:absolute;top:max(16px,env(safe-area-inset-top));left:16px;right:64px;
+.dos .dospills{position:absolute;top:max(16px,calc(10px + env(safe-area-inset-top)));left:16px;right:64px;
   display:flex;flex-wrap:wrap;gap:6px}
 .dos .dp{font-size:8px;font-weight:900;letter-spacing:.14em;padding:6px 10px;border-radius:99px;
   background:rgba(6,8,12,.6);color:#dfe4ee;border:1px solid rgba(255,255,255,.16)}

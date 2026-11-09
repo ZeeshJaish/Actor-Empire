@@ -523,7 +523,7 @@
 .oc :where(button) { border: 0; color: inherit; background: none; font: inherit; cursor: pointer; }
 .octop {
   min-height: 62px;
-  padding: max(14px, env(safe-area-inset-top)) 14px 12px;
+  padding: max(14px, calc(10px + env(safe-area-inset-top))) 14px 12px;
   display: flex;
   align-items: center;
   gap: 11px;

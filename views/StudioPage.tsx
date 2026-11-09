@@ -80,7 +80,7 @@ export const StudioPage: React.FC<StudioPageProps> = ({ player, studioId, onUpda
     const attemptsLeft = 3 - currentAttempts;
 
     return (
-        <div className="fixed inset-0 z-[60] flex min-h-[100dvh] flex-col overflow-hidden bg-[#050505] px-5 pt-[max(1.5rem,env(safe-area-inset-top))] text-white animate-in fade-in duration-500">
+        <div className="fixed inset-0 z-[60] flex min-h-[100dvh] flex-col overflow-hidden bg-[#050505] px-5 pt-[max(1.5rem,calc(10px+env(safe-area-inset-top)))] text-white animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex items-center justify-between gap-3 mb-6">
                 <div className="min-w-0">

@@ -254,7 +254,7 @@ export const BankApp: React.FC<BankAppProps> = ({ player, onBack, onUpdatePlayer
           </div>
         </div>
 
-        <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/10 blur-3xl" /></div>
         <div className="absolute bottom-0 right-20 h-32 w-32 rounded-full bg-blue-400/20 blur-2xl" />
       </div>
 

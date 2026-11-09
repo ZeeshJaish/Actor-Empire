@@ -481,8 +481,8 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
         </div>
       </div>
       {showPortraitBuilder && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md max-h-[100dvh] overflow-x-hidden overflow-y-auto rounded-t-[2rem] sm:rounded-[2rem] border border-zinc-800 bg-black p-5 custom-scrollbar">
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-end sm:items-center justify-center p-0 pt-[calc(env(safe-area-inset-top)+10px)] sm:p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md max-h-full overflow-x-hidden overflow-y-auto rounded-t-[2rem] sm:rounded-[2rem] border border-zinc-800 bg-black p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] custom-scrollbar">
             <button
               type="button"
               onClick={() => setShowPortraitBuilder(false)}

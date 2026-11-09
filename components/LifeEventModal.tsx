@@ -316,7 +316,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         };
 
         return (
-            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4">
                 <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
                     <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">{tr('life.modal.invalid.eyebrow')}</div>
                     <h3 className="text-2xl font-black text-white leading-tight mb-3">{tr('life.modal.invalid.title')}</h3>
@@ -343,14 +343,15 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         const fallbackSignals = structuredEffects.length > 0 ? [] : extractOutcomeSignals(feedback.log);
 
         return (
-            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4">
                 <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="w-full max-w-sm max-h-[calc(100dvh-1.5rem)] bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col"
+                    className="w-full max-w-sm max-h-full bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl relative overflow-hidden flex flex-col"
                 >
                     <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${accentGradient}`} />
-                    <div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-white/5 blur-3xl"></div>
+                    {/* the glow reaches past the card: it is clipped in its own box, so the card has nothing to slide sideways */}
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute -right-10 -top-10 w-36 h-36 rounded-full bg-white/5 blur-3xl"></div></div>
 
                     <div className="overflow-y-auto custom-scrollbar p-5 pb-4 text-left">
                         <div className="flex items-start gap-4 mb-5">
@@ -398,7 +399,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                         )}
                     </div>
 
-                    <div className="shrink-0 border-t border-white/10 bg-zinc-950/95 p-4 pb-safe">
+                    <div className="shrink-0 border-t border-white/10 bg-zinc-950/95 p-4">
                         {resolveError && (
                             <div className="mb-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-200">
                                 {resolveError}
@@ -419,12 +420,12 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     }
 
     return (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className={`w-full max-w-md max-h-[calc(100dvh-1.5rem)] bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(255,255,255,0.05)] relative flex flex-col`}
+                className={`w-full max-w-md max-h-full bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(255,255,255,0.05)] relative flex flex-col`}
             >
                 {isProcessingAd && (
                     <div className="absolute inset-0 z-[210] bg-black/90 flex flex-col items-center justify-center p-6 text-center">

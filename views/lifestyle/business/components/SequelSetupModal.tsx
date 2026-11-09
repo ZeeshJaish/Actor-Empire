@@ -69,7 +69,7 @@ export const SequelSetupModal: React.FC<SequelSetupModalProps> = ({ project, pla
 
     if (step === 'CONFIRM') {
         return (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))]">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md overflow-hidden flex flex-col items-center text-center p-8 animate-in zoom-in-95 duration-300">
                     <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mb-6 border border-blue-500/50">
                         <PenTool className="w-8 h-8 text-blue-400" />
@@ -92,8 +92,8 @@ export const SequelSetupModal: React.FC<SequelSetupModalProps> = ({ project, pla
     }
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))]">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[min(90vh,100%)]">
                 <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
                     <div>
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2">

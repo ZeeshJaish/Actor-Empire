@@ -559,8 +559,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
             exit={{ opacity: 0, x: -24 }}
             className="fixed inset-0 z-[70] flex flex-col bg-[#050505] text-white"
         >
-            <header className="relative shrink-0 overflow-hidden border-b border-[#29251f] bg-[#0c0a08] px-4 pb-5 pt-12">
-                <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
+            <header className="relative shrink-0 overflow-hidden border-b border-[#29251f] bg-[#0c0a08] px-4 pb-5 pt-[max(3rem,calc(env(safe-area-inset-top)+10px))]">
+                <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" /></div>
                 <div className="relative flex items-start gap-3">
                     <button
                         type="button"

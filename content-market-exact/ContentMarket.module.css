@@ -1,5 +1,6 @@
-.mkwrap{position:absolute;inset:0;overflow:hidden}
-.mkwrap .mkprocessing,.mkwrap .mkfeedback{position:absolute;z-index:120;left:50%;top:18px;transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 14px;border-radius:12px;background:#1b2324;color:#f0f5f2;border:1px solid #52635c;font-size:12px;font-weight:700;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+/* the page colour behind the status bar on the title page, whose scroller starts under the status bar (.mkdetail) */
+.mkwrap{position:absolute;inset:0;overflow:hidden;background:#07080b}
+.mkwrap .mkprocessing,.mkwrap .mkfeedback{position:absolute;z-index:120;left:50%;top:max(18px,calc(10px + env(safe-area-inset-top)));transform:translateX(-50%);max-width:calc(100% - 32px);padding:10px 14px;border-radius:12px;background:#1b2324;color:#f0f5f2;border:1px solid #52635c;font-size:12px;font-weight:700;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.45)}
 .mkwrap .mkprocessing{pointer-events:all;min-width:180px}
 .mkwrap .mkprocessingbackdrop{position:fixed;inset:0;z-index:140;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.84)}
 .mkwrap .mkprocessingbackdrop .mkprocessing{position:relative;inset:auto;transform:none;max-width:min(320px,100%);margin:0;padding:20px 24px;font-size:14px;line-height:1.5}
@@ -14,7 +15,8 @@
 .mkwrap .mkglow{position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(110% 46% at 50% -6%,rgba(255,190,110,.13),transparent 62%)}
 
-.mkwrap .mktop{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:12px;margin:0 -14px;padding:16px 14px 12px;
+/* the header fills the status-bar band with its own background, so its arrow and title start 10px under the clock and nothing scrolls up behind the clock */
+.mkwrap .mktop{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:12px;margin:0 -14px;padding:max(16px,calc(10px + env(safe-area-inset-top))) 14px 12px;
   background:radial-gradient(110% 46% at 50% -6%,rgba(255,190,110,.13),transparent 62%) fixed,#07080b}
 .mkwrap .mkback{width:44px;height:44px;flex-shrink:0;border-radius:11px;font-size:15px;color:#eceef3;
   background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11)}
@@ -154,7 +156,9 @@
    boxes. The poster is now PRESENTED — framed, lit, sitting in a pool of its
    own colour — and the page is tinted by the title's hue so that no two titles
    feel like the same screen. */
-.mkwrap .mkdetail{padding:0 0 108px}
+/* the title page has no header bar: its scroller starts under the status bar, so the poster and text never scroll up behind the clock,
+   and the band above shows the page's own colour and bloom (.mkwrap, .mkbloom). The arrow and the poster keep their places under it. */
+.mkwrap .mkdetail{top:env(safe-area-inset-top);padding:0 0 108px}
 .mkwrap .mkbloom{position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
     radial-gradient(78% 42% at 50% 6%,hsl(var(--epx-mkwrap-dh) 76% 46% / .42),transparent 70%),
@@ -163,7 +167,7 @@
   animation:epx-mkbloom 1s ease both}
 @keyframes epx-mkbloom{from{opacity:0}to{opacity:1}}
 .mkwrap .mkhero{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
-  padding:52px 20px 26px}
+  padding:max(46px,calc(52px - env(safe-area-inset-top))) 20px 26px}
 /* NOT .mkframe — the Gate already owns that for its dashed empty-frame icon,
    and this poster inherited its height:84px and dashed border. */
 .mkwrap .mkoneframe{width:62%;max-width:250px;border-radius:10px;overflow:hidden;
@@ -172,7 +176,7 @@
     0 42px 70px -26px rgba(0,0,0,.92),
     0 24px 90px -34px hsl(var(--epx-mkwrap-dh) 80% 52% / .75)}
 @keyframes epx-mkrise{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
-.mkwrap .mkfloat{position:sticky;top:16px;z-index:6;display:block;margin:16px 0 -60px 14px;
+.mkwrap .mkfloat{position:sticky;top:max(10px,calc(16px - env(safe-area-inset-top)));z-index:6;display:block;margin:max(10px,calc(16px - env(safe-area-inset-top))) 0 -60px 14px;
   background:rgba(12,14,20,.55);backdrop-filter:blur(10px)}
 .mkwrap .mkbody{position:relative;z-index:2;padding:0 18px;
   animation:epx-mkbodyup .7s .1s cubic-bezier(.16,.84,.3,1) both}
@@ -329,7 +333,7 @@
 .mkwrap .mkroom{background:#050506;padding-bottom:40px}
 .mkwrap .mkspot{position:fixed;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(60% 32% at 50% 2%,hsl(var(--epx-mkwrap-dh) 80% 52% / .22),transparent 70%)}
-.mkwrap .mkroomtop{position:relative;z-index:1;display:flex;align-items:center;gap:11px;padding:14px 0 10px}
+.mkwrap .mkroomtop{position:relative;z-index:1;display:flex;align-items:center;gap:11px;padding:max(14px,calc(10px + env(safe-area-inset-top))) 0 10px}
 .mkwrap .mkroomlot{display:flex;align-items:center;gap:9px;min-width:0;flex:1}
 .mkwrap .mkposterchip{width:30px;flex-shrink:0;display:block}
 .mkwrap .mkroomlot b{display:block;font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;
@@ -935,7 +939,7 @@
 .mkwrap .mkbidfeedback{margin:0 0 8px;color:#ececf4;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
 
 /* Cinematic terminal outcomes: one arrival, a static title/winner bloom, compact terms. */
-.mkwrap .mkauctionresult{overflow-y:auto;justify-content:flex-start;padding:max(32px,env(safe-area-inset-top)) 24px max(32px,env(safe-area-inset-bottom));animation:none;background:radial-gradient(ellipse at 50% 33%,color-mix(in srgb,var(--epx-result-tint,#8d7bff) 17%,transparent),transparent 65%),#080a10}
+.mkwrap .mkauctionresult{overflow-y:auto;justify-content:flex-start;padding:max(32px,calc(10px + env(safe-area-inset-top))) 24px max(32px,env(safe-area-inset-bottom));animation:none;background:radial-gradient(ellipse at 50% 33%,color-mix(in srgb,var(--epx-result-tint,#8d7bff) 17%,transparent),transparent 65%),#080a10}
 .mkwrap .mkresultbody{width:100%;max-width:540px;margin:auto;flex:none;text-align:center;animation:mkresultarrival .38s ease-out both}
 .mkwrap .mkresultidentity{display:flex;flex-direction:column;align-items:center;gap:24px}
 .mkwrap .mkresultposter{width:112px;filter:none;box-shadow:0 18px 38px rgba(0,0,0,.35)}

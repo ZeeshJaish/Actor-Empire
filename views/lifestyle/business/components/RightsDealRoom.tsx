@@ -130,7 +130,7 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
 
     return (
         <motion.div
-            className="fixed inset-0 z-[150] flex items-end justify-center bg-black/90 backdrop-blur-md md:items-center md:p-6"
+            className="fixed inset-0 z-[150] flex items-end justify-center bg-black/90 pt-[calc(env(safe-area-inset-top)+10px)] backdrop-blur-md md:items-center md:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -146,7 +146,7 @@ export const RightsDealRoom: React.FC<RightsDealRoomProps> = ({
                 animate={{ y: 0, opacity: 1, scale: 1 }}
                 exit={reduceMotion ? { opacity: 0 } : { y: 28, opacity: 0 }}
                 onClick={event => event.stopPropagation()}
-                className={`flex max-h-[96dvh] w-full max-w-2xl flex-col overflow-hidden bg-[#090909] text-white shadow-[0_30px_100px_rgba(0,0,0,0.75)] md:max-h-[90dvh] ${
+                className={`flex max-h-[min(96dvh,100%)] w-full max-w-2xl flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] md:pb-0 bg-[#090909] text-white shadow-[0_30px_100px_rgba(0,0,0,0.75)] md:max-h-[90dvh] ${
                     negotiation?.status === 'ACCEPTED' || negotiation?.status === 'READY_TO_SIGN' || negotiation?.status === 'SIGNED'
                         ? 'border-2 border-emerald-400 shadow-[0_30px_100px_rgba(0,0,0,0.75),0_0_36px_rgba(52,211,153,0.18)]'
                         : 'border border-amber-400/30'

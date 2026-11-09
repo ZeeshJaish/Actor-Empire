@@ -1118,7 +1118,7 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
 
                                 return (
                                     <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950 text-white">
-                                        <div className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/95 p-4 shadow-2xl shadow-black/30 backdrop-blur">
+                                        <div className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/95 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] shadow-2xl shadow-black/30 backdrop-blur">
                                             <div className="mx-auto flex w-full max-w-5xl items-center gap-3">
                                                 <button
                                                     onClick={() => setOutsideInvestmentReview(false)}

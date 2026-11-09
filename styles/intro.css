@@ -28,19 +28,23 @@
     position:fixed;inset:0;
     background:var(--black);
     overflow:hidden;
+    /* clip, where the browser has it: a stage that cannot be scrolled, not even by a focused input */
+    overflow:clip;
   }
 
   /* ---------- shared atmosphere ---------- */
+  /* the grain stays inside the screen and moves its texture, not its box: a box 50% larger than the screen gave the stage
+     hidden width, and focusing the name field on a phone could slide the whole intro sideways */
   .grain{
-    position:absolute;inset:-50%;
+    position:absolute;inset:0;
     pointer-events:none;z-index:60;
     opacity:.05;
     background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     animation:grainShift 0.9s steps(4) infinite;
   }
   @keyframes grainShift{
-    0%{transform:translate(0,0)}25%{transform:translate(-2%,1.5%)}
-    50%{transform:translate(1.5%,-2%)}75%{transform:translate(-1%,-1%)}100%{transform:translate(0,0)}
+    0%{background-position:0 0}25%{background-position:-9px 7px}
+    50%{background-position:7px -9px}75%{background-position:-4px -4px}100%{background-position:0 0}
   }
   .vignette{
     position:absolute;inset:0;pointer-events:none;z-index:55;
@@ -450,7 +454,8 @@
   }
   .menu-head{
     width:100%;
-    padding:56px 28px 0;
+    /* clear of the status bar, the notch and the Dynamic Island */
+    padding:max(56px,calc(18px + env(safe-area-inset-top))) 28px 0;
     display:flex;align-items:center;gap:16px;
   }
   .menu-logo{
@@ -635,7 +640,7 @@
   #act5{overflow-y:auto;display:block}
   .create-wrap{
     max-width:440px;margin:0 auto;
-    padding:56px 24px calc(40px + env(safe-area-inset-bottom));
+    padding:max(56px,calc(18px + env(safe-area-inset-top))) 24px calc(40px + env(safe-area-inset-bottom));
     display:flex;flex-direction:column;gap:18px;
   }
   .create-head{display:flex;align-items:center;gap:16px}

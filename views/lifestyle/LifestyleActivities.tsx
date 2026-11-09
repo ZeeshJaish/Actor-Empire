@@ -1012,7 +1012,7 @@ const AdoptionNameModal: React.FC<{
         { value: 'Heir', labelKey: 'activities.adoptionNameModal.familyTitle.Heir' },
     ];
     return (
-        <div className="fixed inset-0 z-[80] grid place-items-end bg-black/75 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[80] grid place-items-end bg-black/75 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
             <div className="w-full overflow-hidden rounded-[2rem] border border-rose-200/25 bg-zinc-950 shadow-[0_25px_90px_rgba(0,0,0,0.55)]">
                 <div className="bg-[linear-gradient(135deg,rgba(244,114,182,0.22),rgba(251,191,36,0.12),rgba(9,9,11,0.95))] p-5">
                     <div className="flex items-center gap-4">
@@ -1319,7 +1319,7 @@ const PetNameModal: React.FC<{
     if (!pending) return null;
     const language = getPlayerLanguage(pending.player);
     return (
-        <div className="fixed inset-0 z-[80] grid place-items-end bg-black/75 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[80] grid place-items-end bg-black/75 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
             <div className="w-full overflow-hidden rounded-[2rem] border border-lime-200/25 bg-zinc-950 shadow-[0_25px_90px_rgba(0,0,0,0.55)]">
                 <div className="bg-[linear-gradient(135deg,rgba(132,204,22,0.22),rgba(45,212,191,0.12),rgba(9,9,11,0.95))] p-5">
                     <div className="flex items-center gap-4">
@@ -1375,7 +1375,7 @@ const ActivityResultModal: React.FC<{
     if (!result) return null;
     const language = getPlayerLanguage(result.playerAfter);
     return (
-        <div className="fixed inset-0 z-[85] grid place-items-end bg-black/75 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[85] grid place-items-end bg-black/75 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
             <div className="w-full overflow-hidden rounded-[2rem] border border-emerald-200/25 bg-zinc-950 shadow-[0_25px_90px_rgba(0,0,0,0.55)]">
                 <div className="bg-[linear-gradient(135deg,rgba(16,185,129,0.22),rgba(250,204,21,0.12),rgba(9,9,11,0.96))] p-5">
                     <div className="flex items-start justify-between gap-4">
@@ -2251,7 +2251,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
             {isBuilderOpen && (
                 <div className="fixed inset-0 z-[120] bg-black">
                     <div className="mx-auto flex h-full max-w-md flex-col bg-zinc-950">
-                        <div className="shrink-0 border-b border-zinc-800 bg-zinc-950/95 px-5 pb-4 pt-12">
+                        <div className="shrink-0 border-b border-zinc-800 bg-zinc-950/95 px-5 pb-4 pt-[max(3rem,calc(env(safe-area-inset-top)+10px))]">
                             <div className="flex items-center gap-4">
                                 <button onClick={handleBuilderBack} className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-zinc-800 bg-black text-white">
                                     <ArrowLeft size={24} />
@@ -2660,7 +2660,7 @@ export const LifestyleActivities: React.FC<LifestyleActivitiesProps> = ({ player
                             </div>
                         </div>
 
-                        <div className="shrink-0 border-t border-zinc-800 bg-zinc-950/95 p-5 pb-8">
+                        <div className="shrink-0 border-t border-zinc-800 bg-zinc-950/95 p-5 pb-[max(2rem,calc(env(safe-area-inset-bottom)+14px))]">
                             <button
                                 onClick={handleBuilderPrimaryAction}
                                 disabled={builderPrimaryDisabled}

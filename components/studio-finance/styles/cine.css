@@ -41,7 +41,7 @@
 .cine-rail {
   position: absolute; left: 0; right: 0; top: 0; z-index: 4;
   display: flex; gap: 4px;
-  padding: max(14px, env(safe-area-inset-top)) var(--sf-4) 0;
+  padding: max(14px, calc(10px + env(safe-area-inset-top))) var(--sf-4) 0;
 }
 .cine-rail i {
   flex: 1; height: 2px; border-radius: 2px;

@@ -43,12 +43,12 @@ export const StreamingDecisionEventModal: React.FC<Props> = ({ player, event, on
     };
 
     return (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className={`w-full max-w-md max-h-[calc(100dvh-1.5rem)] bg-[#0a0a0a] rounded-3xl overflow-hidden border ${view.urgent ? 'border-rose-900/50' : 'border-amber-900/50'} flex flex-col relative`}
+                className={`w-full max-w-md max-h-full bg-[#0a0a0a] rounded-3xl overflow-hidden border ${view.urgent ? 'border-rose-900/50' : 'border-amber-900/50'} flex flex-col relative`}
             >
                 <div className={`h-2 w-full shrink-0 bg-gradient-to-r ${view.urgent ? 'from-rose-600 to-red-500' : 'from-amber-500 to-orange-500'}`} />
                 <div className="p-5 pb-4 border-b border-white/5 shrink-0">

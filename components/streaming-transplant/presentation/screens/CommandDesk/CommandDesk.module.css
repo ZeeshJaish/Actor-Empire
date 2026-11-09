@@ -50,7 +50,7 @@
 .hq .chipLock{display:inline-block;width:10px;height:10px;margin:-1px 4px 0 0;vertical-align:middle;opacity:.8}
 
 /* ── header ── */
-.hq .hqhead{position:relative;padding:max(16px,env(safe-area-inset-top)) 16px 14px;
+.hq .hqhead{position:relative;padding:max(16px,calc(10px + env(safe-area-inset-top))) 16px 14px;
   background:
     radial-gradient(ellipse 80% 60% at 50% -8%,color-mix(in srgb,var(--epx-hq-c) 20%,transparent),transparent 70%),
     linear-gradient(#0a0c11,#070810)}

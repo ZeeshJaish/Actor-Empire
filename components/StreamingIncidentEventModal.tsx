@@ -64,7 +64,7 @@ export const StreamingIncidentEventModal: React.FC<Props> = ({ player, event, on
     /* gone, or settled elsewhere: say so and close */
     if (!data || !view || !incident || !view.open) {
         return (
-            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+            <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4">
                 <div className="w-full max-w-md bg-[#0a0a0a] rounded-3xl border border-white/10 p-5 text-left">
                     <div className="text-[10px] font-mono uppercase tracking-widest font-bold text-zinc-500 mb-2">Incident</div>
                     <h2 className="text-lg font-black text-white leading-tight mb-2">{incident?.title || event.title}</h2>
@@ -79,12 +79,12 @@ export const StreamingIncidentEventModal: React.FC<Props> = ({ player, event, on
     const options = incident.repairs || [];
     const energyOption = options.find(option => option.path === 'ENERGY');
     return (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-4">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className={`w-full max-w-md max-h-[calc(100dvh-1.5rem)] bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${accent}-900/50 shadow-[0_0_50px_rgba(255,255,255,0.05)] relative flex flex-col`}
+                className={`w-full max-w-md max-h-full bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${accent}-900/50 shadow-[0_0_50px_rgba(255,255,255,0.05)] relative flex flex-col`}
             >
                 {busy && (
                     <div className="absolute inset-0 z-[210] bg-black/90 flex flex-col items-center justify-center p-6 text-center">

@@ -62,13 +62,13 @@ export const OriginalIssueModal: React.FC<Props> = ({ player, event, onResolve }
     const { issue } = view;
     const Icon = KIND_ICON[issue.kind];
     return (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))]">
             <motion.div
                 data-original-issue={issue.kind}
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] min-h-0 flex flex-col bg-[#0a0a0a] rounded-3xl overflow-hidden border border-rose-900/50 shadow-[0_0_50px_rgba(225,29,72,0.25)]"
+                className="relative w-full max-w-md max-h-full min-h-0 flex flex-col bg-[#0a0a0a] rounded-3xl overflow-hidden border border-rose-900/50 shadow-[0_0_50px_rgba(225,29,72,0.25)]"
             >
                 {busy && (
                     <div className="absolute inset-0 z-10 bg-black/90 flex flex-col items-center justify-center p-6 text-center">

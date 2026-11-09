@@ -108,7 +108,7 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
     const totalAnnualOverhead = getStudioAnnualInfrastructureOverhead(depts, equip);
 
     return (
-        <div className="h-full bg-black text-white flex flex-col absolute inset-0 pt-5">
+        <div className="h-full bg-black text-white flex flex-col absolute inset-0 pt-[max(1.25rem,env(safe-area-inset-top))]">
             {/* Header */}
             <div className="shrink-0 z-50 bg-zinc-950 border-b border-zinc-800 px-4 py-4">
                 <div className="flex items-center justify-between">

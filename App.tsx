@@ -3306,9 +3306,13 @@ export const App: React.FC = () => {
       );
   }
 
+  /* The debt banner fills the status band and one row under it. It shows with the bottom nav, so on the tabs, where the pages move
+     down a row for it (actorEmpireShell.css); a full-screen room or app hides the nav, and the banner with it, so it never covers a header. */
+  const showDebtBanner = gameStatus === 'PLAYING' && isBottomNavVisible && player.money < 0 && !showDebtModal;
+
   return (
     <GameErrorBoundary onRecover={handleRecoverToMenu}>
-    <div ref={shellRef} className="ae-game-shell bg-black text-white font-sans selection:bg-amber-500 selection:text-black" data-shell-nav-visible={gameStatus === 'PLAYING' && isBottomNavVisible ? 'true' : 'false'}>
+    <div ref={shellRef} className="ae-game-shell bg-black text-white font-sans selection:bg-amber-500 selection:text-black" data-shell-nav-visible={gameStatus === 'PLAYING' && isBottomNavVisible ? 'true' : 'false'} data-debt-banner={showDebtBanner ? 'true' : 'false'}>
       <div className="fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-zinc-950 to-zinc-950 pointer-events-none" />
 
       {pendingSaveRecovery && (
@@ -3440,7 +3444,7 @@ export const App: React.FC = () => {
 	          onRestore={handleRestorePurchases}
 	      />
 	      {toastMessage && (
-	          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
+	          <div className="fixed top-[max(1.5rem,calc(env(safe-area-inset-top)+8px))] left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
 	              <div className="bg-emerald-500 rounded-full p-1"><CheckCircle size={20} className="text-black" strokeWidth={3}/></div>
 	              <div><div className="font-bold text-sm">{toastMessage.title}</div><div className="text-xs text-zinc-400">{toastMessage.subtext}</div></div>
 	          </div>
@@ -3621,7 +3625,7 @@ export const App: React.FC = () => {
 
       {pendingBabyNaming && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 shadow-2xl">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-sm max-h-full overflow-y-auto p-6 shadow-2xl">
                   <div className="flex flex-col items-center text-center mb-6">
                       <div className="w-14 h-14 bg-amber-500/15 text-amber-400 rounded-full flex items-center justify-center mb-4">
                           <Baby size={28} />
@@ -3730,8 +3734,9 @@ export const App: React.FC = () => {
       )}
 
       {showWhatsNewModal && gameStatus === 'PLAYING' && (
-          <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md overflow-y-auto custom-scrollbar px-3 py-5 sm:p-6 animate-in fade-in duration-200">
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-xl mx-auto max-h-[calc(100dvh-2.5rem)] sm:max-h-[calc(100dvh-3rem)] shadow-2xl flex flex-col relative overflow-hidden">
+          <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md overflow-y-auto custom-scrollbar px-3 sm:px-6 animate-in fade-in duration-200" style={{ paddingTop: 'max(20px, calc(12px + env(safe-area-inset-top)))', paddingBottom: 'max(20px, calc(12px + env(safe-area-inset-bottom)))' }}>
+              {/* clear of the status bar and the home indicator: the card fits between them */}
+              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-xl mx-auto shadow-2xl flex flex-col relative overflow-hidden" style={{ maxHeight: 'calc(100dvh - max(20px, calc(12px + env(safe-area-inset-top))) - max(20px, calc(12px + env(safe-area-inset-bottom))))' }}>
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
                   <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-4 sm:p-7">
                       <div className="mb-5">
@@ -3824,8 +3829,8 @@ export const App: React.FC = () => {
       )}
 
       {/* Persistent Debt Warning Banner (When modal is closed but still in debt) */}
-      {player.money < 0 && !showDebtModal && (gameStatus === 'PLAYING') && (
-          <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-center py-1 text-xs font-bold z-[60] flex justify-between px-4 items-center shadow-lg cursor-pointer" onClick={() => setShowDebtModal(true)}>
+      {showDebtBanner && (
+          <div className="fixed top-0 left-0 right-0 bg-red-600 text-white text-center py-1 pt-[max(0.25rem,env(safe-area-inset-top))] text-xs font-bold z-[60] flex justify-between px-4 items-center shadow-lg cursor-pointer" onClick={() => setShowDebtModal(true)}>
               <span>⚠️ DEBT: ${Math.abs(player.money).toLocaleString()}</span>
               <span>{8 - (player.flags.weeksInDebt || 0)} Weeks Left</span>
           </div>

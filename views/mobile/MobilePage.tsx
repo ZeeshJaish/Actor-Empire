@@ -763,7 +763,9 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const isFullBleedApp = (appMode === 'FORBES' && isImmersiveForbesScene) || (appMode === 'MESSAGES' && isImmersiveMessageReview);
 
   return (
-    <div className={isFullBleedApp ? "fixed inset-0 z-[120] h-screen w-screen bg-black" : "h-[calc(100vh-8rem)] flex items-center justify-center pt-4 relative"}>
+    /* the phone fills the page between the status bar (and the debt banner's row, when it shows) and the nav. The Guide hides the nav,
+       and the older page frame it then sits in keeps the status bar clear itself, so it keeps the old size. */
+    <div className={isFullBleedApp ? "fixed inset-0 z-[120] h-screen w-screen bg-black" : appMode === 'GUIDE' ? "h-[calc(100vh-8rem)] flex items-center justify-center pt-4 relative" : "h-full min-h-0 flex items-center justify-center pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] relative"}>
         <div className={isFullBleedApp ? "h-full w-full overflow-hidden bg-black relative" : "w-full max-w-xs h-full max-h-[650px] bg-black border-[6px] border-zinc-800 rounded-[3rem] overflow-hidden relative shadow-2xl ring-1 ring-zinc-700"}>
             {/* Notch */}
             {!isFullBleedApp && <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-zinc-900 rounded-b-xl z-50"></div>}

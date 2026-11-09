@@ -853,7 +853,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
             <AnimatePresence>
                 {selectedLead && (
                     <motion.div
-                        className="fixed inset-0 z-[120] flex items-end justify-center bg-black/80 backdrop-blur-sm md:items-center md:p-6"
+                        className="fixed inset-0 z-[120] flex items-end justify-center bg-black/80 pt-[calc(env(safe-area-inset-top)+10px)] backdrop-blur-sm md:items-center md:p-6"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -869,7 +869,7 @@ export const RightsMarket: React.FC<RightsMarketProps> = ({ player, studio, onUp
                             animate={{ y: 0, opacity: 1 }}
                             exit={reduceMotion ? { opacity: 0 } : { y: 30, opacity: 0 }}
                             onClick={event => event.stopPropagation()}
-                            className="flex max-h-[96dvh] w-full max-w-2xl flex-col overflow-hidden border border-zinc-300 bg-[#f4f0e6] text-[#171717] shadow-2xl md:max-h-[88dvh]"
+                            className="flex max-h-[min(96dvh,100%)] w-full max-w-2xl flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] md:pb-0 border border-zinc-300 bg-[#f4f0e6] text-[#171717] shadow-2xl md:max-h-[88dvh]"
                         >
                             <header className="flex shrink-0 items-center justify-between border-b border-black/15 px-5 py-4 md:px-7">
                                 <div className="flex items-center gap-3">

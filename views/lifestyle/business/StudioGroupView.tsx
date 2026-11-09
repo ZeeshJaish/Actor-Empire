@@ -261,8 +261,8 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
 
     return (
         <div className="fixed inset-0 z-[60] flex flex-col bg-[#050506] text-white">
-            <div className="relative overflow-hidden border-b border-[#29251f] bg-[#0b0907] px-4 pb-4 pt-12">
-                <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
+            <div className="relative overflow-hidden border-b border-[#29251f] bg-[#0b0907] px-4 pb-4 pt-[max(3rem,calc(env(safe-area-inset-top)+10px))]">
+                <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" /></div>
                 <div className="relative flex items-center gap-3">
                     <button type="button" onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-zinc-400" aria-label="Back to studio dashboard">
                         <ArrowLeft size={19} />
@@ -481,13 +481,13 @@ const OperatingModelDialog: React.FC<{
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] flex items-end bg-black/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center"
+            className="fixed inset-0 z-[90] flex items-end bg-black/80 p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:justify-center"
         >
             <motion.section
                 initial={{ y: 40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 40, opacity: 0 }}
-                className="max-h-[92vh] w-full overflow-y-auto rounded-[32px] border border-amber-400/25 bg-[#0b0b0d] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.7)] sm:max-w-xl"
+                className="max-h-[min(92vh,100%)] w-full overflow-y-auto rounded-[32px] border border-amber-400/25 bg-[#0b0b0d] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.7)] sm:max-w-xl"
             >
                 <div className="flex items-start justify-between gap-4">
                     <div>
@@ -602,7 +602,7 @@ const CarveOutDialog: React.FC<{
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[95] flex items-end bg-black/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center"
+            className="fixed inset-0 z-[95] flex items-end bg-black/80 p-3 pt-[max(0.75rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm sm:items-center sm:justify-center"
         >
             <motion.section
                 initial={{ y: 32, opacity: 0 }}

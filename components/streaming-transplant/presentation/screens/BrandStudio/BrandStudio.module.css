@@ -4,7 +4,7 @@
   background: #07080c; color: #eef0f5; font-family: 'Archivo', system-ui, sans-serif; }
 .studio :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; }
 .studio :where(*) { box-sizing: border-box; min-width: 0; }
-.head { display: flex; align-items: center; gap: 12px; padding: max(12px, env(safe-area-inset-top)) 14px 10px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.head { display: flex; align-items: center; gap: 12px; padding: max(12px, calc(10px + env(safe-area-inset-top))) 14px 10px; border-bottom: 1px solid rgba(255,255,255,.07); }
 .studio .back { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); font-size: 17px; }
 .head span { display: flex; flex-direction: column; gap: 2px; }
 .head small { font-size: 9px; font-weight: 800; letter-spacing: .2em; color: var(--epx-brand, #8b93a5); }

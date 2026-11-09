@@ -9,7 +9,7 @@
 .bld :where(button),.bld .rh :where(button){font-family:inherit;border:none;background:none;color:inherit;
   cursor:pointer;text-align:inherit}
 
-.bld .bldtop,.bld .rhtop{display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 12px;
+.bld .bldtop,.bld .rhtop{display:flex;align-items:center;gap:11px;padding:max(14px,calc(10px + env(safe-area-inset-top))) 14px 12px;
   background:linear-gradient(#0a0c11,#08090e);border-bottom:1px solid rgba(255,255,255,.07);flex:0 0 auto}
 .bld .bldback,.bld .rhx{flex:0 0 auto;width:34px;height:34px;border-radius:11px;font-size:var(--epx-t-title);color:#aeb6c4;
   display:flex;align-items:center;justify-content:center}
@@ -672,7 +672,7 @@
 .bld .com.b3::before,.bld .com.b4::before,.bld .com.b5::before{opacity:0}
 
 .bld .comtop{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:max(16px,env(safe-area-inset-top)) 16px 12px;
+  padding:max(16px,calc(10px + env(safe-area-inset-top))) 16px 12px;
   border-bottom:1px solid color-mix(in srgb,var(--epx-bld-c) 22%,transparent)}
 .bld .comtitle b{display:block;font-size:var(--epx-t-value);font-weight:900;letter-spacing:.1em}
 .bld .comtitle span{font-size:var(--epx-t-micro);font-weight:900;letter-spacing:.2em;color:#7d8698}
@@ -949,7 +949,7 @@
 .bld .viewerOverlay{position:fixed;inset:0;z-index:50;max-width:520px;margin:0 auto;display:flex;flex-direction:column;
   background:radial-gradient(circle at 50% 12%,color-mix(in srgb,var(--epx-bld-c) 14%,transparent),transparent 34%),#040508;
   animation:epx-vin .32s cubic-bezier(.2,1,.4,1)}
-.bld .viewerTop{display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 12px;
+.bld .viewerTop{display:flex;align-items:center;gap:11px;padding:max(14px,calc(10px + env(safe-area-inset-top))) 14px 12px;
   border-bottom:1px solid rgba(255,255,255,.08);background:rgba(5,6,9,.92)}
 .bld .viewerTop>button{flex:0 0 auto;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;color:#adb5c3}
 .bld .viewerTop>button:focus-visible{outline:2px solid #fff;outline-offset:2px}

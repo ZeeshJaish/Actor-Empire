@@ -1581,7 +1581,7 @@ const STYLE = `
 .sa-devnav button.cur{background:var(--gold);color:#000}
 
 /* chrome */
-.sa-topbar{display:flex;align-items:center;gap:10px;padding:max(20px,env(safe-area-inset-top)) 16px 10px;z-index:5}
+.sa-topbar{display:flex;align-items:center;gap:10px;padding:max(20px,calc(10px + env(safe-area-inset-top))) 16px 10px;z-index:5}
 .sa-backbtn{width:44px;height:44px;flex-shrink:0;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:17px;display:flex;align-items:center;justify-content:center}
 .sa-topbar-mid{flex:1;text-align:center}
 .sa-kicker{font-size:10px;font-weight:900;letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}

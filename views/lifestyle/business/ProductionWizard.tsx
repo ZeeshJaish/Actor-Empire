@@ -270,7 +270,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                     }
                     .animate-spotlight { animation: spotlight 8s infinite ease-in-out; }
                 `}</style>
-                <div className="absolute top-[-20%] left-[-20%] w-[140%] h-[80%] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-900/20 via-transparent to-transparent animate-spotlight"></div>
+                <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute top-[-20%] left-[-20%] w-[140%] h-[80%] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-900/20 via-transparent to-transparent animate-spotlight"></div></div>
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none"></div>
                 <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/80 to-black pointer-events-none"></div>
 
@@ -315,7 +315,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
                 )}
 
                 {/* Header */}
-                <div className="relative z-10 p-6 pt-safe-top flex justify-between items-center shrink-0">
+                <div className="relative z-10 px-6 pb-6 pt-[max(1.5rem,calc(env(safe-area-inset-top)+12px))] flex justify-between items-center shrink-0">
                     <button onClick={onCancel} aria-label="Back from studio setup" className="text-zinc-500 hover:text-white transition-colors min-h-[44px] min-w-[44px] inline-flex items-center justify-center bg-black/50 rounded-full backdrop-blur-md"><ArrowLeft size={20}/></button>
                     <div className="flex items-center gap-2 text-[10px] text-amber-400 font-black uppercase tracking-[0.2em] border border-amber-500/30 px-3 py-1 rounded-full bg-amber-950/40 backdrop-blur-md">
                         <Crown size={12} fill="currentColor" /> {tr('services.business.productionWizard.gate.eliteTier')}
@@ -412,7 +412,7 @@ export const ProductionWizard: React.FC<ProductionWizardProps> = ({ player, onCa
 
                 {/* Footer Action */}
                 <div className="fixed left-0 right-0 bottom-0 z-30 max-w-md mx-auto px-6">
-                    <div className="bg-gradient-to-t from-black via-black to-transparent pt-8 pb-2">
+                    <div className="bg-gradient-to-t from-black via-black to-transparent pt-8 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
                     <button 
                         onClick={() => canAfford && setShowConfirm(true)}
                         disabled={!canAfford}

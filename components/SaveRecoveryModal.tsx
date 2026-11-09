@@ -19,12 +19,12 @@ export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
     onRecover,
     onCancel,
 }) => (
-    <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/90 p-5 backdrop-blur-md">
+    <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/90 p-5 pt-[max(1.25rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+10px))] backdrop-blur-md">
         <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="save-recovery-title"
-            className="relative w-full max-w-sm max-h-[calc(100dvh-2.5rem)] overflow-y-auto rounded-[2rem] border border-amber-300/25 bg-[#11100e] shadow-[0_28px_100px_rgba(0,0,0,0.75)]"
+            className="relative w-full max-w-sm max-h-full overflow-y-auto rounded-[2rem] border border-amber-300/25 bg-[#11100e] shadow-[0_28px_100px_rgba(0,0,0,0.75)]"
         >
             <div className="h-1 bg-gradient-to-r from-amber-500 via-yellow-200 to-emerald-400" />
             <div className="p-6">

@@ -128,7 +128,7 @@ export const OriginalTitleDetail: React.FC<{
     };
     if (moment) {
         return createPortal(
-            <div className="fixed inset-0 z-[85] overflow-y-auto bg-[#0a0406] font-sans text-white">
+            <div className="fixed inset-0 z-[85] overflow-y-auto bg-[#0a0406] pt-[env(safe-area-inset-top)] font-sans text-white">
                 <CommissionMoment
                     title={moment.title}
                     platformName={player.ownedStreamingPlatform?.identity?.name || detail.commission.commissionedByPlatformName}

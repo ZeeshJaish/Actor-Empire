@@ -22,6 +22,10 @@
 .ae-game-shell[data-keyboard-open="true"] .ae-live-dock { display: none; }
 
 .ae-game-content { padding-bottom: var(--ae-shell-nav-clearance); }
+/* While the debt banner shows (App.tsx), the tab pages start one banner row lower: the banner is the status band plus
+   this row (16px of text and 4px under it), so it ends above every header. The older pages (custom-scrollbar) have their own pt-8. */
+.ae-game-shell { --ae-debt-row: 20px; }
+.ae-game-shell[data-debt-banner="true"] .ae-game-content:not(.custom-scrollbar) { padding-top: var(--ae-debt-row); }
 .ae-game-content--immersive { padding-bottom: 0; }
 /* Home ends at the nav's top and keeps the 20px gap inside its own dock, so the Age Up glow fades into the gap
    instead of being cut flat at the page's edge */
@@ -31,7 +35,7 @@
 
 .ae-shell-header {
   box-sizing: border-box;
-  padding-top: max(12px, env(safe-area-inset-top));
+  padding-top: max(12px, calc(10px + env(safe-area-inset-top)));
   min-width: 0;
 }
 

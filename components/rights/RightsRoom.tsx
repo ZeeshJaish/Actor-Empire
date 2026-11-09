@@ -73,7 +73,7 @@ interface RightsRoomProps {
 }
 
 const Top: React.FC<{ eyebrow: string; title: string; onBack: () => void; right?: React.ReactNode }> = ({ eyebrow, title, onBack, right }) => (
-    <header className="grid grid-cols-[44px_1fr_auto] items-center gap-3 px-4 pb-2.5 pt-[max(18px,env(safe-area-inset-top))]">
+    <header className="grid grid-cols-[44px_1fr_auto] items-center gap-3 px-4 pb-2.5 pt-[max(18px,calc(10px+env(safe-area-inset-top)))]">
         <button type="button" onClick={onBack} aria-label="Back" className="grid h-11 w-11 place-items-center rounded-[13px] border border-white/10 bg-white/[0.04] text-zinc-300 active:scale-95"><ArrowLeft size={18} /></button>
         <div className="min-w-0">
             <p className="text-[9px] font-black uppercase leading-tight tracking-[0.16em]" style={{ color: GOLD }}>{eyebrow}</p>
@@ -389,7 +389,7 @@ export default function RightsRoom({ player, studioId, onUpdatePlayer, onClose, 
                         <div className="relative h-[196px] shrink-0">
                             <OriginalPoster title={name} className="absolute inset-0" />
                             <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-[#0b0a08]" />
-                            <button type="button" onClick={back} aria-label="Back" className="absolute left-4 top-[max(16px,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-[13px] border border-white/15 bg-black/40 text-zinc-200 active:scale-95"><ArrowLeft size={18} /></button>
+                            <button type="button" onClick={back} aria-label="Back" className="absolute left-4 top-[max(16px,calc(10px+env(safe-area-inset-top)))] z-10 grid h-11 w-11 place-items-center rounded-[13px] border border-white/15 bg-black/40 text-zinc-200 active:scale-95"><ArrowLeft size={18} /></button>
                             <h2 className="absolute inset-x-4 bottom-2 z-10 font-serif text-[28px] font-extrabold italic leading-[1.05] text-white">{name}</h2>
                         </div>
                         <div className="mx-4 mt-3 rounded-[18px] border bg-gradient-to-br from-[#241c0d] to-[#14110b] p-3" style={{ borderColor: `${GOLD}55` }}>
@@ -406,7 +406,7 @@ export default function RightsRoom({ player, studioId, onUpdatePlayer, onClose, 
                         <div className="relative h-[196px]">
                             <OriginalPoster title={sheet.title} className="absolute inset-0" />
                             <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-[#0b0a08]" />
-                            <button type="button" onClick={back} aria-label="Back" className="absolute left-4 top-[max(16px,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-[13px] border border-white/15 bg-black/40 text-zinc-200 active:scale-95"><ArrowLeft size={18} /></button>
+                            <button type="button" onClick={back} aria-label="Back" className="absolute left-4 top-[max(16px,calc(10px+env(safe-area-inset-top)))] z-10 grid h-11 w-11 place-items-center rounded-[13px] border border-white/15 bg-black/40 text-zinc-200 active:scale-95"><ArrowLeft size={18} /></button>
                             <div className="absolute left-[68px] right-4 top-[max(26px,calc(env(safe-area-inset-top)+10px))] z-10 flex flex-wrap gap-1.5">
                                 <span className="rounded-full px-2.5 py-[5px] text-[9px] font-black uppercase tracking-[0.05em]" style={{ background: sheet.buyerColor, color: wordsOn(sheet.buyerColor) }}>On {sheet.buyerName}</span>
                                 {sheet.weeksLeft !== null && <span className="rounded-full px-2.5 py-[5px] text-[9px] font-black uppercase tracking-[0.05em] text-[#14110a]" style={{ background: GOLD }}>{sheet.weeksLeft} {sheet.weeksLeft === 1 ? 'week' : 'weeks'} left</span>}

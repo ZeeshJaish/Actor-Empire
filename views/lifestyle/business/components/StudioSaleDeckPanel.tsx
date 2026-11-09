@@ -1443,10 +1443,10 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
             <SaleRoomStyles />
             {phase === 'sold' ? renderSold() : (
                 <>
-                    <header className="relative shrink-0 overflow-hidden border-b border-[#29251f] bg-[#0c0a08] px-4 pb-4 pt-12">
-                        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" />
+                    <header className="relative shrink-0 overflow-hidden border-b border-[#29251f] bg-[#0c0a08] px-4 pb-4 pt-[max(3rem,calc(env(safe-area-inset-top)+10px))]">
+                        <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-amber-400/10 blur-3xl" /></div>
                         {phase === 'setup' ? (
-                            <div className="ssr-lot absolute right-3.5 top-11 rotate-3 rounded-[12px] border-2 border-amber-300/35 bg-gradient-to-br from-[#241a08] to-[#120d05] px-3 py-2 text-center shadow-[0_4px_0_#020202,inset_0_1px_0_rgba(252,211,77,0.15)]">
+                            <div className="ssr-lot absolute right-3.5 top-[calc(max(3rem,calc(env(safe-area-inset-top)_+_10px))_-_4px)] rotate-3 rounded-[12px] border-2 border-amber-300/35 bg-gradient-to-br from-[#241a08] to-[#120d05] px-3 py-2 text-center shadow-[0_4px_0_#020202,inset_0_1px_0_rgba(252,211,77,0.15)]">
                                 <div className="text-[7px] font-black uppercase tracking-[0.22em] text-amber-300/60">Lot No.</div>
                                 <div className="font-mono text-[17px] font-black text-amber-300">001</div>
                             </div>

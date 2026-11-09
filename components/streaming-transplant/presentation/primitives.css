@@ -87,7 +87,7 @@
   display: flex;
   align-items: center;
   gap: var(--epx-sp-3);
-  padding: max(var(--epx-sp-4), env(safe-area-inset-top)) var(--epx-gutter) var(--epx-sp-3);
+  padding: max(var(--epx-sp-4), calc(10px + env(safe-area-inset-top))) var(--epx-gutter) var(--epx-sp-3);
   background: linear-gradient(var(--epx-s-surface), var(--epx-s-canvas));
   border-bottom: 1px solid var(--epx-line-hairline);
 }

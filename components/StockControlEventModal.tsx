@@ -30,8 +30,8 @@ export const StockControlEventModal: React.FC<StockControlEventModalProps> = ({
     const positionValue = position && stock ? position.shares * stock.price : 0;
 
     return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/92 p-4 text-white backdrop-blur-md animate-in fade-in duration-200">
-            <div className="relative flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-sky-400/35 bg-zinc-950 shadow-2xl">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/92 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))] text-white backdrop-blur-md animate-in fade-in duration-200">
+            <div className="relative flex max-h-[min(92vh,100%)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-sky-400/35 bg-zinc-950 shadow-2xl">
                 <div className="h-2 bg-gradient-to-r from-sky-400 via-emerald-400 to-amber-300" />
                 <div className="pointer-events-none absolute -right-8 -top-8 text-sky-400/10">
                     <Crown size={170} strokeWidth={1.25} />

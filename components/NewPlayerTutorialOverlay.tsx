@@ -171,7 +171,8 @@ export const NewPlayerTutorialOverlay: React.FC<NewPlayerTutorialOverlayProps> =
             const maxTop = Math.max(16, window.innerHeight - cardHeight - 16);
             return {
                 left,
-                top: Math.min(maxTop, Math.max(16, top)),
+                // clear of the status bar and the home indicator as well as the screen's edges
+                top: `min(max(${Math.min(maxTop, Math.max(16, top))}px, calc(env(safe-area-inset-top, 0px) + 12px)), calc(100vh - ${cardHeight}px - 16px - env(safe-area-inset-bottom, 0px)))`,
                 width: cardWidth,
             };
         })()
@@ -305,7 +306,7 @@ export const NewPlayerTutorialOverlay: React.FC<NewPlayerTutorialOverlayProps> =
             )}
 
             <div
-                className="pointer-events-auto fixed max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[1.6rem] border border-white/20 bg-zinc-950 shadow-2xl shadow-black"
+                className="pointer-events-auto fixed max-h-[calc(100vh_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] overflow-y-auto rounded-[1.6rem] border border-white/20 bg-zinc-950 shadow-2xl shadow-black"
                 style={popoverStyle}
                 onClick={(event) => event.stopPropagation()}
                 onWheel={(event) => event.stopPropagation()}

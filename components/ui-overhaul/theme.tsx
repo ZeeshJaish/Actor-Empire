@@ -55,6 +55,8 @@ export const BASE_CSS = `
   --acting:#4cc9ff; --writing:#7c7cff; --directing:#ffd24c;
 
   position:relative;display:flex;flex-direction:column;height:100%;overflow:hidden;
+  /* clip, where the browser has it: a root that cannot be scrolled at all, not even by a script */
+  overflow:clip;
   isolation:isolate;background:var(--bg);color:var(--ink);
   font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;
@@ -66,7 +68,8 @@ export const BASE_CSS = `
 .ae svg{display:block;}
 
 /* ---------- ground ---------- */
-.ae-bg{position:absolute;inset:0;z-index:0;pointer-events:none;}
+/* the glow reaches 30% past each side; clipped here, or it gives the page hidden width that a scroll into view can slide it across */
+.ae-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
 .ae-bg::before{content:"";position:absolute;left:-30%;right:-30%;top:-24%;height:72%;
   background:radial-gradient(46% 40% at 30% 6%, rgba(248,168,16,.035), transparent 72%);}
 .ae-bg::after{content:"";position:absolute;inset:0;

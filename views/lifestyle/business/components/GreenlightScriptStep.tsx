@@ -96,7 +96,7 @@ export const GreenlightScriptStep: React.FC<GreenlightScriptStepProps> = ({
             </div>
         )}
 
-        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+        <div className="fixed bottom-0 left-0 right-0 px-6 pt-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                 <button type="button" onClick={onCancel} className="flex-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white font-bold py-4 rounded-xl transition-colors border border-zinc-700 backdrop-blur-md">
                     Cancel

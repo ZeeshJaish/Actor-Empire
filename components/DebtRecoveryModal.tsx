@@ -18,7 +18,7 @@ export const DebtRecoveryModal: React.FC<DebtRecoveryModalProps> = ({ player, tr
     : Math.floor(Math.abs(player.money) * 0.10) + 2500;
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-red-950/80 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] backdrop-blur-md animate-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center bg-red-950/80 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,calc(10px+env(safe-area-inset-top)))] backdrop-blur-md animate-in zoom-in-95 duration-300">
       <div role="dialog" aria-modal="true" aria-labelledby="debt-recovery-title" className="relative max-h-full w-full max-w-sm overflow-x-hidden overflow-y-auto overscroll-contain rounded-3xl border-2 border-red-500/50 bg-zinc-900 p-6 text-center shadow-2xl">
         <div className="absolute left-0 top-0 h-1 w-full animate-pulse bg-red-500" />
         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10">

@@ -6,7 +6,7 @@
   --ph:#7dff9a;--ph-hi:#dcffe6;--red:#ff2b2b;--grd:#06120b;
   --z:1;--nz:1;--wh:0deg;--ty:0;--dim:0;--rx:0;--ry:0;--rym:999;--redk:1;--cy:5;
   --noise:url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --pk-vw:min(1vw,4.48px);position:fixed;top:0;bottom:0;left:calc(50vw - 50*var(--pk-vw));width:calc(100*var(--pk-vw));line-height:normal;overflow:hidden;background:var(--grd);color:#fff;font-family:Archivo,sans-serif;user-select:none;-webkit-user-select:none}
+  --pk-vw:min(1vw,4.48px);position:fixed;top:0;bottom:0;left:calc(50vw - 50*var(--pk-vw));width:calc(100*var(--pk-vw));line-height:normal;overflow:hidden;overflow:clip;background:var(--grd);color:#fff;font-family:Archivo,sans-serif;user-select:none;-webkit-user-select:none}
 .pk-blk-root *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 .pk-blk-root a{color:inherit;text-decoration:none}
 @media (max-height:739px){.pk-blk-root{overflow-y:auto}}

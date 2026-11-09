@@ -20,7 +20,8 @@
   grid-template-columns: 44px minmax(0, 1fr) auto 44px;
   align-items: center;
   gap: 12px;
-  padding: 10px clamp(14px, 3vw, 36px);
+  /* the bar fills the status-bar band, so its controls start 10px under the clock and nothing scrolls up behind it */
+  padding: calc(10px + env(safe-area-inset-top)) clamp(14px, 3vw, 36px) 10px;
   border-bottom: 1px solid rgba(148, 163, 184, .16);
   background: rgba(7, 9, 18, .9);
   backdrop-filter: blur(22px);
@@ -61,7 +62,8 @@
 
 .rights-exchange-tabs {
   position: sticky;
-  top: 68px;
+  /* under the bar, which is the status band taller on a phone */
+  top: calc(68px + env(safe-area-inset-top));
   z-index: 15;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -406,7 +408,7 @@
   .rights-exchange-scene .streaming-visual-scene__hotspot { top: clamp(92px, var(--streaming-hotspot-y), 175px); }
   .rights-exchange-scene .streaming-visual-scene__hotspot-copy { display: none; }
   .rights-exchange-scene .streaming-visual-scene__status { max-width: 54%; }
-  .rights-exchange-tabs { top: 88px; gap: 3px; margin-top: 10px; padding: 5px; }
+  .rights-exchange-tabs { top: calc(88px + env(safe-area-inset-top)); gap: 3px; margin-top: 10px; padding: 5px; }
   .rights-exchange-tabs button { min-height: 50px; padding: 6px; }
   .rights-exchange-tabs button span { font-size: .64rem; text-align: center; }
   .rights-exchange-tabs button small { display: none; }

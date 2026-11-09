@@ -22,7 +22,7 @@
 .va .ascroll::-webkit-scrollbar{display:none}
 
 .va .topbar2{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:9px;
-  padding:max(12px,env(safe-area-inset-top)) 14px 10px;
+  padding:max(12px,calc(10px + env(safe-area-inset-top))) 14px 10px;
   background:linear-gradient(rgba(7,8,12,.96),rgba(7,8,12,.5) 70%,transparent)}
 .va .tmark{width:20px;height:20px;color:var(--epx-va-c);flex:0 0 auto}
 .va .tmark svg{width:100%;height:100%;display:block}
@@ -121,7 +121,7 @@
 .va .player{position:fixed;inset:0;z-index:60;background:#000;max-width:520px;margin:0 auto;
   animation:epx-plin .3s both}
 @keyframes epx-plin{from{opacity:0}to{opacity:1}}
-.va .pexit{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;z-index:70;
+.va .pexit{position:absolute;top:max(14px,calc(10px + env(safe-area-inset-top)));right:14px;z-index:70;
   width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:15px;
   display:flex;align-items:center;justify-content:center}
 
@@ -290,7 +290,7 @@
 .va .adbreak::after{content:'';position:absolute;top:0;bottom:0;width:45%;left:-55%;
   background:linear-gradient(100deg,transparent,rgba(255,255,255,.12),transparent);animation:epx-adshine 2.4s ease-in-out .3s infinite}
 @keyframes epx-adshine{to{left:120%}}
-.va .adtag{position:absolute;top:max(18px,env(safe-area-inset-top));left:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;
+.va .adtag{position:absolute;top:max(18px,calc(10px + env(safe-area-inset-top)));left:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;
   padding:5px 9px 5px 5px;border-radius:6px;background:rgba(0,0,0,.5);font-size:10.5px;font-weight:800;color:#fff;
   font-variant-numeric:tabular-nums}
 .va .adtag i{font-style:normal;font-size:9px;font-weight:900;letter-spacing:.06em;padding:2px 5px;border-radius:3px;background:#ffcf3f;color:#16120a}
@@ -345,7 +345,7 @@
 /* ── Phase 4 (#63): "Who's watching?", the Kids profile, Because you watched, AI channels, Autoplay ── */
 /* "Who's watching?": the household's profiles, and Kids where the plan includes it */
 .va .who{position:absolute;inset:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:20px;padding:max(28px,env(safe-area-inset-top)) 20px 96px;text-align:center;
+  gap:20px;padding:max(28px,calc(10px + env(safe-area-inset-top))) 20px 96px;text-align:center;
   background:radial-gradient(ellipse 85% 48% at 50% 34%,color-mix(in srgb,var(--epx-va-c) 13%,transparent),transparent 72%)}
 .va .who::-webkit-scrollbar{display:none}
 .va .whomark{width:28px;height:28px;color:var(--epx-va-c)}

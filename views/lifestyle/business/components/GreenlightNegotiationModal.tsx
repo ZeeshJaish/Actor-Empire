@@ -28,8 +28,8 @@ export const GreenlightNegotiationModal: React.FC<GreenlightNegotiationModalProp
     onClose,
     formatMoney,
 }) => (
-    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-        <div className="bg-zinc-950 w-full max-w-md max-h-[90vh] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))] animate-in fade-in duration-200">
+        <div className="bg-zinc-950 w-full max-w-md max-h-[min(90vh,100%)] rounded-2xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col">
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-zinc-900/50 shrink-0">
                 <h3 className="font-bold text-white flex items-center gap-3">
                     <div className="p-2 bg-purple-500/20 rounded-lg"><Briefcase size={18} className="text-purple-400" /></div>

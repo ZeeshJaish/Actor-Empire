@@ -858,8 +858,8 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
                 </div>
 
                 {sharePickerOpen && (
-                    <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-                        <div className="max-h-[88vh] w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-zinc-950 shadow-2xl shadow-black animate-in slide-in-from-bottom duration-200">
+                    <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/80 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="max-h-[min(88vh,100%)] w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-zinc-950 shadow-2xl shadow-black animate-in slide-in-from-bottom duration-200">
                             <div className="flex items-center justify-between gap-3 border-b border-white/10 p-4">
                                 <div>
                                     <div className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">Social Card</div>
@@ -1175,7 +1175,7 @@ export const LifestyleAssets: React.FC<LifestyleAssetsProps> = ({
             </div>
 
             {pendingPremiumGate && pendingPremiumProduct && (
-                <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/80 p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/80 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm">
                     <div className="w-full max-w-md space-y-4 rounded-3xl border border-zinc-800 bg-zinc-950 p-6 animate-in slide-in-from-bottom duration-200">
                         <div className="flex items-start gap-3">
                             <div className="rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-3 text-fuchsia-300">

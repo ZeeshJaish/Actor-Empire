@@ -33,7 +33,7 @@
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-  padding: max(var(--ae-layout-inline-space, 12px), env(safe-area-inset-top)) max(var(--ae-layout-inline-space, 12px), env(safe-area-inset-right)) var(--ae-layout-inline-space, 12px) max(var(--ae-layout-inline-space, 12px), env(safe-area-inset-left));
+  padding: max(var(--ae-layout-inline-space, 12px), calc(10px + env(safe-area-inset-top))) max(var(--ae-layout-inline-space, 12px), env(safe-area-inset-right)) var(--ae-layout-inline-space, 12px) max(var(--ae-layout-inline-space, 12px), env(safe-area-inset-left));
 }
 .ae-layout-header__title { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
 .ae-layout-header__actions { display: flex; flex: 0 1 auto; flex-wrap: wrap; gap: 8px; min-width: 0; }

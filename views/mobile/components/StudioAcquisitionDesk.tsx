@@ -1978,7 +1978,7 @@ const LegacyStudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = ({
                             {tr('studioAcquisitionDesk.signing.srOnly')}
                         </span>
 
-                        <div className="Deal Room Viewport relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
+                        <div className="Deal Room Viewport relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,calc(10px+env(safe-area-inset-top)))] sm:px-6 lg:px-8">
                             <div className="flex shrink-0 items-start justify-between gap-4">
                                 <div className="min-w-0 pt-1">
                                     <div className="flex flex-wrap items-center gap-2 text-[7px] font-black uppercase tracking-[0.28em] text-amber-300">

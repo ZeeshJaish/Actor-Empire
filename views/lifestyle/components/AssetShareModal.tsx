@@ -700,8 +700,8 @@ export const AssetShareModal: React.FC<AssetShareModalProps> = ({
     if (!primaryAsset) return null;
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/92 p-4 backdrop-blur-2xl animate-in fade-in duration-200">
-            <div className="flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-[2.1rem] border border-fuchsia-300/20 bg-zinc-950 shadow-2xl shadow-fuchsia-950/30">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/92 p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))] backdrop-blur-2xl animate-in fade-in duration-200">
+            <div className="flex max-h-[min(94vh,100%)] w-full max-w-lg flex-col overflow-hidden rounded-[2.1rem] border border-fuchsia-300/20 bg-zinc-950 shadow-2xl shadow-fuchsia-950/30">
                 <div className="h-2 bg-gradient-to-r from-rose-500 via-cyan-300 to-emerald-300" />
                 <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-gradient-to-br from-white/[0.08] via-transparent to-rose-500/10 px-4 py-4">
                     <div className="flex min-w-0 items-center gap-3">

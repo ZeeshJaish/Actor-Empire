@@ -75,7 +75,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
 
     return (
         <div className="relative shrink-0 z-20 bg-emerald-950/40 backdrop-blur-2xl border-b border-emerald-500/20 shadow-2xl">
-            <div className="max-w-5xl mx-auto w-full px-4 pt-safe-top pb-4">
+            <div className="max-w-5xl mx-auto w-full px-4 pt-[max(35px,calc(env(safe-area-inset-top)+10px))] pb-4">
                 <div className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center mb-3">
                     <button type="button" onClick={onBack} className="grid h-11 w-11 shrink-0 place-items-center bg-zinc-900/80 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-all border border-zinc-800 shadow-lg group" aria-label="Back to studio dashboard">
                         <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform sm:w-5 sm:h-5" />

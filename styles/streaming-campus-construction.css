@@ -29,6 +29,8 @@
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   min-height: 68px;
+  /* the bar fills the status-bar band, so its controls start 10px under the clock and nothing scrolls up behind it */
+  padding-top: calc(10px + env(safe-area-inset-top));
   border-bottom: 1px solid #323636;
   background: rgba(11, 13, 13, .94);
   backdrop-filter: blur(18px);
@@ -257,7 +259,7 @@
 .campus-build-events article p { margin: 0; color: #b9b4a9; font-size: 12px; line-height: 1.45; }
 .campus-build-events article b { color: #edbb55; font-size: 12px; white-space: nowrap; }
 
-.campus-build-feedback { position: sticky; z-index: 3; bottom: 14px; width: fit-content; max-width: min(720px, calc(100% - 24px)); margin: 18px auto 0; padding: 12px 16px; border: 1px solid #ff7622; background: #1b1814; color: #ffd5bb; font-size: 13px; font-weight: 800; box-shadow: 0 10px 30px #000; }
+.campus-build-feedback { position: sticky; z-index: 3; bottom: calc(14px + env(safe-area-inset-bottom)); width: fit-content; max-width: min(720px, calc(100% - 24px)); margin: 18px auto 0; padding: 12px 16px; border: 1px solid #ff7622; background: #1b1814; color: #ffd5bb; font-size: 13px; font-weight: 800; box-shadow: 0 10px 30px #000; }
 
 .campus-build-shell button { cursor: pointer; }
 .campus-build-shell button:focus-visible,

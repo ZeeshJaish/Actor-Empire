@@ -213,7 +213,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
                           <CustomizationHeroImage item={customizationItem} />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/35 to-black/15" />
                           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/55 via-transparent to-black/30" />
-		                  <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-5 pt-12">
+		                  <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-5 pt-[max(3rem,calc(env(safe-area-inset-top)+10px))]">
 	                          <button onClick={() => setCustomizationItem(null)} className="rounded-2xl border border-white/10 bg-black/55 p-3 text-white shadow-xl shadow-black/30 backdrop-blur"><ArrowLeft size={20}/></button>
 	                          <div className="rounded-2xl border border-emerald-300/20 bg-black/55 px-4 py-3 text-right shadow-xl shadow-black/30 backdrop-blur">
 	                              <div className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-100/75">{tr('lifestyle.total')}</div>

@@ -320,7 +320,8 @@ export const WallOfScreens: React.FC<WallProps> = ({
   return (
     <div className={cx(css.wall2, css['b' + (beat)], (claimed ? css.claimed : ''))} data-epx-root onClick={skip}
       style={claimed ? { ['--epx-wall2-own' as string]: claimed.color } : undefined}>
-      {/* ── the room ── */}
+      {/* ── the room ── (inside its own clipped box, see .roomClip) */}
+      <div className={css.roomClip}>
       <div className={css.room}>
         <div className={css.haze} />
         <div className={css.grid}>
@@ -364,6 +365,7 @@ export const WallOfScreens: React.FC<WallProps> = ({
           {rivals.slice(4, 8).map((r, i) => <RivalScreen key={r.name} r={r} i={i + 4} on={lit > i + 4} />)}
         </div>
 
+      </div>
       </div>
 
       {/* what the channel becomes — UI layer, outside the camera */}

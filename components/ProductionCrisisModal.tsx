@@ -36,7 +36,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
         };
 
         return (
-            <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))]">
                 <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl p-5">
                     <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400 mb-2">{tr('production.modal.recovery.eyebrow')}</div>
                     <h3 className="text-2xl font-black text-white leading-tight mb-3">{tr('production.modal.recovery.title')}</h3>
@@ -96,12 +96,12 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
         : 'from-red-600 via-rose-500 to-orange-500';
 
     return (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1rem,calc(env(safe-area-inset-bottom)+10px))]">
             <motion.div 
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className={`w-full max-w-md max-h-[calc(100dvh-2rem)] min-h-0 flex flex-col bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(${isDirectorDecision ? '6,182,212' : '220,38,38'},0.15)] relative`}
+                className={`w-full max-w-md max-h-full min-h-0 flex flex-col bg-[#0a0a0a] rounded-3xl overflow-hidden border border-${themeColor}-900/50 shadow-[0_0_50px_rgba(${isDirectorDecision ? '6,182,212' : '220,38,38'},0.15)] relative`}
             >
                 {isProcessingAd && (
                     <div className="absolute inset-0 z-[210] bg-black/90 flex flex-col items-center justify-center p-6 text-center">

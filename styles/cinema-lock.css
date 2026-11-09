@@ -259,7 +259,7 @@
 @media (max-height:650px){
   .cinema-lock{overflow-y:auto;overscroll-behavior-y:contain}
   .cinema-lock .curtain,.cinema-lock .curtain-fade,.cinema-lock .grain,.cinema-lock .vignette{position:fixed}
-  .cinema-lock .topbar{position:relative;top:auto;left:auto;right:auto;padding:max(20px,env(safe-area-inset-top)) 20px 8px}
+  .cinema-lock .topbar{position:relative;top:auto;left:auto;right:auto;padding:max(20px,calc(10px + env(safe-area-inset-top))) 20px 8px}
   .cinema-lock .hero{position:relative;inset:auto;transform:none;padding:0 24px 16px}
   .cinema-lock .ticket-zone{margin-bottom:16px}
   .cinema-lock .bulbs{margin-bottom:12px}

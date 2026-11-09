@@ -4,7 +4,7 @@
 .cine *{box-sizing:border-box}
 .cine .cine-grain{position:absolute;inset:0;pointer-events:none;z-index:40;opacity:.035;
   background:repeating-conic-gradient(#fff 0 .4deg,transparent .4deg .8deg)}
-.cine .cine-skip{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:45;font-size:8.5px;
+.cine .cine-skip{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);z-index:45;font-size:8.5px;
   letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.28);animation:epx-cblink 2s infinite}
 @keyframes epx-cblink{50%{opacity:.25}}
 @keyframes epx-cup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}

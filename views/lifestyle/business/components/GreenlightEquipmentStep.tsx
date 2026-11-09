@@ -185,7 +185,7 @@ export const GreenlightEquipmentStep: React.FC<GreenlightEquipmentStepProps> = (
             })}
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
+        <div className="fixed bottom-0 left-0 right-0 px-6 pt-6 pb-safe-lg bg-gradient-to-t from-[#020a05] via-[#020a05]/90 to-transparent pointer-events-none flex justify-center z-30">
             <div className="pointer-events-auto flex gap-4 w-full max-w-md">
                 <button
                     onClick={onBack}

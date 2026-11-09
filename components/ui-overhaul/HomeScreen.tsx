@@ -163,6 +163,8 @@ const CSS = `
   flex-direction:column;
   height:100%;
   overflow:hidden;
+  /* clip, where the browser has it: a root that cannot be scrolled at all, not even by a script */
+  overflow:clip;
   isolation:isolate;
   background:var(--bg);
   color:var(--ink);
@@ -178,7 +180,9 @@ const CSS = `
 .ae-root svg{display:block;}
 
 /* ---------- ground ---------- */
-.ae-bg{position:absolute;inset:0;z-index:0;pointer-events:none;}
+/* the glow reaches 30% past each side; clipped here, or it gives .ae-root 118 px of hidden width that a
+   scroll into view can slide the whole page across, leaving the left column cut off on a phone */
+.ae-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
 .ae-bg::before{
   content:"";position:absolute;left:-30%;right:-30%;top:-26%;height:78%;
   background:

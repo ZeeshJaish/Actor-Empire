@@ -2,7 +2,7 @@
 @media (min-width:449px){.pk-folly-root{contain:layout}}
 .pk-folly-root{--pk-st:max(0px,calc(env(safe-area-inset-top,0px) - 28px));--pk-sb:max(0px,calc(env(safe-area-inset-bottom,0px) - 24px),calc((env(safe-area-inset-bottom,0px) - 34px)*2.3));--pk-vh:calc(100vh - var(--pk-st) - var(--pk-sb));--u:min(calc(calc(100*var(--pk-vw))/375),calc(var(--pk-vh)/812));--oy:calc(78px + var(--pk-st) - var(--u)*78);--open:-9.5deg;--hd:.125s;--amp:6;--lt:7.4s;--j:3;--ra:.62s;--rb:.4s;--ro:.62;--wt:682;--wr:22;--ct:-24;--bh:1;--ce:20px;--lo:.82;--sw:calc(var(--amp)*4.4);
   --pk-folly-noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 3.2 0 0 0 -.9'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
-  --pk-vw:min(1vw,4.48px);position:fixed;top:0;bottom:0;left:calc(50vw - 50*var(--pk-vw));width:calc(100*var(--pk-vw));line-height:normal;overflow:hidden;background:#0a0f0d;color:#fff;font-family:Archivo,sans-serif;user-select:none;-webkit-user-select:none}
+  --pk-vw:min(1vw,4.48px);position:fixed;top:0;bottom:0;left:calc(50vw - 50*var(--pk-vw));width:calc(100*var(--pk-vw));line-height:normal;overflow:hidden;overflow:clip;background:#0a0f0d;color:#fff;font-family:Archivo,sans-serif;user-select:none;-webkit-user-select:none}
 .pk-folly-root *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 @media (max-width:339px){.pk-folly-root{--ce:10px}}
 @media (max-height:739px){.pk-folly-root{--u:min(calc(calc(100*var(--pk-vw))/375),max(.76px,calc((var(--pk-vh) - 206px)/570)));--wt:648;--wr:20.25;--ct:-22;--bh:.34;--open:-7.8deg;overflow-y:auto}}
@@ -23,7 +23,7 @@
 .pk-folly-settled{--j:4;--hd:.21s}
 
 /* ---------- stage ---------- */
-.pk-folly-clip{position:relative;min-height:100vh;overflow:hidden}
+.pk-folly-clip{position:relative;min-height:100vh;overflow:hidden;overflow:clip}
 .pk-folly-stage{position:relative;isolation:isolate;min-height:100vh;animation:pk-folly-land .32s .62s}
 .pk-folly-art{position:absolute;left:50%;top:var(--oy);width:calc(var(--u)*375);height:calc(var(--u)*812);margin-left:calc(var(--u)*-187.5);overflow:visible;pointer-events:none}
 .pk-folly-layer{position:absolute;inset:0;pointer-events:none}

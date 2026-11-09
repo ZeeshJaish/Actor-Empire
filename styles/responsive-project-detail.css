@@ -7,7 +7,7 @@
   }
 
   .ae-project-detail-header.ae-project-detail-header {
-    padding-top: max(3rem, env(safe-area-inset-top));
+    padding-top: max(3rem, calc(10px + env(safe-area-inset-top)));
     padding-bottom: 1rem;
   }
 

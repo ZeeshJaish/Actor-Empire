@@ -872,9 +872,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         </div>
 
         {isReportOpen && (
-          <div className="fixed inset-0 z-[500] bg-black/80 backdrop-blur-xl flex items-end sm:items-center justify-center p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] overscroll-none">
+          <div className="fixed inset-0 z-[500] bg-black/80 backdrop-blur-xl flex items-end sm:items-center justify-center p-4 pt-[max(1rem,calc(env(safe-area-inset-top)+10px))] pb-[calc(env(safe-area-inset-bottom)+1rem)] overscroll-none">
             <div
-              className="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-[2rem] border border-white/10 bg-zinc-950 shadow-2xl"
+              className="w-full max-w-md max-h-full overflow-y-auto overscroll-contain rounded-[2rem] border border-white/10 bg-zinc-950 shadow-2xl"
               onWheel={(event) => event.stopPropagation()}
               onTouchMove={(event) => event.stopPropagation()}
             >

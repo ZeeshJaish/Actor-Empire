@@ -1119,10 +1119,10 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
             <div className="relative shrink-0 z-20 bg-zinc-950 border-b border-zinc-800 overflow-hidden">
                 {/* Background Glow / Texture */}
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-zinc-950 to-zinc-950"></div>
-                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+                <div className="pointer-events-none absolute inset-0 overflow-hidden"><div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div></div>
 
                 {/* Top Nav Bar */}
-                <div className="relative flex items-center justify-between px-4 pt-[max(3rem,env(safe-area-inset-top))] pb-4">
+                <div className="relative flex items-center justify-between px-4 pt-[max(3rem,calc(10px+env(safe-area-inset-top)))] pb-4">
                     <div className="flex min-w-0 items-center gap-3">
                         <button onClick={onBack} aria-label="Back from studio dashboard" className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center hover:bg-zinc-800/50 rounded-full text-zinc-400 hover:text-white transition-colors backdrop-blur-sm">
                             <ArrowLeft size={20} />
@@ -1641,7 +1641,7 @@ const StudioFinanceView: React.FC<{
     return (
         <div className="absolute inset-0 bg-[#050505] flex flex-col z-[60] text-white animate-in slide-in-from-right duration-300 font-sans">
             {/* HEADER */}
-            <div className="relative pt-12 pb-6 px-6 bg-zinc-900/50 border-b border-white/5 backdrop-blur-xl shrink-0 z-20">
+            <div className="relative pt-[max(3rem,calc(env(safe-area-inset-top)+10px))] pb-6 px-6 bg-zinc-900/50 border-b border-white/5 backdrop-blur-xl shrink-0 z-20">
                 <div className="flex items-center justify-between mb-6">
                     <button onClick={onBack} className="grid h-11 w-11 shrink-0 place-items-center bg-black/40 hover:bg-black/60 rounded-full backdrop-blur-md transition-colors border border-white/5" aria-label="Back to studio dashboard"><ArrowLeft size={18} /></button>
                     <div className="flex gap-2">
@@ -2021,7 +2021,7 @@ export const StudioFilmographyView: React.FC<{
 
     return (
         <div className="absolute inset-0 flex flex-col overflow-y-auto bg-[#050505] font-sans text-white">
-            <div className="relative shrink-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 pt-12 pb-5 shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
+            <div className="relative shrink-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 pt-[max(3rem,calc(env(safe-area-inset-top)+10px))] pb-5 shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
                 <div className="flex flex-wrap items-start gap-3">
                     <button onClick={onBack} aria-label="Back to studio" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white">
                         <ArrowLeft size={20} />

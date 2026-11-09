@@ -51,7 +51,7 @@
   display: flex;
   align-items: center;
   gap: var(--sf-3);
-  padding: max(var(--sf-4), env(safe-area-inset-top)) var(--sf-4) var(--sf-2);
+  padding: max(var(--sf-4), calc(10px + env(safe-area-inset-top))) var(--sf-4) var(--sf-2);
 }
 
 .sf-head-titles { flex: 1; min-width: 0; }

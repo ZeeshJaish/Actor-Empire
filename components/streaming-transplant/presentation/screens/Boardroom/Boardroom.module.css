@@ -6,7 +6,7 @@
 
 /* the room's head: its name in the game's display face, its colour rising from the corner, a
    thin line of it under the head, and two matching tiles: the way back and the service's mark */
-.br .brtop{position:relative;display:flex;align-items:center;gap:11px;padding:max(14px,env(safe-area-inset-top)) 14px 13px;isolation:isolate;
+.br .brtop{position:relative;display:flex;align-items:center;gap:11px;padding:max(14px,calc(10px + env(safe-area-inset-top))) 14px 13px;isolation:isolate;
   background:radial-gradient(110% 150% at 100% 0%,color-mix(in srgb,var(--epx-br-c) 22%,transparent) 0%,transparent 60%),linear-gradient(#0b0d13,#08090e);
   border-bottom:1px solid rgba(255,255,255,.07)}
 .br .brtop::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;pointer-events:none;
@@ -62,6 +62,8 @@
   box-shadow:0 0 7px rgba(255,90,95,.9)}
 
 .br .brscroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 14px}
+/* the end of a tab clears the home indicator (a spacer, so nothing sticky inside is lifted while scrolling) */
+.br .brscroll::after{content:"";display:block;height:env(safe-area-inset-bottom)}
 .br .brfoot{height:30px}
 .br .brsec{padding-top:18px}
 .br .brhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:11px}

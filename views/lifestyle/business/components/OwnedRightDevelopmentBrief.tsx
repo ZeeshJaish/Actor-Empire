@@ -130,7 +130,7 @@ export const OwnedRightDevelopmentBrief: React.FC<OwnedRightDevelopmentBriefProp
 
     return (
         <motion.div
-            className="fixed inset-0 z-[190] flex items-end justify-center bg-black/90 backdrop-blur-md md:items-center md:p-6"
+            className="fixed inset-0 z-[190] flex items-end justify-center bg-black/90 pt-[calc(env(safe-area-inset-top)+10px)] backdrop-blur-md md:items-center md:p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -144,7 +144,7 @@ export const OwnedRightDevelopmentBrief: React.FC<OwnedRightDevelopmentBriefProp
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
                 onClick={event => event.stopPropagation()}
-                className="relative flex max-h-[96dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[28px] border border-amber-300/25 bg-[#080808] text-white shadow-[0_35px_120px_rgba(0,0,0,0.82)] md:max-h-[92dvh] md:rounded-[28px]"
+                className="relative flex max-h-[min(96dvh,100%)] w-full max-w-3xl flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] md:pb-0 rounded-t-[28px] border border-amber-300/25 bg-[#080808] text-white shadow-[0_35px_120px_rgba(0,0,0,0.82)] md:max-h-[92dvh] md:rounded-[28px]"
             >
                 <header className="relative shrink-0 overflow-hidden border-b border-white/10 px-5 py-5 md:px-7">
                     <div className="pointer-events-none absolute inset-0 opacity-70" style={{ background: `radial-gradient(circle at 82% 10%, ${ownedRight.accent}33, transparent 52%)` }} />

@@ -115,7 +115,7 @@ export const OwnedIpDossier: React.FC<OwnedIpDossierProps> = ({
                 exit={{ opacity: 0, y: 20 }}
                 className="mx-auto min-h-full w-full max-w-3xl pb-28"
             >
-                <header className="sticky top-0 z-20 border-b border-white/10 bg-[#08080b] px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+                <header className="sticky top-0 z-20 border-b border-white/10 bg-[#08080b] px-5 pb-4 pt-[max(1rem,calc(10px+env(safe-area-inset-top)))]">
                     <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                             <p className="text-[8px] font-black uppercase tracking-[0.24em] text-amber-300">{tr('ownedIp.dossier.title')}</p>
