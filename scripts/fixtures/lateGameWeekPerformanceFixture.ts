@@ -117,7 +117,10 @@ const buildReleasedPlan = (
 };
 
 export const buildLateGameWeekPerformanceFixture = (): Player => {
-    let player = migratePlayerSave(structuredClone(INITIAL_PLAYER) as Player);
+    /* 2026-11-09: migrate at the fixture's own clock. The cinema market (2026-10-22) is anchored to the week the save is
+       migrated at and only accepts the next week, so moving the clock after migration made every processed week
+       "Cinema stale or out-of-order". */
+    let player = migratePlayerSave({ ...structuredClone(INITIAL_PLAYER), age: 82, currentWeek: 49 } as Player);
     player = {
         ...player,
         id: 'late-game-week-performance-player',

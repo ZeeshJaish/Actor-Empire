@@ -17,10 +17,10 @@ const firstDifference = (left: unknown, right: unknown, path = '$'): string | nu
   return null;
 };
 
-const initial = migratePlayerSave(structuredClone(INITIAL_PLAYER) as Player);
-initial.id = 'ios-long-session-soak';
-initial.age = 18;
-initial.currentWeek = 1;
+/* 2026-11-09: migrate at the soak's own clock. The cinema market (2026-10-22) is anchored to the week the save is
+   migrated at and only accepts the next week, so moving the clock after migration failed the first week with
+   "Cinema stale or out-of-order". */
+const initial = migratePlayerSave({ ...structuredClone(INITIAL_PLAYER), id: 'ios-long-session-soak', age: 18, currentWeek: 1 } as Player);
 let left = structuredClone(initial);
 let right = structuredClone(initial);
 const weeks = Math.max(1, Math.round(Number(process.env.IOS_SOAK_DETERMINISM_WEEKS || 104)));
