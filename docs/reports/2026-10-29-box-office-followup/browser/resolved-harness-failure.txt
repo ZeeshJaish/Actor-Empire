@@ -1,0 +1,160 @@
+page.waitForFunction: Timeout 60000ms exceeded.
+    at /private/tmp/actor-cinema-followup-20261029/browser-app.cjs:41:15
+New Player
+ACTOR
+FLOP ERA
+YEAR
+37
+WEEK 23 / 52
+NET WORTH
+$784.9M
+ENERGY
+100 / 100
+
+CONDITION
+
+46%
+HEALTH
+10%
+PHYSIQUE
+67%
+MOOD
+0%
+LOOKS
+
+SKILLS
+
+31%
+TALENT
+100%
+EXPERIENCE
+
+STATUS
+
+96%
+REPUTATION
+100%
+FAME
+ACTIVITY
+50 EVENTS
+YEAR 37 · WEEK 23
+
+⚠️ Offer expired: "Producer Investment: Wild Harbor"
+
+⚠️ Offer expired: "Direct Offer: Avengers: Endgame"
+
+⚠️ Offer expired: "Audition: The Memory of Winter"
+
+🩺 Cold / Flu: A minor illness is dragging down your energy.
+
+🩺 Back Pain: A small body issue is making movement and long workdays harder.
+
+🏢 Hulu: Desert at Summer cleared delivery.
+
+🏢 Apple TV+ committed 1 project to development.
+
+🏢 Lionsgate reviewed 1 active slate project.
+
+🏢 Marvel Studios committed 1 project to development.
+
+🏢 MGM committed 1 project to development.
+
+🏢 Northstar Storyworks reviewed 1 active slate project.
+
+🏢 Crownline Films reviewed 3 active slate projects.
+
+🏢 Midnight Studios reviewed 1 active slate project.
+
+🏢 Golden Hour Productions reviewed 5 active slate projects.
+
+🏢 Bright Arc Films reviewed 3 active slate projects.
+
+🏢 Moonfield Entertainment reviewed 4 active slate projects.
+
+🏢 Northstar Studios reviewed 4 active slate projects.
+
+🏢 Wild Cut Creative House reviewed 2 active slate projects.
+
+🏢 Wild Cut Films reviewed 1 active slate project.
+
+🏢 Graveyard Motion Group reviewed 3 active slate projects.
+
+🏢 Sable Creative House reviewed 1 active slate project.
+
+🏢 Velvet Media reviewed 4 active slate projects.
+
+🏢 The Lost Song of the Northern Lights was released.
+
+The week passed without incident.
+
+YEAR 37 · WEEK 22
+
+⚠️ Offer expired: "Sponsorship: GymShark"
+
+📅 Event: The 'Private' Performance
+
+🌟 New talent has emerged in the industry.
+
+📅 Rights Desk: 0 decisions required; 0 approaching expiry; 0 delegated renewals; 0 market returns; 1 expired.
+
+🏢 Amazon Studios reviewed 1 active slate project.
+
+🏢 Amazon Studios moved 1 greenlit project into physical production.
+
+🏢 Apple TV+ reviewed 1 active slate project.
+
+🏢 Lionsgate committed 1 project to development.
+
+🏢 Lionsgate reviewed 1 active slate project.
+
+🏢 Marvel Studios reviewed 1 active slate project.
+
+🏢 Marvel Studios moved 1 greenlit project into physical production.
+
+🏢 Netflix moved 1 greenlit project into physical production.
+
+🏢 Northstar Storyworks reviewed 2 active slate projects.
+
+🏢 Crownline Films committed 1 project to development.
+
+🏢 Crownline Films reviewed 2 active slate projects.
+
+🏢 Midnight Studios reviewed 2 active slate projects.
+
+🏢 Golden Hour Productions reviewed 1 active slate project.
+
+🏢 Bright Arc Films reviewed 2 active slate projects.
+
+🏢 Moonfield Entertainment reviewed 6 active slate projects.
+
+🏢 Northstar Studios reviewed 1 active slate project.
+
+🏢 Wild Cut Creative House reviewed 4 active slate projects.
+
+🏢 Wild Cut Films reviewed 1 active slate project.
+
+🏢 Graveyard Motion Group reviewed 4 active slate projects.
+
+🏢 Sable Creative House reviewed 3 active slate projects.
+
+🏢 Door: The Other Side was released.
+
+🏢 Island Without River was released.
+
+This week · Energy
+EXPENSE LOG
+
+Week 23 energy usage from actions and commitments.
+
+SPENT
+0E
+RESERVED
+0E
+AVAILABLE
+100E
+
+No energy spent this week.
+
+Age Up Week
+W 24
+9+

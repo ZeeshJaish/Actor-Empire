@@ -1,0 +1,409 @@
+{
+  "order": [
+    "old",
+    "new",
+    "new",
+    "old"
+  ],
+  "scope": "Same-host ABBA built-app samples,6 weeks per run, identical signed initial fixture, normal unseeded UI/events, no forced GC; not field/device evidence",
+  "rows": [
+    {
+      "mode": "old",
+      "n": 12,
+      "medianMs": 3180.849999964237,
+      "p95Ms": 3624.100000023842,
+      "minMs": 2975.5999999046326,
+      "maxMs": 3624.100000023842,
+      "under3": 1,
+      "wall": {
+        "n": 12,
+        "medianMs": 3181,
+        "p95Ms": 3628,
+        "minMs": 2977,
+        "maxMs": 3628,
+        "under3": 1
+      },
+      "weeks": [
+        {
+          "week": 1,
+          "ms": 3284,
+          "interaction": {
+            "clickedEpoch": 1793802311783,
+            "tapToPaintMs": 3238.2999999523163,
+            "tapToDurableMs": 3219.899999976158,
+            "durableToPaintMs": 18.399999976158142,
+            "commandToClickMs": 46
+          },
+          "stage": {
+            "elapsedMs": 3219,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:2|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:10|game_loop_done:1|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:568|indexeddb_write_start:0|indexeddb_write_done:1270|success:1"
+          }
+        },
+        {
+          "week": 2,
+          "ms": 3137,
+          "interaction": {
+            "clickedEpoch": 1793802321103,
+            "tapToPaintMs": 3125.2999999523163,
+            "tapToDurableMs": 3115.399999976158,
+            "durableToPaintMs": 9.899999976158142,
+            "commandToClickMs": 11
+          },
+          "stage": {
+            "elapsedMs": 3115,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:11|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:545|indexeddb_write_start:0|indexeddb_write_done:1249|success:1"
+          }
+        },
+        {
+          "week": 3,
+          "ms": 3060,
+          "interaction": {
+            "clickedEpoch": 1793802327597,
+            "tapToPaintMs": 3046.2999999523163,
+            "tapToDurableMs": 3038,
+            "durableToPaintMs": 8.299999952316284,
+            "commandToClickMs": 13
+          },
+          "stage": {
+            "elapsedMs": 3038,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:4|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:8|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:548|indexeddb_write_start:1|indexeddb_write_done:1255|success:1"
+          }
+        },
+        {
+          "week": 4,
+          "ms": 3149,
+          "interaction": {
+            "clickedEpoch": 1793802338186,
+            "tapToPaintMs": 3142.7999999523163,
+            "tapToDurableMs": 3133.2000000476837,
+            "durableToPaintMs": 9.599999904632568,
+            "commandToClickMs": 11
+          },
+          "stage": {
+            "elapsedMs": 3133,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:0|loop_weekly_offers_done:2|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:8|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:557|indexeddb_write_start:0|indexeddb_write_done:1247|success:2"
+          }
+        },
+        {
+          "week": 5,
+          "ms": 3164,
+          "interaction": {
+            "clickedEpoch": 1793802344372,
+            "tapToPaintMs": 3145.6999999284744,
+            "tapToDurableMs": 3133.100000023842,
+            "durableToPaintMs": 12.599999904632568,
+            "commandToClickMs": 18
+          },
+          "stage": {
+            "elapsedMs": 3133,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:0|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:10|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:558|indexeddb_write_start:0|indexeddb_write_done:1257|success:1"
+          }
+        },
+        {
+          "week": 6,
+          "ms": 3198,
+          "interaction": {
+            "clickedEpoch": 1793802350566,
+            "tapToPaintMs": 3185,
+            "tapToDurableMs": 3173.2000000476837,
+            "durableToPaintMs": 11.799999952316284,
+            "commandToClickMs": 13
+          },
+          "stage": {
+            "elapsedMs": 3173,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:2|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:9|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:560|indexeddb_write_start:0|indexeddb_write_done:1271|success:1"
+          }
+        },
+        {
+          "week": 1,
+          "ms": 3628,
+          "interaction": {
+            "clickedEpoch": 1793802588584,
+            "tapToPaintMs": 3576.100000023842,
+            "tapToDurableMs": 3564,
+            "durableToPaintMs": 12.100000023841858,
+            "commandToClickMs": 48
+          },
+          "stage": {
+            "elapsedMs": 3563,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:1|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:1|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:11|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:618|indexeddb_write_start:1|indexeddb_write_done:1436|success:1"
+          }
+        },
+        {
+          "week": 2,
+          "ms": 3477,
+          "interaction": {
+            "clickedEpoch": 1793802598467,
+            "tapToPaintMs": 3466.100000023842,
+            "tapToDurableMs": 3454.2999999523163,
+            "durableToPaintMs": 11.800000071525574,
+            "commandToClickMs": 11
+          },
+          "stage": {
+            "elapsedMs": 3454,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:15|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:1|persist_prepare_start:0|persist_prepare_done:606|indexeddb_write_start:0|indexeddb_write_done:1371|success:1"
+          }
+        },
+        {
+          "week": 3,
+          "ms": 3436,
+          "interaction": {
+            "clickedEpoch": 1793802605300,
+            "tapToPaintMs": 3425.600000023842,
+            "tapToDurableMs": 3415.600000023842,
+            "durableToPaintMs": 10,
+            "commandToClickMs": 9
+          },
+          "stage": {
+            "elapsedMs": 3415,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:0|loop_weekly_offers_done:5|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:10|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:605|indexeddb_write_start:1|indexeddb_write_done:1455|success:1"
+          }
+        },
+        {
+          "week": 4,
+          "ms": 3142,
+          "interaction": {
+            "clickedEpoch": 1793802616475,
+            "tapToPaintMs": 3131.600000023842,
+            "tapToDurableMs": 3119.8000000715256,
+            "durableToPaintMs": 11.799999952316284,
+            "commandToClickMs": 10
+          },
+          "stage": {
+            "elapsedMs": 3120,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:0|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:8|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:559|indexeddb_write_start:0|indexeddb_write_done:1252|success:1"
+          }
+        },
+        {
+          "week": 5,
+          "ms": 2977,
+          "interaction": {
+            "clickedEpoch": 1793802622650,
+            "tapToPaintMs": 2965.5999999046326,
+            "tapToDurableMs": 2949.5999999046326,
+            "durableToPaintMs": 16,
+            "commandToClickMs": 10
+          },
+          "stage": {
+            "elapsedMs": 2950,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:0|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:8|game_loop_done:1|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:533|indexeddb_write_start:0|indexeddb_write_done:1227|success:1"
+          }
+        },
+        {
+          "week": 6,
+          "ms": 3229,
+          "interaction": {
+            "clickedEpoch": 1793802628722,
+            "tapToPaintMs": 3213.600000023842,
+            "tapToDurableMs": 3198,
+            "durableToPaintMs": 15.600000023841858,
+            "commandToClickMs": 15
+          },
+          "stage": {
+            "elapsedMs": 3198,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:1|loop_weekly_offers_done:3|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:10|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:565|indexeddb_write_start:0|indexeddb_write_done:1330|success:1"
+          }
+        }
+      ]
+    },
+    {
+      "mode": "new",
+      "n": 12,
+      "medianMs": 3119.800000011921,
+      "p95Ms": 3608.8000000715256,
+      "minMs": 3055.600000023842,
+      "maxMs": 3608.8000000715256,
+      "under3": 0,
+      "wall": {
+        "n": 12,
+        "medianMs": 3120,
+        "p95Ms": 3614,
+        "minMs": 3056,
+        "maxMs": 3614,
+        "under3": 0
+      },
+      "weeks": [
+        {
+          "week": 1,
+          "ms": 3192,
+          "interaction": {
+            "clickedEpoch": 1793802393489,
+            "tapToPaintMs": 3141.100000023842,
+            "tapToDurableMs": 3122.899999976158,
+            "durableToPaintMs": 18.200000047683716,
+            "commandToClickMs": 52
+          },
+          "stage": {
+            "elapsedMs": 3122,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:1|loop_weekly_offers_done:8|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:1|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:16|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:574|indexeddb_write_start:0|indexeddb_write_done:1223|success:1"
+          }
+        },
+        {
+          "week": 2,
+          "ms": 3155,
+          "interaction": {
+            "clickedEpoch": 1793802402720,
+            "tapToPaintMs": 3140.600000023842,
+            "tapToDurableMs": 3127.7000000476837,
+            "durableToPaintMs": 12.899999976158142,
+            "commandToClickMs": 15
+          },
+          "stage": {
+            "elapsedMs": 3128,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:18|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:1|persist_prepare_start:0|persist_prepare_done:569|indexeddb_write_start:0|indexeddb_write_done:1239|success:1"
+          }
+        },
+        {
+          "week": 3,
+          "ms": 3107,
+          "interaction": {
+            "clickedEpoch": 1793802409188,
+            "tapToPaintMs": 3087.1999999284744,
+            "tapToDurableMs": 3074.1999999284744,
+            "durableToPaintMs": 13,
+            "commandToClickMs": 19
+          },
+          "stage": {
+            "elapsedMs": 3074,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:0|loop_weekly_offers_done:2|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:6|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:559|indexeddb_write_start:0|indexeddb_write_done:1235|success:1"
+          }
+        },
+        {
+          "week": 4,
+          "ms": 3080,
+          "interaction": {
+            "clickedEpoch": 1793802419739,
+            "tapToPaintMs": 3063.2999999523163,
+            "tapToDurableMs": 3054.100000023842,
+            "durableToPaintMs": 9.199999928474426,
+            "commandToClickMs": 16
+          },
+          "stage": {
+            "elapsedMs": 3054,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:0|loop_weekly_offers_done:3|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:7|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:560|indexeddb_write_start:0|indexeddb_write_done:1264|success:1"
+          }
+        },
+        {
+          "week": 5,
+          "ms": 3116,
+          "interaction": {
+            "clickedEpoch": 1793802425841,
+            "tapToPaintMs": 3102.2999999523163,
+            "tapToDurableMs": 3085.5999999046326,
+            "durableToPaintMs": 16.700000047683716,
+            "commandToClickMs": 13
+          },
+          "stage": {
+            "elapsedMs": 3086,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:0|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:8|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:565|indexeddb_write_start:0|indexeddb_write_done:1314|success:1"
+          }
+        },
+        {
+          "week": 6,
+          "ms": 3056,
+          "interaction": {
+            "clickedEpoch": 1793802434968,
+            "tapToPaintMs": 3038.600000023842,
+            "tapToDurableMs": 3022.9000000953674,
+            "durableToPaintMs": 15.699999928474426,
+            "commandToClickMs": 17
+          },
+          "stage": {
+            "elapsedMs": 3023,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:0|loop_weekly_offers_done:2|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:10|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:563|indexeddb_write_start:0|indexeddb_write_done:1254|success:1"
+          }
+        },
+        {
+          "week": 1,
+          "ms": 3124,
+          "interaction": {
+            "clickedEpoch": 1793802477765,
+            "tapToPaintMs": 3074.3000000715256,
+            "tapToDurableMs": 3055.4000000953674,
+            "durableToPaintMs": 18.899999976158142,
+            "commandToClickMs": 50
+          },
+          "stage": {
+            "elapsedMs": 3055,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:1|loop_weekly_offers_done:5|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:17|game_loop_done:1|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:565|indexeddb_write_start:0|indexeddb_write_done:1214|success:1"
+          }
+        },
+        {
+          "week": 2,
+          "ms": 3146,
+          "interaction": {
+            "clickedEpoch": 1793802486847,
+            "tapToPaintMs": 3132.5,
+            "tapToDurableMs": 3122.8000000715256,
+            "durableToPaintMs": 9.699999928474426,
+            "commandToClickMs": 14
+          },
+          "stage": {
+            "elapsedMs": 3123,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:14|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:551|indexeddb_write_start:0|indexeddb_write_done:1260|success:1"
+          }
+        },
+        {
+          "week": 3,
+          "ms": 3065,
+          "interaction": {
+            "clickedEpoch": 1793802493324,
+            "tapToPaintMs": 3045.7000000476837,
+            "tapToDurableMs": 3037.5,
+            "durableToPaintMs": 8.200000047683716,
+            "commandToClickMs": 19
+          },
+          "stage": {
+            "elapsedMs": 3037,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:3|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:8|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:552|indexeddb_write_start:0|indexeddb_write_done:1269|success:1"
+          }
+        },
+        {
+          "week": 4,
+          "ms": 3064,
+          "interaction": {
+            "clickedEpoch": 1793802503825,
+            "tapToPaintMs": 3044.600000023842,
+            "tapToDurableMs": 3030.600000023842,
+            "durableToPaintMs": 14,
+            "commandToClickMs": 19
+          },
+          "stage": {
+            "elapsedMs": 3030,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:6|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:536|indexeddb_write_start:0|indexeddb_write_done:1285|success:1"
+          }
+        },
+        {
+          "week": 5,
+          "ms": 3306,
+          "interaction": {
+            "clickedEpoch": 1793802509930,
+            "tapToPaintMs": 3290.100000023842,
+            "tapToDurableMs": 3278.2999999523163,
+            "durableToPaintMs": 11.800000071525574,
+            "commandToClickMs": 14
+          },
+          "stage": {
+            "elapsedMs": 3278,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:1|loop_weekly_offers_done:1|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:1|loop_final_trim_done:0|loop_world_integrity_start:0|loop_world_integrity_done:13|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:593|indexeddb_write_start:0|indexeddb_write_done:1422|success:2"
+          }
+        },
+        {
+          "week": 6,
+          "ms": 3614,
+          "interaction": {
+            "clickedEpoch": 1793802516339,
+            "tapToPaintMs": 3597.8000000715256,
+            "tapToDurableMs": 3556.8000000715256,
+            "durableToPaintMs": 41,
+            "commandToClickMs": 11
+          },
+          "stage": {
+            "elapsedMs": 3557,
+            "timeline": "loop_weekly_social_start:0|loop_weekly_social_done:1|loop_weekly_offers_start:13|loop_weekly_offers_done:10|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:8|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:592|indexeddb_write_start:1|indexeddb_write_done:1432|success:3"
+          }
+        }
+      ]
+    }
+  ]
+}

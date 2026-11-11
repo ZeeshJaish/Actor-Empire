@@ -1,0 +1,50 @@
+[
+  {
+    "name": "parity-native-0",
+    "code": 0
+  },
+  {
+    "name": "parity-native-1",
+    "code": 0
+  },
+  {
+    "name": "parity-native-2",
+    "code": 0
+  },
+  {
+    "name": "parity-native-3",
+    "code": 0
+  },
+  {
+    "name": "parity-native-4",
+    "code": 0
+  },
+  {
+    "name": "parity-native-5",
+    "code": 0
+  },
+  {
+    "name": "parity-legacy-0",
+    "code": 0
+  },
+  {
+    "name": "parity-legacy-1",
+    "code": 0
+  },
+  {
+    "name": "parity-legacy-2",
+    "code": 0
+  },
+  {
+    "name": "parity-legacy-3",
+    "code": 0
+  },
+  {
+    "name": "parity-legacy-4",
+    "code": 0
+  },
+  {
+    "name": "parity-legacy-5",
+    "code": 0
+  }
+]

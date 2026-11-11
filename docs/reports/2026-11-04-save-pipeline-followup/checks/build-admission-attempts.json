@@ -1,0 +1,10 @@
+[
+  {
+    "startingHeadroomPercent": 55,
+    "result": "Timed out after180s before starting any heavy build"
+  },
+  {
+    "startingHeadroomPercent": 50,
+    "result": "Retry with unchanged2048MiB heap/3072MiB tree/512MiB swap stop"
+  }
+]

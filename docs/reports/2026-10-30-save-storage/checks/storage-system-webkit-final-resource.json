@@ -1,0 +1,14 @@
+{
+  "label": "storage-system-webkit-final",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 479.546875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 3562
+}

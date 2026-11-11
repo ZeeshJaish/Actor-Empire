@@ -1,0 +1,15 @@
+{
+  "initialFiles": 331,
+  "unchanged": 325,
+  "changedByThisTask": [
+    "services/boxOffice/boxOfficeMarket.ts",
+    "services/saveIntegrity.ts"
+  ],
+  "concurrentChangesPreserved": [
+    "package.json",
+    "services/gameLoop.ts",
+    "types.ts",
+    "views/mobile/MobilePage.tsx"
+  ],
+  "missing": []
+}

@@ -1,0 +1,13 @@
+{
+  "label": "component-comparison",
+  "heapMiB": 128,
+  "rssLimitMiB": 2560,
+  "peakOwnedTreeRssMiB": 1244.125,
+  "peakGlobalSwapGrowthMiB": 0,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 11489,
+  "peakProcesses": "38491 38487 126048 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n38493 38491  78560 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell\n38494 38493  46400 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell\n38495 38493  40688 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell\n38496 38493 948672 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell"
+}

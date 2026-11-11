@@ -1,0 +1,37 @@
+{
+  "weeks": 1469,
+  "finalProfile": {
+    "weeks": 1469,
+    "age": 43,
+    "week": 14,
+    "cash": 4722362616,
+    "craft": 92.32433292473904,
+    "fame": 100,
+    "reputation": 100,
+    "experience": 100,
+    "health": 74.1,
+    "followers": 443723283,
+    "credits": 52,
+    "studios": 0,
+    "roles": [
+      {
+        "id": "aud_active_1800000026265_0.13871339824981987",
+        "role": "LEAD",
+        "phase": "POST_PRODUCTION",
+        "pay": 1404658
+      },
+      {
+        "id": "aud_active_1800000026660_0.013232258148491383",
+        "role": "SUPPORTING",
+        "phase": "PRODUCTION",
+        "pay": 60000
+      }
+    ]
+  },
+  "manualCapitalGrants": 0,
+  "loans": 0,
+  "acceptedSponsorWeeklyMaximum": 68544398,
+  "sponsorshipContractsSigned": 47,
+  "lifeChoiceCashReceipts": [],
+  "note": "Sponsor amounts are actual accepted weekly quotes, before commissions; they are separate from movie gross and producer profit."
+}

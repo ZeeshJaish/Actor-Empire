@@ -1,0 +1,12 @@
+{
+  "label": "final-week",
+  "heapMiB": 128,
+  "peakOwnedTreeRssMiB": 1802.8125,
+  "peakGlobalSwapGrowthMiB": 0,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 326806,
+  "peakProcesses": "41215 41210 147408 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n41267 41215 193568 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing\n41273 41267 149488 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper (GPU).app/Contents/MacOS/Google Chrome for Testing Helper (GPU)\n41274 41267  87584 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper.app/Contents/MacOS/Google Chrome for Testing Helper\n41275 41267  66208 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper.app/Contents/MacOS/Google Chrome for Testing Helper\n41278 41267  79808 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper (Renderer).app/Contents/MacOS/Google Chrome for Testing Helper (Renderer)\n41279 41267 1122032 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper (Renderer).app/Contents/MacOS/Google Chrome for Testing Helper (Renderer)"
+}

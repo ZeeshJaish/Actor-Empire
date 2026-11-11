@@ -1,0 +1,14 @@
+{
+  "label": "legacy-paid-streaming-save-safety",
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 1057.109375,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 4600,
+  "script": "/private/tmp/actor-cinema-mature-universe-route-09edec4-20261024/tooling/run-current-safety.mjs",
+  "args": [
+    "scripts/audit-cinema-mature-final-save.ts",
+    "legacy-paid-streaming-save-safety"
+  ]
+}

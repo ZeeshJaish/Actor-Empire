@@ -1,0 +1,9 @@
+{
+  "label": "archive-red",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 0,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 602
+}

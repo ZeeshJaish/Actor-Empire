@@ -1,0 +1,164 @@
+[
+  {
+    "name": "audit-ai-catalogue-read-batch",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-ai-catalogue-read-batch",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 279
+    }
+  },
+  {
+    "name": "audit-royalty-source-index",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-royalty-source-index",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 268
+    }
+  },
+  {
+    "name": "audit-save-preparation-projections",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-save-preparation-projections",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 894
+    }
+  },
+  {
+    "name": "audit-cinema-country-scaling",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-cinema-country-scaling",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 218
+    }
+  },
+  {
+    "name": "audit-save-generations",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-save-generations",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 333
+    }
+  },
+  {
+    "name": "audit-career-record-preservation",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-career-record-preservation",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 354.75,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3880
+    }
+  },
+  {
+    "name": "audit-box-office-integration",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-box-office-integration",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 488.25,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 18864
+    }
+  },
+  {
+    "name": "audit-weekly-viewing-parity",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-weekly-viewing-parity",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 45.81999999999971,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 857.15625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 5880
+    }
+  },
+  {
+    "name": "audit-streaming-signed-royalties",
+    "code": 0,
+    "resource": {
+      "label": "final-focused-audit-streaming-signed-royalties",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 361.109375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 6451
+    }
+  }
+]

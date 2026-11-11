@@ -1,0 +1,14 @@
+{
+  "label": "latency-clinic-smoke-verified",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": true,
+  "peakGlobalSwapGrowthMiB": 790.2599999999984,
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 1035.828125,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 42757
+}

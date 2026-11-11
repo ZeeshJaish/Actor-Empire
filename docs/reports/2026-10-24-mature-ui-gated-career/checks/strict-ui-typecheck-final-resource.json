@@ -1,0 +1,15 @@
+{
+  "label": "strict-ui-typecheck-final",
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 917.125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 3830,
+  "script": "node_modules/typescript/bin/tsc",
+  "args": [
+    "--noEmit",
+    "-p",
+    "docs/reports/2026-10-24-mature-ui-gated-career/checks/typecheck.json"
+  ]
+}

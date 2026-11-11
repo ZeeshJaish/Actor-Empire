@@ -1,0 +1,15 @@
+{
+  "label": "latency-memory-probe",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 512,
+  "peakProcessBreakdown": "77438 77434 186096 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n77455 77438 100480 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell\n77457 77455  86096 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell\n77459 77455  44784 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell\n77461 77455 2244848 /Users/zeesh/Library/Caches/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+  "peakOwnedTreeRssMiB": 2598.53125,
+  "stopReason": "Worker tree exceeded 2.5GiB",
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 24117
+}

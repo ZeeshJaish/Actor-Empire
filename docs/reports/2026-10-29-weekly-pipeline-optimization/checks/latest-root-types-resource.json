@@ -1,0 +1,14 @@
+{
+  "label": "latest-root-types",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 350.8100000000013,
+  "heapMiB": 2048,
+  "peakOwnedTreeRssMiB": 1227.375,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 33540
+}

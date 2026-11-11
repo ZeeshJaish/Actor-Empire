@@ -1,0 +1,9 @@
+{
+  "label": "final-preservation-roundtrip",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 327.5625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 4923
+}

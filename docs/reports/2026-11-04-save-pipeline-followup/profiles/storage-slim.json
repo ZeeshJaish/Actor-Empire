@@ -1,0 +1,395 @@
+{
+  "scope": "Instrumented actual IndexedDB/preparation of retained large save; controlled +10 dollars, not gameplay earnings or app latency",
+  "rows": [
+    {
+      "iteration": 0,
+      "prepare": {
+        "ms": 348,
+        "metrics": {
+          "validateWorldEconomyCandidate": {
+            "count": 1,
+            "ms": 14.700000047683716
+          },
+          "compactPlayerForPersistence": {
+            "count": 1,
+            "ms": 101.69999992847443
+          },
+          "stableSaveHash": {
+            "count": 59,
+            "ms": 204.59999990463257
+          },
+          "userCareerRecordsState": {
+            "count": 2,
+            "ms": 38.799999833106995
+          },
+          "studioCompanyState": {
+            "count": 2,
+            "ms": 3.399999976158142
+          },
+          "industryIntelligenceState": {
+            "count": 2,
+            "ms": 27.40000009536743
+          },
+          "worldEconomyState": {
+            "count": 2,
+            "ms": 1.399999976158142
+          },
+          "createProtectedState": {
+            "count": 2,
+            "ms": 230.59999990463257
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "ms": 231.10000002384186
+          }
+        }
+      },
+      "write": {
+        "ms": 880.3999999761581,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "ms": 311.7999995946884
+          },
+          "userCareerRecordsState": {
+            "count": 3,
+            "ms": 63.00000011920929
+          },
+          "studioCompanyState": {
+            "count": 3,
+            "ms": 7.8999998569488525
+          },
+          "industryIntelligenceState": {
+            "count": 3,
+            "ms": 74.40000009536743
+          },
+          "worldEconomyState": {
+            "count": 3,
+            "ms": 2.600000023841858
+          },
+          "createProtectedState": {
+            "count": 3,
+            "ms": 386.10000002384186
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "ms": 424.1999999284744
+          },
+          "deserialize": {
+            "count": 5,
+            "ms": 221
+          },
+          "put:actorEmpireSave_1__previous": {
+            "count": 1,
+            "ms": 112.39999997615814
+          },
+          "put:actorEmpireSave_1": {
+            "count": 1,
+            "ms": 105.10000002384186
+          },
+          "put:actorEmpireSave_1__integrity": {
+            "count": 1,
+            "ms": 0
+          }
+        }
+      },
+      "load": {
+        "ms": 254.20000004768372,
+        "metrics": {
+          "deserialize": {
+            "count": 3,
+            "ms": 101.20000004768372
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "ms": 102.39999997615814
+          },
+          "userCareerRecordsState": {
+            "count": 1,
+            "ms": 20.800000071525574
+          },
+          "studioCompanyState": {
+            "count": 1,
+            "ms": 2.200000047683716
+          },
+          "industryIntelligenceState": {
+            "count": 1,
+            "ms": 39.89999997615814
+          },
+          "worldEconomyState": {
+            "count": 1,
+            "ms": 0.6000000238418579
+          },
+          "createProtectedState": {
+            "count": 1,
+            "ms": 142.80000007152557
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "ms": 150.90000009536743
+          }
+        }
+      }
+    },
+    {
+      "iteration": 1,
+      "prepare": {
+        "ms": 274.10000002384186,
+        "metrics": {
+          "validateWorldEconomyCandidate": {
+            "count": 1,
+            "ms": 11.300000071525574
+          },
+          "compactPlayerForPersistence": {
+            "count": 1,
+            "ms": 47.799999952316284
+          },
+          "stableSaveHash": {
+            "count": 59,
+            "ms": 192.4999998807907
+          },
+          "userCareerRecordsState": {
+            "count": 2,
+            "ms": 35.5
+          },
+          "studioCompanyState": {
+            "count": 2,
+            "ms": 2.600000023841858
+          },
+          "industryIntelligenceState": {
+            "count": 2,
+            "ms": 23.799999952316284
+          },
+          "worldEconomyState": {
+            "count": 2,
+            "ms": 1.100000023841858
+          },
+          "createProtectedState": {
+            "count": 2,
+            "ms": 214.79999995231628
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "ms": 214.89999997615814
+          }
+        }
+      },
+      "write": {
+        "ms": 873.7999999523163,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "ms": 303.89999985694885
+          },
+          "userCareerRecordsState": {
+            "count": 3,
+            "ms": 61.200000047683716
+          },
+          "studioCompanyState": {
+            "count": 3,
+            "ms": 6
+          },
+          "industryIntelligenceState": {
+            "count": 3,
+            "ms": 91.69999992847443
+          },
+          "worldEconomyState": {
+            "count": 3,
+            "ms": 1.8000000715255737
+          },
+          "createProtectedState": {
+            "count": 3,
+            "ms": 395.09999990463257
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "ms": 434.1999999284744
+          },
+          "deserialize": {
+            "count": 5,
+            "ms": 210.5
+          },
+          "put:actorEmpireSave_1__previous": {
+            "count": 1,
+            "ms": 112.19999992847443
+          },
+          "put:actorEmpireSave_1": {
+            "count": 1,
+            "ms": 108
+          },
+          "put:actorEmpireSave_1__integrity": {
+            "count": 1,
+            "ms": 0
+          }
+        }
+      },
+      "load": {
+        "ms": 256.5,
+        "metrics": {
+          "deserialize": {
+            "count": 3,
+            "ms": 104.30000007152557
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "ms": 106.89999997615814
+          },
+          "userCareerRecordsState": {
+            "count": 1,
+            "ms": 20.600000023841858
+          },
+          "studioCompanyState": {
+            "count": 1,
+            "ms": 2.1999999284744263
+          },
+          "industryIntelligenceState": {
+            "count": 1,
+            "ms": 37.5
+          },
+          "worldEconomyState": {
+            "count": 1,
+            "ms": 0.7000000476837158
+          },
+          "createProtectedState": {
+            "count": 1,
+            "ms": 143.20000004768372
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "ms": 150.5
+          }
+        }
+      }
+    },
+    {
+      "iteration": 2,
+      "prepare": {
+        "ms": 279.60000002384186,
+        "metrics": {
+          "validateWorldEconomyCandidate": {
+            "count": 1,
+            "ms": 9.100000023841858
+          },
+          "compactPlayerForPersistence": {
+            "count": 1,
+            "ms": 53
+          },
+          "stableSaveHash": {
+            "count": 59,
+            "ms": 196.59999978542328
+          },
+          "userCareerRecordsState": {
+            "count": 2,
+            "ms": 37.00000011920929
+          },
+          "studioCompanyState": {
+            "count": 2,
+            "ms": 2.5999999046325684
+          },
+          "industryIntelligenceState": {
+            "count": 2,
+            "ms": 22.600000023841858
+          },
+          "worldEconomyState": {
+            "count": 2,
+            "ms": 1.2000000476837158
+          },
+          "createProtectedState": {
+            "count": 2,
+            "ms": 217.40000009536743
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "ms": 217.40000009536743
+          }
+        }
+      },
+      "write": {
+        "ms": 843.6000000238419,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "ms": 300.89999973773956
+          },
+          "userCareerRecordsState": {
+            "count": 3,
+            "ms": 58.300000071525574
+          },
+          "studioCompanyState": {
+            "count": 3,
+            "ms": 5.599999904632568
+          },
+          "industryIntelligenceState": {
+            "count": 3,
+            "ms": 87.90000009536743
+          },
+          "worldEconomyState": {
+            "count": 3,
+            "ms": 1.8000000715255737
+          },
+          "createProtectedState": {
+            "count": 3,
+            "ms": 386.80000019073486
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "ms": 407.59999990463257
+          },
+          "deserialize": {
+            "count": 5,
+            "ms": 212.90000009536743
+          },
+          "put:actorEmpireSave_1__previous": {
+            "count": 1,
+            "ms": 109.70000004768372
+          },
+          "put:actorEmpireSave_1": {
+            "count": 1,
+            "ms": 108.59999990463257
+          },
+          "put:actorEmpireSave_1__integrity": {
+            "count": 1,
+            "ms": 0.10000002384185791
+          }
+        }
+      },
+      "load": {
+        "ms": 267,
+        "metrics": {
+          "deserialize": {
+            "count": 3,
+            "ms": 106.5
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "ms": 110.40000021457672
+          },
+          "userCareerRecordsState": {
+            "count": 1,
+            "ms": 17.59999990463257
+          },
+          "studioCompanyState": {
+            "count": 1,
+            "ms": 2.100000023841858
+          },
+          "industryIntelligenceState": {
+            "count": 1,
+            "ms": 47.10000002384186
+          },
+          "worldEconomyState": {
+            "count": 1,
+            "ms": 4.700000047683716
+          },
+          "createProtectedState": {
+            "count": 1,
+            "ms": 152.09999990463257
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "ms": 158.39999997615814
+          }
+        }
+      }
+    }
+  ]
+}

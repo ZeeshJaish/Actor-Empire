@@ -1,0 +1,68 @@
+{
+  "currentHead": "09edec4bf958d12c201b9ef848e1c5bcacc7e39e",
+  "checks": [
+    {
+      "label": "mature-current-final-save",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "637f234443750a0c2eb313b61d51a79958d5ec4fb10127fa274ea5c3c3c9f1ae",
+      "summary": [
+        "{\"passed\":5,\"failures\":0,\"weeks\":1469,\"executable\":\"fc13deb41103c920b7d0dfba268707cc3b8c3ea384a0d7747e7fb41784d6a1a3\",\"paidFactsSha256\":\"9802e8bec2d3b7acef2ddbe4b85f9930e01e24ac3572b111d75fd31f346db354\",\"cash\":4722362616,\"newGameWeeksProcessed\":0,\"personalSaveStorageAccessed\":false}"
+      ]
+    },
+    {
+      "label": "mature-closeout-typecheck",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": []
+    },
+    {
+      "label": "mature-closeout-migration",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "388056841da6b1b6c27eb98508be9701b9eaa2815bfca375a68a7a4c74545701",
+      "summary": [
+        "Migration audit: 25 groups passed"
+      ]
+    },
+    {
+      "label": "mature-closeout-settlement",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "191d4fedc5a662cd47a9524b02f954f9f264787779f8c2b4d34f4165456ad0bd",
+      "summary": [
+        "Integration audit: 32 groups passed"
+      ]
+    },
+    {
+      "label": "mature-closeout-team",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "1db0136af83e2bb2aee5869444e857e266d0783eb497e3fe0bd8b0547c2c5abf",
+      "summary": [
+        "{\"passes\":4,\"failures\":0}"
+      ]
+    },
+    {
+      "label": "mature-closeout-policy",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "7e061c7cde61c14487acac8eb65478b4d3710c24d7c5c2651dd8492de53cd5b2",
+      "summary": [
+        "{\"passed\":15,\"failures\":0,\"kind\":\"UI_ADAPTER_CASES_EXCLUDED_FROM_NORMAL_CAREER_RESULTS\"}"
+      ]
+    },
+    {
+      "label": "mature-closeout-file-store",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "70704fa30f3c835681e470dab22946de15f5ea6a391fa326db3deee08e477812",
+      "summary": [
+        "{\"passed\":9,\"failures\":0,\"kind\":\"SAVE_ADAPTER_PARITY_EXCLUDED_FROM_CAREER_RESULTS\"}"
+      ]
+    }
+  ],
+  "observationBoundaryCases": 2,
+  "simulationEnded": "UNIVERSE_RUN_CLOSED"
+}

@@ -1,0 +1,10 @@
+{
+  "passed": 5,
+  "failures": 0,
+  "weeks": 1469,
+  "executable": "fc13deb41103c920b7d0dfba268707cc3b8c3ea384a0d7747e7fb41784d6a1a3",
+  "paidFactsSha256": "9802e8bec2d3b7acef2ddbe4b85f9930e01e24ac3572b111d75fd31f346db354",
+  "cash": 4722362616,
+  "newGameWeeksProcessed": 0,
+  "personalSaveStorageAccessed": false
+}

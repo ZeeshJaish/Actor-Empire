@@ -1,0 +1,15 @@
+{
+  "offers": 1024,
+  "universes": [
+    "AVATAR",
+    "DCU",
+    "FAST_SAGA",
+    "JURASSIC",
+    "MCU",
+    "MONSTERVERSE",
+    "SPIDER_VERSE",
+    "SW"
+  ],
+  "mismatchCount": 0,
+  "examples": []
+}

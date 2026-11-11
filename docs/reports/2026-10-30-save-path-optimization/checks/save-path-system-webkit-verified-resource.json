@@ -1,0 +1,15 @@
+{
+  "label": "save-path-system-webkit-verified",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 128,
+  "peakProcessBreakdown": "75190 75186  52864 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n75199 75190 374624 /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend",
+  "peakOwnedTreeRssMiB": 417.46875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 6355
+}

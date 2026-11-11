@@ -1,0 +1,14 @@
+{
+  "label": "latency-owned-red-valid",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 622.28125,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 14086
+}

@@ -1,0 +1,20 @@
+{
+  "weeks": 1063,
+  "executable": "aab24cc4b2ba13addbdfc5b5b39f2f75dc691d5abbb181f3e2a155f280597907",
+  "sourceCheckpointSha256": "098ccf56ecb37b25140d54e3069fe9c5ca01f5ea554dcd2f7c521596464ace0b",
+  "finalProfile": {
+    "weeks": 1063,
+    "age": 35,
+    "week": 24,
+    "cash": 2157704968,
+    "craft": 92.28606014871875,
+    "fame": 86.41391769952888,
+    "reputation": 100,
+    "experience": 100,
+    "health": 83.09999999999985,
+    "followers": 222592314,
+    "credits": 33,
+    "studios": 0,
+    "alive": true
+  }
+}

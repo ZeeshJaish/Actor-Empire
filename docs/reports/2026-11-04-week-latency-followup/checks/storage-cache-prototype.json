@@ -1,0 +1,582 @@
+{
+  "scope": "Instrumented storage/preparation of retained large signed save; controlled +10 dollars per iteration, not gameplay or balance evidence",
+  "rows": [
+    {
+      "iteration": 0,
+      "prepare": {
+        "elapsedMs": 346.39999997615814,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 59,
+            "totalMs": 203.89999997615814,
+            "maxMs": 79.5,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 2,
+            "totalMs": 38.700000047683716,
+            "maxMs": 20.100000023841858,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 2,
+            "totalMs": 3.4999998807907104,
+            "maxMs": 2.299999952316284,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 2,
+            "totalMs": 27.5,
+            "maxMs": 16,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 2,
+            "totalMs": 1.399999976158142,
+            "maxMs": 0.7999999523162842,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 2,
+            "totalMs": 228.10000002384186,
+            "maxMs": 120.79999995231628,
+            "firstCallsMs": []
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "totalMs": 228.29999995231628,
+            "maxMs": 228.29999995231628,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "save": {
+        "elapsedMs": 901.7000000476837,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "totalMs": 305.6999999284744,
+            "maxMs": 79,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 3,
+            "totalMs": 58.89999997615814,
+            "maxMs": 20.899999976158142,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 3,
+            "totalMs": 6,
+            "maxMs": 2.399999976158142,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 3,
+            "totalMs": 75.5,
+            "maxMs": 46.39999997615814,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 3,
+            "totalMs": 1.899999976158142,
+            "maxMs": 0.7000000476837158,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 3,
+            "totalMs": 377.39999985694885,
+            "maxMs": 148.29999995231628,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "totalMs": 413.39999997615814,
+            "maxMs": 159,
+            "firstCallsMs": [
+              116.79999995231628,
+              137.60000002384186,
+              159
+            ]
+          },
+          "result_deserialize": {
+            "count": 4,
+            "totalMs": 240.19999980926514,
+            "maxMs": 130.39999997615814,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__previous": {
+            "count": 1,
+            "totalMs": 127.29999995231628,
+            "maxMs": 127.29999995231628,
+            "firstCallsMs": []
+          },
+          "put_sync_slot": {
+            "count": 1,
+            "totalMs": 107.79999995231628,
+            "maxMs": 107.79999995231628,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__integrity": {
+            "count": 1,
+            "totalMs": 0,
+            "maxMs": 0,
+            "firstCallsMs": []
+          },
+          "tx_readwrite": {
+            "count": 1,
+            "totalMs": 784.2999999523163,
+            "maxMs": 784.2999999523163,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "load": {
+        "elapsedMs": 255.39999997615814,
+        "metrics": {
+          "tx_readonly": {
+            "count": 1,
+            "totalMs": 1.399999976158142,
+            "maxMs": 1.399999976158142,
+            "firstCallsMs": []
+          },
+          "result_deserialize": {
+            "count": 2,
+            "totalMs": 103.39999997615814,
+            "maxMs": 103.39999997615814,
+            "firstCallsMs": []
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "totalMs": 102.39999997615814,
+            "maxMs": 76.80000007152557,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 1,
+            "totalMs": 20.5,
+            "maxMs": 20.5,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 1,
+            "totalMs": 2.399999976158142,
+            "maxMs": 2.399999976158142,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 1,
+            "totalMs": 39.700000047683716,
+            "maxMs": 39.700000047683716,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 1,
+            "totalMs": 0.5999999046325684,
+            "maxMs": 0.5999999046325684,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 1,
+            "totalMs": 142.30000007152557,
+            "maxMs": 142.30000007152557,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "totalMs": 150,
+            "maxMs": 150,
+            "firstCallsMs": [
+              150
+            ]
+          }
+        }
+      }
+    },
+    {
+      "iteration": 1,
+      "prepare": {
+        "elapsedMs": 269.7000000476837,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 59,
+            "totalMs": 191.19999969005585,
+            "maxMs": 73.89999997615814,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 2,
+            "totalMs": 35.40000009536743,
+            "maxMs": 17.700000047683716,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 2,
+            "totalMs": 2.299999952316284,
+            "maxMs": 1.1999999284744263,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 2,
+            "totalMs": 23.700000047683716,
+            "maxMs": 12.200000047683716,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 2,
+            "totalMs": 1.100000023841858,
+            "maxMs": 0.6000000238418579,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 2,
+            "totalMs": 213.10000002384186,
+            "maxMs": 106.89999997615814,
+            "firstCallsMs": []
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "totalMs": 213.30000007152557,
+            "maxMs": 213.30000007152557,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "save": {
+        "elapsedMs": 732.6999999284744,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "totalMs": 292.9999998807907,
+            "maxMs": 78.60000002384186,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 3,
+            "totalMs": 53.10000002384186,
+            "maxMs": 18,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 3,
+            "totalMs": 5.599999904632568,
+            "maxMs": 2.399999976158142,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 3,
+            "totalMs": 81.80000007152557,
+            "maxMs": 36.200000047683716,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 3,
+            "totalMs": 1.7999999523162842,
+            "maxMs": 0.6999999284744263,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 3,
+            "totalMs": 372.39999997615814,
+            "maxMs": 138.89999997615814,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "totalMs": 391.7999999523163,
+            "maxMs": 145.89999997615814,
+            "firstCallsMs": [
+              112,
+              133.89999997615814,
+              145.89999997615814
+            ]
+          },
+          "result_deserialize": {
+            "count": 3,
+            "totalMs": 107.90000009536743,
+            "maxMs": 107.90000009536743,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__previous": {
+            "count": 1,
+            "totalMs": 124,
+            "maxMs": 124,
+            "firstCallsMs": []
+          },
+          "put_sync_slot": {
+            "count": 1,
+            "totalMs": 105.20000004768372,
+            "maxMs": 105.20000004768372,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__integrity": {
+            "count": 1,
+            "totalMs": 0,
+            "maxMs": 0,
+            "firstCallsMs": []
+          },
+          "tx_readwrite": {
+            "count": 1,
+            "totalMs": 620.5,
+            "maxMs": 620.5,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "load": {
+        "elapsedMs": 283.60000002384186,
+        "metrics": {
+          "tx_readonly": {
+            "count": 1,
+            "totalMs": 1.7000000476837158,
+            "maxMs": 1.7000000476837158,
+            "firstCallsMs": []
+          },
+          "result_deserialize": {
+            "count": 2,
+            "totalMs": 128.89999997615814,
+            "maxMs": 128.89999997615814,
+            "firstCallsMs": []
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "totalMs": 105.5,
+            "maxMs": 78.19999992847443,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 1,
+            "totalMs": 21.799999952316284,
+            "maxMs": 21.799999952316284,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 1,
+            "totalMs": 2.3000000715255737,
+            "maxMs": 2.3000000715255737,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 1,
+            "totalMs": 40.5,
+            "maxMs": 40.5,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 1,
+            "totalMs": 0.6000000238418579,
+            "maxMs": 0.6000000238418579,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 1,
+            "totalMs": 145.19999992847443,
+            "maxMs": 145.19999992847443,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "totalMs": 152.39999997615814,
+            "maxMs": 152.39999997615814,
+            "firstCallsMs": [
+              152.39999997615814
+            ]
+          }
+        }
+      }
+    },
+    {
+      "iteration": 2,
+      "prepare": {
+        "elapsedMs": 265.90000009536743,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 59,
+            "totalMs": 191.69999992847443,
+            "maxMs": 74.60000002384186,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 2,
+            "totalMs": 35.299999952316284,
+            "maxMs": 17.799999952316284,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 2,
+            "totalMs": 2.600000023841858,
+            "maxMs": 1.3000000715255737,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 2,
+            "totalMs": 23.399999976158142,
+            "maxMs": 12.299999952316284,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 2,
+            "totalMs": 1,
+            "maxMs": 0.5,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 2,
+            "totalMs": 213.5,
+            "maxMs": 107.19999992847443,
+            "firstCallsMs": []
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "totalMs": 213.5,
+            "maxMs": 213.5,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "save": {
+        "elapsedMs": 734.6999999284744,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "totalMs": 297.89999985694885,
+            "maxMs": 81,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 3,
+            "totalMs": 55.99999988079071,
+            "maxMs": 20.199999928474426,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 3,
+            "totalMs": 4.800000071525574,
+            "maxMs": 2.3000000715255737,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 3,
+            "totalMs": 82.39999997615814,
+            "maxMs": 37.699999928474426,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 3,
+            "totalMs": 1.9000000953674316,
+            "maxMs": 0.7000000476837158,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 3,
+            "totalMs": 376.89999985694885,
+            "maxMs": 143.79999995231628,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "totalMs": 400.39999985694885,
+            "maxMs": 151.29999995231628,
+            "firstCallsMs": [
+              114.69999992847443,
+              134.39999997615814,
+              151.29999995231628
+            ]
+          },
+          "result_deserialize": {
+            "count": 3,
+            "totalMs": 107.30000007152557,
+            "maxMs": 107.30000007152557,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__previous": {
+            "count": 1,
+            "totalMs": 112.79999995231628,
+            "maxMs": 112.79999995231628,
+            "firstCallsMs": []
+          },
+          "put_sync_slot": {
+            "count": 1,
+            "totalMs": 107.80000007152557,
+            "maxMs": 107.80000007152557,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__integrity": {
+            "count": 1,
+            "totalMs": 0.09999990463256836,
+            "maxMs": 0.09999990463256836,
+            "firstCallsMs": []
+          },
+          "tx_readwrite": {
+            "count": 1,
+            "totalMs": 618.1999999284744,
+            "maxMs": 618.1999999284744,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "load": {
+        "elapsedMs": 267.3000000715256,
+        "metrics": {
+          "tx_readonly": {
+            "count": 1,
+            "totalMs": 1.7000000476837158,
+            "maxMs": 1.7000000476837158,
+            "firstCallsMs": []
+          },
+          "result_deserialize": {
+            "count": 2,
+            "totalMs": 114.70000004768372,
+            "maxMs": 114.70000004768372,
+            "firstCallsMs": []
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "totalMs": 103,
+            "maxMs": 77.89999997615814,
+            "firstCallsMs": []
+          },
+          "userCareerRecordsState": {
+            "count": 1,
+            "totalMs": 18.799999952316284,
+            "maxMs": 18.799999952316284,
+            "firstCallsMs": []
+          },
+          "studioCompanyState": {
+            "count": 1,
+            "totalMs": 2.5,
+            "maxMs": 2.5,
+            "firstCallsMs": []
+          },
+          "industryIntelligenceState": {
+            "count": 1,
+            "totalMs": 38.799999952316284,
+            "maxMs": 38.799999952316284,
+            "firstCallsMs": []
+          },
+          "worldEconomyState": {
+            "count": 1,
+            "totalMs": 0.6000000238418579,
+            "maxMs": 0.6000000238418579,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 1,
+            "totalMs": 140.39999997615814,
+            "maxMs": 140.39999997615814,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "totalMs": 150.29999995231628,
+            "maxMs": 150.29999995231628,
+            "firstCallsMs": [
+              150.29999995231628
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "browser": "151.0.7922.34"
+}

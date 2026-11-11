@@ -1,0 +1,9 @@
+{
+  "label": "paired-baseline-0",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 1054.296875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 9890
+}

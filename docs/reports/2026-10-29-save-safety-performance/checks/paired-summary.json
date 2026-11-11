@@ -1,0 +1,56 @@
+[
+  {
+    "round": 0,
+    "mode": "baseline",
+    "loopMs": 6764.047792,
+    "prepareMs": 732.1979580000007,
+    "writeMs": 821.7085000000006,
+    "readMs": 443.0426659999994,
+    "paidFacts": "6ad926b61c230cbc"
+  },
+  {
+    "round": 0,
+    "mode": "optimized",
+    "loopMs": 5930.850082999999,
+    "prepareMs": 814.6156660000006,
+    "writeMs": 1045.4911250000005,
+    "readMs": 573.7173750000002,
+    "paidFacts": "6ad926b61c230cbc"
+  },
+  {
+    "round": 1,
+    "mode": "optimized",
+    "loopMs": 6095.588917,
+    "prepareMs": 1421.5391250000002,
+    "writeMs": 901.2310409999991,
+    "readMs": 621.6078749999997,
+    "paidFacts": "6ad926b61c230cbc"
+  },
+  {
+    "round": 1,
+    "mode": "baseline",
+    "loopMs": 11070.067583,
+    "prepareMs": 769.3768749999999,
+    "writeMs": 832.7615420000002,
+    "readMs": 453.5064170000005,
+    "paidFacts": "6ad926b61c230cbc"
+  },
+  {
+    "round": 2,
+    "mode": "baseline",
+    "loopMs": 6004.170167,
+    "prepareMs": 702.8428750000003,
+    "writeMs": 785.702542,
+    "readMs": 431.0513750000009,
+    "paidFacts": "6ad926b61c230cbc"
+  },
+  {
+    "round": 2,
+    "mode": "optimized",
+    "loopMs": 4720.455458,
+    "prepareMs": 633.8685410000007,
+    "writeMs": 753.5910830000003,
+    "readMs": 439.1532500000003,
+    "paidFacts": "6ad926b61c230cbc"
+  }
+]

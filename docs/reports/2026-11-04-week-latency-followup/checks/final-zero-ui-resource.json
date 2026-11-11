@@ -1,0 +1,13 @@
+{
+  "label": "final-zero-ui",
+  "heapMiB": 128,
+  "rssLimitMiB": 2560,
+  "peakOwnedTreeRssMiB": 1749.984375,
+  "peakGlobalSwapGrowthMiB": 1703.5,
+  "swapWarning": true,
+  "stopReason": "Shared swap growth with free memory below 30 percent",
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 288525,
+  "peakProcesses": "7918  7914  68384 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n 8046  7918 194736 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing\n 8052  8046 137424 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper (GPU).app/Contents/MacOS/Google Chrome for Testing Helper (GPU)\n 8053  8046  81216 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper.app/Contents/MacOS/Google Chrome for Testing Helper\n 8054  8046  63952 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper.app/Contents/MacOS/Google Chrome for Testing Helper\n 8057  8046  75248 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper (Renderer).app/Contents/MacOS/Google Chrome for Testing Helper (Renderer)\n 8058  8046 1122512 /Users/zeesh/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/Frameworks/Google Chrome for Testing Framework.framework/Versions/151.0.7922.34/Helpers/Google Chrome for Testing Helper (Renderer).app/Contents/MacOS/Google Chrome for Testing Helper (Renderer)"
+}

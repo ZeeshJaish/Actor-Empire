@@ -1,0 +1,13 @@
+{
+  "initialDirtyFiles": 1121,
+  "runtimeFiles": 901,
+  "productionChanged": [
+    "services/boxOffice/boxOfficeLiveSettlement.ts",
+    "services/boxOffice/boxOfficeMarket.ts"
+  ],
+  "missing": [],
+  "unexpected": [],
+  "allOtherRuntimeHashesUnchanged": true,
+  "allTestedSourceHashesStillExact": true,
+  "ownWorkerStopped": true
+}

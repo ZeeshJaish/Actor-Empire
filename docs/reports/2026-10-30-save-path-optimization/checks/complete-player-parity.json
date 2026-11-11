@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "weeks": 12,
+  "allPriorPlayersUnchanged": true,
+  "allFullPlayerHashesEqual": true,
+  "allManifestAndMoneyEqual": true,
+  "randomCalls": 3584433,
+  "clockNext": 1800000024540
+}

@@ -1,0 +1,9 @@
+{
+  "label": "late-week-baseline",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 1021.6875,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 5930
+}

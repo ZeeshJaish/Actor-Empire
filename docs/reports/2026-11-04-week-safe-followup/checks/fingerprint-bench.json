@@ -1,0 +1,50 @@
+[
+  {
+    "i": 0,
+    "mode": "before",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 218.903458
+  },
+  {
+    "i": 0,
+    "mode": "after",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 167.18483300000003
+  },
+  {
+    "i": 1,
+    "mode": "after",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 164.13066600000002
+  },
+  {
+    "i": 1,
+    "mode": "before",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 202.18104199999993
+  },
+  {
+    "i": 2,
+    "mode": "before",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 234.062459
+  },
+  {
+    "i": 2,
+    "mode": "after",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 249.04204100000015
+  },
+  {
+    "i": 3,
+    "mode": "after",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 170.00183400000014
+  },
+  {
+    "i": 3,
+    "mode": "before",
+    "hash": "cinema-input-v2:6a66ad60",
+    "ms": 209.68187499999976
+  }
+]

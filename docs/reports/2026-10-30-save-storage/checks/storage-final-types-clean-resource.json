@@ -1,0 +1,14 @@
+{
+  "label": "storage-final-types-clean",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": true,
+  "peakGlobalSwapGrowthMiB": 1597.369999999999,
+  "heapMiB": 2048,
+  "peakOwnedTreeRssMiB": 1819.5,
+  "stopReason": null,
+  "exitCode": 2,
+  "signal": null,
+  "elapsedMs": 22307
+}

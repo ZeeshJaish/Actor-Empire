@@ -1,0 +1,13 @@
+{
+  "label": "prefix-pair",
+  "heapMiB": 1024,
+  "rssLimitMiB": 2560,
+  "peakOwnedTreeRssMiB": 416.65625,
+  "peakGlobalSwapGrowthMiB": 0,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 3087,
+  "peakProcesses": "81502 81497 426656 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n81503 81502      0 <defunct>"
+}

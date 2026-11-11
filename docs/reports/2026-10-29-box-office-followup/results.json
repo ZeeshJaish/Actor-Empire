@@ -1,0 +1,161 @@
+{
+  "method": "Actual paid productions, shared world; related retained-origin strategy branches are not independent careers. Profit is collected project result, before company overhead/personal taxes. Historical parent cash includes pre-calibration commercial and other career income. No 3B result observed.",
+  "films": [
+    {
+      "case": "production-v2",
+      "scale": "SMALL",
+      "titleId": "proj_1800000021235",
+      "status": "NATURALLY_CLOSED",
+      "production": 18659832,
+      "campaign": 2239176,
+      "gross": 193507357.62,
+      "receipts": 102558947.39,
+      "collectedProjectProfit": 81917305.39,
+      "paidWeeks": 76,
+      "saves": 604,
+      "reloads": 604,
+      "duplicateWeeksRejected": 296,
+      "manualGrants": 0,
+      "authoredFinishedPackages": 0,
+      "freshCurrentOrigin": false,
+      "approx95PercentGrossWeeksBounds": [
+        19,
+        32
+      ],
+      "approx99PercentGrossWeeksBounds": [
+        32,
+        45
+      ]
+    },
+    {
+      "case": "production-v2",
+      "scale": "GLOBAL",
+      "titleId": "proj_1800000025750",
+      "status": "NATURALLY_CLOSED",
+      "production": 106120144,
+      "campaign": 37142050,
+      "gross": 1622017450.19,
+      "receipts": 779722619.99,
+      "collectedProjectProfit": 637960842.99,
+      "paidWeeks": 118,
+      "saves": 604,
+      "reloads": 604,
+      "duplicateWeeksRejected": 296,
+      "manualGrants": 0,
+      "authoredFinishedPackages": 0,
+      "freshCurrentOrigin": false,
+      "approx95PercentGrossWeeksBounds": [
+        30,
+        43
+      ],
+      "approx99PercentGrossWeeksBounds": [
+        43,
+        56
+      ]
+    },
+    {
+      "case": "earned-sequel-v1",
+      "scale": "GLOBAL",
+      "titleId": "proj_1800000031500",
+      "status": "NATURALLY_CLOSED",
+      "production": 93888090,
+      "campaign": 32860830,
+      "gross": 1274279674.42,
+      "receipts": 605358702.3,
+      "collectedProjectProfit": 479809670.3,
+      "paidWeeks": 108,
+      "saves": 317,
+      "reloads": 317,
+      "duplicateWeeksRejected": 153,
+      "manualGrants": 0,
+      "authoredFinishedPackages": 0,
+      "freshCurrentOrigin": false,
+      "approx95PercentGrossWeeksBounds": [
+        20,
+        33
+      ],
+      "approx99PercentGrossWeeksBounds": [
+        46,
+        59
+      ]
+    },
+    {
+      "case": "earned-epic-v1",
+      "scale": "EPIC",
+      "titleId": "proj_1800000031496",
+      "status": "NATURALLY_CLOSED",
+      "production": 122618468,
+      "campaign": 79702002,
+      "gross": 2074964483.23,
+      "receipts": 985108457.23,
+      "collectedProjectProfit": 786651328.23,
+      "paidWeeks": 114,
+      "saves": 142,
+      "reloads": 142,
+      "duplicateWeeksRejected": 159,
+      "manualGrants": 0,
+      "authoredFinishedPackages": 0,
+      "freshCurrentOrigin": false,
+      "approx95PercentGrossWeeksBounds": [
+        20,
+        33
+      ],
+      "approx99PercentGrossWeeksBounds": [
+        46,
+        59
+      ]
+    },
+    {
+      "case": "weak-wide-v1",
+      "scale": "WEAK_WIDE",
+      "titleId": "proj_1800000032132",
+      "status": "NATURALLY_CLOSED",
+      "production": 12316280,
+      "campaign": 0,
+      "gross": 20382778.45,
+      "receipts": 9860250.04,
+      "collectedProjectProfit": -2343938.96,
+      "paidWeeks": 28,
+      "saves": 62,
+      "reloads": 62,
+      "duplicateWeeksRejected": 84,
+      "manualGrants": 0,
+      "authoredFinishedPackages": 0,
+      "freshCurrentOrigin": false,
+      "approx95PercentGrossWeeksBounds": [
+        9,
+        22
+      ],
+      "approx99PercentGrossWeeksBounds": [
+        9,
+        22
+      ]
+    },
+    {
+      "case": "small-wide-v1",
+      "scale": "SMALL_WIDE",
+      "titleId": "proj_1800000031665",
+      "status": "NATURALLY_CLOSED",
+      "production": 29807169,
+      "campaign": 5961430,
+      "gross": 191865023.63,
+      "receipts": 92107592.19,
+      "collectedProjectProfit": 56530988.19,
+      "paidWeeks": 55,
+      "saves": 73,
+      "reloads": 73,
+      "duplicateWeeksRejected": 97,
+      "manualGrants": 0,
+      "authoredFinishedPackages": 0,
+      "freshCurrentOrigin": false,
+      "approx95PercentGrossWeeksBounds": [
+        10,
+        23
+      ],
+      "approx99PercentGrossWeeksBounds": [
+        23,
+        36
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "label": "storage-production-build",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 285.6800000000003,
+  "heapMiB": 2048,
+  "peakOwnedTreeRssMiB": 1732.1875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 27447
+}

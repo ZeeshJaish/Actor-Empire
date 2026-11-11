@@ -1,0 +1,30 @@
+{
+  "initialDirtyFiles": 1010,
+  "runtimeFiles": 901,
+  "dirtyChanged": [
+    "services/boxOffice/boxOfficeLiveSettlement.ts",
+    "services/boxOffice/boxOfficeMarket.ts",
+    "services/boxOffice/boxOfficeWeek.ts",
+    "services/gameLoop.ts",
+    "services/saveIntegrity.ts",
+    "services/worldEconomy/worldStreamingRoyaltyAttribution.ts",
+    "scripts/audit-save-update-compatibility.cjs",
+    "scripts/audit-week-latency-soak.cjs",
+    "scripts/run-week-latency-audit.mjs"
+  ],
+  "runtimeChanged": [
+    "services/saveIntegrity.ts",
+    "services/gameLoop.ts",
+    "services/platformAi/platformAiState.ts",
+    "services/studioAi/studioAiState.ts",
+    "services/worldEconomy/worldStreamingRoyaltyAttribution.ts",
+    "services/worldEconomy/worldStreamingCommercialEconomy.ts",
+    "services/boxOffice/boxOfficeAudience.ts",
+    "services/boxOffice/boxOfficeMarket.ts",
+    "services/boxOffice/boxOfficeLiveSettlement.ts",
+    "services/boxOffice/boxOfficeWeek.ts"
+  ],
+  "missing": [],
+  "unexpected": [],
+  "hashesStorageProtocolAppAndDependenciesUnchanged": true
+}

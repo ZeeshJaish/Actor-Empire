@@ -1,0 +1,80 @@
+[
+  {
+    "name": "audit-box-office-market",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-box-office-market",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 212.609375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 2080
+    }
+  },
+  {
+    "name": "audit-box-office-fingerprint",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-box-office-fingerprint",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1052
+    }
+  },
+  {
+    "name": "audit-box-office-alternatives",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-box-office-alternatives",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 337
+    }
+  },
+  {
+    "name": "audit-box-office-alternative-batching",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-box-office-alternative-batching",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 274
+    }
+  },
+  {
+    "name": "audit-box-office-alternative-routes",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-box-office-alternative-routes",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1019
+    }
+  },
+  {
+    "name": "audit-box-office-viewing-parity",
+    "code": 1,
+    "resource": {
+      "label": "light-regression-audit-box-office-viewing-parity",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 1,
+      "signal": null,
+      "elapsedMs": 286
+    }
+  }
+]

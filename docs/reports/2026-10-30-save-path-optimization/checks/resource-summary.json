@@ -1,0 +1,146 @@
+[
+  {
+    "label": "save-path-detailed-before",
+    "peakOwnedTreeRssMiB": 1350.234375,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 10637
+  },
+  {
+    "label": "save-path-detailed-atomic",
+    "peakOwnedTreeRssMiB": 1499.6875,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 8850
+  },
+  {
+    "label": "save-path-projection-profile",
+    "peakOwnedTreeRssMiB": 1301.125,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 9231
+  },
+  {
+    "label": "save-path-system-webkit-verified",
+    "peakOwnedTreeRssMiB": 417.46875,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 6355
+  },
+  {
+    "label": "save-path-atomic-chromium-verified",
+    "peakOwnedTreeRssMiB": 753.5625,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 4093
+  },
+  {
+    "label": "save-path-private-result-red",
+    "peakOwnedTreeRssMiB": 638.890625,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 373.4399999999987,
+    "stopReason": null,
+    "exitCode": 1,
+    "elapsedMs": 17462
+  },
+  {
+    "label": "save-path-private-result-green",
+    "peakOwnedTreeRssMiB": 672.8125,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 337.119999999999,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 18097
+  },
+  {
+    "label": "save-path-venture-reload-red",
+    "peakOwnedTreeRssMiB": 0,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 1,
+    "elapsedMs": 370
+  },
+  {
+    "label": "save-path-venture-reload-green-verified",
+    "peakOwnedTreeRssMiB": 0,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 332
+  },
+  {
+    "label": "save-path-final-authority-regressions",
+    "peakOwnedTreeRssMiB": 1015.890625,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 35965
+  },
+  {
+    "label": "save-path-release-types-build",
+    "peakOwnedTreeRssMiB": 2264.625,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 29737
+  },
+  {
+    "label": "save-path-final-career-proof",
+    "peakOwnedTreeRssMiB": 1461.75,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 45470
+  },
+  {
+    "label": "save-path-release-65-weeks",
+    "peakOwnedTreeRssMiB": 1779.75,
+    "swapWarning": true,
+    "peakGlobalSwapGrowthMiB": 4732.750000000001,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 569494
+  },
+  {
+    "label": "save-path-release-storage-recovery",
+    "peakOwnedTreeRssMiB": 1653.921875,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 44918
+  },
+  {
+    "label": "save-path-release-update-compatibility",
+    "peakOwnedTreeRssMiB": 1732.21875,
+    "swapWarning": false,
+    "peakGlobalSwapGrowthMiB": 0,
+    "stopReason": null,
+    "exitCode": 0,
+    "elapsedMs": 49635
+  },
+  {
+    "label": "save-path-old-control-app",
+    "peakOwnedTreeRssMiB": 1503.78125,
+    "swapWarning": true,
+    "peakGlobalSwapGrowthMiB": 855.9399999999996,
+    "stopReason": "Shared swap growth with free memory below 30percent",
+    "exitCode": 1,
+    "elapsedMs": 95424
+  }
+]

@@ -1,0 +1,35 @@
+{
+  "matchedProfile": {
+    "pairs": 2,
+    "baselineMeanLoopMs": 5143.8102915,
+    "optimizedMeanLoopMs": 3560.772604,
+    "computeReductionPercent": 30.775584591755354,
+    "baselineMeanPrepareMs": 815.2907914999996,
+    "optimizedMeanPrepareMs": 565.5654585000002,
+    "fullStateExact": true
+  },
+  "browserFirstFiveWeeksMs": [
+    5375,
+    8675,
+    5444,
+    5297,
+    5400
+  ],
+  "browserLatestThreeWeeksMs": [
+    6857,
+    10074,
+    6868
+  ],
+  "subThreeSecondsReached": false,
+  "nativeVerified": false,
+  "noHardCapAdded": true,
+  "oneOwnHeavyWorker": true,
+  "otherWorkersStopped": false,
+  "latestBuildEntry": "dist/assets/index-C8gh93Bv.js",
+  "sourceChangedAfterBuild": [
+    "services/youtubeLogic.ts",
+    "services/youtubeEconomy.ts",
+    "package.json"
+  ],
+  "allSevenOptimizedSourceFilesUnchangedThroughBrowserAndTypes": true
+}

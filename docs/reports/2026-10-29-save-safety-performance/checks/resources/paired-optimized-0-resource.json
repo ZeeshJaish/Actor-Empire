@@ -1,0 +1,9 @@
+{
+  "label": "paired-optimized-0",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 1056.734375,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 9451
+}

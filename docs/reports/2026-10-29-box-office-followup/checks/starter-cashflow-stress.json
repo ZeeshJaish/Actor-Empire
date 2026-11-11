@@ -1,0 +1,27 @@
+{
+  "purpose": "Actual liquidity stress paths, excluded from completed film hit/flop rates. No product earnings formula changed.",
+  "cases": [
+    {
+      "status": "CHECKPOINT_READY",
+      "weeks": 33,
+      "cash": -1382527,
+      "studioBalance": 6200194,
+      "failure": null,
+      "executable": "70222d121937e98fac0bc5a80840d199e15ebbe11f8b2fb1ccdf7e8b764467ac",
+      "case": "fresh-earned-starter-v1"
+    },
+    {
+      "status": "FAILURE",
+      "weeks": 32,
+      "cash": 4777450,
+      "studioBalance": -12119,
+      "failure": "AssertionError [ERR_ASSERTION]: The starter studio must stay funded\n    at file:///Users/zeesh/Vibe%20code/Actor%20empire/cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v3/normal-worker.mjs:192758:15",
+      "executable": "0a6ad7ac0298d7d17e87d2886afa63838128b50f85f3e4059c2194f4ada31bf9",
+      "case": "fresh-earned-starter-v3"
+    }
+  ],
+  "v1": "Static70% injection left personal cash short of signed annual team fees; retained at checkpoint33 following swap guard.",
+  "v2": "No simulation ran; memory-probe sandbox preflight blocked before a child spawned. Immutable bundle retained.",
+  "v3": "Personal reserve alone left too little corporate operating cash; strict audit stopped when studio balance went negative at week32.",
+  "v4": "NATURALLY_CLOSED at110 weeks; every weekly personal/studio cash check and transfer conservation passed. Actual paid first film reported in fresh-earned-studio.json."
+}

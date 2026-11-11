@@ -1,0 +1,22 @@
+[
+  {
+    "name": "complete-parity-before",
+    "code": 0,
+    "ms": 31535
+  },
+  {
+    "name": "complete-parity-after",
+    "code": 0,
+    "ms": 29156
+  },
+  {
+    "name": "legacy-api-unit",
+    "code": 0,
+    "ms": 74
+  },
+  {
+    "name": "complete-parity-legacy",
+    "code": 0,
+    "ms": 36385
+  }
+]

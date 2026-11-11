@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "interruptedWeeks": 8,
+  "lastCommittedCinemaWeek": 1900,
+  "allReadersRetainExpectedWeek": true,
+  "actualRawStoredFactsPreserved": true,
+  "allProtectedFactsUnchanged": true,
+  "authoredContentUnchanged": true,
+  "originalReaderCompatible": true
+}

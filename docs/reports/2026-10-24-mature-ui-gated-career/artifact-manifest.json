@@ -1,0 +1,63 @@
+{
+  "directory": "/Users/zeesh/Vibe code/Actor empire/cinema-verification.local/mature-ui-gated-09edec4/final-corrected",
+  "uiEligibilityVerified": true,
+  "gameplayBaseline": "09edec4",
+  "gameplayVariant": "UNIVERSE_MEDIA_ROUTE_FIX",
+  "executable": "aab24cc4b2ba13addbdfc5b5b39f2f75dc691d5abbb181f3e2a155f280597907",
+  "status": "UNIVERSE_RUN_CLOSED",
+  "weeks": 1063,
+  "finalCheckpointSha256": "098ccf56ecb37b25140d54e3069fe9c5ca01f5ea554dcd2f7c521596464ace0b",
+  "sourceOverrides": [
+    "types.ts",
+    "services/universeLogic.ts",
+    "views/mobile/MobilePage.tsx"
+  ],
+  "sourceOnlyAuditPolicyOverrides": [
+    "scripts/fixtures/cinemaMatureAppPolicy.ts"
+  ],
+  "lineage": [
+    {
+      "checkpoint": "/Users/zeesh/Vibe code/Actor empire/cinema-verification.local/mature-ui-gated-09edec4/earned-capital-start/career-0.json.gz",
+      "checkpointSha256": "cb0f1c09d68d48f4041c434e9c60c321a82c8d296227b25ae2d1d659196737a6",
+      "executable": "043ea20028c97da089d474bdcda31a2636f51221b9b94dddf336f90d97706cac",
+      "weeks": 689,
+      "cash": 74482247,
+      "playerSha256": "ccd805c9c2d5160ed3dd99a9c27d5103ca3ab6853e1e5ecddcf6d9a07258b9be",
+      "reason": "Continue the verified UI-gated earned career before the actual Monsterverse offer with a narrow future-offer/acceptance media-routing correction; no capital, craft, campaign, gross, signed pay or existing paid releases rewritten"
+    }
+  ],
+  "origin": {
+    "checkpoint": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+    "checkpointSha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+    "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+    "weeks": 156,
+    "cash": 57643,
+    "sourceRef": "07fdfff",
+    "initialCash": 2000,
+    "manualCapitalGrants": 0
+  },
+  "noInjectedCapital": true,
+  "noAuthoredFinishedFilms": true,
+  "noHardEarningCapAdded": true,
+  "files": {
+    "memory-history.jsonl": "ea9495146299c7a293a67a818b7589a90f21cae4eafc775a6d12f28e50efb079",
+    "executable.json": "e0116acdf23b2f1992c3fa429a159126b0c0774e46685361be82af66e8e46000",
+    "memory.json": "3a6d78ffc442a6b2e434bb8b759cefa7ed6dcda7aa27ac7dfbf03b1c57112d40",
+    "results.json": "986c707688d4ba04319f2cf0c8ca42a1ee43f06ada40598ec4e5a8b2a9f8518d",
+    "career-0.json": "eb38725e4c34096d4a14961b63bb42ac96c06aef1a74f8996a79546428dfa4eb",
+    "normal-worker.mjs": "aab24cc4b2ba13addbdfc5b5b39f2f75dc691d5abbb181f3e2a155f280597907",
+    "final-profile.json": "272ab7cf943e66f47fa47cd306c82785425661dd28ee223360296507480ce6ab",
+    "career-0.json.gz": "098ccf56ecb37b25140d54e3069fe9c5ca01f5ea554dcd2f7c521596464ace0b",
+    "source-overrides/types.ts": "3fa79adb66250d4c676ac4c95f586841fefca08d5c4562be6c0645802fe37a30",
+    "source-overrides/services/universeLogic.ts": "8187e97756177b0042fc340df996fca559fbd4a742b092a2944d49667b218126",
+    "source-overrides/views/mobile/MobilePage.tsx": "e1192a449934954c705600d49ced5c0d4116ae392a89f8b1c536c5e1f4b1a6fd",
+    "source-overrides/scripts/fixtures/cinemaMatureAppPolicy.ts": "d1f70085cd15c4e6a9153a20ea933390129324ef6a03474714edf0938b511322",
+    "audit-sources/scripts/report-cinema-mature-career.mjs": "4138d7955796322ba0a46038d1213b51e7bd765e3b239863e29c4d08ba728907",
+    "audit-sources/scripts/audit-universe-release-routing.ts": "2bf917e9ec30e985030518564cf37735e9102b9b237512878ffffcf6fd07005c",
+    "audit-sources/scripts/audit-cinema-mature-ui-career.ts": "2c4b3cf01c27cb5013055ed7b188c571088dbae03684af3ee6af53e5580d31f1",
+    "audit-sources/scripts/fixtures/cinemaFileSaveStore.ts": "074128cc54990e6ceae5f0d3859ac0ef9037cfe9d57fde9739e9e06673f4b676",
+    "audit-sources/scripts/fixtures/cinemaMatureMigrationAssertions.ts": "d494f188ee3af25c032e49fc6fd556957356a62f3f1f7cda09de5df071ff6991",
+    "audit-sources/scripts/fixtures/cinemaInstagramEligibility.ts": "fe00bb860c5254998963bd7ea1f0d966eabf2bdfd712fc13ffbac25021fed132"
+  },
+  "stableOriginDirectory": "/Users/zeesh/Vibe code/Actor empire/cinema-verification.local/mature-ui-gated-09edec4/origin-156"
+}

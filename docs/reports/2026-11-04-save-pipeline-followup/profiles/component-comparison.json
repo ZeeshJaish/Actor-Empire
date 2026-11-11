@@ -1,0 +1,372 @@
+{
+  "scope": "Single browser, identical retained large player and cinema input, task-start/current functions in the same bundle, alternating balanced call order, 2 warm-up pairs excluded, no forced GC. CPU components only, not whole-app/device/earnings evidence.",
+  "summaries": [
+    {
+      "name": "completeVerification",
+      "nPerMode": 16,
+      "oldMedianMs": 116.25,
+      "newMedianMs": 111.44999998807907,
+      "changePercent": -4.129032268319078,
+      "oldMinMs": 109.5,
+      "oldMaxMs": 127.89999997615814,
+      "newMinMs": 104.5,
+      "newMaxMs": 123.10000002384186
+    },
+    {
+      "name": "audienceSnapshot",
+      "nPerMode": 10,
+      "oldMedianMs": 93.44999998807907,
+      "newMedianMs": 86.65000003576279,
+      "changePercent": -7.276618462475892,
+      "oldMinMs": 81.89999997615814,
+      "oldMaxMs": 127.89999997615814,
+      "newMinMs": 72.20000004768372,
+      "newMaxMs": 97.20000004768372
+    }
+  ],
+  "rows": [
+    {
+      "name": "completeVerification",
+      "pair": 0,
+      "mode": "old",
+      "ms": 111.60000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 0,
+      "mode": "new",
+      "ms": 109.39999997615814
+    },
+    {
+      "name": "completeVerification",
+      "pair": 1,
+      "mode": "new",
+      "ms": 108.10000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 1,
+      "mode": "old",
+      "ms": 112.10000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 2,
+      "mode": "old",
+      "ms": 109.5
+    },
+    {
+      "name": "completeVerification",
+      "pair": 2,
+      "mode": "new",
+      "ms": 105.69999992847443
+    },
+    {
+      "name": "completeVerification",
+      "pair": 3,
+      "mode": "new",
+      "ms": 104.5
+    },
+    {
+      "name": "completeVerification",
+      "pair": 3,
+      "mode": "old",
+      "ms": 111.80000007152557
+    },
+    {
+      "name": "completeVerification",
+      "pair": 4,
+      "mode": "old",
+      "ms": 111
+    },
+    {
+      "name": "completeVerification",
+      "pair": 4,
+      "mode": "new",
+      "ms": 111.10000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 5,
+      "mode": "new",
+      "ms": 107.59999990463257
+    },
+    {
+      "name": "completeVerification",
+      "pair": 5,
+      "mode": "old",
+      "ms": 114.80000007152557
+    },
+    {
+      "name": "completeVerification",
+      "pair": 6,
+      "mode": "old",
+      "ms": 116.29999995231628
+    },
+    {
+      "name": "completeVerification",
+      "pair": 6,
+      "mode": "new",
+      "ms": 123.10000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 7,
+      "mode": "new",
+      "ms": 115.10000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 7,
+      "mode": "old",
+      "ms": 127.89999997615814
+    },
+    {
+      "name": "completeVerification",
+      "pair": 8,
+      "mode": "old",
+      "ms": 124.60000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 8,
+      "mode": "new",
+      "ms": 115.19999992847443
+    },
+    {
+      "name": "completeVerification",
+      "pair": 9,
+      "mode": "new",
+      "ms": 115.40000009536743
+    },
+    {
+      "name": "completeVerification",
+      "pair": 9,
+      "mode": "old",
+      "ms": 117.09999990463257
+    },
+    {
+      "name": "completeVerification",
+      "pair": 10,
+      "mode": "old",
+      "ms": 119.10000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 10,
+      "mode": "new",
+      "ms": 111.60000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 11,
+      "mode": "new",
+      "ms": 113.5
+    },
+    {
+      "name": "completeVerification",
+      "pair": 11,
+      "mode": "old",
+      "ms": 122.70000004768372
+    },
+    {
+      "name": "completeVerification",
+      "pair": 12,
+      "mode": "old",
+      "ms": 127.60000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 12,
+      "mode": "new",
+      "ms": 116.10000002384186
+    },
+    {
+      "name": "completeVerification",
+      "pair": 13,
+      "mode": "new",
+      "ms": 116.20000004768372
+    },
+    {
+      "name": "completeVerification",
+      "pair": 13,
+      "mode": "old",
+      "ms": 121
+    },
+    {
+      "name": "completeVerification",
+      "pair": 14,
+      "mode": "old",
+      "ms": 112.29999995231628
+    },
+    {
+      "name": "completeVerification",
+      "pair": 14,
+      "mode": "new",
+      "ms": 109.70000004768372
+    },
+    {
+      "name": "completeVerification",
+      "pair": 15,
+      "mode": "new",
+      "ms": 111.29999995231628
+    },
+    {
+      "name": "completeVerification",
+      "pair": 15,
+      "mode": "old",
+      "ms": 116.20000004768372
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 0,
+      "mode": "old",
+      "ms": 127.89999997615814,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 0,
+      "mode": "new",
+      "ms": 97.20000004768372,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 1,
+      "mode": "new",
+      "ms": 92.5,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 1,
+      "mode": "old",
+      "ms": 114,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 2,
+      "mode": "old",
+      "ms": 91.29999995231628,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 2,
+      "mode": "new",
+      "ms": 82.60000002384186,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 3,
+      "mode": "new",
+      "ms": 88.89999997615814,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 3,
+      "mode": "old",
+      "ms": 97.30000007152557,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 4,
+      "mode": "old",
+      "ms": 99.89999997615814,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 4,
+      "mode": "new",
+      "ms": 78.59999990463257,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 5,
+      "mode": "new",
+      "ms": 75.39999997615814,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 5,
+      "mode": "old",
+      "ms": 95.60000002384186,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 6,
+      "mode": "old",
+      "ms": 88.39999997615814,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 6,
+      "mode": "new",
+      "ms": 91.5,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 7,
+      "mode": "new",
+      "ms": 72.20000004768372,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 7,
+      "mode": "old",
+      "ms": 81.89999997615814,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 8,
+      "mode": "old",
+      "ms": 83.80000007152557,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 8,
+      "mode": "new",
+      "ms": 84.40000009536743,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 9,
+      "mode": "new",
+      "ms": 93.89999997615814,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    },
+    {
+      "name": "audienceSnapshot",
+      "pair": 9,
+      "mode": "old",
+      "ms": 89.20000004768372,
+      "digest": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434"
+    }
+  ],
+  "playerSha256": "7ffad695f1f628804d014f7e3c350257b23e0c9f55ed368c26e3c7d175541f69",
+  "cinemaInputSha256": "cbe4db8341ae06eced70e464b72fcb99998df8ccd3386551c2c8334205635e80",
+  "snapshotSha256": "93dc86c6e703cfeab9d34ce321b951d13154e6781bcf21e98dc18eab5406a434",
+  "inputShape": {
+    "titles": 12,
+    "cohorts": 2363,
+    "countries": 197
+  },
+  "allVerificationsPassed": true,
+  "allFullSnapshotsIdentical": true,
+  "inputsUnchanged": true
+}

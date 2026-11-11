@@ -1,0 +1,362 @@
+[
+  {
+    "name": "audit-ai-catalogue-read-batch",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-ai-catalogue-read-batch",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 143
+    }
+  },
+  {
+    "name": "audit-royalty-source-index",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-royalty-source-index",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 154
+    }
+  },
+  {
+    "name": "audit-save-preparation-projections",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-save-preparation-projections",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 555
+    }
+  },
+  {
+    "name": "audit-cinema-country-scaling",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-cinema-country-scaling",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 127
+    }
+  },
+  {
+    "name": "audit-save-integrity",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-save-integrity",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 190
+    }
+  },
+  {
+    "name": "audit-save-generations",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-save-generations",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 205
+    }
+  },
+  {
+    "name": "audit-career-record-preservation",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-career-record-preservation",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 281.84375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3105
+    }
+  },
+  {
+    "name": "audit-save-migration",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-save-migration",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 257.203125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3568
+    }
+  },
+  {
+    "name": "audit-save-transfer",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-save-transfer",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 223.171875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 2706
+    }
+  },
+  {
+    "name": "audit-box-office-market",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-box-office-market",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 164.046875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1061
+    }
+  },
+  {
+    "name": "audit-box-office-fingerprint",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-box-office-fingerprint",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 504
+    }
+  },
+  {
+    "name": "audit-box-office-integration",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-box-office-integration",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 630.734375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 13584
+    }
+  },
+  {
+    "name": "audit-box-office-alternatives",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-box-office-alternatives",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 164
+    }
+  },
+  {
+    "name": "audit-box-office-alternative-batching",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-box-office-alternative-batching",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 164
+    }
+  },
+  {
+    "name": "audit-box-office-alternative-routes",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-box-office-alternative-routes",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 506
+    }
+  },
+  {
+    "name": "audit-weekly-viewing-parity",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-weekly-viewing-parity",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 707.84375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 2292
+    }
+  },
+  {
+    "name": "audit-streaming-signed-royalties",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-streaming-signed-royalties",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 290.953125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3754
+    }
+  },
+  {
+    "name": "audit-world-streaming-we6",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-world-streaming-we6",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 298.890625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 70815
+    }
+  },
+  {
+    "name": "audit-world-streaming-commercial-economy",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-world-streaming-commercial-economy",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 254
+    }
+  },
+  {
+    "name": "audit-stock-save-safety",
+    "code": 0,
+    "resource": {
+      "label": "closeout-regression-audit-stock-save-safety",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 224.453125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 2301
+    }
+  }
+]

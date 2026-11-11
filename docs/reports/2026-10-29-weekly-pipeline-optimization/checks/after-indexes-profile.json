@@ -1,0 +1,1508 @@
+{
+  "sourceHashes": {
+    "scripts/profile-weekly-pipeline.ts": "0d606037fa7dac8aedf15c473c0c12b75087cccb5e65d9f312da7f486476ca01",
+    "scripts/fixtures/cinemaSaveStore.ts": "b9a98cad7fda543e5d66f495118f6ec6a2adbf130015dae7237e72cdace41577",
+    "scripts/fixtures/cinemaFileSaveStore.ts": "074128cc54990e6ceae5f0d3859ac0ef9037cfe9d57fde9739e9e06673f4b676",
+    "services/gameLoop.ts": "0401d646ff4db282e45c21d37f079f0bc6689a4aaadb7c644c31c2d21baaa3f1",
+    "services/savePreparation.ts": "b44fee4fbbeb73699f35b5342bdc8dcd2ec446d0860c0cf4dcb7eb1917ba4655",
+    "scripts/fixtures/cinemaAuditCheckpoint.ts": "152cce4da289e55103355750f30a22e3cc32c091a644b559004eada44323644b",
+    "services/saveGenerations.ts": "fd474bbf8fc134653f9400cbb00d8f11ed1ae8746d1ca778bc45bdb8d2aed79d",
+    "services/npcLogic.ts": "4e82da8031297f6508c9e7e1d405601b1967eedbaf0f0b5c30e57df155c39609",
+    "services/deterministicRandom.ts": "f401cd1f13be1e918a0aec6363837b223d24e145df06526cc06823f79681e925",
+    "services/worldEconomy/worldEconomyIntegrity.ts": "b5a21bd021d41481568895110c70559fc8449914e4a16f9435895e3f197e8e28",
+    "services/npcAvatar.ts": "5e0246ba7ea350ad438ac02ea4521544144e4bafae89e7b2192e6d8335ffbdc6",
+    "services/saveCompaction.ts": "92e98e08915ffd7068a9b86456d97979255cf8dfb6be6d015e8992816925a3a2",
+    "services/saveIntegrity.ts": "c36627e403facb1a05896689023e849e9678a7d040eb50b1d8ade5f0f1d4fa60",
+    "services/saveMigration.ts": "4269629c36047777f679558f137148b4dbe8754f0948cd26db04d16acc09129c",
+    "services/legacyLogic.ts": "d280aa655c5f4a832c63e1d879fdfc9e4c4fdc47600304a3c11d7e475d4bdde2",
+    "services/npcRetention.ts": "2ad7f47a17f53c9f667692df09e7017f4a2c1972cf088adf430ea0e26d47034f",
+    "services/modTalentData.ts": "73f1afa9bf94cb21ca4d2fd1a2250fdb114b8cde38ec7330984f6bb3d7c3dd55",
+    "services/modTalentSupplement.ts": "7c676cd1edfc8f32fed84bdee12b1a889be770cc96f331adf6204213503ed155",
+    "services/instagramLogic.ts": "0ae40b784da7f3758492268eca8c26602d8263a374e3a61c95f38b0980ad19ed",
+    "services/i18n.ts": "de04e871cfda403a4fb7e5a6e9a6a321e342e565382dae2a8b574352854108b6",
+    "services/genreCatalog.ts": "d8e4059b6f33f1216aa033a5e3796d1925ba45af1c7612ba467f3082ce6c86a7",
+    "services/musicIndustry.ts": "4dd1b47122cf9f961922c531e471dc3d2da47d54ad734ce185c7153a0d2f1fc8",
+    "services/projectInvestors.ts": "b22aec45d91e50cb01f1644957db4f7807c890e9b91b12ad5bccdd9fe5c97ffb",
+    "services/crewMarket.ts": "773eef1c49df27f0241346b08acd29b55b1ac45b6242f56c9a4c5c3f3ac08803",
+    "services/streamingCompany.ts": "851e6bb2060ecfbb90aac014a704c94c37f85ef4dac99f0a90b538dbd3db4d49",
+    "services/writerNpcLibrary.ts": "bdae8eecb77f0ed0b7c14fdf30cdde7df87a0ed425e4ebd69e967b64cabd9207",
+    "services/relationshipBond.ts": "37d2990a836abb88df0e4f8f4ca836b2db1e51f067dc546d51bdf2ffa64dc3ad",
+    "services/weekProcessingDeterminism.ts": "1b4f04d2b56933c7dd2413d4f6ce1e7f36ac0d3cfb65a4a86de16ea89a2d92bb",
+    "services/sponsorshipEconomy.ts": "3f435a645bbd4d4752a4c4d9af03f35cc747ef72cb7de60732a694ac3a2294a5",
+    "services/actorCareerBalance.ts": "2bcd2933a094d4a6cb192c66f6acb8e7d17e3da731295fe7597f3dd8e3d0c236",
+    "services/seriesStreamingValue.ts": "7c1310ce995bd8083f64ae0f19132ce060f8e796a07f465274980b2b407d2f16",
+    "services/stockSettlement.ts": "ec3ed9df84ab5782295112d438ff2ea585f3f87e64519539542051aeb4ed032e",
+    "services/projectTitleGeneration.ts": "6ba0c111aba03af970ee14c5ee7727efd499d114a4b704dd9a4a8567495e2b62",
+    "services/stockLogic.ts": "56b9cedf5b9328f655c560c57ea55de483b9488a363cb71c3be21d983b3fc6e7",
+    "services/boxOffice/boxOfficeStreamingAudience.ts": "b079241470f322a6c4a7e57a76a03fb2b7a21fa5d8cde4354d5d602a963c7523",
+    "services/boxOffice/boxOfficeExposureAdapters.ts": "f18a7dfccc84690ec80999efb46d87d5b8e0cdb588fc1f8355eee357f55cd962",
+    "services/boxOffice/boxOfficeOfferedLaunch.ts": "a30ae30954c25519a71b5dd525a1df4d72993d1768b5984b376ac4e2236309e8",
+    "services/boxOffice/boxOfficeRightsAdapter.ts": "3405d8657d1af44380e8098b1f9d8fea26e4827610a4eec2c63ced78213e75b2",
+    "services/boxOffice/boxOfficeProfiles.ts": "b7e3c38a06e7d18f129cfa2f22499e10e07f99e886cc09ab15a8667b471656f0",
+    "services/talentCareer.ts": "5753b94ea0821b7f581b9bf3772798822c31982280eb1495e25aca9d483ba8d7",
+    "services/boxOffice/boxOfficeMigration.ts": "9595919e52f320620347ccf035c9f1df7c9e43ec218ee7651fee990584ba6871",
+    "services/boxOffice/boxOfficeWeek.ts": "b74e9e89df6d76523836567086491dd1fd9fc51b48f3c6a5a992ee3ae9203af2",
+    "services/studioProductionEconomy.ts": "e7d3bc8d38d03d8fe8b35aca56e2894ea523c6cc7332586949dd812f366949ca",
+    "services/boxOffice/boxOfficeInputs.ts": "5b36db59fa9c21e876e0b24cc00df02f1019501afb92d3977673b51d0f6317fb",
+    "services/studioSaleHistory.ts": "321323585bc146892afe49337b0aae1a5d910a0a6538711cb8475179dca4a09b",
+    "services/bankTransactionHistory.ts": "bf9277fdcc47ac6e56242f7991172e791e078ceef73d15e582d403cdcc6987a2",
+    "services/stockCashOwnership.ts": "8aae10294e812d465de165b5e0550ebac7abc1ea778fbdc0fb1cb4ed04a44693",
+    "services/talentRoster.ts": "da0fd05e3ac8b62af99b16153a4fec8836a66f241cf0c8bf46fb1336e8b59ea4",
+    "services/streamingBackendPolicy.ts": "cd0baee9166c16a91cce29c7b02f3f3a5c0450e56fd3395ff76f43b6152d43c8",
+    "services/lifestyleLogic.ts": "b86ab07558d63711817f5fdbc7a90a3bef12b0578052b57ecec49f1eeffe0d08",
+    "services/realEstateLogic.ts": "c71f21a8b136fc799c2d6b3b5e142eafdd881766c48a4d6aeed0863c7c2c4756",
+    "services/roleLogic.ts": "b892ee0f02779e4ad017e28d2967e92c7cb189248c0c90a17b2986eb7be272c0",
+    "services/streamingLogic.ts": "82c5b262e8fb8f8f93d3da9264c80ba344c7317c29a83e1f7a8abe2fc86a43d3",
+    "services/newsLogic.ts": "0d802ceeb63e0545cbc8073f1302237831cd52b8ee8df383566d961ce4405011",
+    "services/geminiService.ts": "4ac73cbb6c20c8a727b66ad3fe114db75144f9311488c5e1d9143c19b18b6a2b",
+    "services/lifeEventLogic.ts": "90d80b751927ab5d599ca19a9d511abbb1f26bd51c17a2eacca69df0e7188139",
+    "services/teamLogic.ts": "2cb98a3036d9f7088574bbb6dffc8ada740b9a88add1ea478da152ea31ae9929",
+    "services/awardLogic.ts": "0cfe5443330e6727995f1d7fb8c277d57ba9a9d8c598a8db23c74c04283a542a",
+    "services/ownedProductionCareer.ts": "2e02ff59d33824ce2cb06a2efed520f803fde23da3cc902d91f4e2137744b788",
+    "services/dynastyCareer.ts": "a6b7b5cd28c8284b85f9622a2fd97ec9df4b32c2dfd20f07daf093c3fe7bbd5e",
+    "services/platformAi/platformAiProfiles.ts": "27dd612477735000ae9b9a63faba33054660ba7f751bf502310a1f4dc303ba77",
+    "services/platformAi/index.ts": "afaac1dff79d3017bafcd8cf0ae00e7968c5ec66edfa442cff079eef6dc105bc",
+    "services/industryWorld/index.ts": "17b2833329ed4f416eef9cf18dbca573715229d2a09f4a5d2b76a001ddac43c5",
+    "services/streamingEconomyCore.ts": "971e0a6ce9bf9f8375060c9b07512a486b51ca14b8b7d3b0a8a1f1580e9697b5",
+    "services/streamingContractSettlement.ts": "d91db46a2296e83d19254bb73b8a3cb0db3074a79f39f9ddfbc6ab58de0f363e",
+    "services/platformAi/platformAiState.ts": "0915942a1f4dcfc497a3dfe16b8639f388960f8a396b30e3de17ed5b0b589643",
+    "services/playerTalentFinance.ts": "19731471ec9c945a5219c155d98aa8e97c5f1665f6786804c3754168062325aa",
+    "services/streamingRightsCalendar.ts": "e8dd4d30419771fbbcab690e716d65a2a6aad1233e0bfca0f1619bd99fe936e1",
+    "services/streamingOpportunityMarket.ts": "7af5d7415f577773c1dbd56dc597370abad485b64638cdf1b5b29297e5f111b2",
+    "services/streamingReleaseRuns.ts": "aadfe9be0cbe3f29bcdb9dcc04b98b1ea32e9b9f665520917e2d365728d7ab35",
+    "services/streamingPlatformBrandRegistry.ts": "cf16664dae7119c08b6c2686e32353e0f83faf6d524000a03a9a8e8dfb0fc2fb",
+    "services/streamingPlatformEcosystem.ts": "7864189b91119ace3de2d877812dec8d13af1cd5b59bff6d5bdacbf9a7300eb2",
+    "services/streamingCataloguePackages.ts": "ff2266b5912fe1c9a480e21cb2d93c910120fee6e9baef2fbf7f91404b3f098b",
+    "services/streamingCataloguePackageAutomation.ts": "e31a87e662de1fc474371991e4723afb45048e248fce03e0d74695d2c33f0c54",
+    "services/streamingRightsOffice.ts": "f205846be4c613f194498550e8477ee6a653c76a04f3fee8809bab1ad4f41d6c",
+    "services/worldLogic.ts": "d5ee5c4076d3d3bbb7af79b1a3628feeba0ae404e9b99f6ed0e27d32e3504cf3",
+    "services/youtubeLogic.ts": "dd868476fd403b35b46ae0456383b1a473597c73833a29573717778620de9093",
+    "services/productionService.ts": "1149edad97f565456596772c9a34d1de354f3fd887ef22206c41a70f464f8f15",
+    "services/businessLogic.ts": "f822fa5d38c1113ff977d5e756b58a9e2c4343dc46a08c8087b9578905bc94ff",
+    "services/premiumLogic.ts": "9db8b8c02ad470dd5675887196270ad10ae5a08be36dba6ebc8e846fbcaa75d5",
+    "services/datingLogic.ts": "590ea52e3b0e67217d73b679d4fb691a13baa79878eb67f936b0cb20efecba81",
+    "services/npcVentureLogic.ts": "62ea9e2ce7716a12242212c98e8d6e9c1f448246595dc96eb5eadd7d13c7554d",
+    "services/universeLogic.ts": "8187e97756177b0042fc340df996fca559fbd4a742b092a2944d49667b218126",
+    "services/familyLogic.ts": "e02495228033a976a08036884b913843c9bd2167e868e3e856e0fdbcdbd037bd",
+    "services/marketTrends.ts": "b87db04ea88f9150248600d0abba3f61c0d7098a7dedd2ebedd7e943ca78391b",
+    "services/theatricalRunLogic.ts": "a36bc6f36c4a53b5b590dc015136d02771ec0f0ee543346a057048cc75d77c74",
+    "services/studioSpecialization.ts": "053c5de5ee05a654e69bb9582f1d8dbf4470686c6187045dc5cbe1ea4288093f",
+    "services/releaseMediaNarrative.ts": "5201c86e83f551834b2f7a29b7708391e38349df4a08f2e160efdaa9c96bb5ba",
+    "services/firebaseService.ts": "268fb6acf19bbec4b452036d8743072b53839f3d0021d12aabb80096ea898d66",
+    "services/characterIdentityLogic.ts": "0a4fcf244eb3639107c98b19cc6f09802af684db87e336a6fe506f08dc5fba51",
+    "services/characterStoryFit.ts": "91d32cbf4b94e482da36da7028337bd3128aa1536ac78f44033b23228ff68ecf",
+    "services/roleMarketDemand.ts": "857bf7e5083c8b1b8ec4ca8943c5ead473ce36fbb1f28992bf1d6358db30ef24",
+    "services/rareHollywoodChaos.ts": "e16f2ff1c92744517b308cbcc07f72d9c2ac2f74dbe852e78bbd87c4879e94a9",
+    "services/continuationReturnLogic.ts": "b4a10fbc0297ae443fe066c991f5075c708ecb3ef4dadff3e346746a464fc11c",
+    "services/sequelFlow.ts": "5bc973d83c9b806d3f3db9260b344af59a64ff3a1b4b04577f19096d2d5d225d",
+    "services/streamingFundingLogic.ts": "b500ad033111a1f74a21d44f117f8dac483b09816c1160cc1a46d4a204a18b35",
+    "services/projectFundingEconomics.ts": "9b4d1baa659bc9ce50fdeb4beddbc1ec35e304038f537a55692062a6d4ae9159",
+    "services/boxOffice/boxOfficeReceiptHistory.ts": "1309f241b6b0032c2661fc2495ade96d356eff59dddb2cb95b8527e2c8ad3e15",
+    "services/instagramOfferLogic.ts": "1de33fbfb7db703f2780c163200d846aa9b591160bc4c14ec1ff6168b74d8c9c",
+    "services/youtubeEventLogic.ts": "a6365dd95a21b7c2ebfb6182e9aa1e661ffe010112303dbfa5a8670a9dd0d972",
+    "services/studioAcquisition.ts": "37744d36a60586a3a3681abfdb649f7c025f8433f455344db374a5c698b10ad2",
+    "services/audienceReception.ts": "2ff9c4c3022f2cdeb699689827cd40b65e909254bec0aefbc900ca8374a56d3f",
+    "services/subsidiaryOperations.ts": "75b0261a886534b90d1c5d8c01d5be5234abcb0750099272a7d1b398bff5386f",
+    "services/distributionRevenue.ts": "f66e238ba55121400cd79976ec0192979021ebe32ba329e3744db27b8666f869",
+    "services/subsidiaryDecisions.ts": "b7e574abf742e9e2f67c1729b9844f5145f233694e5b51126d87ede826c4f78c",
+    "services/shareholderVoting.ts": "0ee98312f60adff6561d9e40a55b69f20ed8f0a7e7bbed2cf5d04e27deed639a",
+    "services/stockTakeover.ts": "6eaa2e34145039117bdd96b7d15963adaac1a617a5c415acccb87f56678d959f",
+    "services/privateEquityLogic.ts": "64b1cbb13a0f831721092e7d7790fc4980749e532bac64320336487add49217a",
+    "services/worldReactions.ts": "fce4369d3995291e8d83cee4ec970ec2d4d766ccd9a0c52eaa10981c5e4768a2",
+    "services/acquisitionDebt.ts": "96c3ae20a732ca4460dd0723a80e14ea49e437a79daf62bc12694c296ccbf7c0",
+    "services/regulatorPressure.ts": "38a9c43f60b4c8adbc54f5b494e40d69a9b2cc2694c62ce51ebcb450f1189d76",
+    "services/talentInstability.ts": "1c3ff5e135ee9520e1b788a783a53607a31351ce4dda1c43733ab1452d4baccc",
+    "services/rivalRetaliation.ts": "9e64ed851ad09a723158d564e44bdd542ca90ddfcfca0960f2ec41e60f20666a",
+    "services/gameLoopClone.ts": "9850dd1c2b250ad6d7d4ead874bc1fd2d7b70eea87de25236a18450215a36b6b",
+    "services/acquisitionMarketPulse.ts": "b7047983d3e06f8eda0a80517c24186ed7ed75fc4518a78346f47cf30ddd277f",
+    "services/studioSale.ts": "97f72f9400650828fe36f60137113624f2fe645586f746e653fa5a360d5d853c",
+    "services/studioGroup.ts": "940bd3b96307123d45bdc5a712f90dacf62999836303a628f7d06c6fd8964ebf",
+    "services/productionCalendar.ts": "ab3be1eac6c992743c0ae5f5c13272a898731a7b6193e57f8d6d581b7a2dfb39",
+    "services/marketingReality.ts": "19f73ba121d1018e84201ed0903b82c160b032a8db11d553463cfd7963245e88",
+    "services/healthConditions.ts": "5045d5d466e92ed4023eb6a598518e5c710888dd320fc0e813280947b83d3422",
+    "services/actorCareerArc.ts": "9eb297442db25793ed9802b5a0140b6ae1cdc4206a40aca9f1d0f3eaee42bcbb",
+    "services/outsideProductions.ts": "7f9c0feb4fa1c19c2cc50bfd879cc1ef71d0265db95d6c0781a683981c0c7b57",
+    "services/episodeRatings.ts": "26a1dedc34eb814f2461a8f5061fdcfe60c073ed0d0d31ce2e73ce11cb34b784",
+    "services/productionRisk.ts": "cdf9278c065f897259e989b04d58f399b0954d9c9b26dbf3a6c525391c91aa77",
+    "services/studioSlateFatigue.ts": "edd5bae22decdb47c18c3810ee65c01b81bdd67b17ecbc4bac584cdd2a998c73",
+    "services/releaseContinuationLogic.ts": "97dbb2b4d2182901e7d51e23800ecbe9e910c0f0aa2547ca5ba03ba4cb203f6a",
+    "services/livingEnsemble.ts": "c79e5b1714cd1a6518f7e6cafbc19da60fdc628177dbb819b3bc1bb852bc2e9d",
+    "services/streamingWeeklyLoop.ts": "0779341115fbb1cac743c3cd709128fa485ab17bb13c04b8480d38c2ce5aab5c",
+    "services/streamingMarkets.ts": "932b7ba23a8e269197a5b3e4be3d1cc07c77e097f6085cc46f3d29a23af0ba5c",
+    "services/streamingOpeningProgramme.ts": "135172dbde6755cce995810f7da688745e85a1de486908214734a9036f35affd",
+    "services/streamingOpeningCatalogue.ts": "88a9b67f40a8a4328b5888bce3fb99cf52b880f384c0d8344138bb2a29bc7f75",
+    "services/streamingRightsCore.ts": "68c20a793d9c9e74a9bc2fc3953e82c19145645fa889d77cb8bf7e8a77ccbc4b",
+    "services/worldEconomy/worldAudienceCohorts.ts": "1ec86d080067a3b5fd3b3dd2bd6aefab40b0fb33bc97378df49b2e0ca42a885d",
+    "services/worldEconomy/worldAudienceParticipation.ts": "37f86151cadd68e3b82efa61e4dca444022d7f75324667cdae292bd3bc41912b",
+    "services/worldEconomy/worldPopulation.ts": "99f95f27785853b1f37a7ed629944f80845b7dc832387388011bf137ab784e88",
+    "services/worldEconomy/worldStreamingCompetition.ts": "781413dae47795da3d8015da15da824122ae1f2b783179541ecb257857a76171",
+    "services/worldEconomy/worldStreamingCustomers.ts": "94d58321efe6ba74e271a09b92a6f71e3c6c46ff84834387aa5c71d14952060d",
+    "services/worldEconomy/worldStreamingAudienceChoice.ts": "f92d2402e49bc409f5b4ce36035d245530106694c1249a3221569a5a72d1e211",
+    "services/worldEconomy/worldStreamingViewing.ts": "86724cdb23607e1a36d6b9842509d6979e45fdf8ee9fc74b0edba7a1cdbbe091",
+    "services/worldEconomy/worldStreamingPlatformEconomy.ts": "d79635c8a47576ae5f3573c9468cb14a7e32d6a097d9ac5d077380d83c512695",
+    "views/avatar/profilePortraitRenderer.ts": "49cc6b314ec3042326f323892dbc897b0093ea7a3e573863216218d66991ce52",
+    "services/profileBuilder.ts": "7d46bad474010d3dc197059ab88757462c2e8893561455383a1b63e8273ccfb5",
+    "services/streamingRightsTransactions.ts": "533532b980b6d514bc15d3d65646cd75bcc78d69d590ba456f45928281c07480",
+    "services/studioAi/studioAiState.ts": "2f40182dcc4da77a7028be3542ba407f98923ae58d6105215ce098bb6121d4af",
+    "types.ts": "292d8b09a824d69f1e83e6fcf774a14be7db4ef65b9ac73204031b866c625305",
+    "services/customPosterMedia.ts": "f52969418b74307f3281d3d30556b1f4f150fc7ad8fbe4ef2b817da59cf4392b",
+    "services/ownedStreamingPlatform.ts": "25452ddb2014bc9a78a09cc4c04eb90410cba777f9857eb9c451a10716ed3709",
+    "services/platformAi/platformAiExternalCommitments.ts": "c531e8d3fd17943f1d174f2ab1ec0e388c856ef8f24abcc7ec9253816f4798fd",
+    "services/platformAi/platformAiDistress.ts": "1d598a73865d5ec1f5c26973563c08da70c3181d6e0c20399ae5e04b7613a237",
+    "services/platformAi/platformAiContentSourcing.ts": "ac90bbf1876e408ab802598466289c2e917f05ed7f5116adf23d4980b8f8df7f",
+    "services/streamingBidding.ts": "ebbc8dd139b1f7cd138838533938a1cc3c1f47c3463d66dce404dd726d82c246",
+    "services/industryIntelligence/index.ts": "5c5a12299fabd491fd8087ec51e520572e4282e22ac47ea7d034a787d1082d27",
+    "services/industryIntelligence/industryIntelligenceState.ts": "56f34625f53d6ab41a3c3b5b5baadf962b0f95a83804d9be4a1f54494f4835ec",
+    "services/stableSaveHash.ts": "916f1b94075e6bc260a28cfa32cd2c72ecd3495d948d80dc58dd2dd957968b5b",
+    "services/stockSaveCompatibility.ts": "f4ae5ae79343eae7ad6f20849a21ee0522dfb6bcdd39aaa29cfa88c374d05a90",
+    "services/talentNegotiation.ts": "338327deb44ee3915312983f672088d6130eb70ecae398636f144ce21a9af884",
+    "services/lifestyleActivities.ts": "a1bd0f67f8984c6b4f10284e29affa25d9d80f24cdf6c821da6ec1ea1cf4219b",
+    "services/newPlayerTutorial.ts": "c0b124f1a6d831d145f411cec507328c50b71c9bbff9466f1861f1ab74894e53",
+    "services/studioAcquisitionAssets.ts": "839faf952e17957eb8852adf09b5e71e7f94bf8d4dbc3496d44d14bcfe28a08f",
+    "services/characterIdentityMigration.ts": "b0e6016012e6ded58644e20584e121a2514cd3496342746d5bce1060398e375b",
+    "services/industryProductions.ts": "b2717cf43ecb93d92cff15c57bfac68ce00d7ffdcd7e3fcd206e1763bd300f24",
+    "services/talentBookings.ts": "93050986352ff89b5362bda064e70e24600069b62c893fa42267831d35e44b68",
+    "services/platformAi/platformAiPlayerCommissions.ts": "9b52f9a867715a6070901f5d072aaf6199d85e7ca5d51024f87144e1d1436cc0",
+    "services/legacyStreamingRights.ts": "6ae20f7de2b3e1337e8162a929757ab0c14c793fb6b73e6b4439f8917e0b8ff7",
+    "services/historicalCatalogue.ts": "43226442fedb6f93dcacbf6db12a0d4f6c164f8fb113786e9afbfcb0819e9256",
+    "services/historicalMarketRivals.ts": "787ea847883622ad8416d32e0b28c2a0b0692dd8762a3853e7e13a8e8be4dcd5",
+    "services/studioAi/index.ts": "3c4f04c6f0970aa26490682e994658ba5d1df4c3b7f3f9235c7d89ff05ac11c6",
+    "services/profileAvatar.ts": "f665befdf47daad538d902b6cefad6bf9603a35f14145c78a54cf83ca20efe7a",
+    "services/boxOffice/boxOfficeClock.ts": "4b55d94152f0f910dde06cb88adb14afefbf5facbc769a96f78db4a55546446d",
+    "services/worldEconomy/worldStreamingOffers.ts": "87dac9b207c55b4c9ef55228e2a831f89d24ed5a5eaebbc6f670be5b40a78585",
+    "services/streamingPricingEconomy.ts": "21e2e97e9646a9ee57cd8309aa083f3196f6e1dceb6884b1ed0f919fe0ab547d",
+    "services/streamingNetworkCoverage.ts": "e472eb5b3e3708701523116faa9c7a654aeda78851227c976b4a107590f89f0b",
+    "services/streamingSharingPolicy.ts": "2edc20a7e7e060122b772eb7129598fb2eaa0b47f03dfbecc406621bd776f820",
+    "services/localization/locales/de.ts": "cadc2f85f37f0c2be62307c4a949df66274a382a7028f96869bad1d4f42aec25",
+    "services/studioEquityCash.ts": "0c8701e5ddac14e7f228306ff7ec1fe9a5c3e344a8ee7c051c050d5a22094a6e",
+    "services/streamingContentAvailability.ts": "b7cf2242a1e9cd42dd794fce24335c1e05bb0d025aaa62f29e6902d5c6980f78",
+    "services/worldEconomy/worldStreamingRoyaltyAttribution.ts": "6bb78a247947fd57c85e35801a7d3090bd655b21fb9b5b82f4ab218461f94062",
+    "services/streamingRightsCompatibility.ts": "8c3dadacb6eb42eeddf19264343af6f5d07145d3dc204d1d96352cb31257c23d",
+    "services/streamingTitleAccess.ts": "ae47bce0725d60f7b2dae3535da3b1b18e2a470c3ea76ff769e72ef2d9fa0c4a",
+    "services/localization/locales/en.ts": "af4586a0cb7fe2467ae461dfa527f2c655ee92a1d0d6874a07ff08c5e4fbe61c",
+    "services/localization/locales/pt-BR.ts": "8e0da67d55457f0a4ae4789e84e202ec62ee7de48c1382ca9de868902b5fd1fe",
+    "services/localization/locales/fr.ts": "d011ec68fa65c27aa9698240380c9254d9eb72dcce9e5b3e688c798a91f47c4e",
+    "services/localization/locales/es.ts": "b4fdc61e5fe037892d7282fd9d640cf9e2bfb9e400ed488cecd0eae8fc719c21",
+    "services/localization/locales/tr.ts": "f3ada33d0807abea93bb89f8c68381f52e08267d86f09cce5f9d466dd361aa0a",
+    "services/boxOffice/boxOfficeViewingRoutes.ts": "041f0b694aa4827f4db987be01914291202c1a3f157bca39fa1d3ef16ce36067",
+    "services/streamingProductionReadiness.ts": "d4e87bc34c4bcaadf72479bb831ca4a51f26305bb81071fdbe89c6649ec8a7c4",
+    "services/streamingInfrastructureOperations.ts": "584d3ead618bae7a1926b60e6abbca0f324f6e204222bbf37274202190987506",
+    "services/streamingNetworkReach.ts": "785f61c1df722dd6da180789ae919f6ed272555c7a2292132ab18c312ec7437a",
+    "services/streamingLocalizationCapabilities.ts": "8b03ff5ab534db406c9ca4390afdb445fce379c3f52b38b39a017a74173d73c9",
+    "services/streamingOriginals.ts": "bda753c4d78b89264c897b61729b07e1b343a2d6c14c2c701721c10ae8803e83",
+    "services/worldEconomy/worldStreamingContentValue.ts": "0f9a53f5316dc0246cd4886a4cb98ef7072ea9e0d6374819b46e7a232f325581",
+    "services/worldEconomy/worldStreamingHouseholdBudget.ts": "e1728f467dadd244c72532b1a49ec01d55a13d715c005ed2306716ddb016df04",
+    "services/worldEconomy/worldStreamingCommercialEconomy.ts": "258baa254bb04c8516ce80542887d9bd3b814c4cf5d96ca6696fc245c18bbf5c",
+    "services/streamingCommercialOffers.ts": "3479e4612adfa9c251ca36a4dbd8de229dc131ca6674269c44a65b5c6f7b15b1",
+    "services/worldEconomy/worldStreamingAdMarket.ts": "d6e7d27dc601e5e4f4d72a42e99d4a2d14c8ebef0db867bd8d5ed111b6d69508",
+    "services/worldEconomy/worldStreamingAiCatalogue.ts": "629ba2b82932eae4b03c7c2627b2693f8dee1e8f73c153f7e9437790d955a86a",
+    "services/platformAi/platformAiFinancing.ts": "6db25de5011d4fc7cf9af3a5852a203a94a0b99c7a75872772336c70b9ce29b1",
+    "services/releaseStreamingAuction.ts": "71c2f42720ce3076031248c67c7ae9ae23acf4a182f1c4b31a8a3fabe1d2ad1f",
+    "services/productionLocations.ts": "a72a6adec184e2826bb69391a574a5d028aee64abfe145585f82d98b597e09d1",
+    "services/studioLogic.ts": "3d2c200bef65b5c4a4bb37bcfa1088da2edb7c6f65f9b66b7d4ba448d69009ef",
+    "services/talentService.ts": "b6646e8d35e17b4de6e566e133f99ac2f2dea22e43d35a2b517878e17048bb13",
+    "services/famousMovieLogic.ts": "b3e450ff1c699276842d85532bb9f55840a4cb1e7e42ef219395f1d95b034115",
+    "services/studioOwnership.ts": "69f35cb4c829e7c93c7ecfb87df72d412478da8f1bd85ce2adac12ad51cf1f77",
+    "services/actorRoleIdentity.ts": "688d325d49dd46c4df4630ce5fab312fd234fb3c8bc128bd50672c135fe5bcbd",
+    "services/platformAi/platformAiOperatingProfiles.ts": "a4fed8b326b3a2858217175890952ba0b723a686b8e528deac5b170affffe8fb",
+    "services/platformAi/platformAiTurn.ts": "9db94a9185ad72c525b6ed4ae940ace2292ad38c05135c3b809beddb1862da27",
+    "services/streamingMarketsCore.ts": "e5e21c30e70bc427d0794f126940c1f08d9602a485143025124c42a605de0a23",
+    "services/streamingLaunchProgram.ts": "546729c268c977c9eb51708480b926fd35b580a6346b7ecad87b51b3cfce40d8",
+    "services/streamingCatalog.ts": "7480459dc72ab484b371e22a951036da17d328aa2b3f326b2a6465d5d8604443",
+    "services/streamingAuctionTerms.ts": "aa62a645caacd56a67fc3e38715dc63cc2891475daa85a2b5b97c08724ac3f73",
+    "services/streamingContentMarketDraft.ts": "ce70d5f39818f754055116f7099e6ccd762638d57706f857c0b5d459efbe1ceb",
+    "services/streamingContentAccounting.ts": "19decd34be16891bd06b4e11a8808ba03af9bfc981a7b6782b48e52cca69db84",
+    "services/streamingInfrastructureManagement.ts": "8eb83e4b55fed426fa5af449495623d9d3aed0eb95be4b6a2f668a61ff295f46",
+    "services/streamingCanonicalState.ts": "33c92bb18d37be4f59c98542c02ac46c515510bdb4743889e4d0b7a1a369f1ff",
+    "services/streamingEconomy.ts": "75e547296584486c699509e621771edb3ee50d72633514053c8c54a3a5192d8f",
+    "services/streamingBrandImage.ts": "944feca2a4a8c058b4a3d6dc02718038b3443046a80419853fae86a137903c53",
+    "services/streamingDayOneMarkets.ts": "2c0ed58babb174d77a1519793e9ffde45de7951e01f270d8eb9fb8d19ccc62a2",
+    "services/streamingRightsAccessGrant.ts": "13c7c7658331d381691c32381ea07f80f2456ad4765254d7855fc2f0c777eb7e",
+    "services/streamingFacilities.ts": "2e6713a5b1d7dbbd3910b6cd09ca8cb2bec9fd7f723590a8ad50aef487c86128",
+    "services/streamingRackGroups.ts": "3d32c7f6de32fdccf69fa1458ea549d84c9a0d1da7ac75d8794337d4ac381c38",
+    "services/streamingFibreLadder.ts": "8a635a7cc5d1e0c0c38e74b40fc9de71ed13623066ad81420ff156cc973a853d",
+    "services/studioNameRights.ts": "31beabf21a248f854cda76b86d6e1c026b494fc9671eaecf1b0282fa7c1ed174",
+    "services/studioPrestige.ts": "f0efc38e037532f849837f0646029d2ccaa3ca729dbde4436b199a48a8f0abc7",
+    "services/streamingAuctionFunding.ts": "f947f56d288d3e203ac133eee6cb01124cfab4371696743c55ca40367536744e",
+    "services/streamingMarketSupply.ts": "2db79c40075b5e4a07e58fcd41121a394f3014ce56f5dc110b595118b2774822",
+    "services/streamingQuarterSeason.ts": "6769f689168d65d8ba101e20188be7c95fefdf2c3792163a8541c11003089e28",
+    "services/streamingRightsMarketplace.ts": "2450cbcf65c010cc7b90966071b017acecd2fe15b1ff5b591df4d9b5f363c28c",
+    "services/streamingBuyerAuctions.ts": "a821b4098e413b8945627e5f2835c1a8ef8b14761cdb33eea7dc205cff9f6eb2",
+    "services/streamingTechnologyCampus.ts": "5787f6c78b53b848f1b27ae7c5dbd26791386650baad111292f9fc255150703d",
+    "services/streamingProductSuite.ts": "db58bd12ccfe6ac98e440dc6ce7494c3b4c39d3f594dc3f2c6295af5c1374530",
+    "services/streamingPromotion.ts": "e0af077a9b5f3b6bbc6ac05c5228e1d84ed5041da5c86454ac15351d65600b20",
+    "services/streamingLeadershipGovernance.ts": "55b73e42a58e7fdd4c1b408fb8d2bd7f93cc51ff317c3d564aebbc1fb6eee28f",
+    "services/streamingCompetitiveWorld.ts": "2f4548481f5783cefa975e23017deb87802a4b13909a7480feb624553031d225",
+    "services/streamingAcquisitions.ts": "b1e760dc921f5e128e8e562d60e70e21ef91b20dd4cfe3048ac2516d8168e67e",
+    "services/streamingPublicMarkets.ts": "de524a3a338136d0a0c2f61e9d1af4a0e0e1f5d2a2812ec328d348ffc54050e6",
+    "services/streamingCrisisSecurity.ts": "d6a501125e875e2edd32179d876185cf933910d560381a731113192ed868f4ae",
+    "services/streamingLegacy.ts": "0e28e81128cadb190e6a563423f21075fd97fd54d1f1f0c60f66fe7aecf96c4a",
+    "services/streamingResearchLifecycle.ts": "80267a641890a4def9a3c06a171c882732017f9e04579228fb07b9d03be4fba5",
+    "services/streamingCampusConstruction.ts": "185d083ef82051ee2c88932507ed9fd0532734d697b938db58bb1025ec502703",
+    "services/streamingInfrastructureProgression.ts": "1c42295f5a0a9b73872e427aeac4168bb5243b1239b4ad00af3d0317ec61638e",
+    "services/streamingLaunchMarketingLifecycle.ts": "515b37bbc7a13a9613611a928a12ed496ec7db39d1f2f18984a270b0ff41ccfb",
+    "services/streamingOperatingExpenses.ts": "1d99af30689c9bf97a1139b91ff6ec331349c020505655fbe9fd2abed5e4f533",
+    "services/streamingMarketEconomics.ts": "837c1e819a6c8a5869a651230ff0372430037d1fce0eca9c0e1f26d82d4edf04",
+    "services/streamingMarketTaxSettlement.ts": "53e11c6287107304bd1823fca5f65a3ede7cd4204bdec3881c0da68f4425a0d5",
+    "services/streamingInfrastructure.ts": "b622a0463356c36a81dc206816512217a575ed92803a2b1723d4ac9a5db1a78c",
+    "services/streamingMarketFilingQuote.ts": "2b586016fefab351adf482f09cfbf9e738a70d330e6c24c13e8f1ff7bc8617b1",
+    "services/streamingResearchCore.ts": "2d2926906702f3a2b4acc09557dc5cf00de90c0b6ec91c8d69de75122508ad65",
+    "services/platformAi/platformAiLocalizationCore.ts": "45315ea08e45fa5b14f80dc7511aea73dfffc88dcf3388ebd66ad147f9fc14a6",
+    "services/platformAi/platformAiProductionEscrow.ts": "141e6f0585ab1c5331a834bd2721b442130964ea169226002d7d89ca8eaf776f",
+    "services/worldEconomy/worldEconomyCanonicalState.ts": "cb3c9bbed405cd45f493f519ddedd4d37b316a101dfc0f84e8e87e989cc53e5a",
+    "services/streamingPlatformEcosystemSeeds.ts": "810d7ad6fb1faa0a09738db469081311ca104339feb929dba6c76fb38357a681",
+    "services/streamingPlatformBrandGenerator.ts": "cd5c699b257bf3976c08e5e2c4996074e48551c3d75c14e762c1a590eebe0464",
+    "services/energyCosts.ts": "aa393ad431736a85f1ccf85c175be581a1b470a9e33f4127bab2ee58082788cd",
+    "services/streamingRightsDelegation.ts": "02a328449863051ab507654f269fc2ac153e6c444b16fde60c290134bbc6327f",
+    "services/worldEconomy/worldCountryRegistry.ts": "5f1b1adffd541c21e50267efb23eb977026b8b01b2ceb07e8de73b41d983a405",
+    "services/studioEcosystem.ts": "df60f166923746f0bde9be48d89e8d9d5b4027f71177ca191b820cbdbad11aac",
+    "services/industryWorld/publicIndustryProjection.ts": "b94f91e371cca87f2105b11f8de7dbb60901714e3a956358047ad1e18d1fb737",
+    "services/actorOfferTerms.ts": "cbe1bba31ab893f273a91042143950c1c1892fca00f66274c7a307e560a01a1e",
+    "services/projectTitleVocabulary.ts": "447be40264472f56c97bc9b6d79e1a0b77407119b12a21b42d7b9676fd2da8b3",
+    "services/industryWorld/industryMediaIdentities.ts": "4d468404670cded10d0fcb6ecd30596961f7958e79df11ee1e6fae038163d90f",
+    "services/studioAi/studioAiProfiles.ts": "20ca542bde73e0c04058cf2cf89045f7bc4427eb5cc00d251af89da7fbd04b9d",
+    "services/studioAi/studioAiSlateState.ts": "e87b7f6efd31efee210cd8ec46174236d75956b60841ec978507b4d0efef560c",
+    "services/stockMarketClock.ts": "ccb31caa811f4ee7f97eeb00cbb5494cbef6522f72ab13fb68222e3f6888d7a1",
+    "services/boxOffice/boxOfficeAwareness.ts": "e89daa7f4385d01c14d4d6efee0dc67f19615553c2984df38b18a3a59d06af5f",
+    "services/studioAi/studioAiCinemaRelease.ts": "6dd5bf909aed0cd2693d9f9fb4ac0d4dbd4723aeda0b77ccc5309c6b1bb8cde6",
+    "services/boxOffice/boxOfficeSettlement.ts": "b38af7071c50c4f70e85a1b17aa2ea25aab057ba902b32d04c4735804c356764",
+    "services/boxOffice/boxOfficeRightsValue.ts": "e6e54ed7d775d5aa09f9d16aeb7074f1d50350634e15817a88989dc12ceb2ecd",
+    "services/boxOffice/boxOfficeAudienceAdapters.ts": "6d67741b0ff4ceaec30dec27aae6e6859866948df93b3ce1d0d14bec68c73f6f",
+    "services/boxOffice/boxOfficeSupply.ts": "02015b7b1feab3a680482a67e538e2504ffd2bcde75daef9c623e50a432641ff",
+    "services/boxOffice/boxOfficeMath.ts": "007c70236494039f231e50555ca002890e6ca5f1dd65ab2fb582d03bbbfa768b",
+    "services/rightsNegotiation.ts": "31fc688c5a9e8ce63b74e18128ebf1d8aea95c7a672759ee78fdd986c7c9b2bb",
+    "services/boxOffice/boxOfficeLiveSettlement.ts": "e18dbd2982610f01414ea36f25b7f9d7b596d88abb6c46d695aba3a495a44d14",
+    "services/boxOffice/boxOfficeIdentity.ts": "848fe0da6156458823467609a0ef3ec9874ba38ff3f808dc74bd7ec6635271b2",
+    "services/productionEvents.ts": "ff1aa0682527c8646c0a77b6a1725b7fd4c577d00650e4dd2bae660c0f4c016b",
+    "services/crisisGenerator.ts": "30832753f86dbff740bca456e4556ba58fce382219cd396e9628195b7a588fb8",
+    "services/directorGenerator.ts": "44f3673556874cd799dc463afb5a6de70aaa69e7b7e50722fa26aff5bd38dd68",
+    "services/mediaStorage.ts": "bd74d03d84d11f7cefcc82f88b059723817271ac9c6f4b73188960e08adb84fc",
+    "services/boxOffice/boxOfficeDelivery.ts": "e75ea842ec354155f0aedc8071ce8bf015b09452c7fac6227ec9dcfafbd63112",
+    "services/streamingOfferRevisionIntelligence.ts": "f477eb6e9d4219ec1d7122b1e0981a4bc0062827c1f522ce19e52a04dd6ed77c",
+    "services/industryIntelligence/industryIntelligenceContext.ts": "468d13c4642da87f2ee986c73225cc40f7dd0ccfa38165e08fe4af988439b267",
+    "services/industryIntelligence/studioIntelligenceAdapter.ts": "2fb880a46da055039d4379ea26dea46871443185ca248f84ffab71feac43d903",
+    "services/industryIntelligence/platformIntelligenceAdapter.ts": "f58c324e7df8225d08337aa8d6043eff467cac01584e0549237746920df037da",
+    "services/industryIntelligence/industryIntelligenceScheduler.ts": "4585b3f6760879f3188cc36b9ec867daee903c47e9ce633ba3ae67aad2290093",
+    "services/industryIntelligence/industryIntelligenceCoordinator.ts": "eb19c8b67855fde5b228fe1b504515fc2f3b727edb2123c36f5ee70612a11384",
+    "services/industryIntelligence/industryIntelligenceOptions.ts": "1e1d85943115cabf94737114b3c3f0835ced04aa46aec693ebefcac64e4d792b",
+    "services/industryIntelligence/industryIntelligenceForecast.ts": "ba25351f1590c7ffce24be71efef0ca5f536aabb65a46b87599f6d7e3ecde222",
+    "services/industryIntelligence/industryIntelligenceScoring.ts": "bcef16905f329b65223e52e20e682e961e95eb256ce5be26d702867cb07517ec",
+    "services/industryIntelligence/industryIntelligenceLearning.ts": "c9a8d14944178b3c96947141326bc97678360a51c70d5dc670866ddbe1d50fbc",
+    "services/industryIntelligence/industryIntelligenceShadow.ts": "745dfdd3f85921a559c6ccfa6f6cf6c540d59a3bd059030c1e20a5209764be87",
+    "services/industryIntelligence/industryContentGenerator.ts": "d8a82dfdbb2cd5860e8bcdcaba835cb6bb258efa5faeab29530e677b36b41eb7",
+    "services/industryIntelligence/industryContentNovelty.ts": "64694ca83d177effb107effe3ffed9706f8865b542f2f0b840bab774e0014c77",
+    "services/industryIntelligence/industryBudgetSuitability.ts": "e9ed013a7464f4a0f2da87ef7bb158613bf34773f0dc6dc74bc71818da793dc6",
+    "services/industryIntelligence/industryUniverseBlueprint.ts": "9034d607fdbe74be586ec28cd85e1193d4c99a1869c5736bc4ee9771f9bdc48a",
+    "services/industryIntelligence/industryContentMaterialization.ts": "03960a2796ef71569f984a04645e545ada2d436f23011650b25f7d75d68786ed",
+    "services/industryIntelligence/industryContentShadow.ts": "6d7f0d27a51d67d0b1f59cc83439410999e21155b3bad4edc1d5452d5c4996e5",
+    "services/industryWorld/industryEventLedger.ts": "593666e5d26688514da88718f86daac8ca7ef3495c6fafa262eb47691f5b1744",
+    "services/industryWorld/industryWorldWeek.ts": "eca802c66a26817faaa3ad53ff74ecc30016473d93952ac0fdafd11db4cac0d0",
+    "services/industryWorld/industryPresentation.ts": "81902967ecafdb823bbeec01ecb10d14197eaa466ae0d99f27012dbcbc77df63",
+    "services/industryWorld/industryEventCollectors.ts": "f210edb6af1d7ff30cec62dff03b9d3625581bf932eca0d23ff31de9274943d8",
+    "services/industryWorld/industryMediaLedger.ts": "705e425e3e7bd3d9225f28543af5d8d2df812f88f73caacc03f901088019ea50",
+    "services/industryWorld/industryMediaStories.ts": "4b2117989c418e2f57f07fcd87e66d65afd8bfa62610003be1afa6b9f9857405",
+    "services/industryWorld/industryMediaCoverage.ts": "9037c73bc51b89259c3027944f4537367012136be54213aa66a2b5e16340a442",
+    "services/industryWorld/industryMediaVoice.ts": "5f042f5d0e5b5d93384d629fa5a39f3c0ab26cfa69eab77b3410a4e892396c40",
+    "services/industryWorld/industryMediaDiscussions.ts": "14e4dcb007615e125982022e1700f15f2e63cdd99770efe5b3ce40baf34acf42",
+    "services/industryWorld/industryMediaResponses.ts": "312ef1ce7e032d01387c1fef53997382ddc1384f9fbdbe0dfe4d96d3f4a288a8",
+    "services/industryWorld/industryMediaYoutube.ts": "7db5275dccf441d2960d4633fb7f3ab1b18d120fd06f8c9547fe77b5269c9a22",
+    "services/industryWorld/industryMediaFandoms.ts": "d85ce8dddf3dda21dd992856d0a03621329fa8480bea8bfe2de22fd0431c5994",
+    "services/industryWorld/industryMediaClaimsState.ts": "e28d3bdb144234012aecd98a8499fa3c92e6266f5885c2104a79fb4fa637fc30",
+    "services/industryWorld/industryMediaC7State.ts": "b96fd38faf71b98b58ef1b1713315898a737b43458472981eb3d2fc25a9cbab3",
+    "services/industryWorld/industryMediaNarratives.ts": "26f0f5c09d7eec50f252ad85604e1eea8c3067387547a3500825d27f8b0bac1e",
+    "services/industryWorld/industryMediaRelationships.ts": "b945e37c319ff076328f85487971d1fd6f6324d59c4cc81aafdbe786f33ece73",
+    "services/industryWorld/industryMediaPublicist.ts": "2c234ed3edea403260978a42e43ba5610bcc7babc7ab51a5002d5361962dc3ea",
+    "services/industryWorld/industryMediaClaims.ts": "89fbb4babe08557bab5f52af0d68afdbc953ab6582ea06a1b230864f8b986ff4",
+    "services/industryWorld/industryMediaClaimResolution.ts": "56a3506f9b8c80334a99a3c58ec00334ad5e5e49f63c8e20aea10c13a97e9efd",
+    "services/industryWorld/industryMediaClaimPublication.ts": "4249d84738ee2fe465307ba8d9539f92a5ac1068a1bb21065421fe3dd242f8ad",
+    "services/loanLogic.ts": "a1f8cd4441cdb57458a9dd7af9dcf9aa53aa53cd77cce1af751f0d419701c475",
+    "services/streamingContentMarket.ts": "aac6179334c8f5f8b0e9e0e31e8dce0feb3aa0655e1f7e741f279c0d4bf75449",
+    "services/babyNaming.ts": "9e111d16d4042b114874007d8f51f0b4155ac2defa3735f5eef4198848438779",
+    "services/reactionTemplateEngine.ts": "b642b5ef7d73d5520102c376d466094d8c424b42d9f49ce8fe9b4de4e30d850a",
+    "services/appVersion.ts": "970d8492055902bf907fc1e3834f924a9010b54f8dfea528329a45158c283363",
+    "services/scriptConcept.ts": "829a8181ce7b96fa01c79a9a197285c66dc9d528e9929e34cfcc3dcbc31f549b",
+    "services/projectNaming.ts": "e1076ab3ad821b7a75e53215f1c60066cc4cd046550d94989d11f5de3b49b4d1",
+    "services/acquisitionSigningQuote.ts": "a5c1c236eafac8e160424b80551686a9cf2d61ca4e8d4f14b1b5f445ad61ecc5",
+    "services/regionMap.ts": "ea732f048c72eeb3b46219b20cf56987861f90924881f656aa5d510cdaf1084d",
+    "services/entertainmentStockMarket.ts": "f3e2f6e8f75072d85f509a8fe01a671dbdcb0cf11633145263820c9fb1066a0b",
+    "services/acquisitionEventCadence.ts": "179651bbab20413fabf45004ab1394545124ecad1f26f77fc80be596a5d4ef4b",
+    "services/companyPosition.ts": "631bc48919f361c58d1ea5ea5451dd823ec665d84f00400da5e6b7088597953d",
+    "services/industryWorld/studioOwnershipMaterializer.ts": "681be81423f90cf8ddf71e579e8f8d4184cbb24e81e4aa4a9e22a2db4c312a17",
+    "services/releaseTiming.ts": "25e73cb60eb386dd40b3742a0336e581c26ecec84af4fd2dc0d8843de56de36a",
+    "services/historicalCatalogueAwards.ts": "b85f3820146d01b126c9d5dd956ad65adc73cbd3592ba8b87bb1b6fe677e0d88",
+    "services/platformAi/platformAiWeeklyIntegration.ts": "8410b84b29545a0ed6977accbd67ee26d65329a936afa00f368b32793a5bd9e0",
+    "services/platformAi/platformAiEfficiency.ts": "5633c993beff8553863c05f6b052ee13608a4899f88f555f459417b8a355dd3d",
+    "services/platformAi/platformAiLanguageCapabilities.ts": "236123c52189ba3976407bfc66a5f57abf6f7b7969dd8670d392a59cd0189c35",
+    "services/platformAi/platformAiRightsResale.ts": "6eaa71ef4abb4155f25fb524d54745829d34f8719f49e570409dfdb8b0771dd5",
+    "services/platformAi/platformAiLocalization.ts": "040b92c24682f57919ad0c414c49e40535d26123a1d8578d1dcd9343ca3dc6b9",
+    "services/platformAi/platformAiRightsLifecycle.ts": "d59d98a69789e037c6ee59356e942f74bda40f2edfcfbb96e342141ef10ba8e1",
+    "services/platformAi/platformIntelligenceIntent.ts": "fcf9443814b3e3da3e7a669a8fbd11fecdb8a9296fbc9d6655b5639928cc96b6",
+    "services/platformAi/platformIntelligenceExecution.ts": "f169a7ffc651ff0c03ce9a0c3767d7368354734acdea46f15836917aea616566",
+    "services/platformAi/platformIntelligenceMigration.ts": "e616863c5df58e106cc36b81efcc3561eb4a817dd9f5128f38dbfc76573ba5d1",
+    "services/platformAi/streamingOperatorBidderBridge.ts": "28ea369e814e45ebccbb8af61cbfa26634d3bfc9f21223a653e8aea7cadc9419",
+    "services/platformAi/platformAiPlanning.ts": "2adc620c50ca11c8d9aa1f592196b504fa57dc40afc40cdab53f11f8ef9d1fd2",
+    "services/platformAi/platformAiCommissioning.ts": "efe8b5fa907e777cb30da89c980e05a712ca293f2b17b2bd6ebd1eb322900a33",
+    "services/platformAi/platformAiPlayerCommissionQa.ts": "a6a8dbe070acfb9f52242269daca74ae30feef8667808d2620bd95e9b6f51d4d",
+    "services/platformAi/platformAiPlayerCommissionPresentation.ts": "19fab4100bd3b9f0fb03f4265b7ccafab7a4fd0c1dbf73a93c19b06e0227d80e",
+    "services/platformAi/platformAiTalent.ts": "4577803977a1e9f54c1a6ab2148ff8802973b40b5f5ac86097fcc95abb2d3090",
+    "services/platformAi/platformAiProduction.ts": "dccad753dab1a245ee11f545b1dfb1944d08450dba32a124067e6a440c19e72f",
+    "services/platformAi/platformAiResearch.ts": "3e652bf1ea5ef171d86c1b6780f009ff59c9e190796366ab29ee4fdf3d0aa965",
+    "services/platformAi/platformAiResearchPortfolio.ts": "3b8f3e6ebbd53fcea48287ee64b61be33540ec22e488f1960cf9878703b213cb",
+    "services/platformAi/platformAiMarkets.ts": "9c0c0adec39340933e1e175fa8201d22cf4aa43bb29e3abe45bd6eab0da2c053",
+    "services/platformAi/platformAiEconomy.ts": "f7709548ca12a34da8c208a0526d639649daf5534c345efaf56f9f53061b644c",
+    "services/platformAi/platformAiRelease.ts": "8aeb3ae139609bd301ed3b7e0b76d80e521de82b3941f3464a5969bc2e1913ab",
+    "services/platformAi/platformAiReleaseReadiness.ts": "c9d6eff165d0ea2b85a64e1dcebef3db320636136a926c901bf09d55b6d2f2e8",
+    "services/platformAi/platformAiMemory.ts": "7b6eb1c7d99dd53d7109292672095dc7ad4f6d73cfef12af3711cbc98eed0281",
+    "src/data/generators.ts": "337175bd437ebee29425563e92d297eb25392d40514ff8fa99ea073dfca848d4",
+    "services/rightsMarket.ts": "edad80ed0bd18fc76b673d1fa98b845c65d0d0a88ae866290f3b1a57ad90824a",
+    "services/pushRegistration.ts": "02ed3b35906efe278d6e2a4c6506198ef0f89fc0df6302bd5917e47b9a54e7b4",
+    "services/studioClassification.ts": "baf5640a2f1063d16ec67e3eb34c3889e7d742e1c935fb1233073ef87043bc20",
+    "services/publicStockControl.ts": "5528062935399d74c3e773fa5f0b11e463b20d87b4707a4c32da31a44e26bcb5",
+    "services/cinemaChains.ts": "b969c819cdf6861fd2f3ef1d141181d40cf65cff706501a32fcbafa658a0740c",
+    "services/stockControlNotices.ts": "b23341e693129a2b6daf8265ef904e83b799e1b8ffdecec93aeca743d39212aa",
+    "services/streamingSitePlaces.ts": "b2d2e5e28cc76695c361e05ae4a7a5491008590cce7bdbb05b93dd2048253804",
+    "services/streamingPresentationInputs.ts": "ca302e326b2da691b1828c7621b7819b8a1756b2810985481744365157226cab",
+    "services/studioAi/studioAiProductionState.ts": "7558680a4c5a2786d659166e9a88fa1758d29cd2bc66862f6e7833c497cabe64",
+    "services/industryTalentSelection.ts": "f80ab9a1d1e1fb331eaad3b7b3754291c767e0faba18ee9bdbbf848ae9699b5f",
+    "services/studioAi/studioAiProductionExecution.ts": "f7c07b559fb6a005d8266bfbe757445bce9913f5e68c9f43cf051976d1813dc9",
+    "services/worldEconomy/worldCountryGeography.generated.ts": "407e25766beacaae9ae99bc095a83883df043f3eec20040080e51c25c7171f1a",
+    "services/streamingCollectionPrivateOffers.ts": "9370aa759f1e01493f596756e4e4f70927e17343c138e1070c5b0da70bba675b",
+    "services/streamingUpcomingRights.ts": "84951d488cf3c5b2e4dda1c2204bb610392a8d098db9824a46235e3ed3a665d9",
+    "services/streamingProgression.ts": "a9034b0e7a61beccd7727a3ce211d2b4b0b2a7dabd4d6265fa0b1634a3eca6df",
+    "services/streamingInfrastructurePhysical.ts": "99b7401ae4dd62a952d4277a33ed4887da157e64ff02efafb5e64c405bfc34f2",
+    "services/streamingLaunchMarketing.ts": "abc3ab77ddf9b3c21f6b241f36ca8aa237811fa4cb7b3d31374e25b4597b17d9",
+    "services/streamingNetworkQuote.ts": "2a9f5c32e9e77a37fa51734817b4791440a2e061b34a2ab7cb8de8f0f2ba5ce8",
+    "services/stockValuation.ts": "1f769aaffb3681ea0dbdc765cc89b24aebde336bab33fb242638b68a172e5be6",
+    "services/boxOffice/boxOfficeAlternativeAdapters.ts": "bf852d91865680becf83229bca64ff2cde81f9ad0625ef83c3b613217b7459a9",
+    "services/boxOffice/boxOfficeHistory.ts": "44f886331716987b4733b793aecd8b8606d03038952c67e4f0d83c5091e324c9",
+    "services/industryIntelligence/industryContentVocabulary.ts": "3f35c1c2404289de28188d6f9796992179ed6288ee2016a49564ba341906b7ff",
+    "services/studioGroupValuation.ts": "e455f95775c64a11013e03db046c1d0e0de5f98b8f32d4b11d37604bffc0c166",
+    "services/streamingReleaseCalendar.ts": "4df173c5d46156c2c4176f3d0cae01d3d47a50fe8424878f705ffaaa9874725b",
+    "src/data/scriptTemplates.ts": "a97c2ea84d48075a1d9ad80f40bd43ca71232f873b115e84c4312b3f13ec9d21",
+    "services/streamingPlatformEcosystemTurn.ts": "5d121c5a42af4db755ba2ea3bd4e050dd43f4b39ae55b5eef8183473e04c3f4c",
+    "services/platformAi/platformAiLaunchMarketing.ts": "86eac4104f603ca1b6c0bfde6adba60bbb1ddf175c01130c27e014d01393c7c7",
+    "services/streamingStorefront.ts": "b62c5b8445fc322e21421ffe458c28db22cb4323b95eefad370bd16a5659695f",
+    "services/streamingMarketSubRegions.ts": "e64a8530a07891d125751db9364e7a52dc735545b8a2f294a0f48882668cb1b7",
+    "services/studioAi/studioAiMigration.ts": "73f44ea3a053d768448552718b55edd3bd312bb5d25b74118eb05ed2ac5a1cfc",
+    "services/studioAi/studioAiControl.ts": "4954ac7d7f948a5b22b0578f472eacf92b188fadaf7a0a53a2ad138bf9733497",
+    "services/studioAi/studioAiFinance.ts": "26a02ed3a2f5e8eb299cabb7936195a3576c3078900073b448c0d7a540ede6b3",
+    "services/studioAi/studioAiWeek.ts": "a681b9b9ea2f85564bcef736c17626b65b2c599a8e0751c91b029b4f0f5fb3f7",
+    "services/studioAi/studioAiSave.ts": "e653be9bb0c9483cdaca855708cac8524dab042c2229c479a4df5980b38a401c",
+    "services/studioAi/studioAiSlateAdmission.ts": "aee669f92a0c64a195a894af5590183795672411726f58fe25b95f0ce0d32806",
+    "services/studioAi/studioAiGreenlight.ts": "6257915cae762131eb0b4072b235430e658679a087c13e06e1a1c10e34d5e047",
+    "services/studioAi/studioAiSlateExecution.ts": "da4f823ceb231f65f8865028ee3c99c616c16f3c2176449f3944b42673557dc3",
+    "services/studioAi/studioAiDueGate.ts": "bcd9167a0cf59e84a1e69e30a4f4215cceb5ce7ac00736567dab03021811a8eb",
+    "services/studioAi/studioAiCommissionBridge.ts": "02922e074724f18be27f959fca8a2d6c69447d99e565ac4f4df6c2627ade990c",
+    "services/studioAi/studioAiProductionHandoff.ts": "4ff5ec4caf994177eac3bf060e58373c66da9873c3b676472ee4e57c5709bbc5",
+    "services/studioAi/studioAiProductionTalent.ts": "00e8aa9bf947f118cc26b21b7adb1b54bf34db60f3a9a451e7792e2fe27cd90e",
+    "services/studioAi/studioAiProductionEconomy.ts": "3bb0f713ec32b53d903dc1ff532d61e368ffc30c260ccd3e6b43ae518a42e692",
+    "services/studioAi/studioAiProductionProblems.ts": "7400cef2c6be4eb9346987b23e59cdd8a80cbc7736053aa567985b39a30e3866",
+    "services/studioAi/studioAiProductionTurnaround.ts": "bbd1224945687bae9698d186300866b98e75b2769b87efc626581cab54bbd70e",
+    "services/studioAi/studioAiProductionQuality.ts": "8398300109eee0e970a1a57f5cdadf58e72ef63cb75bc9aceb6dee63d03ffe1a",
+    "services/studioAi/studioAiReleasePlanning.ts": "fa6531ac088fc8f0230816531d36732cc8e23b729819bab356dbe722f8b65fc3",
+    "services/studioAi/studioAiCommercialResult.ts": "9c6bffc97dab3cf002b8825e72ab72560366898521365fc3cb5992576b058604",
+    "services/streamingCloudProviders.ts": "8ea480c3dfe676637a682229227bbb485d467ccf5d73a8ff05e420549ce93587",
+    "services/streamingServerSites.ts": "1e667519d0c9ecb74548525afc87868fdb4b119e67ef3d9946dc0db42aaa985c",
+    "services/streamingServerTiers.ts": "c8050f76ad1f225204f7df93b0154d143049449163a80662a7076affa120618e",
+    "services/worldPopulationClusters.ts": "16a09c7758db85838dd3b77bdb69607b36e11c5875f15e249ee50e9b00e57977",
+    "services/streamingNetworkConstruction.ts": "bfc7670f19d67dd0b4a56158c09967c6a5ce6f3fa883d7f54a991e91308f49b8",
+    "services/boxOffice/boxOfficeLiveReports.ts": "e6160627a6baab4b01de880bd72522d5dc80219481a8da3edf2b4ed016601421",
+    "services/boxOffice/boxOfficeMarket.ts": "4c7622d3254536a35f827dfdba865bfd944bd6c24c5aafb0473d9217b1bded6d",
+    "services/streamingBuildMarketAccess.ts": "1bfeb512160569040c2112065ec6a986f17cb07151dc0c4a66bd746fbce62543",
+    "services/boxOffice/boxOfficeAlternativeAccess.ts": "19f0d4edfc326936c513478368bc69832c2bbd5f8f168fced35f9f7d3756fa13",
+    "src/data/scriptStoryVariations.ts": "577602a66be9d32eecee9e73f2faa8d66e4dd3ff485e812e7bf8f4a017c606ca",
+    "services/industryIntelligence/streamingEcosystemIntelligenceAdapter.ts": "9eceef5e51c8adaf9c27dcf3359df091f318f876ae0886d1c5eeda116a56c109",
+    "src/data/scriptVariations.ts": "8294c48b629bd5fe73bcf8a4ec5d67bd0b7a2105eba770b2189d54d8cd0310d5",
+    "services/streamingPlatformCompetitionHealth.ts": "e8ebb03114b78d0d7d59b06a4f7d805bf58d3a4fde608260f55081fd430d20b8",
+    "services/studioAi/studioAiCinemaInvestment.ts": "a681f1d0726c938aaf9b33b4f8390dab0924f4c0cfa52b9dfed5e3e51a97a1b1",
+    "services/worldEconomy/worldPopulationClusters.generated.ts": "365474f735a931301df5238e5cb8e98e69583091f7cde866a61262d9592b7ddd",
+    "services/boxOffice/boxOfficeBooking.ts": "b17f69296ed31b5d549d5c0a52e1535b026e02679e6036d261405cfc1a1c8882",
+    "services/boxOffice/boxOfficeAudience.ts": "81e55ec38e146c42c63b137ef22db1783d10cbe518ba1b7cf7b80627f5b7cca5",
+    "services/boxOffice/boxOfficeAlternatives.ts": "53b5f9b9e18fa038474fcd3445de267f5e385fe13929689f22ec2f50eecc226a"
+  },
+  "kind": "LOOP_ONLY_PROFILE_NOT_SAVE_CERTIFICATION",
+  "mode": "after-indexes",
+  "inputSha256": "5cc27d8febd49070fe837d15cbaafa1038ccad4946a456bb3920743d372345f8",
+  "loopMs": 3264.2508749999997,
+  "financialDigest": "6ad926b61c230cbc",
+  "wholePlayerJsonSha256": "395bff94b990a7c44ecf772a623d617f576392573ed6c8d08326b705e488da94",
+  "stages": [
+    {
+      "name": "state_cloned",
+      "ms": 126.91595800000016,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 0,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "simulation_seed": "process-week-v1:player:1893:53:owned-streaming:player"
+      }
+    },
+    {
+      "name": "state_normalized",
+      "ms": 5.245541999999887,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 0,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_industry_start",
+      "ms": 0.229041000000052,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_turn_start",
+      "ms": 0.0042089999999461725,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_turn_done",
+      "ms": 13.105332999999973,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "world_news": 0
+      }
+    },
+    {
+      "name": "music_industry_start",
+      "ms": 0.012791999999990367,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "music_industry_done",
+      "ms": 2.7462910000001557,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "music_news": 5,
+        "new_artists": 0
+      }
+    },
+    {
+      "name": "universe_payouts_start",
+      "ms": 0.009333999999853404,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "universe_payouts_done",
+      "ms": 0.30533300000001873,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "pending_universe_payouts": 0
+      }
+    },
+    {
+      "name": "world_industry_done",
+      "ms": 0.014832999999953245,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "pending_universe_payouts": 0
+      }
+    },
+    {
+      "name": "markets_start",
+      "ms": 1.3592920000000959,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "markets_done",
+      "ms": 3.112082999999984,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "stocks": 16,
+        "portfolio": 0
+      }
+    },
+    {
+      "name": "creator_talent_start",
+      "ms": 0.006041999999979453,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "creator_talent_done",
+      "ms": 1.6391670000000431,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "talent_roster": 0,
+        "team_agents": 3
+      }
+    },
+    {
+      "name": "business_sim_start",
+      "ms": 0.0029999999999290594,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "business_sim_done",
+      "ms": 1.8553329999999733,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "rights_inbox": 50
+      }
+    },
+    {
+      "name": "health_social_start",
+      "ms": 0.0801249999999527,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "health_social_done",
+      "ms": 0.7019999999999982,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "health_conditions": 1,
+        "instagram_posts": 200,
+        "x_posts": 0
+      }
+    },
+    {
+      "name": "commitments_releases_start",
+      "ms": 0.0808750000001055,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "commitments_releases_done",
+      "ms": 7.618167000000085,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "processed_releases": 1,
+        "new_releases": 0,
+        "past_projects": 37
+      }
+    },
+    {
+      "name": "awards_start",
+      "ms": 0.0073749999999108695,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "awards_done",
+      "ms": 0.09020800000007512,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "awards": 46,
+        "award_history": 66
+      }
+    },
+    {
+      "name": "end_week_start",
+      "ms": 0.0019579999998313724,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_population_start",
+      "ms": 0.5970000000002074,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_population_done",
+      "ms": 1.8697089999998298,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "population": 9615154557,
+        "countries": 197
+      }
+    },
+    {
+      "name": "world_audience_economy_start",
+      "ms": 0.0036660000000665605,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_audience_economy_done",
+      "ms": 8.142833999999993,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "cohorts": 2363,
+        "commercial_households": 2273410168
+      }
+    },
+    {
+      "name": "world_audience_participation_start",
+      "ms": 0.007458000000042375,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_audience_participation_done",
+      "ms": 15.307457999999997,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "streaming_reachable_households": 1382940075,
+        "cinema_reachable_households": 1039679998
+      }
+    },
+    {
+      "name": "streaming_rights_calendar_start",
+      "ms": 0.007791999999881227,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "streaming_rights_calendar_done",
+      "ms": 6.20879200000013,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "created_cases": 0,
+        "expired_contracts": 1
+      }
+    },
+    {
+      "name": "streaming_catalogue_packages_start",
+      "ms": 0.006624999999985448,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "streaming_catalogue_packages_done",
+      "ms": 1.1101249999999254,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "proposed_packages": 0,
+        "signed_packages": 0
+      }
+    },
+    {
+      "name": "streaming_rights_office_start",
+      "ms": 0.003500000000030923,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "streaming_rights_office_done",
+      "ms": 0.6953330000001188,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "action_required": 0,
+        "delegated_decisions": 0
+      }
+    },
+    {
+      "name": "streaming_industry_start",
+      "ms": 0.002457999999933236,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "streaming_industry_done",
+      "ms": 2133.22025,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "industry_world_ms": 435.8928329999999,
+        "cinema_market_ms": 1696.3213750000002,
+        "film_finalization_ms": 0.9894580000000133,
+        "industry_platforms_ms": 132.46870799999988,
+        "industry_studios_ms": 194.851042,
+        "industry_upcoming_rights_ms": 2.7708749999999327,
+        "industry_media_ms": 104.1502089999999,
+        "cinema_prepare_ms": 16.84349999999995,
+        "cinema_input_ms": 221.71062500000016,
+        "cinema_simulate_ms": 1008.0430000000001,
+        "cinema_commit_ms": 449.626041,
+        "absolute_week": 1893,
+        "world_news": 4
+      }
+    },
+    {
+      "name": "owned_streaming_start",
+      "ms": 0.011500000000069122,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_competition_start",
+      "ms": 0.5503750000002583,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_competition_done",
+      "ms": 49.1648339999997,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "subscribing_households": 555286963,
+        "subscriptions": 756423170,
+        "player_households": 0
+      }
+    },
+    {
+      "name": "world_streaming_customers_start",
+      "ms": 0.01108299999987139,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_customers_inputs_ready",
+      "ms": 112.11987500000032,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_desired_ready",
+      "ms": 44.7963749999999,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_countries_advanced",
+      "ms": 23.49016699999993,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_global_ready",
+      "ms": 0.6864160000000084,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_done",
+      "ms": 0.7735419999999067,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "paid_accounts": 451279660,
+        "player_paid_accounts": 0,
+        "external_shared_households": 36470500,
+        "piracy_reach": 43916296
+      }
+    },
+    {
+      "name": "world_streaming_viewing_start",
+      "ms": 0.005333000000064203,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_viewing_audience_ready",
+      "ms": 0.6777500000002874,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_customers_ready",
+      "ms": 1.0028339999998934,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_choices_ready",
+      "ms": 58.0442909999997,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_ai_catalogue_ready",
+      "ms": 14.8412500000004,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_rival_viewing_ready",
+      "ms": 147.18520899999976,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_done",
+      "ms": 414.9100830000002,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "viewing_accounts": 592787969,
+        "hours_viewed": 1579378797,
+        "incremental_revenue": 687676462
+      }
+    },
+    {
+      "name": "world_streaming_platform_economy_start",
+      "ms": 0.008291999999528343,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_platform_economy_done",
+      "ms": 36.33625000000029,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "platforms": 56,
+        "paid_accounts": 451279660,
+        "weekly_revenue": 1967279787.91
+      }
+    },
+    {
+      "name": "owned_streaming_processed",
+      "ms": 2.0781660000002375,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "owned_streaming_transitions_done",
+      "ms": 2.6869589999996606,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "owned_streaming_done",
+      "ms": 0.00837500000034197,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "processed": false
+      }
+    },
+    {
+      "name": "end_week_done",
+      "ms": 0.023999999999432475,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "is_dead": false,
+        "relationships": 9
+      }
+    },
+    {
+      "name": "weekly_events_start",
+      "ms": 0.0017910000005940674,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_event_text_start",
+      "ms": 0.00045899999986431794,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_event_text_done",
+      "ms": 0.08687499999996362,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_news_start",
+      "ms": 0.0007500000001527951,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_news_done",
+      "ms": 1.02404099999967,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "news_items": 50
+      }
+    },
+    {
+      "name": "weekly_social_start",
+      "ms": 0.0024590000002717716,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_social_done",
+      "ms": 0.7678329999998823,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "instagram_feed": 50
+      }
+    },
+    {
+      "name": "weekly_offers_start",
+      "ms": 1.2406250000003638,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_offers_done",
+      "ms": 2.2377919999998994,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_events_done",
+      "ms": 0.02904099999977916,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "weekly_auditions": 5
+      }
+    },
+    {
+      "name": "studio_funding_start",
+      "ms": 0.0017920000000231084,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "studio_funding_done",
+      "ms": 0.2813749999995707,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "subsidiaries_start",
+      "ms": 0.00112500000068394,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "subsidiaries_done",
+      "ms": 0.6230829999994967,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "subsidiaries": 0
+      }
+    },
+    {
+      "name": "final_trim_done",
+      "ms": 0.5764589999998861,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "logs_added": 30,
+        "news_items": 50
+      }
+    },
+    {
+      "name": "world_integrity_start",
+      "ms": 0.003499999999803549,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_integrity_done",
+      "ms": 15.418500000000677,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    }
+  ],
+  "personalSaveStorageAccessed": false
+}

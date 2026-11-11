@@ -1,0 +1,146 @@
+[
+  {
+    "i": 0,
+    "name": "before",
+    "ms": 71.430833,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 0,
+    "name": "short",
+    "ms": 65.38633299999998,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 0,
+    "name": "shapes",
+    "ms": 59.97570900000005,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 0,
+    "name": "both",
+    "ms": 58.964417000000026,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 1,
+    "name": "both",
+    "ms": 64.8916670000001,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 1,
+    "name": "shapes",
+    "ms": 69.646792,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 1,
+    "name": "short",
+    "ms": 101.43512500000008,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 1,
+    "name": "before",
+    "ms": 70.23641599999996,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 2,
+    "name": "before",
+    "ms": 74.4011670000001,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 2,
+    "name": "short",
+    "ms": 96.171292,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 2,
+    "name": "shapes",
+    "ms": 75.106583,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 2,
+    "name": "both",
+    "ms": 61.22058300000003,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 3,
+    "name": "both",
+    "ms": 75.24791700000014,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 3,
+    "name": "shapes",
+    "ms": 57.97812500000009,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 3,
+    "name": "short",
+    "ms": 63.8489169999998,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 3,
+    "name": "before",
+    "ms": 62.69141599999989,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 4,
+    "name": "before",
+    "ms": 64.727666,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 4,
+    "name": "short",
+    "ms": 64.73945800000001,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 4,
+    "name": "shapes",
+    "ms": 59.32458299999985,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 4,
+    "name": "both",
+    "ms": 60.4576669999999,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 5,
+    "name": "both",
+    "ms": 64.73745899999994,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 5,
+    "name": "shapes",
+    "ms": 61.127917000000025,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 5,
+    "name": "short",
+    "ms": 66.69749999999976,
+    "hash": "8a593e3a8addaf55"
+  },
+  {
+    "i": 5,
+    "name": "before",
+    "ms": 66.42933300000004,
+    "hash": "8a593e3a8addaf55"
+  }
+]

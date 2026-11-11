@@ -1,0 +1,262 @@
+[
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 18054.19999998808,
+    "doneAt": 18059.69999998808
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 18054.30000001192,
+    "doneAt": 18059.69999998808
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 23168.600000023842,
+    "returnedAt": 23397.5,
+    "reason": "PROCESS_WEEK",
+    "week": 22
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 23400.600000023842,
+    "doneAt": 23403.5
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 24029,
+    "doneAt": 24042
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 24029.100000023842,
+    "doneAt": 24302.100000023842
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 24029.100000023842,
+    "doneAt": 24302.600000023842
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__previous",
+    "at": 25337.100000023842,
+    "returnedAt": 25519.600000023842,
+    "reason": "AUTOSAVE",
+    "week": 21
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3",
+    "at": 25519.600000023842,
+    "returnedAt": 25707.600000023842,
+    "week": 22
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 25707.69999998808,
+    "returnedAt": 25707.80000001192
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 25751.100000023842,
+    "doneAt": 26012.600000023842
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 25751.19999998808,
+    "doneAt": 26012.600000023842
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 29172.5,
+    "returnedAt": 29336,
+    "reason": "AUTOSAVE",
+    "week": 22
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 29337.399999976158,
+    "doneAt": 29340.600000023842
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 29883.30000001192,
+    "doneAt": 30184.100000023842
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 29883.30000001192,
+    "doneAt": 30330.5
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 29883.30000001192,
+    "doneAt": 30330.600000023842
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__previous",
+    "at": 31341.69999998808,
+    "returnedAt": 31509.19999998808,
+    "reason": "PROCESS_WEEK",
+    "week": 22
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3",
+    "at": 31509.19999998808,
+    "returnedAt": 31658.5,
+    "week": 22
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 31658.5,
+    "returnedAt": 31658.600000023842
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 35629.69999998808,
+    "returnedAt": 35793.89999997616,
+    "reason": "PROCESS_WEEK",
+    "week": 23
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 35797.5,
+    "doneAt": 35985.5
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 36578.60000002384,
+    "doneAt": 36585.60000002384
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 36578.60000002384,
+    "doneAt": 36721.60000002384
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 36578.60000002384,
+    "doneAt": 36721.60000002384
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__previous",
+    "at": 37744.30000001192,
+    "returnedAt": 37948.80000001192,
+    "reason": "AUTOSAVE",
+    "week": 22
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3",
+    "at": 37948.80000001192,
+    "returnedAt": 38115.89999997616,
+    "week": 23
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 38116,
+    "returnedAt": 38116.19999998808
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 38149.39999997616,
+    "doneAt": 38151.60000002384
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 38149.5,
+    "doneAt": 38151.60000002384
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 43617.39999997616,
+    "returnedAt": 43818.39999997616,
+    "reason": "PROCESS_WEEK",
+    "week": 24
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 43820.60000002384,
+    "doneAt": 43822.69999998808
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 44411.5,
+    "doneAt": 44420.80000001192
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 44411.5,
+    "doneAt": 44576.39999997616
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__candidate",
+    "at": 44411.5,
+    "doneAt": 44576.39999997616
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__previous",
+    "at": 45641.19999998808,
+    "returnedAt": 45811.69999998808,
+    "reason": "PROCESS_WEEK",
+    "week": 23
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3",
+    "at": 45811.69999998808,
+    "returnedAt": 45957.80000001192,
+    "week": 24
+  },
+  {
+    "kind": "put",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 45957.80000001192,
+    "returnedAt": 45958
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3",
+    "at": 46204.5,
+    "doneAt": 46207.5
+  },
+  {
+    "kind": "get",
+    "key": "actorEmpireSave_3__integrity",
+    "at": 46204.5,
+    "doneAt": 46207.5
+  }
+]

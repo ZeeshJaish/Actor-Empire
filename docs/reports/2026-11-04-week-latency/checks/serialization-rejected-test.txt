@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {serializeCinemaFacts} from '../services/boxOffice/boxOfficeIdentity';
+const rows=Array.from({length:200},(_,i)=>({z:i,a:'saved',m:[i,undefined]}));
+const original=String.prototype.localeCompare;let calls=0;
+String.prototype.localeCompare=function(...args:any[]){calls++;return Reflect.apply(original,this,args);};
+let actual:string;
+try{actual=serializeCinemaFacts(rows);}finally{String.prototype.localeCompare=original;}
+const expected='['+rows.map(r=>`{"a":"saved","m":[${r.z},null],"z":${r.z}}`).join(',')+']';
+assert.equal(actual!,expected,'Exact issued serialization must remain byte-for-byte identical');
+assert.ok(calls<20,`Repeated fixed-schema objects should reuse sort order in this invocation; saw ${calls} comparisons`);
+assert.equal(serializeCinemaFacts({a:1,z:2}),'{"a":1,"z":2}');
+const mutable={z:1,a:2};serializeCinemaFacts(mutable);mutable.a=9;
+assert.equal(serializeCinemaFacts(mutable),'{"a":9,"z":1}','No mutable value may be cached between serializations');
+console.log(JSON.stringify({serializationChecks:4,sortComparisons:calls,exactIssuedText:true,mutableValuesReadFresh:true}));

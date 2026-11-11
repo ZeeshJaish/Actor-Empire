@@ -1,0 +1,19 @@
+{
+  "builtEntry": "/assets/index-Cb6AFB2s.js",
+  "entrySha256": "581139a3ea2e7b91bf9686d0b637e1a5481868487e3a12a5234b464c91f63086",
+  "sourceSha256": {
+    "index.tsx": "490d83caad9ab6a9888aeb328661705e049380c63349a1600eeb685569749f91",
+    "services/runtimeCompatibility.ts": "64319653d3163298ddc299d2a9c52bda6d2871e5e4f66c72e31f79e6760eedf4",
+    "services/saveCompaction.ts": "2e5d49b208a5b4b51ed9a6935eed6257f42b22cb3fe89ac228337237e3b72f32",
+    "services/saveIntegrity.ts": "76868a9999d6cbe1130635c3bf599fb38508ed0c04e38cf206c5cbe5b78ffe5e",
+    "services/firebaseService.ts": "92a9704eac84f896af97237c5fea9880c737c1c05c27b17e4f330b6c6c985f05",
+    "services/stableSaveHash.ts": "095eef7f6bd6692c181f7af69ae92f114ab152c8140fa40f29b40687bc803cb5",
+    "services/boxOffice/boxOfficeIdentity.ts": "e859573e83eb2511f351223c5349015e3f68e8553b808467326a83bf51885d96",
+    "vite.config.ts": "ee14aad7f9dc5d7893ad993dd5f8802ab6f1ecee4033c2a3545b894aaffb72fd",
+    "package.json": "f93390f929698ba121086ae35aaf07cf112d536cdd33529843e519d87bbb957f",
+    "package-lock.json": "68e5eee39593aac9d1cfc8ea0225f739dc45625706a32ee3f491f05950736de7"
+  },
+  "sourceSnapshot": "docs/reports/2026-11-04-week-latency/context.json",
+  "storageFormatChanged": false,
+  "digestSchemaChangedByThisTask": false
+}

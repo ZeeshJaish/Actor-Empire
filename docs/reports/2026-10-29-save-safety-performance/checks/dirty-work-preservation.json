@@ -1,0 +1,37 @@
+{
+  "initialFileCount": 167,
+  "ourEditsAmongInitial": [
+    "services/gameLoop.ts"
+  ],
+  "unrelatedInitialFilesChanged": [],
+  "initialFilesPreservedCount": 166,
+  "ourChangedExistingFiles": [
+    "scripts/audit-custom-poster-storage.mjs",
+    "scripts/audit-save-generations.ts",
+    "scripts/audit-save-integrity.ts",
+    "scripts/audit-save-transfer.ts",
+    "services/boxOffice/boxOfficeAudienceAdapters.ts",
+    "services/boxOffice/boxOfficeLiveSettlement.ts",
+    "services/boxOffice/boxOfficeMarket.ts",
+    "services/boxOffice/boxOfficeWeek.ts",
+    "services/businessLogic.ts",
+    "services/gameLoop.ts",
+    "services/industryWorld/industryWorldWeek.ts",
+    "services/industryWorld/studioOwnershipMaterializer.ts",
+    "services/platformAi/platformAiPlayerCommissions.ts",
+    "services/playerTalentFinance.ts",
+    "services/privateEquityLogic.ts",
+    "services/saveCompaction.ts",
+    "services/saveIntegrity.ts",
+    "services/stockCashOwnership.ts",
+    "services/streamingCataloguePackages.ts",
+    "services/streamingContractSettlement.ts",
+    "services/studioGroup.ts",
+    "services/studioNameRights.ts",
+    "services/studioRebrand.ts",
+    "services/studioSale.ts",
+    "services/subsidiaryDecisions.ts",
+    "services/subsidiaryOperations.ts",
+    "services/talentNegotiation.ts"
+  ]
+}

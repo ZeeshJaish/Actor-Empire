@@ -1,0 +1,16 @@
+{
+  "name": "The Hunger Games",
+  "grossDollars": 647305886.57,
+  "quality": 86.68,
+  "productionDollars": 140493140.44,
+  "campaignDollars": 25288765.28,
+  "paidWeeks": 63,
+  "trackedRunWeeks": 63,
+  "grossMilestoneWeek": {
+    "0.8": 10,
+    "0.9": 14,
+    "0.95": 18,
+    "0.99": 27
+  },
+  "last10WeeksGross": 53898.4
+}

@@ -1,0 +1,8 @@
+{
+  "controller": "scripts/audit-week-latency-soak.cjs",
+  "sha256": "bf297a33d32ee6e8b9e4544b9d704aff89d593962e8fc707ae5def6594da648a",
+  "browserChannel": "chromium",
+  "browserHeapMiB": 768,
+  "driverHeapMiB": 128,
+  "hardWorkerRssMiB": 2560
+}

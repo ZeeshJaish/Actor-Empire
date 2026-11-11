@@ -1,0 +1,7 @@
+{
+  "productionDriftSinceBuild": [],
+  "testDriverChangesSinceBuild": [
+    "scripts/audit-save-safety-browser.cjs"
+  ],
+  "reason": "Add target-visible tap paint measurement and exclude variable autosave manifest timestamps from durable-fact comparison; same final production build used."
+}

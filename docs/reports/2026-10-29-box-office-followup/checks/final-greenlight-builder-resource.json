@@ -1,0 +1,9 @@
+{
+  "label": "final-greenlight-builder",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 374.703125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 2902
+}

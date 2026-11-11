@@ -1,0 +1,27 @@
+{
+  "scope": "Retained large payload; controlled money +10 autosaves, storage only; no gameplay earnings claim",
+  "rows": [
+    {
+      "iteration": 0,
+      "writeMs": 2342.600000023842,
+      "readMs": 463.2999999523163,
+      "playerJsonSha256": "7fd19e3c68e8b0898a3760d17be661f109072bca2c427fba1eb3937b96e97a9f",
+      "manifestDigest": "ceeafba6412269d2"
+    },
+    {
+      "iteration": 1,
+      "writeMs": 2019.0999999642372,
+      "readMs": 456.9000000357628,
+      "playerJsonSha256": "d1ba2edf70a1bc3bedcb84b3edd43d24548282d994b27843651cc65df8c1c7e3",
+      "manifestDigest": "a27ff52dd43d2e97"
+    },
+    {
+      "iteration": 2,
+      "writeMs": 2050.100000023842,
+      "readMs": 446.0999999642372,
+      "playerJsonSha256": "eb383c1add855cc2faa7318ea775ede508e412395f7fd7aee02d3d436c439d02",
+      "manifestDigest": "b381accce2d54af0"
+    }
+  ],
+  "mode": "baseline"
+}

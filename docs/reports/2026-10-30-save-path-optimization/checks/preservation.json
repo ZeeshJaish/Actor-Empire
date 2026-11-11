@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "initialDirtyFiles": 816,
+  "initialDirtyFilesChangedWithinScope": [
+    "services/boxOffice/boxOfficeLiveSettlement.ts",
+    "services/boxOffice/boxOfficeMarket.ts",
+    "services/saveGenerations.ts",
+    "services/worldEconomy/worldStreamingViewing.ts",
+    "scripts/audit-save-storage-recovery.cjs",
+    "scripts/profile-weekly-pipeline.ts",
+    "services/indexedDbSaveGenerations.ts"
+  ],
+  "unexpectedInitialChanges": [],
+  "runtimeFiles": 842,
+  "runtimeFilesChangedWithinScope": [
+    "services/saveGenerations.ts",
+    "services/indexedDbSaveGenerations.ts",
+    "services/npcVentureLogic.ts",
+    "services/studioAi/studioAiMigration.ts",
+    "services/worldEconomy/worldStreamingViewing.ts",
+    "services/boxOffice/boxOfficeMarket.ts",
+    "services/boxOffice/boxOfficeStreamingAudience.ts",
+    "services/boxOffice/boxOfficeLiveSettlement.ts"
+  ],
+  "unexpectedRuntimeChanges": []
+}

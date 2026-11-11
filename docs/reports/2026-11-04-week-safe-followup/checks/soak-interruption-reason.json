@@ -1,0 +1,4 @@
+{
+  "reason": "Deliberately stopped own hour attempt for same-host old/new comparison after slower observations; all samples retained",
+  "pid": 22216
+}

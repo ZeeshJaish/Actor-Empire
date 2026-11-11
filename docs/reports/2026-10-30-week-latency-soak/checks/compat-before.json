@@ -1,0 +1,163 @@
+{
+  "kind": "CONTROLLED_12_WEEK_COMPLETE_PLAYER_PARITY_NOT_UI_BALANCE",
+  "randomCalls": 3584433,
+  "clockNext": 1800000024540,
+  "rows": [
+    {
+      "week": 1,
+      "age": 37,
+      "careerWeek": 22,
+      "playerSha256": "d9e52e822cdd73b44adea242aa5e59e880d4024d5d4c61d451e273bb2161fb4b",
+      "manifest": "acbdf9ca2d8c6d76",
+      "cash": 784901729,
+      "receipt": {
+        "id": "cinema:0:1893",
+        "grossCents": 3829119727,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 2,
+      "age": 37,
+      "careerWeek": 23,
+      "playerSha256": "574b464ef4cca896250ebb4e3085e20ebbb008f0b938dac75d9cc8d4c7200051",
+      "manifest": "5b5851284f0d31f6",
+      "cash": 784901429,
+      "receipt": {
+        "id": "cinema:0:1894",
+        "grossCents": 4148291891,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 3,
+      "age": 37,
+      "careerWeek": 24,
+      "playerSha256": "ef757e16b70423e843722272ba2bb28411c43209f1f46b165d4059c8b41b406c",
+      "manifest": "fc072e697879fdfb",
+      "cash": 784901129,
+      "receipt": {
+        "id": "cinema:0:1895",
+        "grossCents": 3508045805,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 4,
+      "age": 37,
+      "careerWeek": 25,
+      "playerSha256": "59147c14f805dea15a6c4b6117dc5429deaeb675881004c91a4b70e1212a0ca1",
+      "manifest": "a5d5b83a118a3668",
+      "cash": 784900829,
+      "receipt": {
+        "id": "cinema:0:1896",
+        "grossCents": 2925060960,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 5,
+      "age": 37,
+      "careerWeek": 26,
+      "playerSha256": "91ea0cb974700f5cb4a401ec363182f7b9756fcb396bea62cd9cfd432d41fd50",
+      "manifest": "32761f0cdbd93d6c",
+      "cash": 784900529,
+      "receipt": {
+        "id": "cinema:0:1897",
+        "grossCents": 2332059790,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 6,
+      "age": 37,
+      "careerWeek": 27,
+      "playerSha256": "90c93351011d37ee1c40860ec32bfa1ee5ff81a4c4a42b9072141534d8e27722",
+      "manifest": "55109619dbd9aa97",
+      "cash": 784900229,
+      "receipt": {
+        "id": "cinema:0:1898",
+        "grossCents": 2183523871,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 7,
+      "age": 37,
+      "careerWeek": 28,
+      "playerSha256": "430544e308000c677fc3f93ff810f942ef8f54af14705dc50ca160e0bb539696",
+      "manifest": "64d96c636afc6119",
+      "cash": 784899929,
+      "receipt": {
+        "id": "cinema:0:1899",
+        "grossCents": 1805543827,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 8,
+      "age": 37,
+      "careerWeek": 29,
+      "playerSha256": "1fa7ad13a669162c9f1946a5563562a5709e900711fd8b2cf2f62b96e82dcbb2",
+      "manifest": "1095eb3312393e2b",
+      "cash": 784899629,
+      "receipt": {
+        "id": "cinema:0:1900",
+        "grossCents": 1506439118,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 9,
+      "age": 37,
+      "careerWeek": 30,
+      "playerSha256": "a41115a07e11d93bfccd0bc2b6e7244d7ddd17c9a70042d22978088568045ebb",
+      "manifest": "ad6b811fc993b45f",
+      "cash": 784895729,
+      "receipt": {
+        "id": "cinema:0:1901",
+        "grossCents": 1268074247,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 10,
+      "age": 37,
+      "careerWeek": 31,
+      "playerSha256": "19664b00f31be53edd79007791c30282c79d8e79bbcba9788a6cdaed8fbd4613",
+      "manifest": "8105539e12d2da8e",
+      "cash": 784891829,
+      "receipt": {
+        "id": "cinema:0:1902",
+        "grossCents": 1070570171,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 11,
+      "age": 37,
+      "careerWeek": 32,
+      "playerSha256": "cd71281a9a8d9a0d70a845970bd8b245f4259ebdee4dc75592095c5f3267589b",
+      "manifest": "9b12ce245c2eb5a8",
+      "cash": 784887929,
+      "receipt": {
+        "id": "cinema:0:1903",
+        "grossCents": 908850472,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 12,
+      "age": 37,
+      "careerWeek": 33,
+      "playerSha256": "d568f5161e7fcfa9c2ac692ebc8ec7ea20ebcf7db347e13a688b7061e49220d7",
+      "manifest": "32a0dd0e2d95115e",
+      "cash": 784884029,
+      "receipt": {
+        "id": "cinema:0:1904",
+        "grossCents": 1445310656,
+        "actorCents": 0
+      }
+    }
+  ]
+}

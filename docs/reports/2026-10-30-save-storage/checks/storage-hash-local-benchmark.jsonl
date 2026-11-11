@@ -1,0 +1,6 @@
+{"round":0,"name":"baseline","ms":551.026292,"digest":"e37c7b31a38ccdf9"}
+{"round":0,"name":"local","ms":456.89350000000013,"digest":"e37c7b31a38ccdf9"}
+{"round":1,"name":"local","ms":447.4278750000001,"digest":"e37c7b31a38ccdf9"}
+{"round":1,"name":"baseline","ms":484.9993749999999,"digest":"e37c7b31a38ccdf9"}
+{"round":2,"name":"baseline","ms":485.262166,"digest":"e37c7b31a38ccdf9"}
+{"round":2,"name":"local","ms":447.70674999999983,"digest":"e37c7b31a38ccdf9"}

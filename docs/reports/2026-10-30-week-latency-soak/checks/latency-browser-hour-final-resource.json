@@ -1,0 +1,14 @@
+{
+  "label": "latency-browser-hour-final",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": true,
+  "peakGlobalSwapGrowthMiB": 3460.6900000000005,
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 1446.25,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 1982007
+}

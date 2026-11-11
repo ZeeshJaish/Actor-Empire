@@ -1,0 +1,9 @@
+{
+  "label": "final-preservation-complete",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 360.3125,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 3470
+}

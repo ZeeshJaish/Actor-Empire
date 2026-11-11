@@ -1,0 +1,41 @@
+[
+  {
+    "name": "audit-save-generations",
+    "code": 0,
+    "resource": {
+      "label": "safety-audit-save-generations",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 251
+    }
+  },
+  {
+    "name": "audit-save-migration",
+    "code": 0,
+    "resource": {
+      "label": "safety-audit-save-migration",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 392.046875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3820
+    }
+  },
+  {
+    "name": "audit-save-transfer",
+    "code": 1,
+    "resource": {
+      "label": "safety-audit-save-transfer",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 1,
+      "signal": null,
+      "elapsedMs": 350
+    }
+  }
+]

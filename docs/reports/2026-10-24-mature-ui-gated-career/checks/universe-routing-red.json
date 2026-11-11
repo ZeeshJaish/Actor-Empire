@@ -1,0 +1,88 @@
+{
+  "offers": 512,
+  "universes": [
+    "AVATAR",
+    "DCU",
+    "FAST_SAGA",
+    "JURASSIC",
+    "MCU",
+    "MONSTERVERSE",
+    "SPIDER_VERSE",
+    "SW"
+  ],
+  "mismatchCount": 125,
+  "examples": [
+    {
+      "seed": 2,
+      "title": "Batman v Superman: Dawn of Justice",
+      "studio": "DC_STUDIOS",
+      "wantType": "MOVIE",
+      "wantRoute": "THEATRICAL",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    },
+    {
+      "seed": 3,
+      "title": "Furious 7",
+      "studio": "UNIVERSAL",
+      "wantType": "MOVIE",
+      "wantRoute": "THEATRICAL",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    },
+    {
+      "seed": 4,
+      "title": "Monarch: Legacy of Monsters (Series)",
+      "studio": "WARNER_BROS",
+      "wantType": "SERIES",
+      "wantRoute": "STREAMING_ONLY",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    },
+    {
+      "seed": 7,
+      "title": "Avatar: Fire and Ash",
+      "studio": "DISNEY_PLUS",
+      "wantType": "MOVIE",
+      "wantRoute": "THEATRICAL",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    },
+    {
+      "seed": 9,
+      "title": "Spider-Man: Across the Spider-Verse",
+      "studio": "MARVEL_STUDIOS",
+      "wantType": "MOVIE",
+      "wantRoute": "THEATRICAL",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    },
+    {
+      "seed": 15,
+      "title": "Jurassic Park III",
+      "studio": "UNIVERSAL",
+      "wantType": "MOVIE",
+      "wantRoute": "THEATRICAL",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    },
+    {
+      "seed": 23,
+      "title": "Jurassic World: Fallen Kingdom",
+      "studio": "UNIVERSAL",
+      "wantType": "MOVIE",
+      "wantRoute": "THEATRICAL",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    },
+    {
+      "seed": 32,
+      "title": "Spider-Man: Across the Spider-Verse",
+      "studio": "MARVEL_STUDIOS",
+      "wantType": "MOVIE",
+      "wantRoute": "THEATRICAL",
+      "actualType": "MOVIE",
+      "actualRoute": "STREAMING_ONLY"
+    }
+  ]
+}

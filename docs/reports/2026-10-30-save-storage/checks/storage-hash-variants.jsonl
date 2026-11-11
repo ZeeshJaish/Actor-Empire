@@ -1,0 +1,12 @@
+{"round":0,"name":"baseline","ms":505.915042,"digest":"e37c7b31a38ccdf9"}
+{"round":0,"name":"local","ms":431.026167,"digest":"e37c7b31a38ccdf9"}
+{"round":0,"name":"keys","ms":432.97687499999984,"digest":"e37c7b31a38ccdf9"}
+{"round":0,"name":"native","ms":330.397792,"digest":"e37c7b31a38ccdf9"}
+{"round":1,"name":"native","ms":326.5897500000001,"digest":"e37c7b31a38ccdf9"}
+{"round":1,"name":"keys","ms":454.70058400000016,"digest":"e37c7b31a38ccdf9"}
+{"round":1,"name":"local","ms":437.130083,"digest":"e37c7b31a38ccdf9"}
+{"round":1,"name":"baseline","ms":462.00975000000017,"digest":"e37c7b31a38ccdf9"}
+{"round":2,"name":"baseline","ms":464.4245420000002,"digest":"e37c7b31a38ccdf9"}
+{"round":2,"name":"local","ms":435.9718330000005,"digest":"e37c7b31a38ccdf9"}
+{"round":2,"name":"keys","ms":438.202542,"digest":"e37c7b31a38ccdf9"}
+{"round":2,"name":"native","ms":328.2957919999999,"digest":"e37c7b31a38ccdf9"}

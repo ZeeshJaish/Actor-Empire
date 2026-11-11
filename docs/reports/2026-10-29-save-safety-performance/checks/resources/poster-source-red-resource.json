@@ -1,0 +1,9 @@
+{
+  "label": "poster-source-red",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 338.640625,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 3070
+}

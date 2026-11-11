@@ -1,0 +1,14 @@
+{
+  "label": "latency-metadata-care-smoke",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 2582.5625,
+  "stopReason": "Worker tree exceeded 2.5GiB",
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 19121
+}

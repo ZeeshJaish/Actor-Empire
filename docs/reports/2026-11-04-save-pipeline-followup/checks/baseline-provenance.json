@@ -1,0 +1,7 @@
+{
+  "taskStart901HashesMatchPreviousTestedArtifact": true,
+  "previousArtifact": "/assets/index-BCSTCJCG.js",
+  "goldenSource": "Prior verified12-week full-player output, proven identical on BCSTCJCG before this task",
+  "checkpointedReplay": true,
+  "checkpointSha256": "5cc27d8febd49070fe837d15cbaafa1038ccad4946a456bb3920743d372345f8"
+}

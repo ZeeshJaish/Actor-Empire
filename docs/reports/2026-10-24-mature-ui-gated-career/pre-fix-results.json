@@ -1,0 +1,497 @@
+{
+  "status": "CHECKPOINT_READY",
+  "completeObservation": false,
+  "sourceRef": "09edec4",
+  "gameplayVariant": "BASELINE_UI_V7",
+  "uiEligibilityVerified": true,
+  "executable": "043ea20028c97da089d474bdcda31a2636f51221b9b94dddf336f90d97706cac",
+  "inputReport": "/private/tmp/actor-cinema-mature-ui-gated-09edec4-20261024/career/career-0.json",
+  "inputSha256": "bd94732a09676e99d7f2fd3787544a404007be81f7a26ded1cd7f5a27bc6350e",
+  "weeks": 832,
+  "origin": {
+    "checkpoint": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+    "checkpointSha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+    "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+    "weeks": 156,
+    "cash": 57643,
+    "sourceRef": "07fdfff",
+    "initialCash": 2000,
+    "manualCapitalGrants": 0
+  },
+  "lineage": [],
+  "ownerCapitalMilestone": {
+    "weeks": 684,
+    "cash": 70629205
+  },
+  "finalCashDollars": 275285360,
+  "finalProfile": {
+    "weeks": 832,
+    "age": 31,
+    "week": 1,
+    "cash": 275285360,
+    "craft": 91.94009368772645,
+    "fame": 97.75999999999988,
+    "reputation": 96.5,
+    "experience": 100,
+    "health": 78.69999999999996,
+    "followers": 22998463,
+    "credits": 32,
+    "studios": 0,
+    "roles": [
+      {
+        "id": "uni_job_1800000014597_1",
+        "role": "SUPPORTING",
+        "phase": "SCHEDULED",
+        "pay": 831905
+      },
+      {
+        "id": "uni_job_1800000014598_2",
+        "role": "ENSEMBLE",
+        "phase": "SCHEDULED",
+        "pay": 831905
+      }
+    ]
+  },
+  "firstObservedStarProfileWeek": 455,
+  "safeguards": {
+    "manualCapitalGrants": 0,
+    "authoredCompletedPackages": 0,
+    "loans": 0,
+    "saves": 214,
+    "reloads": 84,
+    "duplicateWeeksRejected": 832,
+    "failedPromotionRecovery": true
+  },
+  "filmCounts": {
+    "released": 272,
+    "closed": 261,
+    "open": 11,
+    "playerCredits": 12,
+    "playerClosed": 12
+  },
+  "attainment": {
+    "player": [
+      {
+        "grossBillions": 1,
+        "observed": 12,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 12,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 12,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ],
+    "world": [
+      {
+        "grossBillions": 1,
+        "observed": 272,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 272,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 272,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ]
+  },
+  "closedFinancialOutcomes": {
+    "all": {
+      "completed": 261,
+      "recouped": 178,
+      "hits": 67,
+      "profits": 101,
+      "nearBreakEven": 22,
+      "losses": 71,
+      "exactDeficits": 83
+    },
+    "small": {
+      "completed": 182,
+      "recouped": 126,
+      "hits": 44,
+      "profits": 78,
+      "nearBreakEven": 14,
+      "losses": 46,
+      "exactDeficits": 56
+    },
+    "player": {
+      "completed": 12,
+      "recouped": 8,
+      "hits": 6,
+      "profits": 2,
+      "nearBreakEven": 1,
+      "losses": 3,
+      "exactDeficits": 4
+    }
+  },
+  "topPlayer": [
+    {
+      "id": "job_1800000009869",
+      "name": "The Hunger Games",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 86.68,
+      "productionDollars": 140493140.44,
+      "campaignDollars": 25288765.28,
+      "grossDollars": 647305886.57,
+      "producerReceiptsDollars": 323301213.88,
+      "theatricalProfitDollars": 152354202.16,
+      "actorBackendDollars": 5165106,
+      "paidWeeks": 63,
+      "trackedRunWeeks": 63,
+      "firstObservedCareerWeek": 592,
+      "lastObservedCareerWeek": 654
+    },
+    {
+      "id": "aud_active_1800000010482_0.07905039261095226",
+      "name": "A Ash for Whisper",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.68,
+      "productionDollars": 95501868,
+      "campaignDollars": 17190336.24,
+      "grossDollars": 346869492.89,
+      "producerReceiptsDollars": 173211079.98,
+      "theatricalProfitDollars": 60518875.74,
+      "actorBackendDollars": 0,
+      "paidWeeks": 42,
+      "trackedRunWeeks": 42,
+      "firstObservedCareerWeek": 619,
+      "lastObservedCareerWeek": 660
+    },
+    {
+      "id": "job_1800000011922",
+      "name": "Sea Without Mountain",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 77.822,
+      "productionDollars": 54134904,
+      "campaignDollars": 9744282.72,
+      "grossDollars": 289742413.72,
+      "producerReceiptsDollars": 144586847.96,
+      "theatricalProfitDollars": 80707661.24,
+      "actorBackendDollars": 0,
+      "paidWeeks": 42,
+      "trackedRunWeeks": 42,
+      "firstObservedCareerWeek": 684,
+      "lastObservedCareerWeek": 725
+    },
+    {
+      "id": "job_1800000008866",
+      "name": "Sea and Promise 2",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 79.88,
+      "productionDollars": 21511532,
+      "campaignDollars": 1720922.56,
+      "grossDollars": 91444558.24,
+      "producerReceiptsDollars": 48465622.57,
+      "theatricalProfitDollars": 24579478.01,
+      "actorBackendDollars": 653690,
+      "paidWeeks": 42,
+      "trackedRunWeeks": 42,
+      "firstObservedCareerWeek": 551,
+      "lastObservedCareerWeek": 592
+    },
+    {
+      "id": "job_1800000009425",
+      "name": "Dawn Without Dust",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 53.354,
+      "productionDollars": 28473364,
+      "campaignDollars": 2277869.12,
+      "grossDollars": 77380844.59,
+      "producerReceiptsDollars": 41011853.14,
+      "theatricalProfitDollars": 10260620.02,
+      "actorBackendDollars": 0,
+      "paidWeeks": 38,
+      "trackedRunWeeks": 38,
+      "firstObservedCareerWeek": 572,
+      "lastObservedCareerWeek": 609
+    }
+  ],
+  "topWorld": [
+    {
+      "id": "job_1800000009869",
+      "name": "The Hunger Games",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 86.68,
+      "productionDollars": 140493140.44,
+      "campaignDollars": 25288765.28,
+      "grossDollars": 647305886.57,
+      "producerReceiptsDollars": 323301213.88,
+      "theatricalProfitDollars": 152354202.16,
+      "actorBackendDollars": 5165106,
+      "paidWeeks": 63,
+      "trackedRunWeeks": 63,
+      "firstObservedCareerWeek": 592,
+      "lastObservedCareerWeek": 654
+    },
+    {
+      "id": "studio_ai_project_0sgbuma",
+      "name": "Dragon and Blood",
+      "ownCredit": false,
+      "closed": true,
+      "quality": 81,
+      "productionDollars": 86626000,
+      "campaignDollars": 15593000,
+      "grossDollars": 479114085.18,
+      "producerReceiptsDollars": 229750646.26,
+      "theatricalProfitDollars": 118341619.26,
+      "actorBackendDollars": 0,
+      "paidWeeks": 49,
+      "trackedRunWeeks": 49,
+      "firstObservedCareerWeek": 636,
+      "lastObservedCareerWeek": 684
+    },
+    {
+      "id": "aud_active_1800000010482_0.07905039261095226",
+      "name": "A Ash for Whisper",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.68,
+      "productionDollars": 95501868,
+      "campaignDollars": 17190336.24,
+      "grossDollars": 346869492.89,
+      "producerReceiptsDollars": 173211079.98,
+      "theatricalProfitDollars": 60518875.74,
+      "actorBackendDollars": 0,
+      "paidWeeks": 42,
+      "trackedRunWeeks": 42,
+      "firstObservedCareerWeek": 619,
+      "lastObservedCareerWeek": 660
+    },
+    {
+      "id": "job_1800000011922",
+      "name": "Sea Without Mountain",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 77.822,
+      "productionDollars": 54134904,
+      "campaignDollars": 9744282.72,
+      "grossDollars": 289742413.72,
+      "producerReceiptsDollars": 144586847.96,
+      "theatricalProfitDollars": 80707661.24,
+      "actorBackendDollars": 0,
+      "paidWeeks": 42,
+      "trackedRunWeeks": 42,
+      "firstObservedCareerWeek": 684,
+      "lastObservedCareerWeek": 725
+    },
+    {
+      "id": "studio_ai_project_0zbnhx9",
+      "name": "Portrait Burning",
+      "ownCredit": false,
+      "closed": true,
+      "quality": 87,
+      "productionDollars": 32904000,
+      "campaignDollars": 5923000,
+      "grossDollars": 284724996.03,
+      "producerReceiptsDollars": 142344833.72,
+      "theatricalProfitDollars": 97824041.72,
+      "actorBackendDollars": 0,
+      "paidWeeks": 53,
+      "trackedRunWeeks": 53,
+      "firstObservedCareerWeek": 574,
+      "lastObservedCareerWeek": 626
+    }
+  ],
+  "management": [
+    {
+      "week": 360,
+      "type": "hire-current-publicist",
+      "cost": 300,
+      "terms": {
+        "id": "pub_rookie",
+        "name": "Spin Doctors",
+        "type": "PUBLICIST",
+        "tier": "ROOKIE",
+        "weeklyCost": 300,
+        "description": "",
+        "descriptionKey": "services.teamLogic.member.pub_rookie.description",
+        "perks": "",
+        "perksKey": "services.teamLogic.member.pub_rookie.perks"
+      }
+    },
+    {
+      "week": 434,
+      "type": "hire-current-agent",
+      "cost": 40000,
+      "terms": {
+        "id": "agent_rookie_2",
+        "name": "Stacy from High School",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_rookie_2.description",
+        "annualFee": 40000,
+        "commission": 0.2,
+        "specialty": "TV",
+        "tier": "ROOKIE",
+        "studioAccess": "LOW"
+      }
+    },
+    {
+      "week": 454,
+      "type": "hire-current-manager",
+      "cost": 50000,
+      "terms": {
+        "id": "mgr_rookie_2",
+        "name": "Momager Karen",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_rookie_2.description",
+        "annualFee": 50000,
+        "commission": 0.2,
+        "tier": "ROOKIE",
+        "sponsorshipPower": 1
+      }
+    },
+    {
+      "week": 538,
+      "type": "hire-current-agent",
+      "cost": 2000000,
+      "terms": {
+        "id": "agent_elite_2",
+        "name": "Creative Artists United",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_elite_2.description",
+        "annualFee": 2000000,
+        "commission": 0.1,
+        "specialty": "FILM",
+        "tier": "ELITE",
+        "studioAccess": "HIGH"
+      }
+    },
+    {
+      "week": 558,
+      "type": "hire-current-manager",
+      "cost": 220000,
+      "terms": {
+        "id": "mgr_std_3",
+        "name": "Michael Scott Mgmt",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_std_3.description",
+        "annualFee": 220000,
+        "commission": 0.15,
+        "tier": "STANDARD",
+        "sponsorshipPower": 6
+      }
+    },
+    {
+      "week": 642,
+      "type": "hire-current-agent",
+      "cost": 10000000,
+      "terms": {
+        "id": "agent_legend_1",
+        "name": "Ari Golding",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_legend_1.description",
+        "annualFee": 10000000,
+        "commission": 0.1,
+        "specialty": "BALANCED",
+        "tier": "LEGEND",
+        "studioAccess": "HIGH"
+      }
+    },
+    {
+      "week": 662,
+      "type": "hire-current-manager",
+      "cost": 800000,
+      "terms": {
+        "id": "mgr_elite_1",
+        "name": "Icon Management",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_elite_1.description",
+        "annualFee": 800000,
+        "commission": 0.1,
+        "tier": "ELITE",
+        "sponsorshipPower": 9
+      }
+    },
+    {
+      "week": 766,
+      "type": "hire-current-manager",
+      "cost": 1200000,
+      "terms": {
+        "id": "mgr_elite_3",
+        "name": "Elena \"The Fixer\" Cruz",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_elite_3.description",
+        "annualFee": 1200000,
+        "commission": 0.12,
+        "tier": "ELITE",
+        "sponsorshipPower": 10
+      }
+    }
+  ],
+  "actualPressTours": 29,
+  "actualSponsorsSigned": 23,
+  "universe": {
+    "universeId": "MONSTERVERSE",
+    "characterName": "Apex Engineer",
+    "signedAtCareerWeek": 764,
+    "salaryTotal": 3119644,
+    "roadmap": [
+      {
+        "title": "Godzilla vs. Kong",
+        "role": "SUPPORTING",
+        "type": "UNIVERSE_ENTRY",
+        "weeksOffset": 10
+      },
+      {
+        "title": "Godzilla x Kong: The New Empire",
+        "role": "SUPPORTING",
+        "type": "SEQUEL",
+        "weeksOffset": 100
+      },
+      {
+        "title": "Godzilla x Kong: Supernova",
+        "role": "ENSEMBLE",
+        "type": "UNIVERSE_EVENT",
+        "weeksOffset": 220
+      }
+    ],
+    "films": [
+      {
+        "id": "uni_job_1800000014596_0",
+        "name": "Godzilla vs. Kong",
+        "cinemaUnobserved": true
+      },
+      {
+        "id": "uni_job_1800000014597_1",
+        "name": "Godzilla x Kong: The New Empire",
+        "cinemaUnobserved": true
+      },
+      {
+        "id": "uni_job_1800000014598_2",
+        "name": "Godzilla x Kong: Supernova",
+        "cinemaUnobserved": true
+      }
+    ]
+  },
+  "positiveLifeChoiceCash": [],
+  "conclusion": "UI_GATED_ORGANIC_PLAYER_2B_NOT_VERIFIED",
+  "limitations": [
+    "One adaptive longitudinal career is a capability probe, not a hit-rate or rarity estimate",
+    "World NPC film gross and player-credited film gross are reported separately",
+    "No owned studio or self-financed production is claimed unless actually founded through paid gameplay",
+    "Open theatrical runs are interim observations; future streaming income is excluded",
+    "Controlled UI-adapter cases and prior prepared-capital examples are excluded"
+  ]
+}

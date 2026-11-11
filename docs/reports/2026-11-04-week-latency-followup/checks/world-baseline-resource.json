@@ -1,0 +1,12 @@
+{
+  "label": "world-baseline",
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 1254.75,
+  "peakGlobalSwapGrowthMiB": 0,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 4264,
+  "peakProcesses": "62810 62781 1284880 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node"
+}

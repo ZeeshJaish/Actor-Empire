@@ -1,0 +1,14 @@
+{
+  "label": "storage-live-race-red",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 529.484375,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 1696
+}

@@ -1,0 +1,9 @@
+{
+  "label": "final-browser",
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 2379.125,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 70666
+}

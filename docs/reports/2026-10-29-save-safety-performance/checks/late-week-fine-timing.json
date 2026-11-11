@@ -1,0 +1,1086 @@
+{
+  "kind": "LOOP_ONLY_PROFILE_NOT_SAVE_CERTIFICATION",
+  "mode": "fine-timing",
+  "inputSha256": "5cc27d8febd49070fe837d15cbaafa1038ccad4946a456bb3920743d372345f8",
+  "loopMs": 10489.860958,
+  "paidFactsSha256": "6ad926b61c230cbc",
+  "stages": [
+    {
+      "name": "state_cloned",
+      "ms": 423.71016599999984,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 0,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "simulation_seed": "process-week-v1:player:1893:53:owned-streaming:player"
+      }
+    },
+    {
+      "name": "state_normalized",
+      "ms": 14.199500000000171,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 0,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_industry_start",
+      "ms": 0.6373749999997926,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_turn_start",
+      "ms": 0.018958999999995285,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_turn_done",
+      "ms": 32.60516600000028,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "world_news": 0
+      }
+    },
+    {
+      "name": "music_industry_start",
+      "ms": 0.06320899999991525,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "music_industry_done",
+      "ms": 7.5507910000001175,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "music_news": 5,
+        "new_artists": 0
+      }
+    },
+    {
+      "name": "universe_payouts_start",
+      "ms": 0.03391699999974662,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "universe_payouts_done",
+      "ms": 1.1788750000000618,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "pending_universe_payouts": 0
+      }
+    },
+    {
+      "name": "world_industry_done",
+      "ms": 0.03274999999985084,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "pending_universe_payouts": 0
+      }
+    },
+    {
+      "name": "markets_start",
+      "ms": 1.0398749999999382,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "markets_done",
+      "ms": 10.784042000000227,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "stocks": 16,
+        "portfolio": 0
+      }
+    },
+    {
+      "name": "creator_talent_start",
+      "ms": 0.012749999999869033,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "creator_talent_done",
+      "ms": 2.187832999999955,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "talent_roster": 0,
+        "team_agents": 3
+      }
+    },
+    {
+      "name": "business_sim_start",
+      "ms": 0.0072079999999914435,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "business_sim_done",
+      "ms": 6.09045900000001,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "rights_inbox": 50
+      }
+    },
+    {
+      "name": "health_social_start",
+      "ms": 0.1670830000002752,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "health_social_done",
+      "ms": 2.5725829999996677,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "health_conditions": 1,
+        "instagram_posts": 200,
+        "x_posts": 0
+      }
+    },
+    {
+      "name": "commitments_releases_start",
+      "ms": 0.6277090000003227,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "commitments_releases_done",
+      "ms": 20.26716600000009,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "processed_releases": 1,
+        "new_releases": 0,
+        "past_projects": 37
+      }
+    },
+    {
+      "name": "awards_start",
+      "ms": 0.008458999999675143,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "awards_done",
+      "ms": 1.4869160000002921,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "awards": 46,
+        "award_history": 66
+      }
+    },
+    {
+      "name": "end_week_start",
+      "ms": 0.006416999999601103,
+      "context": {
+        "age": 37,
+        "week": 21,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_population_start",
+      "ms": 1.20575000000008,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_population_done",
+      "ms": 4.201000000000022,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "population": 9615154557,
+        "countries": 197
+      }
+    },
+    {
+      "name": "world_audience_economy_start",
+      "ms": 0.017000000000280124,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_audience_economy_done",
+      "ms": 26.01037499999984,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "cohorts": 2363,
+        "commercial_households": 2273410168
+      }
+    },
+    {
+      "name": "world_audience_participation_start",
+      "ms": 0.009457999999995081,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_audience_participation_done",
+      "ms": 46.65650000000005,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "streaming_reachable_households": 1382940075,
+        "cinema_reachable_households": 1039679998
+      }
+    },
+    {
+      "name": "streaming_rights_calendar_start",
+      "ms": 0.01641699999981938,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "streaming_rights_calendar_done",
+      "ms": 14.08987500000012,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "created_cases": 0,
+        "expired_contracts": 1
+      }
+    },
+    {
+      "name": "streaming_catalogue_packages_start",
+      "ms": 0.010166999999910331,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "streaming_catalogue_packages_done",
+      "ms": 1.862916000000041,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "proposed_packages": 0,
+        "signed_packages": 0
+      }
+    },
+    {
+      "name": "streaming_rights_office_start",
+      "ms": 0.2508339999999407,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "streaming_rights_office_done",
+      "ms": 2.2265000000002146,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "action_required": 0,
+        "delegated_decisions": 0
+      }
+    },
+    {
+      "name": "streaming_industry_start",
+      "ms": 0.012208000000100583,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "streaming_industry_done",
+      "ms": 7416.867957999999,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "industry_world_ms": 1015.8765829999998,
+        "cinema_market_ms": 6399.8020830000005,
+        "film_finalization_ms": 1.1684590000004391,
+        "industry_platforms_ms": 303.34583399999974,
+        "industry_studios_ms": 491.7398750000002,
+        "industry_upcoming_rights_ms": 5.083999999999833,
+        "industry_media_ms": 212.52299999999968,
+        "cinema_prepare_ms": 45.95045900000014,
+        "cinema_input_ms": 1833.4374160000002,
+        "cinema_simulate_ms": 1902.3881249999995,
+        "cinema_commit_ms": 2617.842042,
+        "absolute_week": 1893,
+        "world_news": 4
+      }
+    },
+    {
+      "name": "owned_streaming_start",
+      "ms": 0.012250000001586159,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_competition_start",
+      "ms": 0.7491669999999431,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_competition_done",
+      "ms": 78.4521249999998,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "subscribing_households": 555286963,
+        "subscriptions": 756423170,
+        "player_households": 0
+      }
+    },
+    {
+      "name": "world_streaming_customers_start",
+      "ms": 0.011042000000088592,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_customers_inputs_ready",
+      "ms": 90.40758300000016,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_desired_ready",
+      "ms": 68.4174579999999,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_countries_advanced",
+      "ms": 32.54658399999971,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_global_ready",
+      "ms": 1.9925829999992857,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_customers_done",
+      "ms": 2.2838750000009895,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "paid_accounts": 451279660,
+        "player_paid_accounts": 0,
+        "external_shared_households": 36470500,
+        "piracy_reach": 43916296
+      }
+    },
+    {
+      "name": "world_streaming_viewing_start",
+      "ms": 0.010000000000218279,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_viewing_audience_ready",
+      "ms": 1.0539579999986017,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_customers_ready",
+      "ms": 2.219542000000729,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_choices_ready",
+      "ms": 95.2924579999999,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_ai_catalogue_ready",
+      "ms": 25.299999999999272,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_rival_viewing_ready",
+      "ms": 758.9439590000002,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "world_streaming_viewing_done",
+      "ms": 1124.4953750000004,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "viewing_accounts": 592787969,
+        "hours_viewed": 1579378797,
+        "incremental_revenue": 687676462
+      }
+    },
+    {
+      "name": "world_streaming_platform_economy_start",
+      "ms": 0.02641600000060862,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_streaming_platform_economy_done",
+      "ms": 65.71129199999996,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "absolute_week": 1893,
+        "platforms": 56,
+        "paid_accounts": 451279660,
+        "weekly_revenue": 1967279787.91
+      }
+    },
+    {
+      "name": "owned_streaming_processed",
+      "ms": 4.746166999999332,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "owned_streaming_transitions_done",
+      "ms": 5.3052499999994325,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "owned_streaming_done",
+      "ms": 0.011666000000332133,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "processed": false
+      }
+    },
+    {
+      "name": "end_week_done",
+      "ms": 0.025292000000263215,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "is_dead": false,
+        "relationships": 9
+      }
+    },
+    {
+      "name": "weekly_events_start",
+      "ms": 0.002082999999402091,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_event_text_start",
+      "ms": 0.0005000000001018634,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_event_text_done",
+      "ms": 0.10687500000130967,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_news_start",
+      "ms": 0.0012499999993451638,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_news_done",
+      "ms": 1.1503749999992579,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "news_items": 50
+      }
+    },
+    {
+      "name": "weekly_social_start",
+      "ms": 0.004625000001396984,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_social_done",
+      "ms": 2.0759170000001177,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1,
+        "instagram_feed": 50
+      }
+    },
+    {
+      "name": "weekly_offers_start",
+      "ms": 1.0638330000001588,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 63,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_offers_done",
+      "ms": 3.965208999999959,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "weekly_events_done",
+      "ms": 0.022874999998748535,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "weekly_auditions": 5
+      }
+    },
+    {
+      "name": "studio_funding_start",
+      "ms": 0.005083000000013271,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "studio_funding_done",
+      "ms": 0.7003330000006827,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "subsidiaries_start",
+      "ms": 0.008792000000539701,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1
+      }
+    },
+    {
+      "name": "subsidiaries_done",
+      "ms": 0.8198749999992287,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "subsidiaries": 0
+      }
+    },
+    {
+      "name": "final_trim_done",
+      "ms": 1.8875829999997222,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "logs_added": 30,
+        "news_items": 50
+      }
+    },
+    {
+      "name": "world_integrity_start",
+      "ms": 0.01804199999969569,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    },
+    {
+      "name": "world_integrity_done",
+      "ms": 80.55504199999996,
+      "context": {
+        "age": 37,
+        "week": 22,
+        "pending_events": 1,
+        "commitments": 0,
+        "active_releases": 1,
+        "inbox_messages": 64,
+        "businesses": 1,
+        "absolute_week": 1893
+      }
+    }
+  ],
+  "personalSaveStorageAccessed": false
+}

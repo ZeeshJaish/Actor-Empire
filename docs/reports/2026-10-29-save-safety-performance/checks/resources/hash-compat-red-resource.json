@@ -1,0 +1,9 @@
+{
+  "label": "hash-compat-red",
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 0,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 81
+}

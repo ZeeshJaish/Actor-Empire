@@ -1,0 +1,9 @@
+{
+  "label": "safety-audit-save-migration",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 392.046875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 3820
+}

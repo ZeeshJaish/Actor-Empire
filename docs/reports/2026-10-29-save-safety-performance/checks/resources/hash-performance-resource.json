@@ -1,0 +1,9 @@
+{
+  "label": "hash-performance",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 463.078125,
+  "stopReason": "System swap growth exceeded 512MiB",
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "elapsedMs": 2080
+}

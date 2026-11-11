@@ -1,0 +1,42 @@
+[
+  {
+    "name": "legacy-api-unit",
+    "code": 0,
+    "ms": 68
+  },
+  {
+    "name": "legacy-capability-app",
+    "code": 0,
+    "ms": 90333
+  },
+  {
+    "name": "complete-parity-before",
+    "code": 0,
+    "ms": 35265
+  },
+  {
+    "name": "complete-parity-after",
+    "code": 0,
+    "ms": 35527
+  },
+  {
+    "name": "atomic-chromium",
+    "code": 0,
+    "ms": 2344
+  },
+  {
+    "name": "atomic-webkit",
+    "code": 0,
+    "ms": 5842
+  },
+  {
+    "name": "update-roundtrip",
+    "code": 0,
+    "ms": 45296
+  },
+  {
+    "name": "recovery-app",
+    "code": 0,
+    "ms": 41111
+  }
+]

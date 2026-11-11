@@ -1,0 +1,366 @@
+{
+  "scope": "Instrumented storage/preparation of retained large signed save; controlled +10 dollars per iteration, not gameplay or balance evidence",
+  "rows": [
+    {
+      "iteration": 0,
+      "prepare": {
+        "elapsedMs": 407.60000002384186,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 59,
+            "totalMs": 222.69999998807907,
+            "maxMs": 90.30000001192093,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 2,
+            "totalMs": 265.80000001192093,
+            "maxMs": 149.19999998807907,
+            "firstCallsMs": []
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "totalMs": 266,
+            "maxMs": 266,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "save": {
+        "elapsedMs": 1141.1000000238419,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 119,
+            "totalMs": 425.9000000357628,
+            "maxMs": 89.19999998807907,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 4,
+            "totalMs": 556.7000000476837,
+            "maxMs": 162.30000001192093,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "totalMs": 594.9000000357628,
+            "maxMs": 290.60000002384186,
+            "firstCallsMs": [
+              130.80000001192093,
+              290.60000002384186,
+              173.5
+            ]
+          },
+          "result_deserialize": {
+            "count": 4,
+            "totalMs": 258.80000001192093,
+            "maxMs": 146,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__previous": {
+            "count": 1,
+            "totalMs": 144.0999999642372,
+            "maxMs": 144.0999999642372,
+            "firstCallsMs": []
+          },
+          "put_sync_slot": {
+            "count": 1,
+            "totalMs": 127.60000002384186,
+            "maxMs": 127.60000002384186,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__integrity": {
+            "count": 1,
+            "totalMs": 0.19999998807907104,
+            "maxMs": 0.19999998807907104,
+            "firstCallsMs": []
+          },
+          "tx_readwrite": {
+            "count": 1,
+            "totalMs": 1009.5,
+            "maxMs": 1009.5,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "load": {
+        "elapsedMs": 282.19999998807907,
+        "metrics": {
+          "tx_readonly": {
+            "count": 1,
+            "totalMs": 2.299999952316284,
+            "maxMs": 2.299999952316284,
+            "firstCallsMs": []
+          },
+          "result_deserialize": {
+            "count": 2,
+            "totalMs": 114.89999997615814,
+            "maxMs": 114.80000001192093,
+            "firstCallsMs": []
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "totalMs": 111.09999996423721,
+            "maxMs": 84.39999997615814,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 1,
+            "totalMs": 155.69999998807907,
+            "maxMs": 155.69999998807907,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "totalMs": 164.10000002384186,
+            "maxMs": 164.10000002384186,
+            "firstCallsMs": [
+              164.10000002384186
+            ]
+          }
+        }
+      }
+    },
+    {
+      "iteration": 1,
+      "prepare": {
+        "elapsedMs": 306.69999998807907,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 59,
+            "totalMs": 207.09999990463257,
+            "maxMs": 79.19999998807907,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 2,
+            "totalMs": 231.5999999642372,
+            "maxMs": 115.89999997615814,
+            "firstCallsMs": []
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "totalMs": 231.80000001192093,
+            "maxMs": 231.80000001192093,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "save": {
+        "elapsedMs": 991.1000000238419,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "totalMs": 333.0999999642372,
+            "maxMs": 86.89999997615814,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 3,
+            "totalMs": 446.89999997615814,
+            "maxMs": 175.0999999642372,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "totalMs": 469.5999999642372,
+            "maxMs": 182.89999997615814,
+            "firstCallsMs": [
+              122,
+              182.89999997615814,
+              164.69999998807907
+            ]
+          },
+          "result_deserialize": {
+            "count": 4,
+            "totalMs": 239.9000000357628,
+            "maxMs": 121.60000002384186,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__previous": {
+            "count": 1,
+            "totalMs": 145.89999997615814,
+            "maxMs": 145.89999997615814,
+            "firstCallsMs": []
+          },
+          "put_sync_slot": {
+            "count": 1,
+            "totalMs": 124.10000002384186,
+            "maxMs": 124.10000002384186,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__integrity": {
+            "count": 1,
+            "totalMs": 0.09999996423721313,
+            "maxMs": 0.09999996423721313,
+            "firstCallsMs": []
+          },
+          "tx_readwrite": {
+            "count": 1,
+            "totalMs": 868.9000000357628,
+            "maxMs": 868.9000000357628,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "load": {
+        "elapsedMs": 279.5,
+        "metrics": {
+          "tx_readonly": {
+            "count": 1,
+            "totalMs": 3.400000035762787,
+            "maxMs": 3.400000035762787,
+            "firstCallsMs": []
+          },
+          "result_deserialize": {
+            "count": 2,
+            "totalMs": 114.80000001192093,
+            "maxMs": 114.80000001192093,
+            "firstCallsMs": []
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "totalMs": 109.5,
+            "maxMs": 82.39999997615814,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 1,
+            "totalMs": 152.89999997615814,
+            "maxMs": 152.89999997615814,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "totalMs": 160.89999997615814,
+            "maxMs": 160.89999997615814,
+            "firstCallsMs": [
+              160.89999997615814
+            ]
+          }
+        }
+      }
+    },
+    {
+      "iteration": 2,
+      "prepare": {
+        "elapsedMs": 300.10000002384186,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 59,
+            "totalMs": 207.30000001192093,
+            "maxMs": 80.10000002384186,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 2,
+            "totalMs": 231.30000001192093,
+            "maxMs": 117.90000003576279,
+            "firstCallsMs": []
+          },
+          "createCheckedSaveIntegrityManifest": {
+            "count": 1,
+            "totalMs": 231.4000000357628,
+            "maxMs": 231.4000000357628,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "save": {
+        "elapsedMs": 966.1999999880791,
+        "metrics": {
+          "stableSaveHash": {
+            "count": 90,
+            "totalMs": 325,
+            "maxMs": 84,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 3,
+            "totalMs": 423.30000001192093,
+            "maxMs": 153.60000002384186,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 3,
+            "totalMs": 449.19999998807907,
+            "maxMs": 163.80000001192093,
+            "firstCallsMs": [
+              124.79999995231628,
+              163.80000001192093,
+              160.60000002384186
+            ]
+          },
+          "result_deserialize": {
+            "count": 4,
+            "totalMs": 234.4000000357628,
+            "maxMs": 121.10000002384186,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__previous": {
+            "count": 1,
+            "totalMs": 151.10000002384186,
+            "maxMs": 151.10000002384186,
+            "firstCallsMs": []
+          },
+          "put_sync_slot": {
+            "count": 1,
+            "totalMs": 122.69999998807907,
+            "maxMs": 122.69999998807907,
+            "firstCallsMs": []
+          },
+          "put_sync_slot__integrity": {
+            "count": 1,
+            "totalMs": 0.10000002384185791,
+            "maxMs": 0.10000002384185791,
+            "firstCallsMs": []
+          },
+          "tx_readwrite": {
+            "count": 1,
+            "totalMs": 841.1000000238419,
+            "maxMs": 841.1000000238419,
+            "firstCallsMs": []
+          }
+        }
+      },
+      "load": {
+        "elapsedMs": 317.69999998807907,
+        "metrics": {
+          "tx_readonly": {
+            "count": 1,
+            "totalMs": 3.399999976158142,
+            "maxMs": 3.399999976158142,
+            "firstCallsMs": []
+          },
+          "result_deserialize": {
+            "count": 2,
+            "totalMs": 147.39999997615814,
+            "maxMs": 147.39999997615814,
+            "firstCallsMs": []
+          },
+          "stableSaveHash": {
+            "count": 30,
+            "totalMs": 115.39999997615814,
+            "maxMs": 84,
+            "firstCallsMs": []
+          },
+          "createProtectedState": {
+            "count": 1,
+            "totalMs": 159.30000001192093,
+            "maxMs": 159.30000001192093,
+            "firstCallsMs": []
+          },
+          "verifySaveIntegrity": {
+            "count": 1,
+            "totalMs": 166,
+            "maxMs": 166,
+            "firstCallsMs": [
+              166
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "browser": "151.0.7922.34"
+}

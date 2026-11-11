@@ -1,0 +1,13 @@
+{
+  "head": "09edec4bf958d12c201b9ef848e1c5bcacc7e39e",
+  "pinnedBaseline": "09edec4",
+  "gameplayVariant": "UNIVERSE_MEDIA_ROUTE_FIX",
+  "executable": "aab24cc4b2ba13addbdfc5b5b39f2f75dc691d5abbb181f3e2a155f280597907",
+  "currentProductDependencyMismatches": [],
+  "productOverrideFiles": [
+    "types.ts",
+    "services/universeLogic.ts",
+    "views/mobile/MobilePage.tsx"
+  ],
+  "moneyFormulaOverrides": false
+}

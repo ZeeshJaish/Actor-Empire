@@ -1,0 +1,9 @@
+{
+  "taskStart901SourceHashesMatchPriorVerifiedArtifact": true,
+  "priorArtifact": "/assets/index-CjAyIpam.js",
+  "baselineFile": "task-start-golden-parity.json",
+  "baselineSha256": "e515fd18f9d2d281ff046c11dcb77f30c9c5be893d6465fda5e3b9961c02fe67",
+  "checkpointSha256": "5cc27d8febd49070fe837d15cbaafa1038ccad4946a456bb3920743d372345f8",
+  "checkpointedReplay": true,
+  "uiTimingOrContinuousSession": false
+}

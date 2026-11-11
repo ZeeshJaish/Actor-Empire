@@ -1,0 +1,562 @@
+{
+  "status": "UNIVERSE_RUN_CLOSED",
+  "completeObservation": true,
+  "sourceRef": "09edec4",
+  "gameplayVariant": "UNIVERSE_MEDIA_ROUTE_FIX",
+  "uiEligibilityVerified": true,
+  "executable": "aab24cc4b2ba13addbdfc5b5b39f2f75dc691d5abbb181f3e2a155f280597907",
+  "inputReport": "/Users/zeesh/Vibe code/Actor empire/cinema-verification.local/mature-ui-gated-09edec4/final-corrected/career-0.json",
+  "inputSha256": "eb38725e4c34096d4a14961b63bb42ac96c06aef1a74f8996a79546428dfa4eb",
+  "weeks": 1063,
+  "origin": {
+    "checkpoint": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+    "checkpointSha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+    "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+    "weeks": 156,
+    "cash": 57643,
+    "sourceRef": "07fdfff",
+    "initialCash": 2000,
+    "manualCapitalGrants": 0
+  },
+  "lineage": [
+    {
+      "checkpoint": "/Users/zeesh/Vibe code/Actor empire/cinema-verification.local/mature-ui-gated-09edec4/earned-capital-start/career-0.json.gz",
+      "checkpointSha256": "cb0f1c09d68d48f4041c434e9c60c321a82c8d296227b25ae2d1d659196737a6",
+      "executable": "043ea20028c97da089d474bdcda31a2636f51221b9b94dddf336f90d97706cac",
+      "weeks": 689,
+      "cash": 74482247,
+      "playerSha256": "ccd805c9c2d5160ed3dd99a9c27d5103ca3ab6853e1e5ecddcf6d9a07258b9be",
+      "reason": "Continue the verified UI-gated earned career before the actual Monsterverse offer with a narrow future-offer/acceptance media-routing correction; no capital, craft, campaign, gross, signed pay or existing paid releases rewritten"
+    }
+  ],
+  "ownerCapitalMilestone": {
+    "weeks": 684,
+    "cash": 70629205
+  },
+  "finalCashDollars": 2157704968,
+  "finalProfile": {
+    "weeks": 1063,
+    "age": 35,
+    "week": 24,
+    "cash": 2157704968,
+    "craft": 92.28606014871875,
+    "fame": 86.41391769952888,
+    "reputation": 100,
+    "experience": 100,
+    "health": 83.09999999999985,
+    "followers": 222592314,
+    "credits": 33,
+    "studios": 0,
+    "alive": true
+  },
+  "latestPeriodicProfile": {
+    "weeks": 1053,
+    "age": 35,
+    "week": 14,
+    "cash": 1964654132,
+    "craft": 92.25685738195311,
+    "fame": 79.57558205220963,
+    "reputation": 100,
+    "experience": 100,
+    "health": 86.59999999999988,
+    "followers": 206786194,
+    "credits": 33,
+    "studios": 0,
+    "roles": [
+      {
+        "id": "aud_active_1800000019888_0.6813887197058648",
+        "role": "SUPPORTING",
+        "phase": "POST_PRODUCTION",
+        "pay": 31406
+      },
+      {
+        "id": "aud_active_1800000020324_0.07125607831403613",
+        "role": "CAMEO",
+        "phase": "PRODUCTION",
+        "pay": 12611
+      }
+    ]
+  },
+  "firstObservedStarProfileWeek": 455,
+  "safeguards": {
+    "manualCapitalGrants": 0,
+    "authoredCompletedPackages": 0,
+    "loans": 0,
+    "saves": 255,
+    "reloads": 107,
+    "duplicateWeeksRejected": 1063,
+    "failedPromotionRecovery": true
+  },
+  "filmCounts": {
+    "released": 335,
+    "closed": 323,
+    "open": 12,
+    "playerCredits": 16,
+    "playerClosed": 15
+  },
+  "attainment": {
+    "player": [
+      {
+        "grossBillions": 1,
+        "observed": 16,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 16,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 16,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ],
+    "world": [
+      {
+        "grossBillions": 1,
+        "observed": 335,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 335,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 335,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ]
+  },
+  "closedFinancialOutcomes": {
+    "all": {
+      "completed": 323,
+      "recouped": 223,
+      "hits": 84,
+      "profits": 127,
+      "nearBreakEven": 25,
+      "losses": 87,
+      "exactDeficits": 100
+    },
+    "small": {
+      "completed": 219,
+      "recouped": 152,
+      "hits": 52,
+      "profits": 94,
+      "nearBreakEven": 17,
+      "losses": 56,
+      "exactDeficits": 67
+    },
+    "player": {
+      "completed": 15,
+      "recouped": 11,
+      "hits": 9,
+      "profits": 2,
+      "nearBreakEven": 1,
+      "losses": 3,
+      "exactDeficits": 4
+    }
+  },
+  "topPlayer": [
+    {
+      "id": "job_1800000009869",
+      "name": "The Hunger Games",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 86.68,
+      "productionDollars": 140493140.44,
+      "campaignDollars": 25288765.28,
+      "grossDollars": 647305886.57,
+      "producerReceiptsDollars": 323301213.88,
+      "theatricalProfitDollars": 152354202.16,
+      "actorBackendDollars": 5165106,
+      "paidWeeks": 63,
+      "trackedRunWeeks": 63,
+      "firstObservedCareerWeek": 592,
+      "lastObservedCareerWeek": 654
+    },
+    {
+      "id": "uni_job_1800000014596_0",
+      "name": "Godzilla vs. Kong",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.9,
+      "productionDollars": 97674241,
+      "campaignDollars": 17581363.38,
+      "grossDollars": 376875711.9,
+      "producerReceiptsDollars": 188469259.76,
+      "theatricalProfitDollars": 72142645.38,
+      "actorBackendDollars": 1071010,
+      "paidWeeks": 43,
+      "trackedRunWeeks": 43,
+      "firstObservedCareerWeek": 802,
+      "lastObservedCareerWeek": 844
+    },
+    {
+      "id": "uni_job_1800000014598_2",
+      "name": "Godzilla x Kong: Supernova",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.666,
+      "productionDollars": 97674241,
+      "campaignDollars": 17581363.38,
+      "grossDollars": 376256350.56,
+      "producerReceiptsDollars": 187759330.85,
+      "theatricalProfitDollars": 71436370.47,
+      "actorBackendDollars": 1067356,
+      "paidWeeks": 43,
+      "trackedRunWeeks": 43,
+      "firstObservedCareerWeek": 1021,
+      "lastObservedCareerWeek": 1063
+    },
+    {
+      "id": "uni_job_1800000014597_1",
+      "name": "Godzilla x Kong: The New Empire",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.9,
+      "productionDollars": 97674241,
+      "campaignDollars": 17581363.38,
+      "grossDollars": 356584989.27,
+      "producerReceiptsDollars": 178068362.83,
+      "theatricalProfitDollars": 61861463.45,
+      "actorBackendDollars": 951295,
+      "paidWeeks": 43,
+      "trackedRunWeeks": 43,
+      "firstObservedCareerWeek": 897,
+      "lastObservedCareerWeek": 939
+    },
+    {
+      "id": "aud_active_1800000010482_0.07905039261095226",
+      "name": "A Ash for Whisper",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.68,
+      "productionDollars": 95501868,
+      "campaignDollars": 17190336.24,
+      "grossDollars": 346869492.89,
+      "producerReceiptsDollars": 173211079.98,
+      "theatricalProfitDollars": 60518875.74,
+      "actorBackendDollars": 0,
+      "paidWeeks": 42,
+      "trackedRunWeeks": 42,
+      "firstObservedCareerWeek": 619,
+      "lastObservedCareerWeek": 660
+    }
+  ],
+  "topWorld": [
+    {
+      "id": "job_1800000009869",
+      "name": "The Hunger Games",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 86.68,
+      "productionDollars": 140493140.44,
+      "campaignDollars": 25288765.28,
+      "grossDollars": 647305886.57,
+      "producerReceiptsDollars": 323301213.88,
+      "theatricalProfitDollars": 152354202.16,
+      "actorBackendDollars": 5165106,
+      "paidWeeks": 63,
+      "trackedRunWeeks": 63,
+      "firstObservedCareerWeek": 592,
+      "lastObservedCareerWeek": 654
+    },
+    {
+      "id": "studio_ai_project_0sgbuma",
+      "name": "Dragon and Blood",
+      "ownCredit": false,
+      "closed": true,
+      "quality": 81,
+      "productionDollars": 86626000,
+      "campaignDollars": 15593000,
+      "grossDollars": 479114085.18,
+      "producerReceiptsDollars": 229750646.26,
+      "theatricalProfitDollars": 118341619.26,
+      "actorBackendDollars": 0,
+      "paidWeeks": 49,
+      "trackedRunWeeks": 49,
+      "firstObservedCareerWeek": 636,
+      "lastObservedCareerWeek": 684
+    },
+    {
+      "id": "uni_job_1800000014596_0",
+      "name": "Godzilla vs. Kong",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.9,
+      "productionDollars": 97674241,
+      "campaignDollars": 17581363.38,
+      "grossDollars": 376875711.9,
+      "producerReceiptsDollars": 188469259.76,
+      "theatricalProfitDollars": 72142645.38,
+      "actorBackendDollars": 1071010,
+      "paidWeeks": 43,
+      "trackedRunWeeks": 43,
+      "firstObservedCareerWeek": 802,
+      "lastObservedCareerWeek": 844
+    },
+    {
+      "id": "uni_job_1800000014598_2",
+      "name": "Godzilla x Kong: Supernova",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.666,
+      "productionDollars": 97674241,
+      "campaignDollars": 17581363.38,
+      "grossDollars": 376256350.56,
+      "producerReceiptsDollars": 187759330.85,
+      "theatricalProfitDollars": 71436370.47,
+      "actorBackendDollars": 1067356,
+      "paidWeeks": 43,
+      "trackedRunWeeks": 43,
+      "firstObservedCareerWeek": 1021,
+      "lastObservedCareerWeek": 1063
+    },
+    {
+      "id": "uni_job_1800000014597_1",
+      "name": "Godzilla x Kong: The New Empire",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 74.9,
+      "productionDollars": 97674241,
+      "campaignDollars": 17581363.38,
+      "grossDollars": 356584989.27,
+      "producerReceiptsDollars": 178068362.83,
+      "theatricalProfitDollars": 61861463.45,
+      "actorBackendDollars": 951295,
+      "paidWeeks": 43,
+      "trackedRunWeeks": 43,
+      "firstObservedCareerWeek": 897,
+      "lastObservedCareerWeek": 939
+    }
+  ],
+  "management": [
+    {
+      "week": 360,
+      "type": "hire-current-publicist",
+      "cost": 300,
+      "terms": {
+        "id": "pub_rookie",
+        "name": "Spin Doctors",
+        "type": "PUBLICIST",
+        "tier": "ROOKIE",
+        "weeklyCost": 300,
+        "description": "",
+        "descriptionKey": "services.teamLogic.member.pub_rookie.description",
+        "perks": "",
+        "perksKey": "services.teamLogic.member.pub_rookie.perks"
+      }
+    },
+    {
+      "week": 434,
+      "type": "hire-current-agent",
+      "cost": 40000,
+      "terms": {
+        "id": "agent_rookie_2",
+        "name": "Stacy from High School",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_rookie_2.description",
+        "annualFee": 40000,
+        "commission": 0.2,
+        "specialty": "TV",
+        "tier": "ROOKIE",
+        "studioAccess": "LOW"
+      }
+    },
+    {
+      "week": 454,
+      "type": "hire-current-manager",
+      "cost": 50000,
+      "terms": {
+        "id": "mgr_rookie_2",
+        "name": "Momager Karen",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_rookie_2.description",
+        "annualFee": 50000,
+        "commission": 0.2,
+        "tier": "ROOKIE",
+        "sponsorshipPower": 1
+      }
+    },
+    {
+      "week": 538,
+      "type": "hire-current-agent",
+      "cost": 2000000,
+      "terms": {
+        "id": "agent_elite_2",
+        "name": "Creative Artists United",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_elite_2.description",
+        "annualFee": 2000000,
+        "commission": 0.1,
+        "specialty": "FILM",
+        "tier": "ELITE",
+        "studioAccess": "HIGH"
+      }
+    },
+    {
+      "week": 558,
+      "type": "hire-current-manager",
+      "cost": 220000,
+      "terms": {
+        "id": "mgr_std_3",
+        "name": "Michael Scott Mgmt",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_std_3.description",
+        "annualFee": 220000,
+        "commission": 0.15,
+        "tier": "STANDARD",
+        "sponsorshipPower": 6
+      }
+    },
+    {
+      "week": 642,
+      "type": "hire-current-agent",
+      "cost": 10000000,
+      "terms": {
+        "id": "agent_legend_1",
+        "name": "Ari Golding",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_legend_1.description",
+        "annualFee": 10000000,
+        "commission": 0.1,
+        "specialty": "BALANCED",
+        "tier": "LEGEND",
+        "studioAccess": "HIGH"
+      }
+    },
+    {
+      "week": 662,
+      "type": "hire-current-manager",
+      "cost": 800000,
+      "terms": {
+        "id": "mgr_elite_1",
+        "name": "Icon Management",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_elite_1.description",
+        "annualFee": 800000,
+        "commission": 0.1,
+        "tier": "ELITE",
+        "sponsorshipPower": 9
+      }
+    },
+    {
+      "week": 766,
+      "type": "hire-current-manager",
+      "cost": 1200000,
+      "terms": {
+        "id": "mgr_elite_3",
+        "name": "Elena \"The Fixer\" Cruz",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_elite_3.description",
+        "annualFee": 1200000,
+        "commission": 0.12,
+        "tier": "ELITE",
+        "sponsorshipPower": 10
+      }
+    }
+  ],
+  "actualPressTours": 34,
+  "actualSponsorsSigned": 39,
+  "largestSignedSponsorshipWeeklyQuoteDollars": 29003122,
+  "universe": {
+    "universeId": "MONSTERVERSE",
+    "characterName": "Apex Engineer",
+    "signedAtCareerWeek": 764,
+    "salaryTotal": 3119644,
+    "roadmap": [
+      {
+        "title": "Godzilla vs. Kong",
+        "role": "SUPPORTING",
+        "type": "UNIVERSE_ENTRY",
+        "projectType": "MOVIE",
+        "weeksOffset": 10
+      },
+      {
+        "title": "Godzilla x Kong: The New Empire",
+        "role": "SUPPORTING",
+        "type": "SEQUEL",
+        "projectType": "MOVIE",
+        "weeksOffset": 100
+      },
+      {
+        "title": "Godzilla x Kong: Supernova",
+        "role": "ENSEMBLE",
+        "type": "UNIVERSE_EVENT",
+        "projectType": "MOVIE",
+        "weeksOffset": 220
+      }
+    ],
+    "films": [
+      {
+        "id": "uni_job_1800000014596_0",
+        "name": "Godzilla vs. Kong",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 74.9,
+        "productionDollars": 97674241,
+        "campaignDollars": 17581363.38,
+        "grossDollars": 376875711.9,
+        "producerReceiptsDollars": 188469259.76,
+        "theatricalProfitDollars": 72142645.38,
+        "actorBackendDollars": 1071010,
+        "paidWeeks": 43,
+        "trackedRunWeeks": 43,
+        "firstObservedCareerWeek": 802,
+        "lastObservedCareerWeek": 844
+      },
+      {
+        "id": "uni_job_1800000014597_1",
+        "name": "Godzilla x Kong: The New Empire",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 74.9,
+        "productionDollars": 97674241,
+        "campaignDollars": 17581363.38,
+        "grossDollars": 356584989.27,
+        "producerReceiptsDollars": 178068362.83,
+        "theatricalProfitDollars": 61861463.45,
+        "actorBackendDollars": 951295,
+        "paidWeeks": 43,
+        "trackedRunWeeks": 43,
+        "firstObservedCareerWeek": 897,
+        "lastObservedCareerWeek": 939
+      },
+      {
+        "id": "uni_job_1800000014598_2",
+        "name": "Godzilla x Kong: Supernova",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 74.666,
+        "productionDollars": 97674241,
+        "campaignDollars": 17581363.38,
+        "grossDollars": 376256350.56,
+        "producerReceiptsDollars": 187759330.85,
+        "theatricalProfitDollars": 71436370.47,
+        "actorBackendDollars": 1067356,
+        "paidWeeks": 43,
+        "trackedRunWeeks": 43,
+        "firstObservedCareerWeek": 1021,
+        "lastObservedCareerWeek": 1063
+      }
+    ]
+  },
+  "positiveLifeChoiceCash": [],
+  "conclusion": "UI_GATED_ORGANIC_PLAYER_2B_NOT_VERIFIED",
+  "limitations": [
+    "One adaptive longitudinal career is a capability probe, not a hit-rate or rarity estimate",
+    "World NPC film gross and player-credited film gross are reported separately",
+    "No owned studio or self-financed production is claimed unless actually founded through paid gameplay",
+    "Open theatrical runs are interim observations; future streaming income is excluded",
+    "Controlled UI-adapter cases and prior prepared-capital examples are excluded"
+  ]
+}

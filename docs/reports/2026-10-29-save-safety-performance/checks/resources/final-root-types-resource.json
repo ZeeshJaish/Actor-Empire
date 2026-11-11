@@ -1,0 +1,9 @@
+{
+  "label": "final-root-types",
+  "heapMiB": 2048,
+  "peakOwnedTreeRssMiB": 1428.328125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 31209
+}

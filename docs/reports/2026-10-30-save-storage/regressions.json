@@ -1,0 +1,398 @@
+[
+  {
+    "name": "audit-save-hash-native-path",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-save-hash-native-path",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 126
+    }
+  },
+  {
+    "name": "audit-stable-save-hash",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-stable-save-hash",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 88
+    }
+  },
+  {
+    "name": "audit-ai-catalogue-read-batch",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-ai-catalogue-read-batch",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 223
+    }
+  },
+  {
+    "name": "audit-royalty-source-index",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-royalty-source-index",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 269
+    }
+  },
+  {
+    "name": "audit-save-preparation-projections",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-save-preparation-projections",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 895
+    }
+  },
+  {
+    "name": "audit-cinema-country-scaling",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-cinema-country-scaling",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 194
+    }
+  },
+  {
+    "name": "audit-save-integrity",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-save-integrity",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 286
+    }
+  },
+  {
+    "name": "audit-save-generations",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-save-generations",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 323
+    }
+  },
+  {
+    "name": "audit-career-record-preservation",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-career-record-preservation",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 374.890625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3745
+    }
+  },
+  {
+    "name": "audit-save-migration",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-save-migration",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 423.515625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 5660
+    }
+  },
+  {
+    "name": "audit-save-transfer",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-save-transfer",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 446.96875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3166
+    }
+  },
+  {
+    "name": "audit-box-office-market",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-box-office-market",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 237.140625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1606
+    }
+  },
+  {
+    "name": "audit-box-office-fingerprint",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-box-office-fingerprint",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 854
+    }
+  },
+  {
+    "name": "audit-box-office-integration",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-box-office-integration",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 572.03125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 16065
+    }
+  },
+  {
+    "name": "audit-box-office-alternatives",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-box-office-alternatives",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 291
+    }
+  },
+  {
+    "name": "audit-box-office-alternative-batching",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-box-office-alternative-batching",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 235
+    }
+  },
+  {
+    "name": "audit-box-office-alternative-routes",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-box-office-alternative-routes",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 833
+    }
+  },
+  {
+    "name": "audit-weekly-viewing-parity",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-weekly-viewing-parity",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 551.40625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3891
+    }
+  },
+  {
+    "name": "audit-streaming-signed-royalties",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-streaming-signed-royalties",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 411.078125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 4658
+    }
+  },
+  {
+    "name": "audit-world-streaming-we6",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-world-streaming-we6",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": true,
+      "peakGlobalSwapGrowthMiB": 1158.3100000000013,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 416.90625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 103544
+    }
+  },
+  {
+    "name": "audit-world-streaming-commercial-economy",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-world-streaming-commercial-economy",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 407
+    }
+  },
+  {
+    "name": "audit-stock-save-safety",
+    "code": 0,
+    "resource": {
+      "label": "storage-regression-audit-stock-save-safety",
+      "sharedBackgroundJobsAuthorized": true,
+      "hardOwnedRssMiB": 2560,
+      "minFreePercent": 20,
+      "swapWarning": false,
+      "peakGlobalSwapGrowthMiB": 0,
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 346.5,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 2783
+    }
+  }
+]

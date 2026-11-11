@@ -1,0 +1,184 @@
+[
+  {
+    "name": "audit-career-record-preservation",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-career-record-preservation",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 289.90625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 5692
+    }
+  },
+  {
+    "name": "audit-stable-save-hash",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-stable-save-hash",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 153
+    }
+  },
+  {
+    "name": "audit-cinema-audience-indexes",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-cinema-audience-indexes",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 331
+    }
+  },
+  {
+    "name": "audit-save-integrity",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-save-integrity",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 462
+    }
+  },
+  {
+    "name": "audit-save-generations",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-save-generations",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 691
+    }
+  },
+  {
+    "name": "audit-save-migration",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-save-migration",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 362.84375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 9950
+    }
+  },
+  {
+    "name": "audit-save-transfer",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-save-transfer",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 418.703125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 6507
+    }
+  },
+  {
+    "name": "audit-cinema-legacy-replay",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-cinema-legacy-replay",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 629
+    }
+  },
+  {
+    "name": "audit-box-office-market",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-box-office-market",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 207.859375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 2882
+    }
+  },
+  {
+    "name": "audit-box-office-fingerprint",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-box-office-fingerprint",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 118.375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1916
+    }
+  },
+  {
+    "name": "audit-box-office-integration",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-box-office-integration",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 549.984375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 27077
+    }
+  },
+  {
+    "name": "audit-box-office-rights",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-box-office-rights",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 351.28125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 8103
+    }
+  },
+  {
+    "name": "audit-box-office-booking",
+    "code": 0,
+    "resource": {
+      "label": "final-audit-box-office-booking",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 255
+    }
+  },
+  {
+    "name": "audit-stock-save-safety",
+    "code": 1,
+    "resource": {
+      "label": "final-audit-stock-save-safety",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 118.40625,
+      "stopReason": "System swap growth exceeded 512MiB",
+      "exitCode": null,
+      "signal": "SIGTERM",
+      "elapsedMs": 1076
+    }
+  }
+]

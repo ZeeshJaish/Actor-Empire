@@ -1,0 +1,11 @@
+{
+  "exitCode": 0,
+  "retainedOutput": "{\"seed\":0,\"retained\":\"UNIVERSE_RUN_CLOSED\",\"weeks\":1063}",
+  "checkpointReportAndMemoryHistoryUnchanged": true,
+  "sha256": {
+    "career-0.json": "eb38725e4c34096d4a14961b63bb42ac96c06aef1a74f8996a79546428dfa4eb",
+    "career-0.json.gz": "098ccf56ecb37b25140d54e3069fe9c5ca01f5ea554dcd2f7c521596464ace0b",
+    "memory-history.jsonl": "ea9495146299c7a293a67a818b7589a90f21cae4eafc775a6d12f28e50efb079"
+  },
+  "newWeeksProcessed": 0
+}

@@ -1,0 +1,14 @@
+{
+  "label": "latency-owned-source-immutable",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 247.6200000000008,
+  "heapMiB": 1536,
+  "peakOwnedTreeRssMiB": 926.921875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 5991
+}

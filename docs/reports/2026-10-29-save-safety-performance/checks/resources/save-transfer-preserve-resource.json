@@ -1,0 +1,9 @@
+{
+  "label": "save-transfer-preserve",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 332.40625,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 2873
+}

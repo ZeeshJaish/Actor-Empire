@@ -1,0 +1,17 @@
+{
+  "method": "Exact initial vs current tracked diff sections outside this follow-up scope; untracked old reports not rewritten",
+  "trackedSections": {
+    "docs/reports/2026-10-23-mature-no-grant-career/checks/typecheck.json": true,
+    "docs/reports/2026-10-23-mature-no-grant-career/progress.md": true,
+    "docs/reports/2026-10-23-mature-no-grant-career/shared-source-check.json": true,
+    "scripts/audit-cinema-canonical-migration.ts": true,
+    "scripts/audit-cinema-mature-career.ts": true,
+    "scripts/audit-cinema-mature-policy.ts": true,
+    "scripts/audit-cinema-observation-boundary.mjs": true,
+    "scripts/fixtures/actorLifetimeActions.ts": true,
+    "scripts/fixtures/cinemaMatureAppPolicy.ts": true,
+    "scripts/report-cinema-mature-career.mjs": true,
+    "services/universeLogic.ts": true,
+    "views/mobile/MobilePage.tsx": true
+  }
+}

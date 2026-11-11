@@ -1,0 +1,41 @@
+[
+  {
+    "name": "audit-stock-save-safety",
+    "code": 0,
+    "resource": {
+      "label": "final-followup-audit-stock-save-safety",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 347.828125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3265
+    }
+  },
+  {
+    "name": "audit-box-office-finance-contracts",
+    "code": 0,
+    "resource": {
+      "label": "final-followup-audit-box-office-finance-contracts",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 70
+    }
+  },
+  {
+    "name": "audit-save-transfer",
+    "code": 0,
+    "resource": {
+      "label": "final-followup-audit-save-transfer",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 413,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3384
+    }
+  }
+]

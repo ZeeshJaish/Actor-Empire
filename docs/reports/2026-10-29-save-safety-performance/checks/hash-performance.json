@@ -1,0 +1,44 @@
+{
+  "scope": "Same actual large-save subtrees; alternating algorithm order, no weeks advanced",
+  "rows": [
+    {
+      "round": 0,
+      "field": "cinema",
+      "issuedMs": 216.813,
+      "candidateMs": 200.5568340000001
+    },
+    {
+      "round": 0,
+      "field": "viewing",
+      "issuedMs": 217.588792,
+      "candidateMs": 184.24029200000018
+    },
+    {
+      "round": 1,
+      "field": "cinema",
+      "issuedMs": 188.47399999999993,
+      "candidateMs": 166.33612500000004
+    },
+    {
+      "round": 1,
+      "field": "viewing",
+      "issuedMs": 209.9936670000002,
+      "candidateMs": 159.3218750000001
+    },
+    {
+      "round": 2,
+      "field": "cinema",
+      "issuedMs": 193.90154200000006,
+      "candidateMs": 150.7443330000001
+    },
+    {
+      "round": 2,
+      "field": "viewing",
+      "issuedMs": 244.22366699999975,
+      "candidateMs": 235.48725000000013
+    }
+  ],
+  "oldTotal": 1270.9946679999998,
+  "newTotal": 1096.6867090000005,
+  "personalSaveStorageAccessed": false
+}

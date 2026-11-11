@@ -1,0 +1,14 @@
+{
+  "label": "latency-matched-pairs",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 99.43000000000029,
+  "heapMiB": 1536,
+  "peakOwnedTreeRssMiB": 1127.34375,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 32208
+}

@@ -1,0 +1,13 @@
+{
+  "label": "regressions-resume",
+  "heapMiB": 128,
+  "rssLimitMiB": 2560,
+  "peakOwnedTreeRssMiB": 1537.5625,
+  "peakGlobalSwapGrowthMiB": 596.6800000000003,
+  "swapWarning": true,
+  "stopReason": "Shared swap growth with free memory below 30 percent",
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "elapsedMs": 97341,
+  "peakProcesses": "10221 10217  35664 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n10867 10221 1539072 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node"
+}

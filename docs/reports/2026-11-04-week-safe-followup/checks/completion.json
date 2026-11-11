@@ -1,0 +1,34 @@
+{
+  "sourcePreservation": true,
+  "focusedSuites": 35,
+  "rootTypes": true,
+  "productionBuild": true,
+  "completePlayerReplaysExact": true,
+  "continuousHour": true,
+  "minutes": 60.020940040966664,
+  "weeks": 65,
+  "medianMs": 2999.100000023842,
+  "p95Ms": 3606.5999999046326,
+  "maxMs": 3864.5,
+  "under3": 33,
+  "olderSameHost": [
+    {
+      "count": 3,
+      "medianMs": 7208.799999952316,
+      "p95Ms": 7416.5,
+      "minMs": 6852.5,
+      "maxMs": 7416.5,
+      "under3Seconds": 0
+    },
+    {
+      "count": 3,
+      "medianMs": 6831.899999976158,
+      "p95Ms": 6874.600000023842,
+      "minMs": 6578.299999952316,
+      "maxMs": 6874.600000023842,
+      "under3Seconds": 0
+    }
+  ],
+  "interruptedReload": true,
+  "ownWorkerStopped": true
+}

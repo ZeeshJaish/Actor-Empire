@@ -1,0 +1,168 @@
+--- before/services/boxOffice/boxOfficeIdentity.ts
++++ after/services/boxOffice/boxOfficeIdentity.ts
+@@ -9,15 +9,34 @@
+         return `{${Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${JSON.stringify(k)}:${serializeCinemaFacts(v)}`).join(',')}}`;
+     return JSON.stringify(value);
+ };
+-const issued = new WeakMap<CinemaWeekResult, string>();
++interface IssuedCinemaFacts { serialized: string; sourceSignature?: string }
++const issued = new WeakMap<CinemaWeekResult, IssuedCinemaFacts>();
++const factsWithoutSourceString = (result: CinemaWeekResult): string => serializeCinemaFacts({
++    ...result, live: { ...result.live, sourceSignature: undefined },
++});
++const separateSourceString = (result: CinemaWeekResult): string | undefined => {
++    if (!result || typeof result !== 'object' || Array.isArray(result)) return undefined;
++    const live = Object.getOwnPropertyDescriptor(result, 'live');
++    if (!live?.enumerable || !('value' in live) || !live.value || typeof live.value !== 'object' || Array.isArray(live.value)) return undefined;
++    const source = Object.getOwnPropertyDescriptor(live.value, 'sourceSignature');
++    return source?.enumerable && 'value' in source && typeof source.value === 'string' ? source.value : undefined;
++};
+ /** Only a freshly simulated result may first apply cash. Recovery reruns from the durable prior save. */
+ export const issueCinemaResult = (result: CinemaWeekResult): CinemaWeekResult => {
+-    if (result.mode === 'LIVE')
+-        issued.set(result, serializeCinemaFacts(result));
++    if (result.mode === 'LIVE') {
++        const sourceSignature = separateSourceString(result);
++        // The exact immutable string is compared separately. Re-encoding it inside
++        // both result snapshots duplicated tens of MB without checking another fact.
++        issued.set(result, sourceSignature !== undefined
++            ? { sourceSignature, serialized: factsWithoutSourceString(result) }
++            : { serialized: serializeCinemaFacts(result) });
++    }
+     return result;
+ };
+ export const assertIssuedCinemaResult = (result: CinemaWeekResult): void => {
+     const original = issued.get(result);
+-    if (!original || original !== serializeCinemaFacts(result))
++    if (!original || !original.serialized || (original.sourceSignature !== undefined
++        ? original.sourceSignature !== separateSourceString(result) || original.serialized !== factsWithoutSourceString(result)
++        : original.serialized !== serializeCinemaFacts(result)))
+         throw new Error('Cinema result was not issued by the allocator or changed after simulation');
+ };
+--- before/services/boxOffice/boxOfficeLiveSettlement.ts
++++ after/services/boxOffice/boxOfficeLiveSettlement.ts
+@@ -22,7 +22,7 @@
+ const receiptSignature = (r: CinemaWeekResult) => serializeCinemaFacts({ week: r.absoluteWeek, epoch: r.live?.clockEpoch, tuning: r.tuningVersion, fingerprint: r.inputFingerprint,
+     titles: [...r.titles].sort((a, b) => a.titleId.localeCompare(b.titleId)).map(({ countries, ...t }) => t), costs: [...new Set(r.costEvents.map(c => c.titleId))].sort().map(id => ({ titleId: id, total: sum(r.costEvents.filter(c => c.titleId === id).map(c => c.amountCents)) })) });
+ /** One atomic candidate mutation. Caller persists it through existing verified save generations. */
+-const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, readInput: () => CinemaWeekInput): CinemaCommitResult => {
++const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, readInput: () => CinemaWeekInput, reuseDetachedWeekCandidate = false): CinemaCommitResult => {
+     const previous = player.world.cinemaMarket;
+     if (!previous || result.mode !== 'LIVE' || !result.live || result.tuningVersion !== previous.tuningVersion)
+         throw new Error('Live cinema result requires migrated source');
+@@ -59,7 +59,11 @@
+             throw new Error('Cinema cost source conflict');
+         costIds.add(c.id);
+     }
+-    const copied = clonePlayerForWeekProcessing({ world: player.world, businesses: player.businesses, activeReleases: player.activeReleases, outsideProductions: player.outsideProductions } as Player);
++    const settlementFields = { world: player.world, businesses: player.businesses, activeReleases: player.activeReleases, outsideProductions: player.outsideProductions };
++    // processGameWeek already owns a detached complete candidate. Its caller only
++    // publishes after verified persistence, and discards this candidate on failure.
++    // Public/detached proposals retain the independent copy and source recheck.
++    const copied = reuseDetachedWeekCandidate ? settlementFields : clonePlayerForWeekProcessing(settlementFields as Player);
+     const next: Player = { ...player, ...copied, stats: { ...player.stats }, finance: { ...player.finance, history: [...player.finance.history] } };
+     const state = next.world.cinemaMarket!;
+     const committed: CinemaCommittedTitle[] = [];
+@@ -220,13 +224,13 @@
+ /** One synchronous owner builds, simulates and settles from the same fresh snapshot.
+  * No caller callbacks run between snapshot creation and settlement. This reuses
+  * only this invocation's input; detached/public results keep the full recheck. */
+-export const processAndCommitCinemaWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}): {player:Player;result:CinemaWeekResult} => {
++export const processAndCommitCinemaWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}, options?: { reuseDetachedWeekCandidate?: true }): {player:Player;result:CinemaWeekResult} => {
+     let started=performance.now();
+     const input=buildCinemaWeekInput(player,absoluteWeek),inputMs=performance.now()-started;
+     started=performance.now();
+     const result=simulateCinemaWeek(input),simulationMs=performance.now()-started;
+     started=performance.now();
+-    const committed=commitCinemaWeekWithInput(player,result,()=>input),commitMs=performance.now()-started;
++    const committed=commitCinemaWeekWithInput(player,result,()=>input,options?.reuseDetachedWeekCandidate),commitMs=performance.now()-started;
+     diagnostics?.onPhase('cinema_input_ms',inputMs);
+     diagnostics?.onPhase('cinema_simulate_ms',simulationMs);
+     diagnostics?.onPhase('cinema_commit_ms',commitMs);
+--- before/services/boxOffice/boxOfficeWeek.ts
++++ after/services/boxOffice/boxOfficeWeek.ts
+@@ -125,7 +125,7 @@
+     }
+     return projects.length === player.world.projects.length ? player : { ...player, world: { ...player.world, projects } };
+ };
+-export const processCinemaMarketWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}): {
++export const processCinemaMarketWeek = (player: Player, absoluteWeek: number, diagnostics?: {onPhase:(name:string,ms:number)=>void}, options?: { reuseDetachedWeekCandidate?: true }): {
+     player: Player;
+     result: CinemaWeekResult;
+ } => {
+@@ -143,5 +143,5 @@
+     });
+     if (changed) prepared = { ...prepared, world: { ...prepared.world, projects } };
+     diagnostics?.onPhase('cinema_prepare_ms',performance.now()-phaseStarted);
+-    return processAndCommitCinemaWeek(prepared,absoluteWeek,diagnostics);
++    return processAndCommitCinemaWeek(prepared,absoluteWeek,diagnostics,options);
+ };
+--- before/services/gameLoop.ts
++++ after/services/gameLoop.ts
+@@ -6571,7 +6571,7 @@
+     nextPlayer.world = streamingIndustryResult.world;
+     const industryWorldMs = performance.now() - industryWorldStarted;
+     const cinemaStarted = performance.now();
+-    const cinemaWeek=processCinemaMarketWeek(nextPlayer,enteredStreamingAbsoluteWeek,{onPhase:(name,ms)=>{industryPhases[name]=ms}});
++    const cinemaWeek=processCinemaMarketWeek(nextPlayer,enteredStreamingAbsoluteWeek,{onPhase:(name,ms)=>{industryPhases[name]=ms}},{reuseDetachedWeekCandidate:true});
+     nextPlayer=cinemaWeek.player;
+     const cinemaMs = performance.now() - cinemaStarted;
+     const finalizationStarted = performance.now();
+--- before/services/firebaseService.ts
++++ after/services/firebaseService.ts
+@@ -114,6 +114,7 @@
+   elapsed_ms?: number;
+   save_size?: number;
+   save_size_mb?: number;
++  save_size_basis?: 'SOURCE_AT_WEEK_START' | 'EXPLICIT' | 'LAST_RECORDED' | 'UNKNOWN';
+   pending_events?: number;
+   commitments?: number;
+   active_releases?: number;
+@@ -524,6 +525,7 @@
+       week_debug_elapsed_ms: snapshot.elapsed_ms,
+       week_debug_save_size: snapshot.save_size,
+       week_debug_save_mb: snapshot.save_size_mb,
++      week_debug_save_size_basis: snapshot.save_size_basis,
+       week_debug_pending_events: snapshot.pending_events,
+       week_debug_commitments: snapshot.commitments,
+       week_debug_active_releases: snapshot.active_releases,
+@@ -947,16 +949,19 @@
+     : Number.isFinite(startedAtMs)
+       ? Math.max(0, Date.now() - startedAtMs)
+       : undefined;
+-  // Full serialization is expensive on long-running mobile saves. Capture it only
+-  // at the start and after compaction, then reuse that size for every checkpoint.
++  // This is diagnostic source size, measured once for this run. Re-encoding the
++  // prepared player here allocated another complete large-save string solely for
++  // tracing. Verified persistence independently checks the full prepared player.
+   const shouldMeasureSaveSize = typeof context.save_size === 'number'
+-    || safeStage === 'start'
+-    || safeStage === 'persist_prepare_done';
++    || safeStage === 'start';
+   const saveSize = typeof context.save_size === 'number'
+     ? context.save_size
+     : shouldMeasureSaveSize
+       ? estimateSaveSize(player)
+       : previous?.save_size || 0;
++  const saveSizeBasis: WeekProcessingDebugSnapshot['save_size_basis'] = typeof context.save_size === 'number'
++    ? 'EXPLICIT' : safeStage === 'start' ? 'SOURCE_AT_WEEK_START'
++      : previous?.save_size_basis || (previous?.save_size ? 'LAST_RECORDED' : 'UNKNOWN');
+   const playerSnapshot = getPlayerSnapshot(player);
+   const productionSnapshot = getProductionHouseSnapshot(player);
+   const status = String(context.status || (safeStage.includes('fail') ? 'failed' : safeStage === 'success' ? 'success' : 'running'));
+@@ -995,6 +1000,7 @@
+     elapsed_ms: elapsedMs,
+     save_size: saveSize,
+     save_size_mb: saveSize ? Math.round((saveSize / 1000000) * 10) / 10 : 0,
++    save_size_basis: saveSizeBasis,
+     pending_events: numericContext('pending_events', playerSnapshot.pending_events as number | undefined),
+     commitments: numericContext('commitments', playerSnapshot.commitments as number | undefined),
+     active_releases: numericContext('active_releases', playerSnapshot.active_releases as number | undefined),
+@@ -1040,6 +1046,7 @@
+       week_run_id: runId,
+       week_elapsed_ms: elapsedMs,
+       week_save_size: saveSize,
++      week_save_size_basis: saveSizeBasis,
+       week_error: error,
+       week_slowest_stage: slowestStage,
+       week_slowest_stage_ms: slowestStageMs,

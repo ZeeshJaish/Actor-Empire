@@ -1,0 +1,14 @@
+{
+  "label": "storage-blocks-red",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 820.859375,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 1220
+}

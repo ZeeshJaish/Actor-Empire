@@ -1,0 +1,536 @@
+--- before-task/services/storage.ts
++++ after-task/services/storage.ts
+@@ -1,8 +1,9 @@
+ 
+ import { addBreadcrumb, markTraceAction, recordNonFatal, startPerformanceTrace, stopPerformanceTrace } from './firebaseService';
+ import type { Player } from '../types';
+-import { verifySaveIntegrity, type SaveIntegrityManifest } from './saveIntegrity';
++import { type SaveIntegrityManifest } from './saveIntegrity';
+ import { waitForIndexedDbOpen, waitForIndexedDbTransaction } from './indexedDbResilience';
++import { createIndexedDbSaveGenerationStore } from './indexedDbSaveGenerations';
+ import {
+   loadVerifiedGameData as loadVerifiedGeneration,
+   recoverPreviousGameData as recoverPreviousGeneration,
+@@ -11,11 +12,6 @@
+   stageVerifiedGameDataBatch as stageVerifiedGenerationBatch,
+   promoteStagedGameDataBatch as promoteStagedGenerationBatch,
+   deleteSaveGenerationFamily,
+-  type PromoteSaveGenerationInput,
+-  type PromoteSaveGenerationBatchInput,
+-  type RecoverSaveGenerationInput,
+-  type SaveGenerationStore,
+-  type StoredSaveGeneration,
+   type VerifiedGameLoad,
+   type VerifiedSaveBatchEntry,
+ } from './saveGenerations';
+@@ -131,199 +127,7 @@
+   return waitForIndexedDbOpen(request, { operation: 'open Actor Empire saves' });
+ };
+ 
+-const readGameRecord = async (key: string): Promise<unknown | null> => {
+-  const db = await openDB();
+-  try {
+-    const transaction = db.transaction(STORE_NAME, 'readonly');
+-    const request = transaction.objectStore(STORE_NAME).get(key);
+-    await waitForIndexedDbTransaction(transaction, { operation: `read save record ${key}` });
+-    return request.result ?? null;
+-  } finally {
+-    db.close();
+-  }
+-};
+-
+-/** Player and integrity must belong to the same committed generation. Separate
+- * transactions can straddle an autosave promotion and falsely report damage. */
+-const readGameRecords = async (keys: readonly string[]): Promise<Array<unknown | null>> => {
+-  const db = await openDB();
+-  try {
+-    const transaction = db.transaction(STORE_NAME, 'readonly');
+-    const store = transaction.objectStore(STORE_NAME);
+-    const requests = keys.map(key => store.get(key));
+-    await waitForIndexedDbTransaction(transaction, { operation: 'read verified save snapshot' });
+-    return requests.map(request => request.result ?? null);
+-  } finally {
+-    db.close();
+-  }
+-};
+-
+-const writeGameRecord = async (key: string, value: unknown): Promise<void> => {
+-  const db = await openDB();
+-  try {
+-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+-    transaction.objectStore(STORE_NAME).put(value, key);
+-    await waitForIndexedDbTransaction(transaction, { operation: `write save record ${key}` });
+-  } finally {
+-    db.close();
+-  }
+-};
+-
+-const removeGameRecord = async (key: string): Promise<void> => {
+-  const db = await openDB();
+-  try {
+-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+-    transaction.objectStore(STORE_NAME).delete(key);
+-    await waitForIndexedDbTransaction(transaction, { operation: `delete save record ${key}` });
+-  } finally {
+-    db.close();
+-  }
+-};
+-
+-const promoteIndexedDbGeneration = async ({ keys, retainPrevious }: PromoteSaveGenerationInput): Promise<void> => {
+-  const db = await openDB();
+-  try {
+-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+-    const store = transaction.objectStore(STORE_NAME);
+-    let current: unknown = null;
+-    let currentManifest: unknown = null;
+-    let candidate: StoredSaveGeneration | null = null;
+-    let completedReads = 0;
+-    const promoteAfterReads = () => {
+-      completedReads += 1;
+-      if (completedReads !== 3) return;
+-      if (!candidate || !verifySaveIntegrity(candidate.player, candidate.manifest).ok) {
+-        transaction.abort();
+-        return;
+-      }
+-      if (
+-        retainPrevious
+-        && current
+-        && currentManifest
+-        && verifySaveIntegrity(current as Player, currentManifest as SaveIntegrityManifest).ok
+-      ) {
+-        store.put({
+-          kind: 'ACTOR_EMPIRE_SAVE_GENERATION',
+-          formatVersion: 1,
+-          player: current as Player,
+-          manifest: currentManifest as SaveIntegrityManifest,
+-          needsRecoveryCheckpoint: false,
+-        } satisfies StoredSaveGeneration, keys.previous);
+-      }
+-      store.put(candidate.player, keys.current);
+-      store.put(candidate.manifest, keys.integrity);
+-      store.delete(keys.candidate);
+-    };
+-    const currentRequest = store.get(keys.current);
+-    currentRequest.onsuccess = () => { current = (currentRequest.result as unknown) ?? null; promoteAfterReads(); };
+-    const integrityRequest = store.get(keys.integrity);
+-    integrityRequest.onsuccess = () => { currentManifest = (integrityRequest.result as unknown) ?? null; promoteAfterReads(); };
+-    const candidateRequest = store.get(keys.candidate);
+-    candidateRequest.onsuccess = () => { candidate = (candidateRequest.result as StoredSaveGeneration | undefined) ?? null; promoteAfterReads(); };
+-    await waitForIndexedDbTransaction(transaction, { operation: `promote verified save ${keys.current}` });
+-  } finally {
+-    db.close();
+-  }
+-};
+-
+-const recoverIndexedDbGeneration = async ({ keys }: RecoverSaveGenerationInput): Promise<void> => {
+-  const db = await openDB();
+-  try {
+-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+-    const store = transaction.objectStore(STORE_NAME);
+-    let current: unknown = null;
+-    let currentManifest: unknown = null;
+-    let previous: StoredSaveGeneration | null = null;
+-    let completedReads = 0;
+-    const recoverAfterReads = () => {
+-      completedReads += 1;
+-      if (completedReads !== 3) return;
+-      if (!previous) {
+-        transaction.abort();
+-        return;
+-      }
+-      store.put({ player: current, manifest: currentManifest, quarantinedAt: Date.now() }, keys.quarantine);
+-      store.put(previous.player, keys.current);
+-      store.put(previous.manifest, keys.integrity);
+-    };
+-    const currentRequest = store.get(keys.current);
+-    currentRequest.onsuccess = () => { current = currentRequest.result ?? null; recoverAfterReads(); };
+-    const integrityRequest = store.get(keys.integrity);
+-    integrityRequest.onsuccess = () => { currentManifest = integrityRequest.result ?? null; recoverAfterReads(); };
+-    const previousRequest = store.get(keys.previous);
+-    previousRequest.onsuccess = () => { previous = previousRequest.result ?? null; recoverAfterReads(); };
+-    await waitForIndexedDbTransaction(transaction, { operation: `recover verified save ${keys.current}` });
+-  } finally {
+-    db.close();
+-  }
+-};
+-
+-const promoteIndexedDbGenerationBatch = async ({ keys }: PromoteSaveGenerationBatchInput): Promise<void> => {
+-  const db = await openDB();
+-  try {
+-    const transaction = db.transaction(STORE_NAME, 'readwrite');
+-    const store = transaction.objectStore(STORE_NAME);
+-    const snapshots = keys.map(generationKeys => ({
+-      keys: generationKeys,
+-      candidate: null as StoredSaveGeneration | null,
+-      current: null as Player | null,
+-      integrity: null as SaveIntegrityManifest | null,
+-    }));
+-    let pendingReads = snapshots.length * 3;
+-    let abortedForValidation = false;
+-    const finishRead = () => {
+-      pendingReads -= 1;
+-      if (pendingReads !== 0) return;
+-      for (const snapshot of snapshots) {
+-        if (!snapshot.candidate || !verifySaveIntegrity(snapshot.candidate.player, snapshot.candidate.manifest).ok) {
+-          abortedForValidation = true;
+-          transaction.abort();
+-          return;
+-        }
+-      }
+-      for (const snapshot of snapshots) {
+-        if (snapshot.current && snapshot.integrity && verifySaveIntegrity(snapshot.current, snapshot.integrity).ok) {
+-          store.put({
+-            kind: 'ACTOR_EMPIRE_SAVE_GENERATION',
+-            formatVersion: 1,
+-            player: snapshot.current,
+-            manifest: snapshot.integrity,
+-            needsRecoveryCheckpoint: false,
+-          } satisfies StoredSaveGeneration, snapshot.keys.previous);
+-        }
+-        store.put(snapshot.candidate!.player, snapshot.keys.current);
+-        store.put(snapshot.candidate!.manifest, snapshot.keys.integrity);
+-        store.delete(snapshot.keys.candidate);
+-      }
+-    };
+-    snapshots.forEach(snapshot => {
+-      const candidateRequest = store.get(snapshot.keys.candidate);
+-      candidateRequest.onsuccess = () => { snapshot.candidate = candidateRequest.result ?? null; finishRead(); };
+-      const currentRequest = store.get(snapshot.keys.current);
+-      currentRequest.onsuccess = () => { snapshot.current = currentRequest.result ?? null; finishRead(); };
+-      const integrityRequest = store.get(snapshot.keys.integrity);
+-      integrityRequest.onsuccess = () => { snapshot.integrity = integrityRequest.result ?? null; finishRead(); };
+-    });
+-    await waitForIndexedDbTransaction(transaction, {
+-      operation: 'promote staged save batch',
+-      abortedError: new Error(
+-        abortedForValidation ? 'Staged save batch failed integrity validation.' : 'Staged save batch promotion aborted.',
+-      ),
+-    });
+-  } finally {
+-    db.close();
+-  }
+-};
+-
+-const indexedDbGenerationStore: SaveGenerationStore = {
+-  read: readGameRecord,
+-  readMany: readGameRecords,
+-  write: writeGameRecord,
+-  remove: removeGameRecord,
+-  promoteGeneration: promoteIndexedDbGeneration,
+-  recoverGeneration: recoverIndexedDbGeneration,
+-  promoteGenerationBatch: promoteIndexedDbGenerationBatch,
+-};
++const indexedDbGenerationStore = createIndexedDbSaveGenerationStore(openDB, STORE_NAME);
+ 
+ export const saveVerifiedGameData = async (
+   key: string,
+@@ -405,18 +209,13 @@
+   startPerformanceTrace(traceName, { key });
+   const startedAt = performance.now();
+   try {
+-      const db = await openDB();
+-      try {
+-        const transaction = db.transaction(STORE_NAME, 'readonly');
+-        const store = transaction.objectStore(STORE_NAME);
+-        const request = store.get(key);
+-        await waitForIndexedDbTransaction(transaction, { operation: `load game data ${key}` });
+-        markTraceAction('save_load_completed', { save_key: key, save_slot: request.result?.flags?.lastLoadedSlot || key });
+-        addBreadcrumb('load_game:success', { key, found: !!request.result, ...getSaveStats(request.result) });
+-        return request.result;
+-      } finally {
+-        db.close();
++      const result = await indexedDbGenerationStore.read(key);
++      if (result && typeof result === 'object' && (result as any).kind === 'ACTOR_EMPIRE_INVALID_PAYLOAD') {
++        throw new Error('Saved payload failed its content verification.');
+       }
++      markTraceAction('save_load_completed', { save_key: key, save_slot: (result as any)?.flags?.lastLoadedSlot || key });
++      addBreadcrumb('load_game:success', { key, found: !!result, ...getSaveStats(result) });
++      return result;
+   } catch (err) {
+       console.error("Failed to load game data", err);
+       markTraceAction('save_load_failed', { save_key: key, save_slot: key });
+--- before-task/services/saveGenerations.ts
++++ after-task/services/saveGenerations.ts
+@@ -26,6 +26,7 @@
+ export interface PromoteSaveGenerationInput {
+     keys: SaveGenerationKeys;
+     retainPrevious: boolean;
++    expectedCandidateDigest?: string;
+ }
+ 
+ export interface RecoverSaveGenerationInput {
+@@ -34,6 +35,7 @@
+ 
+ export interface PromoteSaveGenerationBatchInput {
+     keys: SaveGenerationKeys[];
++    expectedCandidateDigests?: Record<string, string>;
+ }
+ 
+ export interface SaveGenerationStore {
+@@ -55,6 +57,7 @@
+ 
+ export interface StagedSaveBatch {
+     keys: SaveGenerationKeys[];
++    expectedCandidateDigests?: Record<string, string>;
+ }
+ 
+ export type VerifiedGameLoad =
+@@ -162,6 +165,7 @@
+     await store.promoteGeneration({
+         keys,
+         retainPrevious: options.retainPrevious !== false,
++        expectedCandidateDigest: manifest.digest,
+     });
+ });
+ 
+@@ -270,9 +274,10 @@
+             await store.write(keys.candidate, generation);
+             const readBack = verifyGeneration(await store.read(keys.candidate));
+             if (!readBack.ok) throw new Error(`Import candidate read-back failed: ${readBack.violations.join('; ')}`);
++            if (readBack.generation.manifest.digest !== entry.manifest.digest) throw new Error('Import candidate read-back does not match the requested generation.');
+             stagedKeys.push(keys);
+         }
+-        return { keys: stagedKeys };
++        return { keys: stagedKeys, expectedCandidateDigests: Object.fromEntries(entries.map(entry => [entry.currentKey, entry.manifest.digest])) };
+     } catch (error) {
+         const candidateKeys = new Set([
+             ...stagedKeys.map(keys => keys.candidate),
+@@ -288,7 +293,7 @@
+     batch: StagedSaveBatch,
+ ): Promise<void> => {
+     if (batch.keys.length === 0) throw new Error('Cannot promote an empty save batch.');
+-    await store.promoteGenerationBatch({ keys: batch.keys });
++    await store.promoteGenerationBatch({ keys: batch.keys, expectedCandidateDigests: batch.expectedCandidateDigests });
+ };
+ 
+ export const deleteSaveGenerationFamily = async (
+--- before-task/services/stableSaveHash.ts
++++ after-task/services/stableSaveHash.ts
+@@ -1,19 +1,24 @@
+-/** The exact issued UTF-16 structural hash, emitted in chunks instead of building
+- * a second complete serialized world. Bounded per-call quoting cache only. */
++/** The exact issued UTF-16 structural hash. Native JSON quoting handles ordinary
++ * strings; surrogate-containing strings retain the issued UTF-16 spelling.
++ * Mutable hash state and both bounded quoting caches are invocation-local. */
+ export const stableSaveHash = (value: unknown): string => {
+     let first = 0x811c9dc5, second = 0x9e3779b9, offset = 0;
+     const quoted = new Map<string, string>();
++    const quotedKeys = new Map<string, string>();
+     const write = (text: string) => {
+-        for (let index = 0; index < text.length; index++, offset++) {
++        let localFirst = first, localSecond = second, localOffset = offset;
++        for (let index = 0; index < text.length; index++, localOffset++) {
+             const code = text.charCodeAt(index);
+-            first = Math.imul(first ^ code, 0x01000193);
+-            second = Math.imul(second ^ (code + offset), 0x85ebca6b);
++            localFirst = Math.imul(localFirst ^ code, 0x01000193);
++            localSecond = Math.imul(localSecond ^ (code + localOffset), 0x85ebca6b);
+         }
++        first = localFirst; second = localSecond; offset = localOffset;
+     };
+-    const quote = (text: string): string => {
+-        const hit = quoted.get(text);
++    const quote = (text: string, key = false): string => {
++        const cache = key ? quotedKeys : quoted;
++        const hit = cache.get(text);
+         if (hit !== undefined) return hit;
+-        const result = `"${text.replace(/[\\"\u0000-\u001f]/g, character => {
++        const result = !/[\ud800-\udfff]/.test(text) ? JSON.stringify(text) : `"${text.replace(/[\\"\u0000-\u001f]/g, character => {
+             if (character === '\\') return '\\\\';
+             if (character === '"') return '\\"';
+             if (character === '\b') return '\\b';
+@@ -23,7 +28,7 @@
+             if (character === '\t') return '\\t';
+             return `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`;
+         })}"`;
+-        if (text.length <= 128 && quoted.size < 2048) quoted.set(text, result);
++        if (text.length <= 128 && cache.size < 2048) cache.set(text, result);
+         return result;
+     };
+     const visit = (item: unknown): void => {
+@@ -45,7 +50,7 @@
+             write('{');
+             for (let index = 0; index < keys.length; index++) {
+                 if (index) write(',');
+-                const key = keys[index]; write(quote(key)); write(':'); visit(record[key]);
++                const key = keys[index]; write(quote(key, true)); write(':'); visit(record[key]);
+             }
+             write('}'); return;
+         }
+--- before-task/services/saveMirror.ts
++++ after-task/services/saveMirror.ts
+@@ -13,6 +13,47 @@
+     return (player.world?.projects?.length || 0) > 1_200;
+ };
+ 
++/** A conservative lower bound, not a serializer. Ignore keys/punctuation and
++ * unknown conversions; stop once ordinary data alone exceeds the mirror limit.
++ * A bounded inconclusive probe simply falls back to the original JSON path. */
++const dataExceedsMirrorBudget = (value: unknown, budget: number): boolean => {
++    if (!Number.isFinite(budget)) return false;
++    const seen = new WeakSet<object>();
++    let size = 0, visited = 0;
++    const inconclusive = {};
++    const visit = (item: unknown, inArray = false): boolean => {
++        if (++visited > 250_000) throw inconclusive;
++        if (typeof item === 'string') size += item.length;
++        else if (typeof item === 'number') size += Number.isFinite(item) ? String(item).length : 4;
++        else if (typeof item === 'boolean') size += item ? 4 : 5;
++        else if (item === null) size += 4;
++        else if (item === undefined || typeof item === 'function' || typeof item === 'symbol') size += inArray ? 4 : 0;
++        else if (typeof item === 'object') {
++            if (seen.has(item)) return false;
++            const array = Array.isArray(item), prototype = Object.getPrototypeOf(item);
++            if (prototype !== null && prototype !== Object.prototype && (!array || prototype !== Array.prototype)) return false;
++            const conversion = Object.getOwnPropertyDescriptor(item, 'toJSON')
++                || (prototype && Object.getOwnPropertyDescriptor(prototype, 'toJSON'));
++            if (conversion && (conversion.get || conversion.set || typeof conversion.value === 'function')) return false;
++            seen.add(item);
++            if (array) {
++                for (let index = 0; index < item.length; index++) {
++                    const field = Object.getOwnPropertyDescriptor(item, String(index));
++                    if (!field) { size += 4; if (size > budget) return true; }
++                    else if ('value' in field && visit(field.value, true)) return true;
++                }
++            } else {
++                for (const key of Object.keys(item)) {
++                    const field = Object.getOwnPropertyDescriptor(item, key)!;
++                    if ('value' in field && visit(field.value)) return true;
++                }
++            }
++        }
++        return size > budget;
++    };
++    try { return visit(value); } catch { return false; }
++};
++
+ /**
+  * IndexedDB is authoritative. This plans only the optional legacy localStorage mirror and
+  * avoids a large main-thread JSON pass when canonical collection counts already prove that
+@@ -24,6 +65,7 @@
+     serialize: (value: Player) => string = JSON.stringify,
+ ): LocalStorageMirrorPlan => {
+     if (isClearlyOversizedLocalMirror(player)) return { kind: 'METADATA_ONLY' };
++    if (serialize === JSON.stringify && dataExceedsMirrorBudget(player, budgetBytes)) return { kind: 'METADATA_ONLY' };
+     const serialized = serialize(player);
+     return serialized.length <= budgetBytes
+         ? { kind: 'FULL', serialized }
+--- before-task/services/crewMarket.ts
++++ after-task/services/crewMarket.ts
+@@ -119,7 +119,7 @@
+     VFX_SUPERVISOR: 'VFX Supervisor',
+ }[role]);
+ 
+-export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map(profile => ({
++export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map((profile): NPCActor => ({
+     id: profile.id,
+     name: profile.name,
+     handle: `@${profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
+--- before-task/services/projectInvestors.ts
++++ after-task/services/projectInvestors.ts
+@@ -1,4 +1,4 @@
+-import {canonicalPersonName,fictionalPersonName} from './fictionalNames';
++import {canonicalPersonName,fictionalPersonName,canonicalProjectTitle} from './fictionalNames';
+ import {
+     Business,
+     GameLanguage,
+@@ -38,7 +38,7 @@
+     'aggressive expansion into entertainment'
+ ];
+ 
+-export const PROJECT_INVESTORS: ProjectInvestor[] = [
++export const PROJECT_INVESTORS: ProjectInvestor[] = ([
+     {
+         id: 'investor_marlowe_pictures',
+         name: 'Marlowe Pictures',
+@@ -296,7 +296,7 @@
+         preferredFundingModes: ['SYNDICATE'],
+         description: 'Expensive gap money that appears when top-tier investors hesitate.'
+     }
+-].map(investor => ({...investor,...(investor.ownerName?{ownerName:fictionalPersonName(investor.ownerName)}:{})}));
++] satisfies ProjectInvestor[]).map(investor => ({...investor,...(investor.ownerName?{ownerName:fictionalPersonName(investor.ownerName)}:{})}));
+ 
+ const genreFit = (investor: ProjectInvestor, genre: Genre) => (
+     investor.preferredGenres.includes(genre) ? 18 : -8
+@@ -487,7 +487,7 @@
+     const score = getStudioInvestorScore(studio, player);
+     const budgetPressure = clamp((packageBudget / 100_000_000) * 12, 0, 16);
+     const maxRaise = getMaxInvestorRaise(packageBudget, lockedExternalFunding);
+-    const availabilitySeed = `${project.sourceScriptId || project.title}:${player?.currentWeek || 0}:${player?.age || 0}:${fundingMode}`;
++    const availabilitySeed = `${project.sourceScriptId || (project.isFamous ? canonicalProjectTitle(project.title) : project.title)}:${player?.currentWeek || 0}:${player?.age || 0}:${fundingMode}`;
+     return PROJECT_INVESTORS
+         .map(investor => {
+             const modeFit = getInvestorModeFit(investor, fundingMode);
+--- before-task/scripts/audit-builtin-name-transition.ts
++++ after-task/scripts/audit-builtin-name-transition.ts
+@@ -3,16 +3,25 @@
+ Math.random=()=>.5;Date.now=()=>1700000000000;
+ const {INITIAL_PLAYER}=await import('../types');
+ const {NPC_DATABASE,createGlobalActorPackNPCs,calculateProjectFameMultiplier}=await import('../services/npcLogic');
+-const {FAMOUS_MOVIE_DB,FAMOUS_SERIES_DB,getNextFamousMovie,getNextFamousSeries,getFamousProjectDescription}=await import('../services/famousMovieLogic');
++const {FAMOUS_MOVIE_DB,FAMOUS_SERIES_DB,getNextFamousMovie,getNextFamousSeries,getFamousProjectDescription,createFamousOpportunity}=await import('../services/famousMovieLogic');
+ const {initUniverses,generateDirectEntryOffer,normalizeUniverseCharacterKey,normalizeUniverseMap,buildUniverseRoster,processUniverseTurn}=await import('../services/universeLogic');
+ const {BUILTIN_PERSON_ALIASES,BUILTIN_PROJECT_ALIASES}=await import('../services/fictionalNameCatalog');
+-const {fictionalPersonName,fictionalProjectTitle,canonicalProjectTitle,fictionalHandle}=await import('../services/fictionalNames');
++const {fictionalPersonName,fictionalProjectTitle,canonicalProjectTitle,fictionalHandle,fictionalCharacterName,projectBuiltinPerson,isBuiltinPersonId,fictionalBuiltinText}=await import('../services/fictionalNames');
+ const {migrateBuiltinNames}=await import('../services/builtinNameMigration');
+ const {getCastingDirectorStyle}=await import('../services/roleLogic');
++const {generateProjectInvestorOffers}=await import('../services/projectInvestors');
+ const issued=JSON.parse(readFileSync('scripts/fixtures/issued-builtin-identities.json','utf8'));
+ const universes=JSON.parse(readFileSync('scripts/fixtures/issued-builtin-universes.json','utf8'));
++// Frozen published and explicit-media schedules preserve each contract schema independently.
++const legacyUniverses=JSON.parse(readFileSync('scripts/fixtures/issued-builtin-universes-legacy.json','utf8'));
+ assert.equal(calculateProjectFameMultiplier([],'Christopher Nolan',0),calculateProjectFameMultiplier([],'Christopher Noland',0),'Legacy director names must keep their fame contribution');
+ for(const def of issued.famous)assert.equal(getCastingDirectorStyle(def.director),getCastingDirectorStyle(fictionalPersonName(def.director)),`Director style changed for ${def.director}`);
++for(const name of ['constructor','toString','__proto__']){
++ assert.equal(fictionalPersonName(name),name);assert.equal(fictionalProjectTitle(name),name);assert.equal(fictionalCharacterName(name),name);
++ assert.deepEqual(projectBuiltinPerson({id:name,name:'My custom person'}),{id:name,name:'My custom person'});
++}
++const hasOwn=Object.hasOwn;try{Object.hasOwn=undefined as any;assert.equal(isBuiltinPersonId('celeb_act_18'),true);}finally{Object.hasOwn=hasOwn;}
++assert.equal(fictionalBuiltinText('Thor/Loki; Thorough Jelly and A4 paper'),'Thorr/Lokki; Thorough Jelly and A4 paper');
+ const original=issued.npcs.find((n:any)=>n.name==='Tom Holland');
+ const tom={...NPC_DATABASE.find(n=>n.id===original.id)!,name:original.name,handle:original.handle};
+ const pack=createGlobalActorPackNPCs('india')[0];
+@@ -22,6 +31,7 @@
+ player.weeklyOpportunities={auditions:[{id:'famous_agent_old',projectName:'Interstellar',project:{isFamous:true,title:'Interstellar',directorName:'Christopher Nolan'}}],jobs:[]};
+ player.instagram.feed=[{id:'old-feed-post',authorId:tom.id,authorName:tom.name,authorHandle:tom.handle,caption:'My original player caption',likes:321}];
+ player.youtube.activeCollabs=[{id:'signed-collab',creatorId:'yt_global_mrbeast',creatorName:'MrBeast',creatorHandle:'@mrbeast',bonusViews:123456}];
++player.world.projects=[{id:'retained-world-film',title:'My Custom Film',leadActorId:tom.id,leadActorName:tom.name}];
+ const input=JSON.stringify(player),migrated=migrateBuiltinNames(player);
+ assert.equal(migrated.relationships[0].name,'Tommy Holland','Old connections must display the same built-in alias');
+ assert.equal(JSON.stringify(player),input,'Migration must not mutate its input');
+@@ -39,6 +49,8 @@
+ const withoutSnapshot=(c:any)=>{const {actorSnapshot,...facts}=c;return facts};
+ assert.deepEqual(withoutSnapshot(migrated.studio.talentRoster[0]),withoutSnapshot(contract),'Signed contract facts must not change');
+ assert.equal(migrated.money,player.money);
++assert.equal(migrated.world.projects[0].leadActorName,'Tommy Holland','Retained industry film credits follow stable actor IDs');
++assert.equal(migrated.world.projects[0].title,'My Custom Film');
+ assert.equal(migrated.weeklyOpportunities.auditions[0].projectName,'Interstella','Already pending famous offers must also transition');
+ assert.equal(migrated.commitments[0].name,'Interstella');
+ assert.equal(migrated.commitments[0].projectDetails.directorName,'Christopher Noland');
+@@ -62,19 +74,23 @@
+ assert.equal(getNextFamousSeries(noReleases,reserved),null);
+ const interstellar=FAMOUS_MOVIE_DB.find(d=>d.title==='Interstella')!;
+ assert.ok(getFamousProjectDescription('en',interstellar).length>40,'Canonical translation keys retain the existing detailed plot');
++const project=createFamousOpportunity(interstellar,'LEAD','DIRECT','en',INITIAL_PLAYER).project;let checkedOffers=0;
++for(let week=1;week<=12;week++){const input={project,player:{...INITIAL_PLAYER,currentWeek:week,stats:{...INITIAL_PLAYER.stats,fame:90,reputation:90}},targetRaise:20_000_000,packageBudget:60_000_000};const aliasOffers=generateProjectInvestorOffers(input);checkedOffers+=aliasOffers.length;assert.deepEqual(generateProjectInvestorOffers({...input,project:{...project,title:'Interstellar'}}),aliasOffers,'Renaming a curated package must not reroll its investor terms');}
++assert.ok(checkedOffers>0);
+ assert.equal(normalizeUniverseCharacterKey('Iron Mann'),'iron_mann','Generic custom-character keys must retain their original semantics');
+ const current=initUniverses();
+ for(const name of ['Tom Holland','Interstellar','Iron Man','My Own Name']){const turn=processUniverseTurn({...INITIAL_PLAYER,name,stats:{...INITIAL_PLAYER.stats,fame:90}},{...current.MCU,weeksUntilNextPhase:1});assert.ok(turn.news.some(n=>n.headline.includes(`Fans Demand ${name} as`)),'Player-written names must not be rewritten inside localized narrative variables');}
+ const legacyUniverse={...current.MCU,roster:[{id:'iron_man',characterId:'iron_man',name:'Iron Man',actorId:'UNKNOWN',actorName:'Unknown Actor'}]};
+ const legacyNormalized=normalizeUniverseMap({MCU:legacyUniverse}).MCU;
+ assert.equal(legacyNormalized.roster.find(r=>r.characterId==='iron_man')!.actorId,current.MCU.roster[0].actorId,'Old canonical names must still recover their original default cast');
+-assert.equal(buildUniverseRoster(legacyUniverse,[],'QA')[0].actorId,current.MCU.roster[0].actorId);
++assert.equal(buildUniverseRoster(legacyUniverse as unknown as Parameters<typeof buildUniverseRoster>[0],[],'QA')[0].actorId,current.MCU.roster[0].actorId);
+ for(const previous of universes){
+  const now=current[previous.id];
+  assert.deepEqual(now.roster.map(r=>({id:r.id,characterId:r.characterId,actorId:r.actorId})),previous.roster.map(({name,...rest}:any)=>rest));
+  const offer=generateDirectEntryOffer({...INITIAL_PLAYER,age:30},previous.id);
+  const normalize=(o:any)=>({...o,characterName:undefined,films:o.films.map((f:any)=>({...f,title:canonicalProjectTitle(f.title)}))});
+- assert.deepEqual(normalize(offer),normalize(previous.offer),'Universe film obligations, pay and schedule remain identical');
++ const issuedOffer=offer.films.some(f=>Object.prototype.hasOwnProperty.call(f,'projectType'))?previous.offer:legacyUniverses.find((u:any)=>u.id===previous.id).offer;
++ assert.deepEqual(normalize(offer),normalize(issuedOffer),'Universe film obligations, pay and schedule remain identical within its issued schema');
+ }
+ const edited={...player,flags:{...player.flags,extraNPCs:[{...tom,name:'My Custom Actor'}]}};
+ assert.equal(migrateBuiltinNames(edited).flags.extraNPCs[0].name,'My Custom Actor');

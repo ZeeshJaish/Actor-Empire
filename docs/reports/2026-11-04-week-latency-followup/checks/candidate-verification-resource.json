@@ -1,0 +1,12 @@
+{
+  "label": "candidate-verification",
+  "heapMiB": 128,
+  "peakOwnedTreeRssMiB": 2010.34375,
+  "peakGlobalSwapGrowthMiB": 423.8100000000004,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 57059,
+  "peakProcesses": "71339 71335  35168 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n71966 71339 2023328 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node"
+}

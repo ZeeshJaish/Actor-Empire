@@ -1,0 +1,12 @@
+{
+  "label": "candidate-build-1792",
+  "heapMiB": 1792,
+  "peakOwnedTreeRssMiB": 2599.328125,
+  "peakGlobalSwapGrowthMiB": 713.25,
+  "swapWarning": true,
+  "stopReason": "Own tree exceeded 2560 MiB",
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "elapsedMs": 25162,
+  "peakProcesses": "74926 74922 2216032 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n74927 74926 445744 /Users/zeesh/Vibe code/Actor empire/node_modules/@esbuild/darwin-arm64/bin/esbuild"
+}

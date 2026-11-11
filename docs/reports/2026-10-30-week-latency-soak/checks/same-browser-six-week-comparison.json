@@ -1,0 +1,26 @@
+{
+  "sameControllerBrowserAndFixture": true,
+  "oldArtifact": "/assets/index-CZNU5kV9.js",
+  "newArtifact": "/assets/index-D_8ERCE3.js",
+  "oldFirst6Ms": [
+    4208,
+    4279,
+    4218,
+    4119,
+    4175,
+    4244
+  ],
+  "newFirst6Ms": [
+    3938,
+    3979,
+    3855,
+    3885,
+    3858,
+    3854
+  ],
+  "oldMedianMs": 4213.0,
+  "newMedianMs": 3871.5,
+  "observedMedianReductionPercent": 8.105862805601708,
+  "initialTrackedFactsEqual": true,
+  "caveat": "Sequential observations under shared background load, not a universal or isolated-device guarantee; do not compare the later lighter release calendar as the same workload."
+}

@@ -1,0 +1,28 @@
+{
+  "storageOnly": {
+    "beforeWriteMeanMs": 2137.2666666706405,
+    "afterWriteMeanMs": 1232.5,
+    "writeReductionPercent": 42.33288624110039,
+    "beforeReadMeanMs": 455.4333333174388,
+    "afterReadMeanMs": 285.7666666706403,
+    "wholePlayerAndOriginalManifestExact": true
+  },
+  "finalAppWeeksMs": [
+    3972,
+    5617,
+    3878
+  ],
+  "finalAppPhasedVerification": true,
+  "largeRecovery": [
+    "Large-career real candidate quota failure preserves committed cash, week, gross, records and archive content",
+    "Large-career corrupted current is rejected and verified previous generation recovers through normal UI"
+  ],
+  "resumedCareerWeek": 24,
+  "recoveredCareerWeek": 24,
+  "pageErrors": [],
+  "blockMigrationEnabled": false,
+  "nativeIphoneVerified": false,
+  "underThreeSecondsAchieved": false,
+  "noEarningsOrPaymentFormulaChanges": true,
+  "otherWorkersStopped": false
+}

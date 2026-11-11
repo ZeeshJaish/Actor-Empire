@@ -1,0 +1,32 @@
+[
+  {
+    "name": "legacy-api-unit",
+    "code": 0,
+    "ms": 86
+  },
+  {
+    "name": "legacy-capability-app",
+    "code": 0,
+    "ms": 96038
+  },
+  {
+    "name": "atomic-chromium",
+    "code": 0,
+    "ms": 1642
+  },
+  {
+    "name": "atomic-webkit",
+    "code": 0,
+    "ms": 3025
+  },
+  {
+    "name": "update-roundtrip",
+    "code": 0,
+    "ms": 44351
+  },
+  {
+    "name": "recovery-app",
+    "code": 0,
+    "ms": 44020
+  }
+]

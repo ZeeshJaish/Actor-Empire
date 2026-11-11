@@ -1,0 +1,231 @@
+{
+  "passed": true,
+  "weeks": 12,
+  "allPriorPlayersUnchanged": true,
+  "scope": "Additional canonical NPC treasury fix intentionally changes those persisted company balances; optimization-only full-byte parity is recorded separately",
+  "playerMoneyAndReceiptRowsEqual": true,
+  "beforeRows": [
+    {
+      "week": 1,
+      "cash": 784901729,
+      "receipt": {
+        "id": "cinema:0:1893",
+        "grossCents": 3829119727,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 2,
+      "cash": 784901429,
+      "receipt": {
+        "id": "cinema:0:1894",
+        "grossCents": 4148291891,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 3,
+      "cash": 784901129,
+      "receipt": {
+        "id": "cinema:0:1895",
+        "grossCents": 3508045805,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 4,
+      "cash": 784900829,
+      "receipt": {
+        "id": "cinema:0:1896",
+        "grossCents": 2925060960,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 5,
+      "cash": 784900529,
+      "receipt": {
+        "id": "cinema:0:1897",
+        "grossCents": 2332059790,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 6,
+      "cash": 784900229,
+      "receipt": {
+        "id": "cinema:0:1898",
+        "grossCents": 2183523871,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 7,
+      "cash": 784899929,
+      "receipt": {
+        "id": "cinema:0:1899",
+        "grossCents": 1805543827,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 8,
+      "cash": 784899629,
+      "receipt": {
+        "id": "cinema:0:1900",
+        "grossCents": 1506439118,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 9,
+      "cash": 784895729,
+      "receipt": {
+        "id": "cinema:0:1901",
+        "grossCents": 1268074247,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 10,
+      "cash": 784891829,
+      "receipt": {
+        "id": "cinema:0:1902",
+        "grossCents": 1070570171,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 11,
+      "cash": 784887929,
+      "receipt": {
+        "id": "cinema:0:1903",
+        "grossCents": 908850472,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 12,
+      "cash": 784884029,
+      "receipt": {
+        "id": "cinema:0:1904",
+        "grossCents": 1445310656,
+        "actorCents": 0
+      }
+    }
+  ],
+  "afterRows": [
+    {
+      "week": 1,
+      "cash": 784901729,
+      "receipt": {
+        "id": "cinema:0:1893",
+        "grossCents": 3829119727,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 2,
+      "cash": 784901429,
+      "receipt": {
+        "id": "cinema:0:1894",
+        "grossCents": 4148291891,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 3,
+      "cash": 784901129,
+      "receipt": {
+        "id": "cinema:0:1895",
+        "grossCents": 3508045805,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 4,
+      "cash": 784900829,
+      "receipt": {
+        "id": "cinema:0:1896",
+        "grossCents": 2925060960,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 5,
+      "cash": 784900529,
+      "receipt": {
+        "id": "cinema:0:1897",
+        "grossCents": 2332059790,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 6,
+      "cash": 784900229,
+      "receipt": {
+        "id": "cinema:0:1898",
+        "grossCents": 2183523871,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 7,
+      "cash": 784899929,
+      "receipt": {
+        "id": "cinema:0:1899",
+        "grossCents": 1805543827,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 8,
+      "cash": 784899629,
+      "receipt": {
+        "id": "cinema:0:1900",
+        "grossCents": 1506439118,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 9,
+      "cash": 784895729,
+      "receipt": {
+        "id": "cinema:0:1901",
+        "grossCents": 1268074247,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 10,
+      "cash": 784891829,
+      "receipt": {
+        "id": "cinema:0:1902",
+        "grossCents": 1070570171,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 11,
+      "cash": 784887929,
+      "receipt": {
+        "id": "cinema:0:1903",
+        "grossCents": 908850472,
+        "actorCents": 0
+      }
+    },
+    {
+      "week": 12,
+      "cash": 784884029,
+      "receipt": {
+        "id": "cinema:0:1904",
+        "grossCents": 1445310656,
+        "actorCents": 0
+      }
+    }
+  ],
+  "randomCallsBefore": 3584433,
+  "randomCallsAfter": 3584433,
+  "clockNextBefore": 1800000024540,
+  "clockNextAfter": 1800000024540
+}

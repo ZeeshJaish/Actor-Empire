@@ -1,0 +1,15 @@
+{
+  "label": "save-path-private-result-green",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 337.119999999999,
+  "heapMiB": 1024,
+  "peakProcessBreakdown": "77427 77423 618512 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node",
+  "peakOwnedTreeRssMiB": 672.8125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 18097
+}

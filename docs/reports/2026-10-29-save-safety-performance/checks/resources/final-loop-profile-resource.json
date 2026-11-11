@@ -1,0 +1,9 @@
+{
+  "label": "final-loop-profile",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 602.359375,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 14427
+}

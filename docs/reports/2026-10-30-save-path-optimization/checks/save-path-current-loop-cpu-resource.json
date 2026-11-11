@@ -1,0 +1,15 @@
+{
+  "label": "save-path-current-loop-cpu",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 1024,
+  "peakProcessBreakdown": "60999 60995 1303504 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node",
+  "peakOwnedTreeRssMiB": 1272.953125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 4243
+}

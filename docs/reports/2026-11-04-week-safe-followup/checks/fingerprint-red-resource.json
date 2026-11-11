@@ -1,0 +1,13 @@
+{
+  "label": "fingerprint-red",
+  "heapMiB": 1024,
+  "rssLimitMiB": 2560,
+  "peakOwnedTreeRssMiB": 0,
+  "peakGlobalSwapGrowthMiB": 0,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 107,
+  "peakProcesses": ""
+}

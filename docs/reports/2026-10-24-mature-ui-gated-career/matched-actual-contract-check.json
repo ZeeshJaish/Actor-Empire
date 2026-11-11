@@ -1,0 +1,29 @@
+{
+  "sameActualOffer": true,
+  "sameSigningCareerWeek": 764,
+  "sameQuotedSalaryDollars": 3119644,
+  "sameRoadmapAndIds": true,
+  "identicalEarnedProfileAtWeek780": true,
+  "cashAtWeek780": 162852268,
+  "correctedMovieRoutes": [
+    {
+      "id": "uni_job_1800000014596_0",
+      "name": "Godzilla vs. Kong",
+      "projectType": "MOVIE",
+      "releaseStrategy": "THEATRICAL"
+    },
+    {
+      "id": "uni_job_1800000014597_1",
+      "name": "Godzilla x Kong: The New Empire",
+      "projectType": "MOVIE",
+      "releaseStrategy": "THEATRICAL"
+    },
+    {
+      "id": "uni_job_1800000014598_2",
+      "name": "Godzilla x Kong: Supernova",
+      "projectType": "MOVIE",
+      "releaseStrategy": "THEATRICAL"
+    }
+  ],
+  "grantOrCraftOrSalaryBoost": false
+}

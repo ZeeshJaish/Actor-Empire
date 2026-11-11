@@ -1,0 +1,8 @@
+{
+  "substantiveOptimizedSourceDrift": [],
+  "concurrentChangesPreserved": [
+    "services/projectInvestors.ts",
+    "services/fictionalNames.ts",
+    "package.json"
+  ]
+}

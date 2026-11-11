@@ -1,0 +1,26 @@
+{
+  "finalPersonalCashDollars": 2157704968,
+  "notFilmGrossOrProducerProfit": true,
+  "largestActuallySignedSponsorshipQuotes": [
+    {
+      "careerWeek": 1046,
+      "weeklyQuoteDollars": 29003122,
+      "durationWeeks": 14,
+      "brand": "Mercedes-Benz"
+    },
+    {
+      "careerWeek": 1033,
+      "weeklyQuoteDollars": 21494150,
+      "durationWeeks": 10,
+      "brand": "Coca-Cola"
+    },
+    {
+      "careerWeek": 1015,
+      "weeklyQuoteDollars": 15329716,
+      "durationWeeks": 18,
+      "brand": "Samsung"
+    }
+  ],
+  "note": "These are signed pre-commission weekly quotes, not a claim that their full face value was collected. Personal wealth includes acting and brand income. The $29M/week quote scale is a separate reward-balance concern and must not be matched by inflating cinema gross. No existing signed payment has been changed.",
+  "positiveRecordedLifeChoiceCash": []
+}

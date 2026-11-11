@@ -1,0 +1,48 @@
+{
+  "sourceRef": "09edec4",
+  "observations": [
+    {
+      "file": "services/universeLogic.ts",
+      "symbol": "generateRandomUniverseOpportunity",
+      "behavior": "A regular universe offer starts from one generated HIGH movie package; the contract carries the actual remaining roadmap and quoted actor compensation.",
+      "verificationMeaning": "A franchise title by itself is not proof of an epic ensemble, unusually strong craft or very large campaign."
+    },
+    {
+      "file": "views/mobile/MobilePage.tsx",
+      "symbol": "handleAcceptMessage universe-contract branch",
+      "behavior": "Future commitments clone the entry project, then change title, subtype and per-film actor identity. Preparation, premieres and paid audience history still run through the normal engine.",
+      "verificationMeaning": "Compare actual resulting quality, cast and budgets. Do not add a gross multiplier to make a named crossover meet a target."
+    }
+  ],
+  "productChangesMadeForTarget": false,
+  "remainingScopeLimit": "This policy follows actual offered acting work; it does not author an owned-studio movie or claim an untested self-financed production route.",
+  "routingDefect": {
+    "reproducedNormalCareerWeek": 832,
+    "title": "Godzilla vs. Kong",
+    "finalOwner": "WARNER_BROS",
+    "incorrectRoute": "STREAMING_ONLY",
+    "cinemaLedgerCreated": false,
+    "oldOutcome": "Streaming-only archive with $0 gross and misleading MAJOR_FAILURE field; not a theatrical flop observation",
+    "cause": "generateProjectDetails selected a temporary streaming studio; overwriting the owner/genre for a universe left the old route in place. Future mixed-roadmap items also inherited the entry media type.",
+    "fix": "Explicit per-roadmap media; new movie projects THEATRICAL and actual series STREAMING_ONLY; legacy series markers supported on acceptance",
+    "redCases": {
+      "offers": 512,
+      "mismatches": 125,
+      "gender": "MALE"
+    },
+    "expandedGreenCases": {
+      "offers": 1024,
+      "genders": [
+        "MALE",
+        "FEMALE"
+      ],
+      "universes": 8,
+      "mixedRoadmaps": 3,
+      "acceptedMedia": 28,
+      "mismatches": 0
+    },
+    "existingSignedCommitmentsRetagged": false,
+    "existingRightsContractsRewritten": false,
+    "grossQualityOrBudgetFormulaChanged": false
+  }
+}

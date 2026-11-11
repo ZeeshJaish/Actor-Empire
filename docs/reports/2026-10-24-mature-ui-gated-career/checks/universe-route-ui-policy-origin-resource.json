@@ -1,0 +1,11 @@
+{
+  "label": "universe-route-ui-policy-origin",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 1302.765625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 2369,
+  "script": "/private/tmp/actor-cinema-mature-universe-route-09edec4-20261024/tooling/run-policy-unit.mjs",
+  "args": []
+}

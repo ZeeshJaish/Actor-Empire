@@ -1,0 +1,361 @@
+{
+  "case": "CURRENT_FRESH_EARNED_SMALL",
+  "status": "NATURALLY_CLOSED",
+  "method": "Current-source fresh UI-gated actor career into paid owned production; no manual grants or authored completed films. This is one strategy, not a rarity estimate.",
+  "originActorWeeks": 857,
+  "additionalWeeks": 110,
+  "manualCapitalGrants": 0,
+  "authoredCompletedPackages": 0,
+  "production": 18421019,
+  "paidCampaign": 2210520,
+  "gross": 163936870.14,
+  "theaterProducerReceipts": 86886586.19,
+  "allCollectedProjectReceipts": 87140107.19,
+  "collectedProjectProfit": 66508568.19,
+  "totalPaidProjectCosts": 20631539.0,
+  "paidWeeks": 63,
+  "approx95PercentGrossWeeksBounds": [
+    18,
+    31
+  ],
+  "personalCash": 13879700,
+  "studioCash": 62819579.19,
+  "incorporationAndTransfers": [
+    {
+      "week": 0,
+      "action": "paid-incorporation-and-treasury-transfer",
+      "studioId": "biz_1800000016282",
+      "incorporationCost": 50000000,
+      "initialOperatingBalance": 10000000,
+      "transferredEarnedCash": 11579678
+    },
+    {
+      "week": 21,
+      "action": "actual-working-capital-injection",
+      "amount": 682031
+    },
+    {
+      "week": 38,
+      "action": "actual-working-capital-injection",
+      "amount": 510136
+    },
+    {
+      "week": 48,
+      "action": "actual-owner-distribution",
+      "amount": 10299967
+    },
+    {
+      "week": 49,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 50,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 51,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 52,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 53,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 54,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 55,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 56,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 57,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 58,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 59,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 60,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 61,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 62,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 63,
+      "action": "actual-owner-distribution",
+      "amount": 11220300
+    },
+    {
+      "week": 64,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 65,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 66,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 67,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 68,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 69,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 70,
+      "action": "actual-owner-distribution",
+      "amount": 20450
+    },
+    {
+      "week": 71,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 72,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 73,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 74,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 75,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 76,
+      "action": "actual-owner-distribution",
+      "amount": 20300
+    },
+    {
+      "week": 77,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 78,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 79,
+      "action": "actual-owner-distribution",
+      "amount": 1478387
+    },
+    {
+      "week": 80,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 81,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 82,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 83,
+      "action": "actual-owner-distribution",
+      "amount": 20450
+    },
+    {
+      "week": 84,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 85,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 86,
+      "action": "actual-owner-distribution",
+      "amount": 20300
+    },
+    {
+      "week": 87,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 88,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 89,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 90,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 91,
+      "action": "actual-owner-distribution",
+      "amount": 20300
+    },
+    {
+      "week": 92,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 93,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 94,
+      "action": "actual-owner-distribution",
+      "amount": 20450
+    },
+    {
+      "week": 95,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 96,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 97,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 98,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 99,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 100,
+      "action": "actual-owner-distribution",
+      "amount": 20450
+    },
+    {
+      "week": 101,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 102,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 103,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 104,
+      "action": "actual-owner-distribution",
+      "amount": 450
+    },
+    {
+      "week": 105,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 106,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 107,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 108,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    },
+    {
+      "week": 109,
+      "action": "actual-owner-distribution",
+      "amount": 300
+    }
+  ],
+  "saves": 82,
+  "reloads": 82,
+  "duplicatePaymentRejections": 110,
+  "failedPromotionRecoveryPassed": true,
+  "checkpointSha256": "d8444e1696f56ae18e971a5f63dd5d4e3e2702e6a6234f6f52d883a0788303a7",
+  "executable": "dece86374945525a685fee0c3de21f3bf479f3f490da1c0f8da0c5eb36dcd9dc",
+  "fullReport": "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v4/career-0.json",
+  "note": "Project profit excludes incorporation, company overhead and personal staff fees/tax; owner distributions move existing earned cash and are not extra revenue."
+}

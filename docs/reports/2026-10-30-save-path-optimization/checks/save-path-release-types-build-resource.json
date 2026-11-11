@@ -1,0 +1,15 @@
+{
+  "label": "save-path-release-types-build",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 128,
+  "peakProcessBreakdown": "17850 17846  35376 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n18032 17850 1837808 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n18033 18032 445792 /Users/zeesh/Vibe code/Actor empire/node_modules/@esbuild/darwin-arm64/bin/esbuild",
+  "peakOwnedTreeRssMiB": 2264.625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 29737
+}

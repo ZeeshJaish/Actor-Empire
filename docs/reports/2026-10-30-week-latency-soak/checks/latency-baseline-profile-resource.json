@@ -1,0 +1,14 @@
+{
+  "label": "latency-baseline-profile",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 1061.5625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 3372
+}

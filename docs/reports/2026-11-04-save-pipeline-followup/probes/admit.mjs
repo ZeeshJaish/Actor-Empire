@@ -1,0 +1,4 @@
+import {execFileSync,spawn} from 'node:child_process';
+const args=process.argv.slice(2),required=Number(process.env.SAFE_START_FREE||50),start=Date.now();let last=-1;
+for(;;){const free=Number(execFileSync('/usr/bin/memory_pressure',['-Q'],{encoding:'utf8'}).match(/free percentage: (\d+)/)?.[1]||0);if(free>=required)break;if(Date.now()-start>180000)throw Error('Required memory headroom unavailable; no heavy worker started');const minute=Math.floor((Date.now()-start)/30000);if(minute!==last){last=minute;console.log(JSON.stringify({waitingForHeadroom:true,free,required}));}await new Promise(r=>setTimeout(r,1000));}
+const child=spawn(process.execPath,['--max-old-space-size=128','/private/tmp/actor-save-round-20261104-Lm5LRx/guard.mjs',...args],{stdio:'inherit',env:process.env});child.on('error',e=>{throw e});child.on('close',code=>process.exitCode=code);

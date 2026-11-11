@@ -1,0 +1,14 @@
+{
+  "label": "universe-routing-red",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 0,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 900,
+  "script": "/private/tmp/actor-cinema-mature-ui-gated-09edec4-20261024/tooling/run-current-safety.mjs",
+  "args": [
+    "scripts/audit-universe-release-routing.ts",
+    "universe-routing-red"
+  ]
+}

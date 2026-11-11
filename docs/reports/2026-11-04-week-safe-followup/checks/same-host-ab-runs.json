@@ -1,0 +1,26 @@
+[
+  {
+    "name": "same-host-0-old",
+    "mode": "old",
+    "code": 0,
+    "out": "output/playwright/2026-11-04-safe-same-host-0-old"
+  },
+  {
+    "name": "same-host-1-new",
+    "mode": "new",
+    "code": 0,
+    "out": "output/playwright/2026-11-04-safe-same-host-1-new"
+  },
+  {
+    "name": "same-host-2-new",
+    "mode": "new",
+    "code": 0,
+    "out": "output/playwright/2026-11-04-safe-same-host-2-new"
+  },
+  {
+    "name": "same-host-3-old",
+    "mode": "old",
+    "code": 0,
+    "out": "output/playwright/2026-11-04-safe-same-host-3-old"
+  }
+]

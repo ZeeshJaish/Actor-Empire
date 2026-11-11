@@ -1,0 +1,10 @@
+{
+  "weeks": 12,
+  "allPriorPlayersUnchanged": true,
+  "completeParsedPlayerJsonExactlyEqual": true,
+  "rawJsonByteOrderEqual": false,
+  "cashAndReceiptParity": true,
+  "manifestDigestParity": true,
+  "randomAndClockParity": true,
+  "comparison": "node:util isDeepStrictEqual on each entire independently parsed old/new gzip snapshot; array order and all values are compared, object key insertion order is irrelevant; raw byte hashes retained"
+}

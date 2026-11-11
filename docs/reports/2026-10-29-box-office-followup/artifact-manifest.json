@@ -1,0 +1,523 @@
+{
+  "createdAt": "2026-10-29T14:56:38.458057+00:00",
+  "head": "09edec4bf958d12c201b9ef848e1c5bcacc7e39e",
+  "sourceHashes": {
+    "package.json": "0865116c43af13a967d32fd6a818d3496da2f2f7e7242b485019641d644a4640",
+    "tsconfig.json": "54fd67fd47d8599a6565c68fa1d0c37aec9ee75993064513320b1952d0fc1e69",
+    "types.ts": "292d8b09a824d69f1e83e6fcf774a14be7db4ef65b9ac73204031b866c625305",
+    "services/sponsorshipEconomy.ts": "3f435a645bbd4d4752a4c4d9af03f35cc747ef72cb7de60732a694ac3a2294a5",
+    "services/scriptDevelopmentFinance.ts": "7671ed27977dfd4e3b2b4f1035e40daaf3e311335f25d0ffc667e25881f82aa5",
+    "services/talentService.ts": "b6646e8d35e17b4de6e566e133f99ac2f2dea22e43d35a2b517878e17048bb13",
+    "services/teamLogic.ts": "2cb98a3036d9f7088574bbb6dffc8ada740b9a88add1ea478da152ea31ae9929",
+    "services/gameLoop.ts": "e37b1e4e39511211ea52626944899047ea120269a00cc8ecd46242fe05e0ce6d",
+    "views/lifestyle/business/DevelopmentLab.tsx": "2ce2885f2b25b2ede0367b0a5abfb917a8afb1bab32908b96a174e42a74856b1",
+    "views/lifestyle/business/ProductionHouseGame.tsx": "ab80ddc8cb5c5557fdf8a43e1fc974c402a48aab7dcfd3bae9dfd644080cb887",
+    "views/lifestyle/business/GreenlightWizard.tsx": "1a5aa6f501e06a2eaa9d627e37fea37113d961b66df5a0259096d989b7b9056e",
+    "views/lifestyle/business/greenlightCalculations.ts": "15e3d70b26c839131ee4cef6eb87f5cea2c20982318c88de90eca0892ca8189a",
+    "views/lifestyle/business/greenlightProjectBuilder.ts": "166682800498771c3d3f304f34c0ad6b63b1cc079e82abaaefa02744cbda97c7",
+    "scripts/audit-cinema-normal-cohort.ts": "5285acadf4245e90e531935e0913681ab7b66fb34c843fa5f5c1bb9ce54c17e2",
+    "scripts/audit-cinema-owned-studio.ts": "18aa14050722cc8856e02771ee95d733dec80f6a95b301934586f927a8f905fc",
+    "scripts/audit-cinema-earned-browser.cjs": "d828900fd1174989155251f5758049b8fd9386a7fd8e2f240818c6a34d1d8fa5",
+    "scripts/audit-cinema-browser-fixture.ts": "61ff9f21157889f18f2827432c0c1c228d5d9f0387686b9892eb87972c124d50",
+    "scripts/audit-cinema-mature-final-save.ts": "78f48ae303866ea2080c0dd6a64261f3c93b329550e3798b65133594d0c4b323",
+    "scripts/audit-cinema-persistence-profile.ts": "ec3c50f0a181a460930390c720adebecff14803477ca627d0a63db21fbc9f6c2",
+    "scripts/audit-sponsorship-audience-value.ts": "9d0c36570234418ab96ea8c0f40daf1db7c8468f43c2df17774ef3f867dcf82a",
+    "scripts/audit-sponsorship-earned-snapshot.ts": "ff8c459c2a26713a2bac546a1366f0aae1b7049e452a0645ac26c58303775773",
+    "scripts/audit-cinema-director-quotes.ts": "066a2cdfdbf45927f2f03f2b6ac31d9d795c2ca8bec206f4d3801ef3697fe922",
+    "scripts/audit-script-development-finance.ts": "4bdae7972c5659ee17ca2c29f4c7b2640b8a1b96e0eb0f57845724ad91e9304f",
+    "scripts/audit-greenlight-project-builder.ts": "2ef40a2dc45d19e6911769411aca297282dc7d823d4e02fab4aa2551cce4121e",
+    "scripts/audit-cinema-owned-actions.ts": "d5494f2e051ef6686d687b0772c1dee4525f9610829569544713a82b6ba436f8",
+    "scripts/audit-cinema-owned-sequel-actions.ts": "7cda5719e36bea906446e93e839c560b0d269238f9845d5c8930124d5e093520",
+    "scripts/run-cinema-normal-cohort.mjs": "cb6428a8d85c600c04a6b4ff5659d6e32bd8c4611007b815fd46744c07d0c729",
+    "scripts/fixtures/cinemaOwnedStudioActions.ts": "f197704cb626447dfe23b28041cf4b122c4f1c6726d51d9e50f7af9d00aa1e8b",
+    "scripts/fixtures/cinemaMatureMigrationAssertions.ts": "d494f188ee3af25c032e49fc6fd556957356a62f3f1f7cda09de5df071ff6991"
+  },
+  "durableEvidence": {
+    "README.md": {
+      "sha256": "141a1caf98a450502be8c4672052cbec9edb77c75f3d206b5563ab562abb73e2",
+      "bytes": 9149
+    },
+    "browser/actual-career-home.png": {
+      "sha256": "06fad11229607d6b8276fc9cb9ad842c394dd8c080acffe33851418ef1dc7a4a",
+      "bytes": 158408
+    },
+    "browser/actual-career-phone.png": {
+      "sha256": "7b1c1cc650b5e6cde26f8fcbe59dd7ca14e6c9365f8b870917b875b13d4c57f1",
+      "bytes": 56583
+    },
+    "browser/actual-financial-report.png": {
+      "sha256": "0609dd81b767acad0d5e9fa05779b6682743604d2bef31d8fbe927f047bbcf0a",
+      "bytes": 46304
+    },
+    "browser/actual-imdb-audience-320.png": {
+      "sha256": "225caa0869858b2d6715ea4ce156ff5b17293e82709867fa64d7fcadbbf195be",
+      "bytes": 58881
+    },
+    "browser/actual-week-reloaded.png": {
+      "sha256": "05b7bf78c1e087c80253c7050757d220cc7a0d49eab8a5d0c71e81af4e602781",
+      "bytes": 99089
+    },
+    "browser/app-check.json": {
+      "sha256": "ad227befab0fe238a4488ace2af31fc8240e47dfe0a1428b72c413cd8accec6d",
+      "bytes": 2713
+    },
+    "browser/discovery-box.txt": {
+      "sha256": "2775f3a8dbc432560fc3a9c91ecfb884f287946f6ed4dd29423dd7180829848c",
+      "bytes": 636
+    },
+    "browser/discovery-home.txt": {
+      "sha256": "ff71ed68fe562edc8cb82582ed485e022c0cd4065a15cf0c4750e15d5aba4063",
+      "bytes": 3592
+    },
+    "browser/discovery-phone-final.txt": {
+      "sha256": "89127c6ff57f2f958d7d2fccdc5a707e62a065492dcf18abfbbc1a67e097d4e6",
+      "bytes": 105
+    },
+    "browser/discovery-phone.txt": {
+      "sha256": "89127c6ff57f2f958d7d2fccdc5a707e62a065492dcf18abfbbc1a67e097d4e6",
+      "bytes": 105
+    },
+    "browser/resolved-harness-failure.png": {
+      "sha256": "bac1d3ba1ad02248823dfda01b66e3b557b992f9cc874e86ace66ab347880a1e",
+      "bytes": 96204
+    },
+    "browser/resolved-harness-failure.txt": {
+      "sha256": "7be89cd0d2bd9e9673185b81a701b5f0c021e4713961855f4f6b417aab5a292e",
+      "bytes": 3433
+    },
+    "browser-final/actual-career-home.png": {
+      "sha256": "d46df5687f2b493414ff5ff65a3ed8462ad6f126d4a617eb37b969526f540e60",
+      "bytes": 158437
+    },
+    "browser-final/actual-career-phone.png": {
+      "sha256": "7b1c1cc650b5e6cde26f8fcbe59dd7ca14e6c9365f8b870917b875b13d4c57f1",
+      "bytes": 56583
+    },
+    "browser-final/actual-financial-report.png": {
+      "sha256": "5f1031d46bc4e4035bcdfaea283584c9db92945fb4054463dfb13c149da335b1",
+      "bytes": 46272
+    },
+    "browser-final/actual-imdb-audience-320.png": {
+      "sha256": "6cbabaeffa460f88a1dacd034a999ad5a8ba3c0f2056b145ea69f237b1127d76",
+      "bytes": 58876
+    },
+    "browser-final/actual-week-reloaded.png": {
+      "sha256": "05b7bf78c1e087c80253c7050757d220cc7a0d49eab8a5d0c71e81af4e602781",
+      "bytes": 99089
+    },
+    "browser-final/app-check.json": {
+      "sha256": "a01d0daea0f48c34e6ffadba8ba7ae0724c9baca51a83a5ec26d6a60f5d6fe92",
+      "bytes": 4126
+    },
+    "browser-final/discovery-box.txt": {
+      "sha256": "2775f3a8dbc432560fc3a9c91ecfb884f287946f6ed4dd29423dd7180829848c",
+      "bytes": 636
+    },
+    "browser-final/discovery-home.txt": {
+      "sha256": "ff71ed68fe562edc8cb82582ed485e022c0cd4065a15cf0c4750e15d5aba4063",
+      "bytes": 3592
+    },
+    "browser-final/discovery-phone-final.txt": {
+      "sha256": "89127c6ff57f2f958d7d2fccdc5a707e62a065492dcf18abfbbc1a67e097d4e6",
+      "bytes": 105
+    },
+    "browser-final/discovery-phone.txt": {
+      "sha256": "89127c6ff57f2f958d7d2fccdc5a707e62a065492dcf18abfbbc1a67e097d4e6",
+      "bytes": 105
+    },
+    "checks/build-resource.json": {
+      "sha256": "16cce4e76a8669255d4003bbf8a2129c26ed694155557147ffab872a0692380c",
+      "bytes": 137
+    },
+    "checks/compiler-input-memory.json": {
+      "sha256": "f80c643432868e3ee719e359ba0c7f01f6f3a9b102ce8d51ca6f958b8f46fe68",
+      "bytes": 539
+    },
+    "checks/current-source-parity.json": {
+      "sha256": "9a5baed6af16c538c5d338deae5e551cf20a24449aaa2ed2fc5b86a14d2cbdfd",
+      "bytes": 306
+    },
+    "checks/epic-final-save.json": {
+      "sha256": "2a06fac2317b607b1baa3a9196705face0272671493e33b82e04f6f2d4ba7bc8",
+      "bytes": 315
+    },
+    "checks/final-app-audit-types-resource.json": {
+      "sha256": "86e41b8f8ab0e2d06565de606939011839864e8c7fb27b95203014b9e53df6d5",
+      "bytes": 170
+    },
+    "checks/final-browser-fixture-resource.json": {
+      "sha256": "fa9d1d88d20242dde025b245fd21f40c25d44c30540d524509ab7c2ad914e018",
+      "bytes": 170
+    },
+    "checks/final-build-resource.json": {
+      "sha256": "79806115ccfb1dd68c680e1c5eaf7aeb55f7df14563fef8b4170c327a81889ef",
+      "bytes": 137
+    },
+    "checks/final-checks.json": {
+      "sha256": "bcbe2640fa6e72616ad787ceb0378da40be294a20b8534559fb6f90e7de9fcc3",
+      "bytes": 16372
+    },
+    "checks/final-cinema-booking-resource.json": {
+      "sha256": "5b554bde933972a3158bbce8b0ae72b48b0b0f5b0af3ba6a67782954d56b2fc9",
+      "bytes": 160
+    },
+    "checks/final-cinema-delivery-resource.json": {
+      "sha256": "9a60fb66a9b8fe92bcaa624e5aa5191b7c4f68aa866a3a27e7a9700f7ffe755c",
+      "bytes": 161
+    },
+    "checks/final-cinema-integration-resource.json": {
+      "sha256": "b9a85a3a2ba69f56516a7faf1e9880b9760625d24c023ed2bb16a69d8eee8e95",
+      "bytes": 174
+    },
+    "checks/final-cinema-migration-resource.json": {
+      "sha256": "72e86316640e2fe5ca2752fb2a61f51d98ea1b585ebcce28e958f2968a91b703",
+      "bytes": 172
+    },
+    "checks/final-cinema-presentation-resource.json": {
+      "sha256": "24eb14c85594a2cc84181fec55bc5e83d58d888068e37ad1226979da61dce789",
+      "bytes": 175
+    },
+    "checks/final-cinema-rights-resource.json": {
+      "sha256": "6e5c4318eba111084f7bda5e69fde0206220dee74eb634af0eddd27010e950c0",
+      "bytes": 169
+    },
+    "checks/final-commission-contracts-resource.json": {
+      "sha256": "d81bc1f9df1f5fe3886ecf90f59c064872a60e4cf0707703e6860e11d813365e",
+      "bytes": 166
+    },
+    "checks/final-development-finance-resource.json": {
+      "sha256": "5b928daa70da372eae1d85068b4b4b48b19ada10cfbe07990d470ffa5f6fd1b1",
+      "bytes": 165
+    },
+    "checks/final-director-quotes-resource.json": {
+      "sha256": "d70e69f5e6374307ad7f204587ee71ec3a5f1ffec697f1f2e10002c87bbf8ac9",
+      "bytes": 161
+    },
+    "checks/final-earned-browser-resource.json": {
+      "sha256": "73857c4e9e77ccd09f081a956d623830230210da38c5cf91cdb4fb6822445f9c",
+      "bytes": 171
+    },
+    "checks/final-epic-final-save-resource.json": {
+      "sha256": "875d2eadaa6d5023c62cefbef6fa5e8cee0afb250360b19be7a540eeb5a73fd2",
+      "bytes": 172
+    },
+    "checks/final-greenlight-builder-resource.json": {
+      "sha256": "9894a45f4599802be332f91910498cb367ddd69aae473cb8a0acfad966528f83",
+      "bytes": 174
+    },
+    "checks/final-greenlight-calculations-resource.json": {
+      "sha256": "9674983128ea3317475d929cc44100cdfe92ba9df186ec2d4a98797af021a276",
+      "bytes": 168
+    },
+    "checks/final-legacy-career-payments-resource.json": {
+      "sha256": "f291fb3a070873ba548ff909e3ca397e782f328d1471bbe8718d8ab468f14e11",
+      "bytes": 180
+    },
+    "checks/final-root-lint-resource.json": {
+      "sha256": "90c32624bea3d1a9db3f664415760a24d32c7274dd07500317cf516bfb9f1350",
+      "bytes": 164
+    },
+    "checks/final-season-funding-resource.json": {
+      "sha256": "c54ce6043aa8d9afb4a9c05d33cf524537ff2f0750a4872293e1a64175287e14",
+      "bytes": 159
+    },
+    "checks/final-sponsorship-properties-resource.json": {
+      "sha256": "2fd7e23f1bd5fa6d4dad00a8e7397bcc4ae096af7eba3bf341171f7431ada9ad",
+      "bytes": 178
+    },
+    "checks/final-team-renewals-resource.json": {
+      "sha256": "f5a94754eb10a9940c0a2e7b3cbccfedd031010c1566459560228d5998a80c74",
+      "bytes": 159
+    },
+    "checks/fresh-audit-continuation.json": {
+      "sha256": "ee73533e4899cfc6e06f9b6de919d5f2fddf5c07f40b6d9cfdbdcdec1de819a5",
+      "bytes": 1007
+    },
+    "checks/fresh-owner-final-save-resource.json": {
+      "sha256": "9ee4c1275fd45f9cb554379e445cd962b9741e725900d9f80d72f59883f229bb",
+      "bytes": 171
+    },
+    "checks/fresh-owner-save-safety.json": {
+      "sha256": "a1c51b3cc355effada6805be216896735fdf352217f6c3aae2881cdc880dea4a",
+      "bytes": 314
+    },
+    "checks/large-save-persistence-profile.json": {
+      "sha256": "b00bdc1ccf288963fb3c1c8e72a67fef70c93a05613164b706d1d0cafd976cb1",
+      "bytes": 1544
+    },
+    "checks/legacy-compatibility/results.json": {
+      "sha256": "54cc3038f232b4afd4e46fc78cd3015791ae6d65433f20184a3bd6138bf64d50",
+      "bytes": 1114
+    },
+    "checks/prior-dirty-work-preservation.json": {
+      "sha256": "fc40edcc40758b387183cd118becebdb64e385a76993f2c0ea706db5c1909bfb",
+      "bytes": 857
+    },
+    "checks/starter-cashflow-stress.json": {
+      "sha256": "1a5528eb7b1cf81eac953e29f236261c0db78ee938e01e0c5a31c4b7d02ff710",
+      "bytes": 1477
+    },
+    "checks/type-resource.json": {
+      "sha256": "0618485eb7989614f3edaec97867e145d7ef1617a31273a1bde4625829333eed",
+      "bytes": 180
+    },
+    "checks/typecheck.json": {
+      "sha256": "bcbc938e18a092287a078c02dce937638f935cb08bd8481a38f3755cdadf9beb",
+      "bytes": 2809
+    },
+    "earned-mature-career.json": {
+      "sha256": "9c03a768519a2bfca57e5e192d4fe1dcce2f728435281f1d77839b2bf4a269de",
+      "bytes": 3693
+    },
+    "fresh-careers.json": {
+      "sha256": "ac544356ee0d23ea6ad3bf9765f0a4227391340595a371f733cb5bc7a34c97e9",
+      "bytes": 234498
+    },
+    "fresh-earned-studio.json": {
+      "sha256": "5796d5eee154a420308f9e8ee3e6221018c1971b0ab4e961172ed036954f7d7f",
+      "bytes": 7796
+    },
+    "progress.md": {
+      "sha256": "915e316639ab2b9b94e1abb2d67e63c3d1fcbdbef6f9b3b2a074316b9dadee0c",
+      "bytes": 16401
+    },
+    "results.json": {
+      "sha256": "864b9b1fd29fe34927884a35e2477b28b4dacb24e286c5251a005fc17efa1694",
+      "bytes": 4259
+    },
+    "sponsorship-earned-snapshot.json": {
+      "sha256": "7da56f53c5ad6c88a0750d3a7e71dd8f7e23888a737d7c878b52b02417c38f61",
+      "bytes": 99456
+    }
+  },
+  "ignoredImmutableEvidence": {
+    "cinema-verification.local/owned-studio-20261029/production-v2/executable.json": {
+      "sha256": "2327a7044b811e6200f22f54a84b82767abf41746034c97ebace8beb46330623",
+      "bytes": 50944
+    },
+    "cinema-verification.local/owned-studio-20261029/production-v2/career-0.json": {
+      "sha256": "c5417eff19f1fce7a544d5b1a26a4e6d37d205c09befea2082730e994a98ee01",
+      "bytes": 92217
+    },
+    "cinema-verification.local/owned-studio-20261029/production-v2/career-0.json.gz": {
+      "sha256": "2311355c6270b79c9ca556ec3933a3c665167c456c45180865e0b5b05769f118",
+      "bytes": 7906199
+    },
+    "cinema-verification.local/owned-studio-20261029/production-v2/normal-worker.mjs": {
+      "sha256": "31c950416c31180a5409e7fa992d70a409ea3a3c2b92fb2f5da943ddc9295873",
+      "bytes": 11801965
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-sequel-v1/executable.json": {
+      "sha256": "1b9a7ff1aa17c7e63e2529d61e8070bd3e76123053a079d23128d5bd5b612364",
+      "bytes": 51312
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-sequel-v1/career-0.json": {
+      "sha256": "916d29bf438638fc9a5c91cb3955c6bf6fcafcd59672cca6759d48bff67dd823",
+      "bytes": 47271
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-sequel-v1/career-0.json.gz": {
+      "sha256": "3bd6e6894a38ae4759a948b8fb9f694dd2a6b62c72ad09c30f126db605a6d0e3",
+      "bytes": 7997153
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-sequel-v1/normal-worker.mjs": {
+      "sha256": "fc0aaedec3a4d3db6dc408ca63f4c2d4c8470b8b14ceec36c21a8abe482329a0",
+      "bytes": 11968942
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-epic-v1/executable.json": {
+      "sha256": "6a73644ba79d8200324443da3c2ae29bf457c53b8a4892837736cf5ce5607e7b",
+      "bytes": 51372
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-epic-v1/career-0.json": {
+      "sha256": "4ea10c0f14db7da3b6f970f8c37afc3aa9b0c0d31648fe5ddb1395a513d45647",
+      "bytes": 49447
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-epic-v1/career-0.json.gz": {
+      "sha256": "61e4036be5072d0f05797b93e515913d452c927d27a95e290435fd5eb5adccb2",
+      "bytes": 8029657
+    },
+    "cinema-verification.local/owned-studio-20261029/earned-epic-v1/normal-worker.mjs": {
+      "sha256": "0d68cb07a5c484f3ea6937e5f7b1c971a6742f832a6794722ad683ae5f9d7e24",
+      "bytes": 11972186
+    },
+    "cinema-verification.local/owned-studio-20261029/weak-wide-v1/executable.json": {
+      "sha256": "a3bf471d42c729201d78457c90f4fdde200fc8819ed6c07550eb978498d4064e",
+      "bytes": 51372
+    },
+    "cinema-verification.local/owned-studio-20261029/weak-wide-v1/career-0.json": {
+      "sha256": "f8ef73138848cadb3bee33673cbc17d3bfe3c560d7b56907448ede9cef566ba6",
+      "bytes": 40122
+    },
+    "cinema-verification.local/owned-studio-20261029/weak-wide-v1/career-0.json.gz": {
+      "sha256": "28020455eb676b44c4b0e0681e39bd30d7ad4a1dd370d5b7e0337988d7571ea8",
+      "bytes": 7816610
+    },
+    "cinema-verification.local/owned-studio-20261029/weak-wide-v1/normal-worker.mjs": {
+      "sha256": "db64a412d774df9bf47f9a21d61c366635a94021ccd265ce724074e457eef190",
+      "bytes": 11972511
+    },
+    "cinema-verification.local/owned-studio-20261029/small-wide-v1/executable.json": {
+      "sha256": "a3bf471d42c729201d78457c90f4fdde200fc8819ed6c07550eb978498d4064e",
+      "bytes": 51372
+    },
+    "cinema-verification.local/owned-studio-20261029/small-wide-v1/career-0.json": {
+      "sha256": "16eb3d46c73f50d5e85c9151e9c9464d7ad5c4970fb43aac9052ed15d8371ddb",
+      "bytes": 41164
+    },
+    "cinema-verification.local/owned-studio-20261029/small-wide-v1/career-0.json.gz": {
+      "sha256": "2e95034da5ea2f9f14570e1ba9dc14cc6992d7b312cc4076f9728874dc3085cd",
+      "bytes": 7977259
+    },
+    "cinema-verification.local/owned-studio-20261029/small-wide-v1/normal-worker.mjs": {
+      "sha256": "db64a412d774df9bf47f9a21d61c366635a94021ccd265ce724074e457eef190",
+      "bytes": 11972511
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/executable.json": {
+      "sha256": "f53c18756c57d73c4092a125e03d11f626cd7a92be652b27974be704abd9805c",
+      "bytes": 49533
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-1.json": {
+      "sha256": "06f6e40b5693aab8a513d688cb53db38b977d2de5fffa43fc75566433a26a6d5",
+      "bytes": 817988
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-0.json": {
+      "sha256": "1ea92dba7cba194e3459292d5fb409cad382f91380299644c479b0564344e0a0",
+      "bytes": 818918
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-3.json": {
+      "sha256": "4ae1a49baad82aa7c118ead5bc2bfbfd4ad6488427ccdacac8e1399dad879cde",
+      "bytes": 835706
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-2.json": {
+      "sha256": "263d9601c94187a7fbd0b8577f5b2287f80a2efe187a9632d50ca5b3903cd961",
+      "bytes": 823346
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-3.json.gz": {
+      "sha256": "6c2eb00d2ca9edd58c3de8eea0e8db9a22173c855a16536761141c8106e8c6f6",
+      "bytes": 4485207
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-2.json.gz": {
+      "sha256": "f71456581bbe28b59f7da05c0fecb38a648313bded1bb338b0264e5482d4cdcc",
+      "bytes": 4273123
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-0.json.gz": {
+      "sha256": "5613ed18c97c1ccc8505a9a911341309336d416670abcb7606c4fc8fa1353ecf",
+      "bytes": 4338402
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/career-1.json.gz": {
+      "sha256": "bc44d37f1c4e23cf5960e9b6ea8cdb74f7ad909c945fe94a07d9db1e10f86f84",
+      "bytes": 4194883
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-four-seeds/normal-worker.mjs": {
+      "sha256": "b8f07abff3b821e30ab617ef6729f54b29c510ccc837778cd41e1581c1f7eaf7",
+      "bytes": 11146714
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability/executable.json": {
+      "sha256": "440803d3a7f36c8614489d867820e312284cea8142b0998e8f8a0b65d97377dd",
+      "bytes": 49644
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability/career-0.json": {
+      "sha256": "722445d02215007aac1f0881bfdac1fa7cef047c7468cfd38f76de370b798fef",
+      "bytes": 2083024
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability/career-0.json.gz": {
+      "sha256": "e159a707fa5ee5f92a31e4bfa632daffe9d8514085590c87d4254b123540e844",
+      "bytes": 6177677
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability/normal-worker.mjs": {
+      "sha256": "b8f07abff3b821e30ab617ef6729f54b29c510ccc837778cd41e1581c1f7eaf7",
+      "bytes": 11146714
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability-v2/executable.json": {
+      "sha256": "1e98350a63462d73b0c28a6d63844ad6df9751e4d78622cda5e6551dd9a78e57",
+      "bytes": 49601
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability-v2/career-0.json": {
+      "sha256": "af67ec736631e34fda94637d4687b2e6cee7dd82363b497972e7b9b54729f18d",
+      "bytes": 3315248
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability-v2/career-0.json.gz": {
+      "sha256": "b28f05c9b4de8439048c474293d061bd84eab7cea265c70d17784b0c279ace87",
+      "bytes": 7043985
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability-v2/normal-worker.mjs": {
+      "sha256": "cd65251398fa959acfe6d15d0cddc0e428220c378aab375e131b3b5d43adddeb",
+      "bytes": 11147739
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v1/executable.json": {
+      "sha256": "4a1ea7e1205e7b52996e2a06d23e0bf1cb5c4dfc40520d607f513a52350ddbce",
+      "bytes": 51312
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v1/career-0.json": {
+      "sha256": "b376d5a30dfb06bf6566e81990f8e841afe69618ecadd9e90fcc2bfb8a499817",
+      "bytes": 10147
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v1/career-0.json.gz": {
+      "sha256": "08f8ff0bb303f1fa23db236c8dc4e80e4b49c8feee83cce16b0dbb4e3b3dd7af",
+      "bytes": 6887546
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v1/milestone-ready-script.json.gz": {
+      "sha256": "e54b136ce66ee64075add70100df812f1c229dd1c699669b34721a0909242e53",
+      "bytes": 6954347
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v1/normal-worker.mjs": {
+      "sha256": "70222d121937e98fac0bc5a80840d199e15ebbe11f8b2fb1ccdf7e8b764467ac",
+      "bytes": 11973146
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v3/executable.json": {
+      "sha256": "86f82cf04e8323fa59bd0ad43b8c15b63f750e863d5d2f5e1c1b003402ddaf9f",
+      "bytes": 51312
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v3/career-0.json": {
+      "sha256": "a3e86669b7a4715e9b6598c132f216a6d83604709fb61a8fea00b64d7c372bb0",
+      "bytes": 10665
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v3/career-0.json.gz": {
+      "sha256": "1ebf5e1698f2ae5658ccb0f44e6d196246aa6b61098fc394ca2d32cfc7e93f9e",
+      "bytes": 6911357
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v3/milestone-ready-script.json.gz": {
+      "sha256": "2ab57a24b4548624b5d026392bc5919378bc2c0fb17585e111848489d1427b31",
+      "bytes": 6954003
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v3/normal-worker.mjs": {
+      "sha256": "0a6ad7ac0298d7d17e87d2886afa63838128b50f85f3e4059c2194f4ada31bf9",
+      "bytes": 11974587
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v4/executable.json": {
+      "sha256": "c52a3472232c92ff182e0ac9c73231e972c8aefe54ab5ffeae71c0acd6224631",
+      "bytes": 51312
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v4/career-0.json": {
+      "sha256": "fc261cfa14bbfc4dc8fcbbb840b7a3831def410c80c0d1f8e046c9967aba32b9",
+      "bytes": 48350
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v4/career-0.json.gz": {
+      "sha256": "d8444e1696f56ae18e971a5f63dd5d4e3e2702e6a6234f6f52d883a0788303a7",
+      "bytes": 7145978
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v4/milestone-ready-script.json.gz": {
+      "sha256": "a7cbffa577f32783a9220c447f2feebbcafc758e9cacb5d7c8bea5c2761c9b2a",
+      "bytes": 6954005
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v4/milestone-awaiting-release.json.gz": {
+      "sha256": "0488228c9a3370d5962cb6ec562860fc1d129dddb7cbc983e48561a46a5d5834",
+      "bytes": 6921022
+    },
+    "cinema-verification.local/owned-studio-20261029/fresh-earned-starter-v4/normal-worker.mjs": {
+      "sha256": "dece86374945525a685fee0c3de21f3bf479f3f490da1c0f8da0c5eb36dcd9dc",
+      "bytes": 11975337
+    }
+  },
+  "qualification": {
+    "currentSourceFirstStudioCompleted": true,
+    "freshPostCalibrationTwoBillionEndToEndVerified": false,
+    "preparedHistoricalCareerTwoBillionObserved": 2074964483.23,
+    "threeBillionObserved": false,
+    "lifetimeRarityEstimated": false,
+    "hardEarningCapAdded": false,
+    "filmDemandBoostAdded": false,
+    "nativeDeviceVerified": false,
+    "lateSaveLatencyFullySolved": false,
+    "unrelatedPriorDirtyTrackedSectionsPreserved": 12
+  }
+}

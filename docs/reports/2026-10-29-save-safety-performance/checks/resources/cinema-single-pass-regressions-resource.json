@@ -1,0 +1,9 @@
+{
+  "label": "cinema-single-pass-regressions",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 678.21875,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 20917
+}

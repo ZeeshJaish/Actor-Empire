@@ -1,0 +1,14 @@
+{
+  "label": "mature-closeout-file-store",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 347.015625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 1515,
+  "script": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/tooling/run-current-safety.mjs",
+  "args": [
+    "scripts/audit-cinema-file-save-store.ts",
+    "closeout-file-store"
+  ]
+}

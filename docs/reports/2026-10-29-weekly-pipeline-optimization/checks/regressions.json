@@ -1,0 +1,106 @@
+[
+  {
+    "name": "audit-ai-catalogue-read-batch",
+    "code": 0,
+    "resource": {
+      "label": "regression-audit-ai-catalogue-read-batch",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 291
+    }
+  },
+  {
+    "name": "audit-royalty-source-index",
+    "code": 0,
+    "resource": {
+      "label": "regression-audit-royalty-source-index",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 351
+    }
+  },
+  {
+    "name": "audit-save-preparation-projections",
+    "code": 0,
+    "resource": {
+      "label": "regression-audit-save-preparation-projections",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 169.9375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1124
+    }
+  },
+  {
+    "name": "audit-cinema-country-scaling",
+    "code": 0,
+    "resource": {
+      "label": "regression-audit-cinema-country-scaling",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 210
+    }
+  },
+  {
+    "name": "audit-save-integrity",
+    "code": 0,
+    "resource": {
+      "label": "regression-audit-save-integrity",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 506
+    }
+  },
+  {
+    "name": "audit-save-generations",
+    "code": 0,
+    "resource": {
+      "label": "regression-audit-save-generations",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 400
+    }
+  },
+  {
+    "name": "audit-career-record-preservation",
+    "code": 0,
+    "resource": {
+      "label": "regression-audit-career-record-preservation",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 311.515625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 4693
+    }
+  },
+  {
+    "name": "audit-save-migration",
+    "code": 1,
+    "resource": {
+      "label": "regression-audit-save-migration",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 305.21875,
+      "stopReason": "System swap growth exceeded 512MiB",
+      "exitCode": null,
+      "signal": "SIGTERM",
+      "elapsedMs": 8203
+    }
+  }
+]

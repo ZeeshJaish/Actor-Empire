@@ -1,0 +1,285 @@
+{
+  "status": "CHECKPOINT_READY",
+  "completeObservation": false,
+  "sourceRef": "09edec4",
+  "uiEligibilityVerified": true,
+  "executable": "043ea20028c97da089d474bdcda31a2636f51221b9b94dddf336f90d97706cac",
+  "inputReport": "/private/tmp/actor-cinema-mature-ui-gated-09edec4-20261024/career/career-0.json",
+  "inputSha256": "ec587599b60554ead9852d611f5f4d186f89642fa25103fd04a1a3100d741fb7",
+  "weeks": 169,
+  "origin": {
+    "checkpoint": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+    "checkpointSha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+    "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+    "weeks": 156,
+    "cash": 57643,
+    "sourceRef": "07fdfff",
+    "initialCash": 2000,
+    "manualCapitalGrants": 0
+  },
+  "lineage": [],
+  "ownerCapitalMilestone": null,
+  "finalCashDollars": 49318,
+  "finalProfile": {
+    "weeks": 169,
+    "age": 18,
+    "week": 14,
+    "cash": 49318,
+    "craft": 44.70546401535277,
+    "fame": 3.2869275160098628,
+    "reputation": 6.275,
+    "experience": 10,
+    "health": 78.34999999999854,
+    "followers": 78,
+    "credits": 3,
+    "studios": 0,
+    "roles": [
+      {
+        "id": "aud_active_1800000001883_0.030688693281263113",
+        "role": "MINOR",
+        "phase": "POST_PRODUCTION",
+        "pay": 20788
+      }
+    ]
+  },
+  "safeguards": {
+    "manualCapitalGrants": 0,
+    "authoredCompletedPackages": 0,
+    "loans": 0,
+    "saves": 97,
+    "reloads": 18,
+    "duplicateWeeksRejected": 169,
+    "failedPromotionRecovery": true
+  },
+  "filmCounts": {
+    "released": 49,
+    "closed": 38,
+    "open": 11,
+    "playerCredits": 3,
+    "playerClosed": 3
+  },
+  "attainment": {
+    "player": [
+      {
+        "grossBillions": 1,
+        "observed": 3,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 3,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 3,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ],
+    "world": [
+      {
+        "grossBillions": 1,
+        "observed": 49,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 49,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 49,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ]
+  },
+  "closedFinancialOutcomes": {
+    "all": {
+      "completed": 38,
+      "recouped": 19,
+      "hits": 6,
+      "profits": 13,
+      "nearBreakEven": 3,
+      "losses": 16,
+      "exactDeficits": 19
+    },
+    "small": {
+      "completed": 29,
+      "recouped": 15,
+      "hits": 4,
+      "profits": 11,
+      "nearBreakEven": 2,
+      "losses": 12,
+      "exactDeficits": 14
+    },
+    "player": {
+      "completed": 3,
+      "recouped": 2,
+      "hits": 1,
+      "profits": 1,
+      "nearBreakEven": 1,
+      "losses": 0,
+      "exactDeficits": 1
+    }
+  },
+  "topPlayer": [
+    {
+      "id": "aud_active_1800000000293_0.046049175318330526",
+      "name": "The Spirit of Horizon",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 30.342,
+      "productionDollars": 9679728,
+      "campaignDollars": 774378.24,
+      "grossDollars": 19166308.02,
+      "producerReceiptsDollars": 10158146.63,
+      "theatricalProfitDollars": -295959.61,
+      "actorBackendDollars": 0,
+      "paidWeeks": 32,
+      "trackedRunWeeks": 32,
+      "firstObservedCareerWeek": 47,
+      "lastObservedCareerWeek": 78
+    },
+    {
+      "id": "aud_active_1800000000848_0.4088848610408604",
+      "name": "Solar Sea Shadow",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 46.432,
+      "productionDollars": 942200,
+      "campaignDollars": 75376,
+      "grossDollars": 5739414.61,
+      "producerReceiptsDollars": 3041892.61,
+      "theatricalProfitDollars": 2024316.61,
+      "actorBackendDollars": 0,
+      "paidWeeks": 27,
+      "trackedRunWeeks": 27,
+      "firstObservedCareerWeek": 92,
+      "lastObservedCareerWeek": 118
+    },
+    {
+      "id": "aud_active_1800000001229_0.7556751167867333",
+      "name": "Azure Song",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 29.468,
+      "productionDollars": 1481781,
+      "campaignDollars": 118542.48,
+      "grossDollars": 3262870.76,
+      "producerReceiptsDollars": 1729324.02,
+      "theatricalProfitDollars": 129000.54,
+      "actorBackendDollars": 0,
+      "paidWeeks": 24,
+      "trackedRunWeeks": 24,
+      "firstObservedCareerWeek": 123,
+      "lastObservedCareerWeek": 146
+    }
+  ],
+  "topWorld": [
+    {
+      "id": "studio_ai_project_1gg2ip7",
+      "name": "The Forest of Blood",
+      "ownCredit": false,
+      "closed": true,
+      "quality": 76,
+      "productionDollars": 73274000,
+      "campaignDollars": 13189000,
+      "grossDollars": 265625645.36,
+      "producerReceiptsDollars": 130177673.44,
+      "theatricalProfitDollars": 39809351.44,
+      "actorBackendDollars": 0,
+      "paidWeeks": 42,
+      "trackedRunWeeks": 42,
+      "firstObservedCareerWeek": 108,
+      "lastObservedCareerWeek": 149
+    },
+    {
+      "id": "studio_ai_project_0hvkqpm",
+      "name": "Gentle Ember",
+      "ownCredit": false,
+      "closed": false,
+      "quality": 96,
+      "productionDollars": 24816000,
+      "campaignDollars": 1985000,
+      "grossDollars": 170643641.23,
+      "producerReceiptsDollars": 84546522.66,
+      "theatricalProfitDollars": null,
+      "actorBackendDollars": 0,
+      "paidWeeks": 22,
+      "trackedRunWeeks": 22,
+      "firstObservedCareerWeek": 148,
+      "lastObservedCareerWeek": 169
+    },
+    {
+      "id": "studio_ai_project_06oqpap",
+      "name": "Crimson Cyber Rise",
+      "ownCredit": false,
+      "closed": true,
+      "quality": 60,
+      "productionDollars": 41260000,
+      "campaignDollars": 7427000,
+      "grossDollars": 167597865.07,
+      "producerReceiptsDollars": 83648649.91,
+      "theatricalProfitDollars": 33288673.91,
+      "actorBackendDollars": 0,
+      "paidWeeks": 40,
+      "trackedRunWeeks": 40,
+      "firstObservedCareerWeek": 80,
+      "lastObservedCareerWeek": 119
+    },
+    {
+      "id": "studio_ai_project_1ucmzca",
+      "name": "The Rise of Kingdom",
+      "ownCredit": false,
+      "closed": false,
+      "quality": 85,
+      "productionDollars": 47735000,
+      "campaignDollars": 8592000,
+      "grossDollars": 139639845.03,
+      "producerReceiptsDollars": 68322511.86,
+      "theatricalProfitDollars": null,
+      "actorBackendDollars": 0,
+      "paidWeeks": 29,
+      "trackedRunWeeks": 29,
+      "firstObservedCareerWeek": 141,
+      "lastObservedCareerWeek": 169
+    },
+    {
+      "id": "studio_ai_project_1vt7vge",
+      "name": "Analog Spark",
+      "ownCredit": false,
+      "closed": true,
+      "quality": 90,
+      "productionDollars": 35919000,
+      "campaignDollars": 6465000,
+      "grossDollars": 119435596.28,
+      "producerReceiptsDollars": 58523472.67,
+      "theatricalProfitDollars": 14969002.67,
+      "actorBackendDollars": 0,
+      "paidWeeks": 58,
+      "trackedRunWeeks": 58,
+      "firstObservedCareerWeek": 111,
+      "lastObservedCareerWeek": 168
+    }
+  ],
+  "management": [],
+  "actualPressTours": 1,
+  "actualSponsorsSigned": 0,
+  "universe": null,
+  "positiveLifeChoiceCash": [],
+  "conclusion": "UI_GATED_ORGANIC_PLAYER_2B_NOT_VERIFIED",
+  "limitations": [
+    "One adaptive longitudinal career is a capability probe, not a hit-rate or rarity estimate",
+    "World NPC film gross and player-credited film gross are reported separately",
+    "No owned studio or self-financed production is claimed unless actually founded through paid gameplay",
+    "Open theatrical runs are interim observations; future streaming income is excluded",
+    "Controlled UI-adapter cases and prior prepared-capital examples are excluded"
+  ]
+}

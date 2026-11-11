@@ -1,0 +1,9 @@
+{
+  "label": "cinema-cpu-profile",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 694.890625,
+  "stopReason": "System swap growth exceeded 512MiB",
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "elapsedMs": 7084
+}

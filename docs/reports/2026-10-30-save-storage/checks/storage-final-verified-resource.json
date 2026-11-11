@@ -1,0 +1,14 @@
+{
+  "label": "storage-final-verified",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 2602.65625,
+  "stopReason": "Worker tree exceeded 2.5GiB",
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 57156
+}

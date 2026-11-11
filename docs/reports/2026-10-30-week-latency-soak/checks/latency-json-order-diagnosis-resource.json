@@ -1,0 +1,15 @@
+{
+  "label": "latency-json-order-diagnosis",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 1536,
+  "peakProcessBreakdown": "27039 27035  48448 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n27149 27039 1457984 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node",
+  "peakOwnedTreeRssMiB": 1471.125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 9717
+}

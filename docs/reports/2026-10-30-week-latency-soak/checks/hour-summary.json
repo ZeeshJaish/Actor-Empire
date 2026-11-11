@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "minutes": 60.020958245833334,
+  "weeks": 65,
+  "medianMs": 3574,
+  "p95Ms": 3938,
+  "rangeMs": [
+    3006,
+    4298
+  ],
+  "first6Ms": [
+    3938,
+    3979,
+    3855,
+    3885,
+    3858,
+    3854
+  ],
+  "last6Ms": [
+    3010,
+    3042,
+    3124,
+    3095,
+    3086,
+    3006
+  ],
+  "navigationCount": 195,
+  "medianNavigationHandlerTo2RafMs": 22.899999976158142,
+  "p95NavigationMs": 116.60000002384186,
+  "rangeNavigationMs": [
+    16.5,
+    716
+  ],
+  "jsHeapRangeMiB": [
+    248.68364334106445,
+    448.0205879211426
+  ],
+  "firstLast10MedianJsHeapMiB": [
+    396.3973579406738,
+    407.23731231689453
+  ],
+  "domNodesRange": [
+    758,
+    905
+  ],
+  "credits": 37,
+  "posts": 200,
+  "dynastyArchiveBytes": 2,
+  "careVisits": 13,
+  "deferredClinic": 5,
+  "forcedGc": false,
+  "reloadEvery": 0,
+  "reloads": [
+    {
+      "count": 65,
+      "cash": 772252529,
+      "processed": 1957,
+      "final": true
+    }
+  ],
+  "pageErrors": [],
+  "startCash": 784792029,
+  "finalCash": 772252529,
+  "initialAgeWeek": [
+    37,
+    21
+  ],
+  "finalAgeWeek": [
+    38,
+    34
+  ],
+  "quantileMethod": "nearest-rank",
+  "first6MedianMs": 3871.5,
+  "last6MedianMs": 3064.0
+}

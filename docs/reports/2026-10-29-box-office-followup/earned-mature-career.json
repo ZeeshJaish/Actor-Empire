@@ -1,0 +1,117 @@
+{
+  "kind": "UI_GATED_FRESH_NORMAL_CAREER_COHORT",
+  "uiEligibilityVerified": true,
+  "auditAssertionUpdate": true,
+  "originCheckpointSha256": "e159a707fa5ee5f92a31e4bfa632daffe9d8514085590c87d4254b123540e844",
+  "executable": "cd65251398fa959acfe6d15d0cddc0e428220c378aab375e131b3b5d43adddeb",
+  "seed": 0,
+  "genre": "DRAMA",
+  "horizon": 1200,
+  "status": "OWNER_READY",
+  "weeks": 857,
+  "saves": 303,
+  "reloads": 90,
+  "replays": 857,
+  "failedPromotionChecked": true,
+  "phases": [
+    "AUDITION",
+    "PRODUCTION",
+    "POST_PRODUCTION",
+    "AWAITING_RELEASE",
+    "PRE_PRODUCTION",
+    "SCHEDULED"
+  ],
+  "ownIds": [
+    "aud_active_1800000003356_0.2084897451568395",
+    "aud_active_1800000003717_0.596783216111362",
+    "aud_active_1800000004381_0.8680683134589344",
+    "aud_active_1800000005134_0.2652193633839488",
+    "aud_active_1800000005498_0.40232519642449915",
+    "aud_active_1800000005725_0.13250390347093344",
+    "aud_active_1800000006021_0.3630366700235754",
+    "aud_active_1800000006113_0.3934233475010842",
+    "aud_active_1800000006457_0.5303560870233923",
+    "job_1800000006683",
+    "job_1800000007670",
+    "job_1800000008074",
+    "job_1800000008533",
+    "aud_active_1800000009011_0.6296739235986024",
+    "aud_active_1800000009092_0.7633003380615264",
+    "uni_job_1800000009610_0",
+    "uni_job_1800000009611_1",
+    "uni_job_1800000009612_2",
+    "uni_job_1800000009613_3",
+    "uni_job_1800000009614_4",
+    "job_1800000015180",
+    "aud_active_1800000016054_0.9039772406686097"
+  ],
+  "cash": 75459678,
+  "alive": true,
+  "skill": 92.33017334227527,
+  "health": 87.54999999999997,
+  "peakRssBytes": 1720434688,
+  "elapsedMs": 2552987,
+  "summary": {
+    "released": 275,
+    "completed": 265,
+    "open": 10,
+    "unknownCompleted": 0,
+    "all": {
+      "completed": 265,
+      "recouped": 178,
+      "hits": 73,
+      "profits": 93,
+      "nearBreakEven": 24,
+      "losses": 75,
+      "exactDeficits": 87
+    },
+    "small": {
+      "completed": 180,
+      "recouped": 121,
+      "hits": 44,
+      "profits": 68,
+      "nearBreakEven": 19,
+      "losses": 49,
+      "exactDeficits": 59
+    },
+    "player": {
+      "completed": 13,
+      "recouped": 13,
+      "hits": 8,
+      "profits": 5,
+      "nearBreakEven": 0,
+      "losses": 0,
+      "exactDeficits": 0
+    },
+    "billionAttainment": [
+      {
+        "billions": 1,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 2,
+        "allReleased": 0,
+        "completed": 0
+      },
+      {
+        "billions": 3,
+        "allReleased": 0,
+        "completed": 0
+      }
+    ]
+  },
+  "limitations": [
+    "Fresh $2000 actor; exact current App action callbacks; no grants",
+    "Fixed sustainable actor policy, not every player strategy; some credits may be series/streaming",
+    "Only completed cinema titles with known production/campaign costs enter hit/loss denominators",
+    "Shared studio identities can recur across careers; pooled film observations are not independent population probabilities",
+    "Theatrical result excludes future media and investor ownership distributions; recorded backend is a cost"
+  ],
+  "sampleNote": "Seed0 selected sustainable actor route extended from the four-seed early cohort; do not pool as an independent career or an all-player success probability.",
+  "originInitialCash": 2000,
+  "manualCapitalGrants": 0,
+  "fullReport": "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability-v2/career-0.json",
+  "checkpointSha256": "b28f05c9b4de8439048c474293d061bd84eab7cea265c70d17784b0c279ace87",
+  "firstStudioRoute": "Paid incorporation/production audited separately in fresh-earned-starter-v1"
+}

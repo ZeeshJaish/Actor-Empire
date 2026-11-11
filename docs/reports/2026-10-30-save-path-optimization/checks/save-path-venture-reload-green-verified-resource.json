@@ -1,0 +1,15 @@
+{
+  "label": "save-path-venture-reload-green-verified",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 1024,
+  "peakProcessBreakdown": "",
+  "peakOwnedTreeRssMiB": 0,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 332
+}

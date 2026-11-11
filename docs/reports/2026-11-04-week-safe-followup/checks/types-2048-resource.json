@@ -1,0 +1,13 @@
+{
+  "label": "types-2048",
+  "heapMiB": 2048,
+  "rssLimitMiB": 2560,
+  "peakOwnedTreeRssMiB": 1865.796875,
+  "peakGlobalSwapGrowthMiB": 722.1200000000008,
+  "swapWarning": true,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 19835,
+  "peakProcesses": "17746 17742 1910720 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node"
+}

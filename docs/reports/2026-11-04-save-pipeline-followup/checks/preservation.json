@@ -1,0 +1,23 @@
+{
+  "runtimeFiles": 901,
+  "testedSourceHashesStillExact": true,
+  "runtimePredatesBuild": true,
+  "initialDirtyFiles": 1242,
+  "missing": [],
+  "unexpectedChanges": [],
+  "productionChanged": [
+    "services/boxOffice/boxOfficeAudience.ts",
+    "services/saveIntegrity.ts",
+    "services/stableSaveHash.ts"
+  ],
+  "testProbesAbsent": [
+    "__industryIntegrityProbe",
+    "__hashSortKeyNodes",
+    "__captureCinemaLanguage",
+    "__captureIndustryWork",
+    "__cinemaLanguageCalls",
+    "__saveWork",
+    "saveBlocksQA"
+  ],
+  "ownWorkerLockPresent": false
+}

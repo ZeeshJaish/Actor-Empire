@@ -1,0 +1,69 @@
+[
+  {
+    "name": "audit-cinema-identity-cost",
+    "code": 0,
+    "ms": 123
+  },
+  {
+    "name": "audit-week-diagnostic-cost",
+    "code": 0,
+    "ms": 244
+  },
+  {
+    "name": "audit-save-integrity",
+    "code": 0,
+    "ms": 237
+  },
+  {
+    "name": "audit-save-generations",
+    "code": 0,
+    "ms": 282
+  },
+  {
+    "name": "audit-stable-save-hash",
+    "code": 0,
+    "ms": 79
+  },
+  {
+    "name": "audit-career-record-preservation",
+    "code": 0,
+    "ms": 3504
+  },
+  {
+    "name": "audit-save-migration",
+    "code": 0,
+    "ms": 4767
+  },
+  {
+    "name": "audit-save-preparation-projections",
+    "code": 0,
+    "ms": 754
+  },
+  {
+    "name": "audit-stock-save-safety",
+    "code": 0,
+    "ms": 2627
+  },
+  {
+    "name": "audit-streaming-signed-royalties",
+    "code": 0,
+    "ms": 4059
+  },
+  {
+    "name": "audit-box-office-market",
+    "code": 0,
+    "ms": 1448
+  },
+  {
+    "name": "audit-weekly-viewing-parity",
+    "code": 0,
+    "ms": 3037
+  },
+  {
+    "name": "audit-week-processing-diagnostics",
+    "code": 0,
+    "ms": 53,
+    "verification": "latency-diagnostic-wiring.log",
+    "priorFailureRetained": "audit-week-processing-diagnostics.log"
+  }
+]

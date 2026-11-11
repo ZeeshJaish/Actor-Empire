@@ -1,0 +1,99 @@
+{
+  "sampledCertainInvalidBtsActions": 21,
+  "examples": [
+    {
+      "week": 208,
+      "phases": [
+        "AWAITING_RELEASE",
+        "PRE_PRODUCTION"
+      ],
+      "projectId": "job_1800000002407"
+    },
+    {
+      "week": 455,
+      "phases": [
+        "PRE_PRODUCTION"
+      ],
+      "projectId": "job_1800000007033"
+    },
+    {
+      "week": 1040,
+      "phases": [
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED"
+      ],
+      "projectId": "uni_job_1800000017485_1"
+    },
+    {
+      "week": 1053,
+      "phases": [
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED"
+      ],
+      "projectId": "uni_job_1800000017485_1"
+    },
+    {
+      "week": 1066,
+      "phases": [
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED"
+      ],
+      "projectId": "uni_job_1800000017485_1"
+    },
+    {
+      "week": 1079,
+      "phases": [
+        "PRE_PRODUCTION",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED"
+      ],
+      "projectId": "uni_job_1800000017485_1"
+    },
+    {
+      "week": 1105,
+      "phases": [
+        "AWAITING_RELEASE",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED"
+      ],
+      "projectId": "uni_job_1800000017485_1"
+    },
+    {
+      "week": 1118,
+      "phases": [
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED",
+        "SCHEDULED"
+      ],
+      "projectId": "uni_job_1800000017486_2"
+    }
+  ],
+  "scope": "Lower bound from exact pre-action curve samples, not all weeks",
+  "supersededNormalUiProof": true
+}

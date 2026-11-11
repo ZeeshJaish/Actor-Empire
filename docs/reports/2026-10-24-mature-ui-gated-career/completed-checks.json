@@ -1,0 +1,94 @@
+{
+  "currentHead": "09edec4bf958d12c201b9ef848e1c5bcacc7e39e",
+  "simulationStatus": "UNIVERSE_RUN_CLOSED",
+  "simulationWeeks": 1063,
+  "checks": [
+    {
+      "label": "universe-route-continuation-typecheck",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": []
+    },
+    {
+      "label": "universe-route-ui-policy-origin",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "3114d69f64cab33e3085b976584cd8e2b5e86a065886862e26e8c17c9d96c09c",
+      "summary": [
+        "{\"passed\":18,\"failures\":0,\"kind\":\"UI_ADAPTER_CASES_EXCLUDED_FROM_NORMAL_CAREER_RESULTS\"}"
+      ]
+    },
+    {
+      "label": "final-earned-save-safety",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "e69e674c96b42120266c40c548847053b87af83fb436e6cd2373d15b4a5dfece",
+      "summary": [
+        "{\"passed\":5,\"failures\":0,\"weeks\":1063,\"executable\":\"aab24cc4b2ba13addbdfc5b5b39f2f75dc691d5abbb181f3e2a155f280597907\",\"paidFactsSha256\":\"00778ab09bff5be0dfadbc1c17ba462e9311d6c888664e42ac67adcd817707c8\",\"cash\":2157704968,\"newGameWeeksProcessed\":0,\"personalSaveStorageAccessed\":false}"
+      ]
+    },
+    {
+      "label": "legacy-paid-streaming-save-safety",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "ed11d0c837ca8cd273913ba1ec5815454aefdd859e690fece9be3569685b1264",
+      "summary": [
+        "{\"passed\":5,\"failures\":0,\"weeks\":832,\"executable\":\"043ea20028c97da089d474bdcda31a2636f51221b9b94dddf336f90d97706cac\",\"paidFactsSha256\":\"3034c9bcad6d9cc0b51055b3d53638ccaa6bddceb9ff64517d114e25f6f14e5a\",\"cash\":275285360,\"newGameWeeksProcessed\":0,\"personalSaveStorageAccessed\":false}"
+      ]
+    },
+    {
+      "label": "final-cinema-migration",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "388056841da6b1b6c27eb98508be9701b9eaa2815bfca375a68a7a4c74545701",
+      "summary": [
+        "Migration audit: 25 groups passed"
+      ]
+    },
+    {
+      "label": "final-cinema-settlement",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "d467505502731384271276cf1fea99297be415d0a14f432d19e1db0bda2a5cd6",
+      "summary": [
+        "Integration audit: 32 groups passed"
+      ]
+    },
+    {
+      "label": "final-career-team-fees",
+      "exitCode": 0,
+      "stopReason": null,
+      "logSha256": "1db0136af83e2bb2aee5869444e857e266d0783eb497e3fe0bd8b0547c2c5abf",
+      "summary": [
+        "{\"passes\":4,\"failures\":0}"
+      ]
+    }
+  ],
+  "routingRegression": {
+    "offers": 1024,
+    "universes": 8,
+    "mixedRoadmaps": 3,
+    "acceptedMedia": 28,
+    "failures": 0
+  },
+  "terminalRetry": {
+    "exitCode": 0,
+    "retainedOutput": "{\"seed\":0,\"retained\":\"UNIVERSE_RUN_CLOSED\",\"weeks\":1063}",
+    "checkpointReportAndMemoryHistoryUnchanged": true,
+    "sha256": {
+      "career-0.json": "eb38725e4c34096d4a14961b63bb42ac96c06aef1a74f8996a79546428dfa4eb",
+      "career-0.json.gz": "098ccf56ecb37b25140d54e3069fe9c5ca01f5ea554dcd2f7c521596464ace0b",
+      "memory-history.jsonl": "ea9495146299c7a293a67a818b7589a90f21cae4eafc775a6d12f28e50efb079"
+    },
+    "newWeeksProcessed": 0
+  },
+  "productionBuild": {
+    "exitCode": 0,
+    "signal": null,
+    "heapMB": 2048,
+    "peakOwnedTreeRssMiB": 2841.9,
+    "stopReason": null,
+    "systemGuard": "darwin"
+  }
+}

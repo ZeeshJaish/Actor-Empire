@@ -1,0 +1,23 @@
+{
+  "initialDirtyFiles": 924,
+  "runtimeFiles": 845,
+  "initialChanged": [
+    "package.json",
+    "scripts/audit-week-diagnostic-cost.ts",
+    "scripts/audit-week-latency-soak.cjs",
+    "services/firebaseService.ts",
+    "services/saveCompaction.ts",
+    "services/saveIntegrity.ts"
+  ],
+  "runtimeChanged": [
+    "services/saveIntegrity.ts",
+    "services/saveCompaction.ts",
+    "services/firebaseService.ts",
+    "package.json",
+    "vite.config.ts"
+  ],
+  "missing": [],
+  "unexpected": [],
+  "packageAndLockOnlyPinnedCompatibilityDependency": true,
+  "hashAndCinemaIdentityUnchanged": true
+}

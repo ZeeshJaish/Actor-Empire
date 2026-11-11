@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "scope": "65 consecutive real UI weeks, accelerated cadence; not a 60-minute/native session",
+  "weeks": 65,
+  "medianMs": 3728,
+  "p95NearestRankMs": 4650,
+  "rangeMs": [
+    3009,
+    5346
+  ],
+  "pageErrors": [],
+  "durationMs": 569494,
+  "underThreeSecondsP95": false
+}

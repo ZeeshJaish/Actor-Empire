@@ -1,0 +1,17 @@
+{
+  "before": {
+    "rootFiles": 1928,
+    "generatedFiles": 39,
+    "generatedSourceMiB": 210.419020652771,
+    "lintHeapMiB": 8192
+  },
+  "after": {
+    "rootFiles": 1889,
+    "generatedFiles": 0,
+    "lintHeapMiB": 2048
+  },
+  "rootTypeCheck": "PASS",
+  "rootPeakWorkerTreeRssMiB": 2148.25,
+  "exclusion": "cinema-verification.local",
+  "meaning": "Generated/frozen test executables are not current source and must not enter the production root compiler. The heap budget bounds V8, not total RSS. No gameplay or save fields changed."
+}

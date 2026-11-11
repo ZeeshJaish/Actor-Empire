@@ -1,0 +1,45 @@
+{
+  "sourceRef": "09edec4",
+  "executable": "043ea20028c97da089d474bdcda31a2636f51221b9b94dddf336f90d97706cac",
+  "auditKind": "mature-ui",
+  "origin": {
+    "path": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+    "sha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+    "careerWeek": 156,
+    "cashDollars": 57643,
+    "freshInitialCashDollars": 2000
+  },
+  "heapMiB": 768,
+  "batchWeeks": 13,
+  "maxWorkerTreeRssMiB": 3072,
+  "minimumFreePercent": 15,
+  "minimumStartFreePercent": 25,
+  "maximumBatchSwapGrowthMiB": 512,
+  "boundedCareerHorizonWeeks": 1600,
+  "matureMinimumCareerWeeks": 1040,
+  "endpoint": "Mature craft >=80, fame >=70 and first actually offered universe arc closed, or bounded horizon/career end",
+  "manualGrants": 0,
+  "authoredFinishedFilms": 0,
+  "loans": 0,
+  "overrides": {
+    "scripts/fixtures/cinemaMatureAppPolicy.ts": "Only audit policy, not product source"
+  },
+  "ordinaryUiLocksEnforced": true,
+  "oldCallbackCaseExcluded": true,
+  "preFixRunStoppedAtWeek": 832,
+  "preFixRunStopReason": "Reproduced universe film incorrectly inherited STREAMING_ONLY from temporary random studio, so the actual film bypassed cinema.",
+  "correctedContinuation": {
+    "parentWeek": 689,
+    "cashDollars": 74482247,
+    "parentUiEligibilityVerified": true,
+    "root": "/private/tmp/actor-cinema-mature-universe-route-09edec4-20261024",
+    "gameplayVariant": "UNIVERSE_MEDIA_ROUTE_FIX",
+    "sourceOverrides": [
+      "services/universeLogic.ts",
+      "views/mobile/MobilePage.tsx",
+      "types.ts"
+    ],
+    "earningsFormulaChanges": false,
+    "existingPaidReleasesRetagged": false
+  }
+}

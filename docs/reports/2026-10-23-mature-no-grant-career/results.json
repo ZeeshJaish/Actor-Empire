@@ -1,0 +1,679 @@
+{
+  "status": "UNIVERSE_RUN_CLOSED",
+  "completeObservation": true,
+  "sourceRef": "07fdfff",
+  "executable": "fc13deb41103c920b7d0dfba268707cc3b8c3ea384a0d7747e7fb41784d6a1a3",
+  "inputReport": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/v6/career-0.json",
+  "inputSha256": "e9cb539bf66d4885628bf90afac21eac42b521f9c028ec9fc0872fec1b4fa2bf",
+  "weeks": 1469,
+  "origin": {
+    "checkpoint": "/private/tmp/actor-cinema-final-07fdfff-20261023/normal/career-0.json.gz",
+    "checkpointSha256": "5aeec4d9bbfa70ed2f7e01893f4cf56a3817a1032ea49480d91d3bccc4ecbe8d",
+    "executable": "8c6ceb1878902029d1ccdc03c8d261612a7d7cc000bb2d94091b11658807207d",
+    "weeks": 156,
+    "cash": 57643,
+    "sourceRef": "07fdfff",
+    "initialCash": 2000,
+    "manualCapitalGrants": 0
+  },
+  "lineage": [
+    {
+      "checkpoint": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/policy-v1-source/career-0.json.gz",
+      "checkpointSha256": "c2d44be64f5e0633c5d4c45d29415fe433f6dfd3031da338a166d8ba20daa663",
+      "executable": "831247770f52bf1062d66a1c1d447aba92784d70539891f96346c74d6e75092a",
+      "weeks": 424,
+      "cash": 1094398,
+      "playerSha256": "94cd0b20e8900212edb60e3dc4f9271171c7251fcd2971d28aa5efd446fc20b9",
+      "reason": "Compare current inbox and Casting App choices together; improve actual paid cross-genre preparation; no player state altered"
+    },
+    {
+      "checkpoint": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/policy-v2-source/career-0.json.gz",
+      "checkpointSha256": "1881e8d43c2c632aafa6e621c43e7d7c5f6f27165a2d9390e1be6c771bc80cef",
+      "executable": "b4125fc23ac723eac740739f546f6f800fb6c44685181231fade593ce4231b25",
+      "weeks": 712,
+      "cash": 3159553,
+      "playerSha256": "bdb3051d6878e7c62eb910b6bd75511231691935d57b1a8638a89c9a8a27dfe8",
+      "reason": "Add real paid agents, managers, publicist, sponsorship obligations and actual generated press answers; no player state altered"
+    },
+    {
+      "checkpoint": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/policy-v3-source/career-0.json.gz",
+      "checkpointSha256": "297d46bf148b08366a40234e001ee2c7179806b6841863e6e80634df771404e5",
+      "executable": "206d6faf120d47cc5cd19609ac034bbfd7b7a9b59fbc5657f767e79716cc631e",
+      "weeks": 924,
+      "cash": 58929460,
+      "playerSha256": "4d1e749c6ad333bcee99f490cf9f62ab3db4b76daea932b2af000e1133d6dd48",
+      "reason": "Keep the identical managed-career policy through the full horizon; record the cash financing milestone without terminating mature film observation; no player state altered"
+    },
+    {
+      "checkpoint": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/policy-v4-source/career-0.json.gz",
+      "checkpointSha256": "f57cdd680e3de85dd295e89c4bd087ec6d5288f349d8415b453c2c03c644bf11",
+      "executable": "ca457caa7884d22e9a2ae255a38af2ca1ce25d1887a225d4e82ff6efb985d4d9",
+      "weeks": 932,
+      "cash": 62610938,
+      "playerSha256": "6cdcbc4b0d685e9cb8b7e5bb6fdb76f4ecc234697a282cd4990cb276432d1c25",
+      "reason": "Replace only the audit memory save store with parity-verified immutable disk generations; retain the exact world, gameplay policy, payments, RNG and clock"
+    },
+    {
+      "checkpoint": "/private/tmp/actor-cinema-mature-no-grants-07fdfff-20261023/policy-v5-source/career-0.json.gz",
+      "checkpointSha256": "25fdd89da1dc6deabf0eb78a21a22c812971ce146a1728459718e4c11d103fd5",
+      "executable": "26945ebf18fb1e64167d5af1b1b6256d7c2a059107ba9dbff23eb073fd396e23",
+      "weeks": 1000,
+      "cash": 89974506,
+      "playerSha256": "0c461bec3d6dcdfdf9056eb5bb5c2d295637ab0a398f8b897f7172bf5d0f15be",
+      "reason": "Permit only verified AUTO-to-CANON provenance enrichment while preserving story meanings and paid facts; follow the organically offered universe contract through its last theatrical closure; no gameplay policy or player state changed"
+    }
+  ],
+  "ownerCapitalMilestone": {
+    "weeks": 964,
+    "cash": 70505921
+  },
+  "finalCashDollars": 4722362616,
+  "finalProfile": {
+    "weeks": 1469,
+    "age": 43,
+    "week": 14,
+    "cash": 4722362616,
+    "craft": 92.32433292473904,
+    "fame": 100,
+    "reputation": 100,
+    "experience": 100,
+    "health": 74.1,
+    "followers": 443723283,
+    "credits": 52,
+    "studios": 0,
+    "roles": [
+      {
+        "id": "aud_active_1800000026265_0.13871339824981987",
+        "role": "LEAD",
+        "phase": "POST_PRODUCTION",
+        "pay": 1404658
+      },
+      {
+        "id": "aud_active_1800000026660_0.013232258148491383",
+        "role": "SUPPORTING",
+        "phase": "PRODUCTION",
+        "pay": 60000
+      }
+    ]
+  },
+  "firstObservedStarProfileWeek": 754,
+  "safeguards": {
+    "manualCapitalGrants": 0,
+    "authoredCompletedPackages": 0,
+    "loans": 0,
+    "saves": 455,
+    "reloads": 163,
+    "duplicateWeeksRejected": 1469,
+    "failedPromotionRecovery": true
+  },
+  "filmCounts": {
+    "released": 433,
+    "closed": 423,
+    "open": 10,
+    "playerCredits": 29,
+    "playerClosed": 28
+  },
+  "attainment": {
+    "player": [
+      {
+        "grossBillions": 1,
+        "observed": 29,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 29,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 29,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ],
+    "world": [
+      {
+        "grossBillions": 1,
+        "observed": 433,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 2,
+        "observed": 433,
+        "attained": 0,
+        "closedAttained": 0
+      },
+      {
+        "grossBillions": 3,
+        "observed": 433,
+        "attained": 0,
+        "closedAttained": 0
+      }
+    ]
+  },
+  "closedFinancialOutcomes": {
+    "all": {
+      "completed": 423,
+      "recouped": 277,
+      "hits": 105,
+      "profits": 157,
+      "nearBreakEven": 36,
+      "losses": 125,
+      "exactDeficits": 146
+    },
+    "small": {
+      "completed": 248,
+      "recouped": 169,
+      "hits": 54,
+      "profits": 104,
+      "nearBreakEven": 26,
+      "losses": 64,
+      "exactDeficits": 79
+    },
+    "player": {
+      "completed": 28,
+      "recouped": 22,
+      "hits": 13,
+      "profits": 9,
+      "nearBreakEven": 1,
+      "losses": 5,
+      "exactDeficits": 6
+    }
+  },
+  "topPlayer": [
+    {
+      "id": "job_1800000016927",
+      "name": "The Sixth Sense",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 91.198,
+      "productionDollars": 140681709.57,
+      "campaignDollars": 25322707.72,
+      "grossDollars": 765444497.61,
+      "producerReceiptsDollars": 381981576.84,
+      "theatricalProfitDollars": 212830632.55,
+      "actorBackendDollars": 3146527,
+      "paidWeeks": 71,
+      "trackedRunWeeks": 71,
+      "firstObservedCareerWeek": 1010,
+      "lastObservedCareerWeek": 1080
+    },
+    {
+      "id": "aud_active_1800000015418_0.9677096514496952",
+      "name": "The Green Mile",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 93.9,
+      "productionDollars": 109868284.04,
+      "campaignDollars": 19776291.13,
+      "grossDollars": 730233588.16,
+      "producerReceiptsDollars": 363936939.67,
+      "theatricalProfitDollars": 230923084.5,
+      "actorBackendDollars": 3369280,
+      "paidWeeks": 74,
+      "trackedRunWeeks": 74,
+      "firstObservedCareerWeek": 935,
+      "lastObservedCareerWeek": 1008
+    },
+    {
+      "id": "aud_active_1800000025894_0.8884446402080357",
+      "name": "The Bourne Identity",
+      "ownCredit": true,
+      "closed": false,
+      "quality": 83.9,
+      "productionDollars": 111029897.07,
+      "campaignDollars": 19985381.47,
+      "grossDollars": 571367049.43,
+      "producerReceiptsDollars": 285348847.98,
+      "theatricalProfitDollars": null,
+      "actorBackendDollars": 1816397,
+      "paidWeeks": 15,
+      "trackedRunWeeks": 15,
+      "firstObservedCareerWeek": 1455,
+      "lastObservedCareerWeek": 1469
+    },
+    {
+      "id": "uni_job_1800000017491_7",
+      "name": "Thor: Love and Thunder",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 77.64,
+      "productionDollars": 62209844,
+      "campaignDollars": 11197771.92,
+      "grossDollars": 535583435.77,
+      "producerReceiptsDollars": 266841078.52,
+      "theatricalProfitDollars": 189938571.6,
+      "actorBackendDollars": 3494891,
+      "paidWeeks": 45,
+      "trackedRunWeeks": 45,
+      "firstObservedCareerWeek": 1425,
+      "lastObservedCareerWeek": 1469
+    },
+    {
+      "id": "job_1800000016315",
+      "name": "Taken 3",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 81.31,
+      "productionDollars": 100083919.78,
+      "campaignDollars": 18015105.56,
+      "grossDollars": 434093791.81,
+      "producerReceiptsDollars": 216658434.86,
+      "theatricalProfitDollars": 97179246.52,
+      "actorBackendDollars": 1380163,
+      "paidWeeks": 44,
+      "trackedRunWeeks": 44,
+      "firstObservedCareerWeek": 980,
+      "lastObservedCareerWeek": 1023
+    }
+  ],
+  "topWorld": [
+    {
+      "id": "job_1800000016927",
+      "name": "The Sixth Sense",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 91.198,
+      "productionDollars": 140681709.57,
+      "campaignDollars": 25322707.72,
+      "grossDollars": 765444497.61,
+      "producerReceiptsDollars": 381981576.84,
+      "theatricalProfitDollars": 212830632.55,
+      "actorBackendDollars": 3146527,
+      "paidWeeks": 71,
+      "trackedRunWeeks": 71,
+      "firstObservedCareerWeek": 1010,
+      "lastObservedCareerWeek": 1080
+    },
+    {
+      "id": "aud_active_1800000015418_0.9677096514496952",
+      "name": "The Green Mile",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 93.9,
+      "productionDollars": 109868284.04,
+      "campaignDollars": 19776291.13,
+      "grossDollars": 730233588.16,
+      "producerReceiptsDollars": 363936939.67,
+      "theatricalProfitDollars": 230923084.5,
+      "actorBackendDollars": 3369280,
+      "paidWeeks": 74,
+      "trackedRunWeeks": 74,
+      "firstObservedCareerWeek": 935,
+      "lastObservedCareerWeek": 1008
+    },
+    {
+      "id": "aud_active_1800000025894_0.8884446402080357",
+      "name": "The Bourne Identity",
+      "ownCredit": true,
+      "closed": false,
+      "quality": 83.9,
+      "productionDollars": 111029897.07,
+      "campaignDollars": 19985381.47,
+      "grossDollars": 571367049.43,
+      "producerReceiptsDollars": 285348847.98,
+      "theatricalProfitDollars": null,
+      "actorBackendDollars": 1816397,
+      "paidWeeks": 15,
+      "trackedRunWeeks": 15,
+      "firstObservedCareerWeek": 1455,
+      "lastObservedCareerWeek": 1469
+    },
+    {
+      "id": "uni_job_1800000017491_7",
+      "name": "Thor: Love and Thunder",
+      "ownCredit": true,
+      "closed": true,
+      "quality": 77.64,
+      "productionDollars": 62209844,
+      "campaignDollars": 11197771.92,
+      "grossDollars": 535583435.77,
+      "producerReceiptsDollars": 266841078.52,
+      "theatricalProfitDollars": 189938571.6,
+      "actorBackendDollars": 3494891,
+      "paidWeeks": 45,
+      "trackedRunWeeks": 45,
+      "firstObservedCareerWeek": 1425,
+      "lastObservedCareerWeek": 1469
+    },
+    {
+      "id": "studio_ai_project_04gmgi1",
+      "name": "Red Analog Republic",
+      "ownCredit": false,
+      "closed": true,
+      "quality": 82,
+      "productionDollars": 85732000,
+      "campaignDollars": 15432000,
+      "grossDollars": 446598313.7,
+      "producerReceiptsDollars": 214105725.69,
+      "theatricalProfitDollars": 106518556.69,
+      "actorBackendDollars": 0,
+      "paidWeeks": 48,
+      "trackedRunWeeks": 48,
+      "firstObservedCareerWeek": 702,
+      "lastObservedCareerWeek": 749
+    }
+  ],
+  "management": [
+    {
+      "week": 712,
+      "type": "hire-current-agent",
+      "cost": 250000,
+      "terms": {
+        "id": "agent_std_1",
+        "name": "Sarah Jenkins",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_std_1.description",
+        "annualFee": 250000,
+        "commission": 0.12,
+        "specialty": "TV",
+        "tier": "STANDARD",
+        "studioAccess": "MID"
+      }
+    },
+    {
+      "week": 713,
+      "type": "hire-current-manager",
+      "cost": 75000,
+      "terms": {
+        "id": "mgr_rookie_1",
+        "name": "Cousin Vinny",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_rookie_1.description",
+        "annualFee": 75000,
+        "commission": 0.2,
+        "tier": "ROOKIE",
+        "sponsorshipPower": 2
+      }
+    },
+    {
+      "week": 714,
+      "type": "hire-current-publicist",
+      "cost": 1500,
+      "terms": {
+        "id": "pub_std",
+        "name": "Global PR",
+        "type": "PUBLICIST",
+        "tier": "STANDARD",
+        "weeklyCost": 1500,
+        "description": "",
+        "descriptionKey": "services.teamLogic.member.pub_std.description",
+        "perks": "",
+        "perksKey": "services.teamLogic.member.pub_std.perks"
+      }
+    },
+    {
+      "week": 817,
+      "type": "hire-current-manager",
+      "cost": 800000,
+      "terms": {
+        "id": "mgr_elite_1",
+        "name": "Icon Management",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_elite_1.description",
+        "annualFee": 800000,
+        "commission": 0.1,
+        "tier": "ELITE",
+        "sponsorshipPower": 9
+      }
+    },
+    {
+      "week": 827,
+      "type": "hire-current-agent",
+      "cost": 1500000,
+      "terms": {
+        "id": "agent_elite_1",
+        "name": "Vantage Talent",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_elite_1.description",
+        "annualFee": 1500000,
+        "commission": 0.1,
+        "specialty": "BALANCED",
+        "tier": "ELITE",
+        "studioAccess": "HIGH"
+      }
+    },
+    {
+      "week": 931,
+      "type": "hire-current-manager",
+      "cost": 1200000,
+      "terms": {
+        "id": "mgr_elite_3",
+        "name": "Elena \"The Fixer\" Cruz",
+        "description": "",
+        "descriptionKey": "services.teamLogic.manager.mgr_elite_3.description",
+        "annualFee": 1200000,
+        "commission": 0.12,
+        "tier": "ELITE",
+        "sponsorshipPower": 10
+      }
+    },
+    {
+      "week": 934,
+      "type": "hire-current-agent",
+      "cost": 10000000,
+      "terms": {
+        "id": "agent_legend_1",
+        "name": "Ari Golding",
+        "description": "",
+        "descriptionKey": "services.teamLogic.agent.agent_legend_1.description",
+        "annualFee": 10000000,
+        "commission": 0.1,
+        "specialty": "BALANCED",
+        "tier": "LEGEND",
+        "studioAccess": "HIGH"
+      }
+    }
+  ],
+  "actualPressTours": 27,
+  "actualSponsorsSigned": 47,
+  "universe": {
+    "universeId": "MCU",
+    "characterName": "Thor",
+    "signedAtCareerWeek": 1000,
+    "salaryTotal": 9464991,
+    "roadmap": [
+      {
+        "title": "Thor",
+        "role": "LEAD",
+        "type": "UNIVERSE_ENTRY",
+        "weeksOffset": 10
+      },
+      {
+        "title": "The Avengers",
+        "role": "ENSEMBLE",
+        "type": "UNIVERSE_EVENT",
+        "weeksOffset": 70
+      },
+      {
+        "title": "Thor: The Dark World",
+        "role": "LEAD",
+        "type": "SEQUEL",
+        "weeksOffset": 130
+      },
+      {
+        "title": "Doctor Strange",
+        "role": "CAMEO",
+        "type": "UNIVERSE_CROSSOVER",
+        "weeksOffset": 160
+      },
+      {
+        "title": "Avengers: Age of Ultron",
+        "role": "ENSEMBLE",
+        "type": "UNIVERSE_EVENT",
+        "weeksOffset": 190
+      },
+      {
+        "title": "Thor: Ragnarok",
+        "role": "LEAD",
+        "type": "SEQUEL",
+        "weeksOffset": 250
+      },
+      {
+        "title": "Avengers: Infinity War",
+        "role": "ENSEMBLE",
+        "type": "UNIVERSE_EVENT",
+        "weeksOffset": 310
+      },
+      {
+        "title": "Thor: Love and Thunder",
+        "role": "LEAD",
+        "type": "SEQUEL",
+        "weeksOffset": 390
+      }
+    ],
+    "films": [
+      {
+        "id": "uni_job_1800000017484_0",
+        "name": "Thor",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 77.28,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 318880127.01,
+        "producerReceiptsDollars": 159122091.98,
+        "theatricalProfitDollars": 84061563.06,
+        "actorBackendDollars": 1652913,
+        "paidWeeks": 42,
+        "trackedRunWeeks": 42,
+        "firstObservedCareerWeek": 1029,
+        "lastObservedCareerWeek": 1070
+      },
+      {
+        "id": "uni_job_1800000017485_1",
+        "name": "The Avengers",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 75.51,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 325684612.26,
+        "producerReceiptsDollars": 162454320.29,
+        "theatricalProfitDollars": 87335953.37,
+        "actorBackendDollars": 1710751,
+        "paidWeeks": 42,
+        "trackedRunWeeks": 42,
+        "firstObservedCareerWeek": 1106,
+        "lastObservedCareerWeek": 1147
+      },
+      {
+        "id": "uni_job_1800000017486_2",
+        "name": "Thor: The Dark World",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 77.4,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 346948821.46,
+        "producerReceiptsDollars": 172993748.94,
+        "theatricalProfitDollars": 97694636.02,
+        "actorBackendDollars": 1891497,
+        "paidWeeks": 42,
+        "trackedRunWeeks": 42,
+        "firstObservedCareerWeek": 1166,
+        "lastObservedCareerWeek": 1207
+      },
+      {
+        "id": "uni_job_1800000017487_3",
+        "name": "Doctor Strange",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 72.9,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 268555369.91,
+        "producerReceiptsDollars": 134499617.21,
+        "theatricalProfitDollars": 59866848.29,
+        "actorBackendDollars": 1225153,
+        "paidWeeks": 42,
+        "trackedRunWeeks": 42,
+        "firstObservedCareerWeek": 1192,
+        "lastObservedCareerWeek": 1233
+      },
+      {
+        "id": "uni_job_1800000017488_4",
+        "name": "Avengers: Age of Ultron",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 75.588,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 295454188.06,
+        "producerReceiptsDollars": 146892280.76,
+        "theatricalProfitDollars": 72030871.84,
+        "actorBackendDollars": 1453793,
+        "paidWeeks": 42,
+        "trackedRunWeeks": 42,
+        "firstObservedCareerWeek": 1222,
+        "lastObservedCareerWeek": 1263
+      },
+      {
+        "id": "uni_job_1800000017489_5",
+        "name": "Thor: Ragnarok",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 77.52,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 357138268.38,
+        "producerReceiptsDollars": 177913229.73,
+        "theatricalProfitDollars": 102527506.81,
+        "actorBackendDollars": 1978107,
+        "paidWeeks": 43,
+        "trackedRunWeeks": 43,
+        "firstObservedCareerWeek": 1283,
+        "lastObservedCareerWeek": 1325
+      },
+      {
+        "id": "uni_job_1800000017490_6",
+        "name": "Avengers: Infinity War",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 75.666,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 395171138.19,
+        "producerReceiptsDollars": 196515007.82,
+        "theatricalProfitDollars": 120806004.9,
+        "actorBackendDollars": 2301387,
+        "paidWeeks": 43,
+        "trackedRunWeeks": 43,
+        "firstObservedCareerWeek": 1340,
+        "lastObservedCareerWeek": 1382
+      },
+      {
+        "id": "uni_job_1800000017491_7",
+        "name": "Thor: Love and Thunder",
+        "ownCredit": true,
+        "closed": true,
+        "quality": 77.64,
+        "productionDollars": 62209844,
+        "campaignDollars": 11197771.92,
+        "grossDollars": 535583435.77,
+        "producerReceiptsDollars": 266841078.52,
+        "theatricalProfitDollars": 189938571.6,
+        "actorBackendDollars": 3494891,
+        "paidWeeks": 45,
+        "trackedRunWeeks": 45,
+        "firstObservedCareerWeek": 1425,
+        "lastObservedCareerWeek": 1469
+      }
+    ]
+  },
+  "positiveLifeChoiceCash": [],
+  "conclusion": "CONDITIONAL_CALLBACK_CASE_NOT_NORMAL_UI_PROOF",
+  "limitations": [
+    "One adaptive longitudinal career is a capability probe, not a hit-rate or rarity estimate",
+    "World NPC film gross and player-credited film gross are reported separately",
+    "No owned studio or self-financed production is claimed unless actually founded through paid gameplay",
+    "Open theatrical runs are interim observations; future streaming income is excluded",
+    "Controlled UI-adapter cases and prior prepared-capital examples are excluded"
+  ],
+  "uiEligibilityVerified": false,
+  "normalUiProofInvalidatedReason": "BTS posts were called without the normal post picker PRODUCTION prerequisite; financial results remain conditional, not ordinary UI career evidence."
+}

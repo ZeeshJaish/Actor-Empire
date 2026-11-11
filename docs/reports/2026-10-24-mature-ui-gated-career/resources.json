@@ -1,0 +1,26 @@
+{
+  "careerHeapMiB": 768,
+  "careerRecordedPeakRssMiB": 1961.609375,
+  "careerMaxSampledWorkerTreeRssMiB": 1916.75,
+  "workerTreeLimitMiB": 3072,
+  "correctedRootGuardStops": [
+    {
+      "stopReason": "System swap growth exceeded 512MiB",
+      "at": "2026-10-23T22:31:33.662Z"
+    },
+    {
+      "stopReason": "System swap growth exceeded 512MiB",
+      "at": "2026-10-23T22:49:57.306Z"
+    }
+  ],
+  "productionBuild": {
+    "exitCode": 0,
+    "signal": null,
+    "heapMB": 2048,
+    "peakOwnedTreeRssMiB": 2841.9,
+    "stopReason": null,
+    "systemGuard": "darwin"
+  },
+  "oneHeavyWorkerAtATime": true,
+  "simulationStopped": true
+}

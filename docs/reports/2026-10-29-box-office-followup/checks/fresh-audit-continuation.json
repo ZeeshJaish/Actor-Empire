@@ -1,0 +1,20 @@
+{
+  "status": "VERIFIED_AUDIT_ONLY_TRANSITION",
+  "parentCheckpoint": "cinema-verification.local/owned-studio-20261029/fresh-ui-owner-affordability/career-0.json.gz",
+  "parentCheckpointSha256": "e159a707fa5ee5f92a31e4bfa632daffe9d8514085590c87d4254b123540e844",
+  "parentCommittedWeek": 530,
+  "parentExecutable": "b8f07abff3b821e30ab617ef6729f54b29c510ccc837778cd41e1581c1f7eaf7",
+  "continuedExecutable": "cd65251398fa959acfe6d15d0cddc0e428220c378aab375e131b3b5d43adddeb",
+  "changedBundledInputs": [
+    "scripts/audit-cinema-normal-cohort.ts"
+  ],
+  "addedBundledInputs": [
+    "scripts/fixtures/cinemaMatureMigrationAssertions.ts"
+  ],
+  "identicalProductInputs": 427,
+  "allOtherExistingAuditInputsIdentical": true,
+  "allowedMetadataTransition": "AUTO to CANON only for a universe cast credit; existing story meanings still guarded",
+  "moneySalaryCharacterIdRecognitionAndLedgerGuardsUnchanged": true,
+  "failedWeek533EvidenceRetained": true,
+  "replayedWeek533CashMatchesFailedReport": 12949851
+}

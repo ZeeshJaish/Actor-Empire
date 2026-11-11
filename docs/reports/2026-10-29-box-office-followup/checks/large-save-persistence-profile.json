@@ -1,0 +1,68 @@
+{
+  "phases": [
+    {
+      "name": "prepareProcessedWeek",
+      "ms": 897.1255420000002
+    },
+    {
+      "name": "firstVerifiedSave",
+      "ms": 903.0326660000001
+    },
+    {
+      "name": "secondVerifiedSaveWithPrevious",
+      "ms": 841.1712079999998
+    },
+    {
+      "name": "verifiedLoad",
+      "ms": 506.72716699999955
+    }
+  ],
+  "hashes": 230,
+  "serializeMs": 1251.9863710000009,
+  "hashMs": 242.87745899999913,
+  "largestHashes": [
+    {
+      "characters": 13184858,
+      "serializeMs": 188.90533300000016,
+      "hashMs": 23.750458999999864
+    },
+    {
+      "characters": 13184858,
+      "serializeMs": 159.09254099999998,
+      "hashMs": 26.18662499999982
+    },
+    {
+      "characters": 13184858,
+      "serializeMs": 152.9515409999999,
+      "hashMs": 32.028334000000086
+    },
+    {
+      "characters": 13184858,
+      "serializeMs": 133.53862500000014,
+      "hashMs": 28.952166000000034
+    },
+    {
+      "characters": 13184858,
+      "serializeMs": 131.75779199999988,
+      "hashMs": 26.954957999999806
+    },
+    {
+      "characters": 13184858,
+      "serializeMs": 128.87845800000014,
+      "hashMs": 22.816125000000284
+    },
+    {
+      "characters": 13184858,
+      "serializeMs": 123.43100000000004,
+      "hashMs": 22.176999999999907
+    },
+    {
+      "characters": 13184858,
+      "serializeMs": 116.03870799999982,
+      "hashMs": 21.46187500000019
+    }
+  ],
+  "newWeeks": 0,
+  "personalSaveStorageAccessed": false,
+  "sourceSha": "f76f9c26b1f018fbe4e2866c1ce97174ebc5bc5812494e79076e7920f7984e38"
+}

@@ -1,0 +1,9 @@
+{
+  "label": "final-audit-stock-save-safety",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 118.40625,
+  "stopReason": "System swap growth exceeded 512MiB",
+  "exitCode": null,
+  "signal": "SIGTERM",
+  "elapsedMs": 1076
+}

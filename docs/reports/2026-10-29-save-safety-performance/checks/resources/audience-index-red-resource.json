@@ -1,0 +1,9 @@
+{
+  "label": "audience-index-red",
+  "heapMiB": 512,
+  "peakOwnedTreeRssMiB": 0,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 280
+}

@@ -1,0 +1,18 @@
+{
+  "App.tsx": "71c80dc044246d1608a47b006cf2ef8c99c87373921909f0c52c12a7180403bc",
+  "services/storage.ts": "fbb049f1c4b017d2d8343fb913e9c832e533896205e60ecbeb300695016f9f79",
+  "services/indexedDbSaveGenerations.ts": "4c7198d010a5ddde2d970f659cfad254e65f60f8d57cefa2a0b739796c2b0983",
+  "services/savePayloadBlocks.ts": "6a1c7adc1495e2dd253f0ea975e8f305e0b901b9dd7c3ae2087f15aaff8ed270",
+  "services/saveGenerations.ts": "371d4d2d595da0a49e085fb615dc184bbeff067968c0cd58dff0525517d7ea38",
+  "services/stableSaveHash.ts": "095eef7f6bd6692c181f7af69ae92f114ab152c8140fa40f29b40687bc803cb5",
+  "services/saveIntegrity.ts": "0fd92e0d8bf1020d37032cabf31e9abcb076cdc92d31505ce6194abcd0ee61b8",
+  "services/savePreparation.ts": "5edcac9e6bd2c7941abe0325432037b6b6a8851d79165476de6a9a19377ae2c3",
+  "services/crewMarket.ts": "c98f57e6eacfd62cdc489d0f189473ffb964cf00c774f9883da107156b892227",
+  "services/projectInvestors.ts": "9c0e15257a16e0fa70b45d3de7908b123e831e901741f6f96204c567d89527cf",
+  "services/gameLoop.ts": "a0beb5a7d0e5b8bb33836ee17ec4cc2b136b5911bb2822f3ab8126bce6de716d",
+  "services/fictionalNames.ts": "d29a6705d5b9992f0c852d299f796ef05c1387f17c937353ecb8a80853d6d35d",
+  "services/fictionalNameCatalog.ts": "4c0a67725db5ebf75fddd28d4e2e04fc70b325bc752283b15d65995a64b9b52c",
+  "types.ts": "9bdef63848e11dcb238479457d388701163bd14f27ff4eb26221784330ce26c1",
+  "package.json": "41eabee5187ee51923c9ed4cfecb525d5583ef896bf540e13f712c0a440a4039",
+  "tsconfig.json": "54fd67fd47d8599a6565c68fa1d0c37aec9ee75993064513320b1952d0fc1e69"
+}

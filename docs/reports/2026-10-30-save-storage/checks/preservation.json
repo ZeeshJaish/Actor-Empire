@@ -1,0 +1,16 @@
+{
+  "initialFiles": 462,
+  "unchanged": 455,
+  "changedWithinTaskScope": [
+    "services/stableSaveHash.ts"
+  ],
+  "concurrentChangesPreserved": [
+    "package.json",
+    "services/universeLogic.ts",
+    "services/youtubeLogic.ts",
+    "docs/superpowers/plans/2026-10-29-creator-economy.md",
+    "docs/superpowers/reports/2026-10-30-creator-economy-verification.json",
+    "docs/superpowers/reports/2026-10-30-creator-economy-verification.md"
+  ],
+  "missing": []
+}

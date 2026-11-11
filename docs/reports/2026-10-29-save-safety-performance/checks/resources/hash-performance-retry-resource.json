@@ -1,0 +1,9 @@
+{
+  "label": "hash-performance-retry",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 454.703125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 3283
+}

@@ -1,0 +1,264 @@
+--- before-task/services/worldEconomy/worldStreamingAiCatalogue.ts
++++ after-task/services/worldEconomy/worldStreamingAiCatalogue.ts
+@@ -4,6 +4,7 @@
+ } from '../../types';
+ import { createDeterministicId, hashDeterministicSeed } from '../deterministicRandom';
+ import { getHistoricalCatalogueTitles } from '../historicalCatalogue';
++import { readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from '../streamingContentAvailability';
+ import { getAbsoluteWeek } from '../legacyLogic';
+ import { resolveStreamingRightsCompatibility } from '../streamingRightsCompatibility';
+ import { normalizeStreamingRightsAccessGrant } from '../streamingRightsAccessGrant';
+@@ -205,11 +206,19 @@
+         || left.titleId.localeCompare(right.titleId)), seededPlatformIds: [...seeded].sort() };
+ };
+ 
++const historicalPositionsKey = {};
++
+ export const getAiCataloguePositions = (
+     player: Player, platformId: string, legacy: WorldStreamingAiCatalogueTitle[],
++    context?: StreamingCatalogueReadContext,
+ ): AiCataloguePosition[] => {
+     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+-    const historicalById = new Map(getHistoricalCatalogueTitles(player).map(title => [title.id, title]));
++    const readHistorical = () => new Map(getHistoricalCatalogueTitles(player).map(title => [title.id, title]));
++    // Only the caller's immutable read batch can reuse this index. Public reads
++    // without a context, and contexts for another player, always read fresh facts.
++    const historicalById = context?.player === player
++        ? readStreamingCatalogueDerivedView(context, historicalPositionsKey, readHistorical)
++        : readHistorical();
+     const projected = legacy.filter(title => title.platformId === platformId).filter(title => {
+         const source = historicalById.get(title.titleId);
+         if (!source) return true; // Preserve old synthetic save entries without fabricating missing rights.
+@@ -226,9 +235,10 @@
+ 
+ export const createAiTitleAccessResolver = (
+     player: Player, offer: WorldStreamingPlatformOffer, legacy: WorldStreamingAiCatalogueTitle[],
++    context?: StreamingCatalogueReadContext,
+ ): ((countryId: string, absoluteWeek: number, route: StreamingTitleAccessRoute, onlyTitleId?: string) => AiCataloguePosition[]) => {
+     const projected = projectStreamingCommercialOffers(offer.commercialConfiguration);
+-    const positions = getAiCataloguePositions(player, offer.platformId, legacy);
++    const positions = getAiCataloguePositions(player, offer.platformId, legacy, context);
+     let byTitle: Map<string, AiCataloguePosition[]> | undefined;
+     return (countryId, absoluteWeek, route, onlyTitleId) => {
+         if (onlyTitleId !== undefined && !byTitle) {
+--- before-task/services/boxOffice/boxOfficeAlternativeAccess.ts
++++ after-task/services/boxOffice/boxOfficeAlternativeAccess.ts
+@@ -20,12 +20,12 @@
+         ...(platform.starterCatalog?.ownedProjectIds||[]),...(platform.starterCatalog?.licensedProjectIds||[]),
+         ...platform.catalogLicenses.map(l=>l.sourceProjectId),...entries.map(e=>e.projectId)])]:[];
+     const playerRoute=offer.isPlayer?createStreamingTitleRouteReadBatch(player,week,platform,owned,context):undefined;
+-    const aiRoute=offer.isPlayer?undefined:createAiTitleAccessResolver(player,offer,player.world.worldStreamingViewing?.aiCatalogue||[]);
++    const aiRoute=offer.isPlayer?undefined:createAiTitleAccessResolver(player,offer,player.world.worldStreamingViewing?.aiCatalogue||[],context);
+     let aiPositionsByTitle:Map<string,ReturnType<typeof getAiCataloguePositions>>|undefined;
+     const aiPositionsFor=(id:string)=>{
+         if(!aiPositionsByTitle){
+             aiPositionsByTitle=new Map();
+-            for(const position of getAiCataloguePositions(player,offer.platformId,player.world.worldStreamingViewing?.aiCatalogue||[])){
++            for(const position of getAiCataloguePositions(player,offer.platformId,player.world.worldStreamingViewing?.aiCatalogue||[],context)){
+                 const rows=aiPositionsByTitle.get(position.titleId)||[];rows.push(position);aiPositionsByTitle.set(position.titleId,rows);
+             }
+         }
+--- before-task/services/worldEconomy/worldStreamingViewing.ts
++++ after-task/services/worldEconomy/worldStreamingViewing.ts
+@@ -349,7 +349,7 @@
+         return qualityByTitle.get(id)!;
+     };
+     const titleResolvers = new Map([...offers.values()].filter(offer => !offer.isPlayer).map(offer => [
+-        offer.platformId, createAiTitleAccessResolver(player, offer, aiCatalogue),
++        offer.platformId, createAiTitleAccessResolver(player, offer, aiCatalogue, titleFacts),
+     ]));
+     priorEntitlements.filter(item => item.kind === 'PURCHASE' || (item.expiresAtAbsoluteWeek || 0) > absoluteWeek)
+         .forEach(item => entitlementMap.set(`${item.platformId}:${item.countryId}:${item.titleId}:${item.kind}`, { ...item }));
+--- before-task/services/worldEconomy/worldStreamingRoyaltyAttribution.ts
++++ after-task/services/worldEconomy/worldStreamingRoyaltyAttribution.ts
+@@ -7,12 +7,30 @@
+ import {streamingTitleFreshness, streamingTitleQuality} from './worldStreamingContentValue';
+ 
+ type Receipts = NonNullable<WorldStreamingViewingState['royaltyReceipts']>;
++
++/** Stable insertion order, local to one close; arbitrary IDs remain separate keys. */
++const indexPlatformCountries = <T extends {platformId: string; countryId: string}>(rows: readonly T[]) => {
++    const index = new Map<string, Map<string, T[]>>();
++    for (const row of rows) {
++        const platformId = row.platformId, countryId = row.countryId;
++        let countries = index.get(platformId);
++        if (!countries) index.set(platformId, countries = new Map());
++        let local = countries.get(countryId);
++        if (!local) countries.set(countryId, local = []);
++        local.push(row);
++    }
++    return index;
++};
+ /** Conserved contribution attribution; this does not create customer revenue or measure causal profit. */
+ export const attachStreamingRoyaltyReceipts = (
+     player: Player, state: WorldStreamingViewingState, offers: WorldStreamingPlatformOffer[],
+ ): WorldStreamingViewingState => {
+     const week = state.lastProcessedAbsoluteWeek;
+     const receipts: Receipts = [];
++    // Preserve source order, including zero-value rows: source ordinals form
++    // part of the issued receipt IDs. Index only this immutable close's inputs.
++    const sourcesByPlatform = indexPlatformCountries(state.royaltySourceReceipts || []);
++    const aiEntitlements = indexPlatformCountries(state.aiStoreEntitlements || []);
+     const titleFacts=createStreamingCatalogueReadContext(player);
+     // Facts are immutable within this close; reuse them across countries/plans.
+     const qualityCache = new Map<string, number>();
+@@ -29,7 +47,13 @@
+     for (const offer of offers) {
+         const summary = state.platforms[offer.platformId];
+         if (!summary) continue;
+-        const aiResolve = offer.isPlayer ? null : createAiTitleAccessResolver(player, offer, state.aiCatalogue || []);
++        const aiResolve = offer.isPlayer ? null : createAiTitleAccessResolver(player, offer, state.aiCatalogue || [], titleFacts);
++        const entitlementsByPlatform = offer.isPlayer
++            ? indexPlatformCountries([
++                ...(player.world.worldStreamingAudienceChoice?.entitlements || []),
++                ...(state.commercialTransactions || []).map(row => ({...row, platformId: 'PLAYER',
++                    expiresAtAbsoluteWeek: row.kind === 'PURCHASE' ? null : week + offer.commercialConfiguration.rentals.windowWeeks})),
++            ]) : aiEntitlements;
+         const titleMap = new Map(summary.titlePerformance.map(row => [row.projectId, row]));
+         // Free/ad and store-only services legitimately have no subscription customer row.
+         const countries = [...new Set([...Object.keys(state.countries),
+@@ -127,21 +151,15 @@
+                     });
+                 });
+             };
+-            for (const source of state.royaltySourceReceipts || []) {
+-                if (source.platformId !== offer.platformId || source.countryId !== countryId) continue;
++            for (const source of sourcesByPlatform.get(offer.platformId)?.get(countryId) || []) {
+                 if (source.sourceKind === 'SUBSCRIPTION') appendSource('ANCILLARY', source.grossReceipts,
+                     [{route: {kind: 'SUBSCRIPTION', planId: source.planId || ''}, weight: 1}], source.projectId);
+                 else if (source.sourceKind === 'FREE_AD') appendSource('ANCILLARY', source.grossReceipts,
+                     [{route: {kind: 'AD_SUPPORTED'}, weight: 1}], source.projectId);
+                 else {
+                     // A store customer can fund extras only against their actually delivered store title/mode.
+-                    const entitlements = offer.isPlayer
+-                        ? [...(player.world.worldStreamingAudienceChoice?.entitlements || []),
+-                            ...(state.commercialTransactions || []).map(row => ({...row, platformId: 'PLAYER',
+-                                expiresAtAbsoluteWeek: row.kind === 'PURCHASE' ? null : week + offer.commercialConfiguration.rentals.windowWeeks}))]
+-                        : state.aiStoreEntitlements || [];
+-                    const weights = (['RENTAL', 'PURCHASE'] as const).map(kind => entitlements.filter(row => row.countryId === countryId
+-                        && row.platformId === offer.platformId && (!source.projectId || row.titleId === source.projectId)
++                    const entitlements = entitlementsByPlatform.get(offer.platformId)?.get(countryId) || [];
++                    const weights = (['RENTAL', 'PURCHASE'] as const).map(kind => entitlements.filter(row => (!source.projectId || row.titleId === source.projectId)
+                         && row.kind === kind && (row.expiresAtAbsoluteWeek === null || row.expiresAtAbsoluteWeek > week))
+                         .reduce((sum, row) => sum + row.households, 0));
+                     appendSource('ANCILLARY', source.grossReceipts, [{route: {kind: 'RENTAL'}, weight: weights[0]},
+--- before-task/services/boxOffice/boxOfficeMarket.ts
++++ after-task/services/boxOffice/boxOfficeMarket.ts
+@@ -237,9 +237,9 @@
+     for(const title of titles){
+         const cells=snapshot.titles.find(t=>t.titleId===title.titleId)!.cells;
+         const choices=snapshot.choices.filter(c=>c.titleId===title.titleId&&c.kind==='FIRST');
++        const cellsByCountry=group(cells,c=>inputCohortIndex.get(c.cohortId)?.countryId || '');
+         const countries=[...inputCohortsByCountry.keys()].sort().map(countryId=>{
+-            const ids=new Set(inputCohortsByCountry.get(countryId)!.map(c=>c.id));
+-            const local=cells.filter(c=>ids.has(c.cohortId));
++            const local=cellsByCountry.get(countryId)||[];
+             return {countryId,awarePeople:cinemaSum(local.map(c=>c.awarePeople)),deferredPeople:cinemaSum(local.map(c=>c.deferredPeople))};
+         }).filter(c=>c.awarePeople>0||c.deferredPeople>0);
+         Object.assign(title,{audienceSignals:{awarePeople:cinemaSum(cells.map(c=>c.awarePeople)),
+--- before-task/services/saveIntegrity.ts
++++ after-task/services/saveIntegrity.ts
+@@ -429,11 +429,12 @@
+     protected: manifest.protected,
+ });
+ 
+-export const createSaveIntegrityManifest = (
++const manifestWithProtectedState = (
+     player: Player,
+     reason: SaveIntegrityReason,
+-    createdAt = Date.now(),
+-    needsRecoveryCheckpoint = false,
++    createdAt: number,
++    needsRecoveryCheckpoint: boolean,
++    protectedState: SaveProtectedState,
+ ): SaveIntegrityManifest => {
+     const core = {
+         formatVersion: SAVE_INTEGRITY_FORMAT_VERSION,
+@@ -445,7 +446,7 @@
+         week: finiteNumber(player.currentWeek),
+         reason,
+         needsRecoveryCheckpoint,
+-        protected: createProtectedState(player),
++        protected: protectedState,
+     } as const;
+     return {
+         ...core,
+@@ -453,6 +454,15 @@
+         digest: stableHash(manifestDigestSource(core)),
+     };
+ };
++
++export const createSaveIntegrityManifest = (
++    player: Player,
++    reason: SaveIntegrityReason,
++    createdAt = Date.now(),
++    needsRecoveryCheckpoint = false,
++): SaveIntegrityManifest => manifestWithProtectedState(
++    player, reason, createdAt, needsRecoveryCheckpoint, createProtectedState(player),
++);
+ 
+ const compareFingerprint = (
+     label: string,
+@@ -463,9 +473,7 @@
+     if (before.count !== after.count || before.digest !== after.digest) violations.push(`${label} identities changed`);
+ };
+ 
+-export const compareProtectedSaveState = (before: Player, after: Player): ProtectedSaveComparison => {
+-    const left = createProtectedState(before);
+-    const right = createProtectedState(after);
++const compareProtectedProjections = (left: SaveProtectedState, right: SaveProtectedState): ProtectedSaveComparison => {
+     const violations: string[] = [];
+     if (!Number.isFinite(right.money)) violations.push('player money is not finite');
+     else if (left.money !== right.money) violations.push('player money changed');
+@@ -512,6 +520,23 @@
+     if (left.cinemaState !== right.cinemaState) violations.push('cinema market canonical state changed');
+     if (left.worldEconomy !== right.worldEconomy) violations.push('world economy canonical state changed');
+     return violations.length ? { ok: false, violations } : { ok: true };
++};
++
++export const compareProtectedSaveState = (before: Player, after: Player): ProtectedSaveComparison =>
++    compareProtectedProjections(createProtectedState(before), createProtectedState(after));
++
++/** One synchronous preparation owns both projections. No cached projection is
++ * accepted from callers, and candidate/read-back/promotion still verify afresh. */
++export const createCheckedSaveIntegrityManifest = (
++    before: Player, after: Player, reason: SaveIntegrityReason,
++    createdAt = Date.now(), needsRecoveryCheckpoint = false,
++) => {
++    const original = createProtectedState(before), prepared = createProtectedState(after);
++    const comparison = compareProtectedProjections(original, prepared);
++    if ('violations' in comparison) {
++        throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);
++    }
++    return { comparison, manifest: manifestWithProtectedState(after, reason, createdAt, needsRecoveryCheckpoint, prepared) };
+ };
+ 
+ export const verifySaveIntegrity = (
+--- before-task/services/savePreparation.ts
++++ after-task/services/savePreparation.ts
+@@ -1,8 +1,7 @@
+ import type { Player } from '../types';
+ import { compactPlayerForPersistence } from './saveCompaction';
+ import {
+-    compareProtectedSaveState,
+-    createSaveIntegrityManifest,
++    createCheckedSaveIntegrityManifest,
+     type ProtectedSaveComparison,
+     type SaveIntegrityManifest,
+     type SaveIntegrityReason,
+@@ -109,13 +108,10 @@
+             ),
+         },
+     };
+-    const comparison = compareProtectedSaveState(canonical, player);
+-    if ('violations' in comparison) {
+-        throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);
+-    }
++    const { comparison, manifest } = createCheckedSaveIntegrityManifest(canonical, player, reason, Date.now(), oversizedLegacy);
+     return {
+         player,
+-        manifest: createSaveIntegrityManifest(player, reason, Date.now(), oversizedLegacy),
++        manifest,
+         comparison,
+         estimatedSourceBytes,
+         oversizedLegacy,

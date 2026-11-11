@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "weeks": 70,
+  "minutes": 9.272751721533334,
+  "medianWeekMs": 3636.0,
+  "rangeMs": [
+    3028,
+    4581
+  ],
+  "careVisits": 13,
+  "deferredClinic": 5,
+  "navigationCount": 210,
+  "medianNavigationMs": 23.099999994039536,
+  "navigationRangeMs": [
+    15.700000047683716,
+    616.8000000119209
+  ],
+  "reloads": [
+    {
+      "count": 70,
+      "cash": 772251029,
+      "processed": 1962,
+      "final": true
+    }
+  ],
+  "pageErrors": [],
+  "recordsAtEnd": 37
+}

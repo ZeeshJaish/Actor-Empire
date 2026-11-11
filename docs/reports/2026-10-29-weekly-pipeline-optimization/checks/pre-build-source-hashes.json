@@ -1,0 +1,17 @@
+{
+  "services/worldEconomy/worldStreamingAiCatalogue.ts": "629ba2b82932eae4b03c7c2627b2693f8dee1e8f73c153f7e9437790d955a86a",
+  "services/worldEconomy/worldStreamingViewing.ts": "86724cdb23607e1a36d6b9842509d6979e45fdf8ee9fc74b0edba7a1cdbbe091",
+  "services/worldEconomy/worldStreamingRoyaltyAttribution.ts": "1be6f6b0267fa2c3d386bf7003e062c7b70b23d3c219c21a05c7fb3f6f393953",
+  "services/boxOffice/boxOfficeAlternativeAccess.ts": "19f0d4edfc326936c513478368bc69832c2bbd5f8f168fced35f9f7d3756fa13",
+  "services/boxOffice/boxOfficeMarket.ts": "0a5ecd895806261a2be3aa4c06b6392a39ac1e90625ff81a7c84268df9020dc5",
+  "services/saveIntegrity.ts": "0fd92e0d8bf1020d37032cabf31e9abcb076cdc92d31505ce6194abcd0ee61b8",
+  "services/savePreparation.ts": "5edcac9e6bd2c7941abe0325432037b6b6a8851d79165476de6a9a19377ae2c3",
+  "App.tsx": "71c80dc044246d1608a47b006cf2ef8c99c87373921909f0c52c12a7180403bc",
+  "types.ts": "9bdef63848e11dcb238479457d388701163bd14f27ff4eb26221784330ce26c1",
+  "services/gameLoop.ts": "80ce0fa6dc6bd1cfb1184c0a4e04317ac7e0d068806bbc7b9be2cbb9c81d4331",
+  "services/storage.ts": "f4dc245a60da60434f8a35c6356ed3bc8218dbdb05517d54b02c2f7e0f2d21b4",
+  "services/saveGenerations.ts": "fd474bbf8fc134653f9400cbb00d8f11ed1ae8746d1ca778bc45bdb8d2aed79d",
+  "tsconfig.json": "54fd67fd47d8599a6565c68fa1d0c37aec9ee75993064513320b1952d0fc1e69",
+  "package.json": "0865116c43af13a967d32fd6a818d3496da2f2f7e7242b485019641d644a4640",
+  "scripts/audit-weekly-optimization-browser.cjs": "ae7337ffbed455cb9ec32d652c75bd2065f2fc0b8d80abb0991a188bd186dbbf"
+}

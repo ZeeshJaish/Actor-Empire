@@ -1,0 +1,9 @@
+{
+  "label": "final-browser-fixture",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 682.78125,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 1970
+}

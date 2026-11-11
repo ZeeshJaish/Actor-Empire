@@ -1,0 +1,16 @@
+{
+  "selectedRuntimeMatchesFrozenArtifact": true,
+  "selectedRuntimeChanged": [],
+  "commonSnapshotFiles": 507,
+  "commonSnapshotChanged": [],
+  "commonSnapshotMissing": [],
+  "initialIndividuallyListedDirtyFiles": 138,
+  "initialDirtyMissing": [],
+  "initialDirtyChanged": [
+    "services/boxOffice/boxOfficeLiveSettlement.ts",
+    "services/boxOffice/boxOfficeWeek.ts",
+    "services/gameLoop.ts",
+    "scripts/audit-save-storage-recovery.cjs",
+    "scripts/profile-weekly-pipeline.ts"
+  ]
+}

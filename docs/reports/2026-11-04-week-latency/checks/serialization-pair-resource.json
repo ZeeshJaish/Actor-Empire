@@ -1,0 +1,12 @@
+{
+  "label": "serialization-pair",
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 512.203125,
+  "peakGlobalSwapGrowthMiB": 0,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 1725,
+  "peakProcesses": "35643 35639 457872 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n35645 35643      0 <defunct>"
+}

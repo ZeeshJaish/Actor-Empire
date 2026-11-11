@@ -1,0 +1,240 @@
+[
+  {
+    "name": "sponsorship-properties",
+    "code": 0,
+    "resource": {
+      "label": "final-sponsorship-properties",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 454.640625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1344
+    },
+    "output": "{\"passed\":17,\"establishedWeekly\":33724,\"inflatedFollowerWeekly\":37709,\"observedQuote\":{\"weeklyPay\":57234,\"valueBasis\":{\"version\":1,\"source\":\"MANAGER\",\"audienceBasis\":\"OBSERVED_ENGAGEMENT\",\"absoluteWeek\":1519,\"eligiblePeople\":4080741564.3639574,\"reachablePeople\":1525606.5895716741,\"qualifiedImpressions\":915363.9537430045,\"referenceCpm\":15.635837826023954,\"weeklyBuyerBudget\":57234.466373009236,\"perDeliverableValue\":109517.36153985957,\"estimatedContractValue\":457872}},\"microWeekly\":156,\"kind\":\"CONTROLLED_QUOTE_CASES_NOT_CAREER_RESULTS\"}\n"
+  },
+  {
+    "name": "director-quotes",
+    "code": 0,
+    "resource": {
+      "label": "final-director-quotes",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 380
+    },
+    "output": "{\"passed\":2,\"defaultQuote\":16464000,\"explicitQuote\":123456789,\"kind\":\"CONTROLLED_QUOTE_CASES_NOT_EARNINGS_PROOF\"}\n"
+  },
+  {
+    "name": "development-finance",
+    "code": 0,
+    "resource": {
+      "label": "final-development-finance",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 390
+    },
+    "output": "{\"passed\":10,\"kind\":\"CONTROLLED_FINANCIAL_AND_INPUT_PARITY_CASES_NOT_CAREER_RESULTS\"}\n{\"actualPreviewCases\":2,\"kind\":\"SOURCE_UI_PREVIEW_NOT_CAREER_RESULTS\"}\n"
+  },
+  {
+    "name": "greenlight-calculations",
+    "code": 0,
+    "resource": {
+      "label": "final-greenlight-calculations",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 55
+    },
+    "output": "Greenlight calculation audit passed.\n"
+  },
+  {
+    "name": "greenlight-builder",
+    "code": 0,
+    "resource": {
+      "label": "final-greenlight-builder",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 374.703125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 2902
+    },
+    "output": "Greenlight project builder audit passed: package, funding, and launch buzz preserve their core outputs.\nGreenlight contract lifecycle passed: one use per project, zero extra salary, last use retains unpaid EMI.\nFull talent flow passed: immutable signing -> zero cast salary -> funded Greenlight -> last use -> verified save preparation -> EMI after exhaustion -> migration/reload.\nPrepaid Greenlight funding passed: real studio/investor/production/locked-funding conservation, one allocation and conservative legacy handling.\n"
+  },
+  {
+    "name": "season-funding",
+    "code": 0,
+    "resource": {
+      "label": "final-season-funding",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 56
+    },
+    "output": "Season funding audit passed.\n"
+  },
+  {
+    "name": "commission-contracts",
+    "code": 0,
+    "resource": {
+      "label": "final-commission-contracts",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 221
+    },
+    "output": "Platform AI player commission audit passed.\n"
+  },
+  {
+    "name": "cinema-integration",
+    "code": 0,
+    "resource": {
+      "label": "final-cinema-integration",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 738.21875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 11352
+    },
+    "output": "PASS live adapter includes all owner routes without paying or mutating\nPASS one common result pays once and JSON replay is identical\nPASS changed receipt for committed week refuses payment\nPASS slate ordering has no effect on receipts or owner payments\nPASS new standard exhibition credits receipts without an unagreed producer show fee\nPASS legacy exhibition agreement still charges its producer once and protects signed terms\nPASS signed investor and actor backend pay only actual new receipts once\nPASS ownership change uses the canonical title and invalidates a stale owner result\nPASS country-specific chosen chains do not create a cross-product release\nPASS new NPC admission pays marketing once and no lifetime or phantom streaming income\nPASS legacy fully paid NPCs never manufacture new attendance or cash\nPASS outside theatrical stake is admitted without synthetic payout or duplicate principal\nPASS cinema calculations preserve pending event callbacks in the live candidate\nPASS changed signed terms cannot settle an old pending result\nPASS commit detaches saved audience from the transient kernel result\nPASS missing canonical NPC owner rejects atomically\nPASS NPC operating ledger keeps the cent already earned from tickets\nPASS altered first-time result cannot invent conserved ticket cash\nPASS changing release budget or destination business makes a result stale\nPASS inherited signed backend continues on heir clock without changing old receipt keys\nPASS inherited parent actor royalty is paid to its signed beneficiary\nPASS earned demand can continue beyond old week or lifetime-gross caps\nPASS a migrated film above three billion keeps historical cash and can earn further paid receipts\nPASS current regional and audience reports agree with saved paid facts\nPASS committed chart retains prior ranks even when last weeks winner retires\nPASS NPC closure finalizes one actual outcome without paying production cash again\nPASS actual no-streamer theatrical exit archives once and stays retired next week\nPASS actual processGameWeek includes newly admitted NPC and player slate in one saved result\nPASS actual release confirmation retry from prior durable state produces one identical receipt\nPASS actual persistence preparation, generation save and replay keep paid history\nPASS actual reload and next game week preserve previous receipt identity and amounts\nPASS actual paid week survives failed promotion and successful retry without duplicate cash\nLive week diagnostic: {\"firstGameWeekMs\":465,\"journeyMs\":2879,\"titles\":4,\"cinemaBytes\":2813898,\"saveBytes\":9406970}\nIntegration audit: 32 groups passed\n"
+  },
+  {
+    "name": "cinema-migration",
+    "code": 0,
+    "resource": {
+      "label": "final-cinema-migration",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 862.640625,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 5863
+    },
+    "output": "PASS absent state activates the next unprocessed week without changing cash or historical gross\nPASS active legacy audience is bounded estimated history without historical payout\nPASS a sparse legacy release retains an explicitly unknown owner without corrupting its migrated audience\nPASS migration is idempotent and survives JSON reload\nPASS fully settled NPC gross is preserved and cannot enter new payouts\nPASS unsupported future schema is rejected without overwriting input\nPASS ambiguous partial paid state is recoverably rejected instead of reset\nPASS corrupt money and historical gross are never silently normalized into a migration\nPASS actual loader refuses corrupt raw legacy money before defaults\nPASS actual inheritance remaps parent cinema identity\nPASS settled legacy display history can compact while financial truth stays protected\nPASS partial receipts and malformed audience memory require recovery before signing\nPASS legacy catalogue with missing theatrical facts stays unknown and already settled\nPASS signed streaming agreements survive unchanged\nPASS load migration rejects future cinema state before generic defaults can overwrite it\nPASS cinema audience and receipt checkpoints are protected by save integrity\nPASS issued digest schema 2 still verifies its exact pre-cinema projection\nPASS closed audience matrices retire into compact earned universe/actor memory\nPASS inheritance changes the cinema clock without changing paid source identities\nPASS actual save-generation failure and previous-generation recovery retain cinema money/history\nPASS signed tuning 1 generation verifies before migration and current re-sign/reload preserves paid facts\nPASS tuning 2 active runs preserve paid facts and do not restart discovery or awareness\nPASS signed tuning 3 load/upgrade/reload retains every old payment, cash balance and local booking\nPASS tuning 4 active booking terms migrate without rewriting any paid fact or cash\nPASS dropped fully tracked release fields restore from paid ledger without changing cash, receipts, bookings or payment IDs\nMigration audit: 25 groups passed\n"
+  },
+  {
+    "name": "cinema-booking",
+    "code": 0,
+    "resource": {
+      "label": "final-cinema-booking",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 119
+    },
+    "output": "PASS partial country inputs cannot inherit absent countries screens\nPASS standard distributor revenue-share exhibition does not charge producers per show\nPASS a booked paid-show agreement retains its price when the next supply quote changes\nPASS existing physical screens do not move with weekly population access or seed\nPASS complete world preserves every existing chain regional screen total\nPASS automatic prices still respond to country economy independently of footprint\nPASS repeated unviable exhibition ends without waiting for a tiny absolute ticket threshold\nPASS opening shows use public package expectations instead of secret final delivery\nPASS booking observations are retained for renewal and have no owner preference\nPASS a tiny residual audience cannot keep a full scheduled screen indefinitely\nPASS a previously weak run stays open when viable demand is denied screen time\nPASS real screen-day packing retains each feasible minimum before expansion\nPASS secret script accessibility cannot change an unviewed crossover opening\nPASS succession rebases booking observations while historical receipt identities stay frozen\nBooking audit: 14 passed, 0 failed\n"
+  },
+  {
+    "name": "cinema-delivery",
+    "code": 0,
+    "resource": {
+      "label": "final-cinema-delivery",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 200
+    },
+    "output": "PASS max equipment cannot turn ordinary craft into a perfect film\nPASS equipment has diminishing returns\nPASS zero craft is not silently replaced with average craft\nPASS fame does not substitute for acting craft\nPASS generated cash budgets match every declared tier including blockbuster\nPASS identical cash/package cannot change risk when only a tier label changes\nPASS one dollar across $120M does not create a ticket-earnings cliff\nPASS legacy dynamic ceiling uses continuous cash inputs instead of labels\nPASS event and sleeper opening bonuses remain continuous across $35M and $90M\nPASS blockbuster fallback has the actual offered ensemble and stable credits\nPASS sleeper week-two and later retention do not cliff at $90M\n"
+  },
+  {
+    "name": "cinema-presentation",
+    "code": 0,
+    "resource": {
+      "label": "final-cinema-presentation",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 338.734375,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1047
+    },
+    "output": "PASS forecast is pure, ordered, deterministic and creates no live receipt\nPASS hidden final delivery and unknown observed fields cannot alter preview\nPASS mid scenario equals the same known-input market kernel\nPASS presentation preserves every cent and labels shadow results\nPASS no attendance-derived tags without settled evidence; legacy repeats are never invented\nPASS real release forecast is pure and hides final quality including payoff\nPASS generic unconverted demand is never called a known streaming wait\nPASS nonzero release preview matches live mid with country-specific chains and paid campaign\nCinema presentation: 8 groups passed\n"
+  },
+  {
+    "name": "cinema-rights",
+    "code": 0,
+    "resource": {
+      "label": "final-cinema-rights",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 434.828125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 4151
+    },
+    "output": "PASS buyer-specific quote is pure, ordered and affordable\nPASS no rights or an already signed position creates no new bid\nPASS exhausted and overlapping households reduce value\nPASS low resources and unpaid obligations constrain all fixed exposure\nPASS deferred demand is bounded by reachable unique households, never added twice\nPASS no production budget floor or theatrical gross multiplier exists\nPASS later windows decay current intentions and short licences have less value\nPASS automatic signing retains exact unblocked countries and never rewrites old deals\nPASS exact shared rights remain eligible after a legitimate first shared licence\nPASS a future restriction cannot be priced into a room that excludes that country\nPASS new film bidding keeps fixed obligations within incremental value through revisions and reload\nPASS funded playback waits for actual date, country and route, then only competes within its envelope\nPASS automatic streaming settlement pays both parties exactly once after save reload\nPASS malformed streaming evidence is rejected by derived-state normalization\nPASS local audience can justify a small film bid while an unseen expensive package has no floor\nPASS actual shared streaming close gates cinema catch-up by delivery, date, rights and language\nPASS live and forecast cinema waiting use signed country windows rather than a worldwide summary\nPASS actual no-buyer studio title archives exactly once\nCinema rights: 18 groups passed\n"
+  },
+  {
+    "name": "legacy-career-payments",
+    "code": 0,
+    "resource": {
+      "label": "final-legacy-career-payments",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 1049.328125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 11384
+    },
+    "output": "PASS legacy production, legacy paid class, signed salary paid once, signed commercial paid twice, earned skills/XP, shares and grandfathered Legend; 14 actual weeks, 15 verified save/reloads.\n"
+  },
+  {
+    "name": "team-renewals",
+    "code": 0,
+    "resource": {
+      "label": "final-team-renewals",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 369
+    },
+    "output": "PASS paid hire callbacks prevent a second annual and first-week staff fee\nPASS anniversary renews once at the contracted fee, including a midyear hire\nPASS legacy untracked staff retain calendar renewals with no historical refunds\nPASS manager renewal follows its paid term without changing commission or annual fee\n{\"passes\":4,\"failures\":0}\n"
+  },
+  {
+    "name": "epic-final-save",
+    "code": 0,
+    "resource": {
+      "label": "final-epic-final-save",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 1193.421875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 5394
+    },
+    "output": "{\"passed\":5,\"failures\":0,\"weeks\":159,\"executable\":\"0d68cb07a5c484f3ea6937e5f7b1c971a6742f832a6794722ad683ae5f9d7e24\",\"paidFactsSha256\":\"65fada6d02446e0bbe1daac0095208d73bb01b7cdc658d826e76352899fc7c51\",\"cash\":715298279,\"newGameWeeksProcessed\":0,\"personalSaveStorageAccessed\":false}\n"
+  },
+  {
+    "name": "browser-fixture",
+    "code": 0,
+    "resource": {
+      "label": "final-browser-fixture",
+      "heapMiB": 768,
+      "peakOwnedTreeRssMiB": 682.78125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 1970
+    },
+    "output": "{\"passed\":3,\"output\":\"/private/tmp/actor-cinema-followup-20261029/browser-fixture.json\",\"personalSaveStorageAccessed\":false,\"originWeeks\":101,\"liveOwned\":1}\n"
+  }
+]

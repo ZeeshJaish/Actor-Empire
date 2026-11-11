@@ -1,0 +1,74 @@
+{
+  "scope": "Actual production build, isolated browser context, retained earned save copy; no personal save storage",
+  "origin": "earned-owned-prefix",
+  "views": [
+    "Actual retained career loaded through normal start/slot UI",
+    "Existing optional award event skipped through its normal UI",
+    "Phone rendered",
+    "Settled public gross, producer receipts, paid costs and collected profit match actual report source",
+    "Actual paid audience insights shown on IMDb credit",
+    "Three actual UI weeks, including rapid double click, advance once each and persist the cinema week",
+    "Normal app reload preserves cash, paid title gross and processed week without paying again"
+  ],
+  "loaded": {
+    "cash": 784902029,
+    "age": 37,
+    "week": 21,
+    "lastCinemaWeek": 1892,
+    "manifestDigest": "30f5ead5cbf2702c",
+    "trackedTitleCount": 367
+  },
+  "financialReport": "Project financial report\n\nProfit to date \u00b7 theatrical run in progress\n\nPublic theatrical gross\n$193.2M\nTheatrical producer receipts\n$102.4M\nTheatrical cost recovery before backend\n$81.5M\nCollected release receipts, all media\n$102.6M\nProduction and paid release costs\n$20.9M\nInvestor distributions\n$0\nTalent backend paid\n$0\nNet studio receipts\n$102.6M\nCollected project profit / loss\n$81.7M\nStudio cash at risk\n$20.9M\nStudio profit / loss after financing\n$81.7M\n\nSigned actor backend paid since tracking began: $0\n\nTotal actor earnings are not recorded on this release.\n\nProfit uses receipts collected to date. Future streaming and soundtrack income is excluded. Theater cost recovery compares theatrical receipts with paid project costs before backend and financing; collected project profit includes paid backend and applied platform cover, before investor distributions. Studio profit uses its own funded cash. Actor earnings and performance are separate from the producer's return. Upfront actor pay is already in production cost.",
+  "financialValues": {
+    "Public theatrical gross": "$193.2M",
+    "Theatrical producer receipts": "$102.4M",
+    "Collected project profit / loss": "$81.7M",
+    "Production and paid release costs": "$20.9M"
+  },
+  "audienceInsights": "Cinema audience insights\n\n12,311,464 first visits \u00b7 108,279 paid repeat visits\n\nModeled paid visits; waiting interest is not a guaranteed stream.\n\nGrowing word of mouth\nProven theater attendance\nUnconverted audience interest",
+  "mobileWidth": {
+    "viewport": 320,
+    "document": 320
+  },
+  "weekTimingsMs": [
+    6076,
+    7417,
+    5716
+  ],
+  "reloadProtected": {
+    "cash": 784901129,
+    "week": 24,
+    "lastCinemaWeek": 1895,
+    "manifestDigest": "6eeb13bc1555403b"
+  },
+  "errors": [],
+  "weekProcessingTrace": {
+    "actorEmpire.weekProcessingDebug.v1.slot.3": {
+      "run_id": "week_37_23_mvtntmne",
+      "status": "success",
+      "stage": "success",
+      "age": 37,
+      "week": 24,
+      "screen": "HOME",
+      "save_slot": 3,
+      "started_at": "2026-10-29T14:49:55.181Z",
+      "updated_at": "2026-10-29T14:50:00.718Z",
+      "elapsed_ms": 5540,
+      "save_size": 70140070,
+      "save_size_mb": 70.1,
+      "pending_events": 0,
+      "commitments": 0,
+      "active_releases": 1,
+      "inbox_messages": 63,
+      "production_house_projects": 0,
+      "studio_scripts": 1,
+      "studio_concepts": 0,
+      "pending_return_deals": 0,
+      "studio_balance_m": 1388,
+      "slowest_stage": "loop_streaming_industry_done",
+      "slowest_stage_ms": 2278,
+      "stage_timeline": "loop_weekly_social_start:0|loop_weekly_social_done:0|loop_weekly_offers_start:0|loop_weekly_offers_done:4|loop_weekly_events_done:0|loop_studio_funding_start:0|loop_studio_funding_done:0|loop_subsidiaries_start:0|loop_subsidiaries_done:0|loop_final_trim_done:1|loop_world_integrity_start:0|loop_world_integrity_done:11|game_loop_done:0|post_week_sync_start:0|post_week_sync_done:0|persist_prepare_start:0|persist_prepare_done:617|indexeddb_write_start:153|indexeddb_write_done:1441|success:1"
+    }
+  },
+  "originalDetailedReportSha256": "46cbbbe6f43a0d3e3208c44a3371d7d087c2faee8c1061c5c97fca32a69eab20"
+}

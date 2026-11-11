@@ -1,0 +1,25 @@
+{
+  "scope": "Actual retained cinema subtree, byte-identical output, alternating order",
+  "rows": [
+    {
+      "round": 0,
+      "oldMs": 211.51483399999998,
+      "newMs": 458.179709,
+      "characters": 13182770
+    },
+    {
+      "round": 1,
+      "oldMs": 169.44054099999994,
+      "newMs": 360.5615,
+      "characters": 13182770
+    },
+    {
+      "round": 2,
+      "oldMs": 143.10020800000007,
+      "newMs": 426.136792,
+      "characters": 13182770
+    }
+  ],
+  "oldTotal": 524.055583,
+  "newTotal": 1244.878001
+}

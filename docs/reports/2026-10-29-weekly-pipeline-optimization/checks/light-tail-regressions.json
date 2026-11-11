@@ -1,0 +1,41 @@
+[
+  {
+    "name": "audit-streaming-signed-royalties",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-streaming-signed-royalties",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 346.78125,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 5580
+    }
+  },
+  {
+    "name": "audit-world-streaming-commercial-economy",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-world-streaming-commercial-economy",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 0,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 432
+    }
+  },
+  {
+    "name": "audit-stock-save-safety",
+    "code": 0,
+    "resource": {
+      "label": "light-regression-audit-stock-save-safety",
+      "heapMiB": 512,
+      "peakOwnedTreeRssMiB": 328.421875,
+      "stopReason": null,
+      "exitCode": 0,
+      "signal": null,
+      "elapsedMs": 3279
+    }
+  }
+]

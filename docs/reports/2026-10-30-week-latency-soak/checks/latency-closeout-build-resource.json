@@ -1,0 +1,15 @@
+{
+  "label": "latency-closeout-build",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0,
+  "heapMiB": 2048,
+  "peakProcessBreakdown": "72982 72977 1849072 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n72983 72982 188928 /Users/zeesh/Vibe code/Actor empire/node_modules/@esbuild/darwin-arm64/bin/esbuild",
+  "peakOwnedTreeRssMiB": 1997.15625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 18214
+}

@@ -1,0 +1,12 @@
+{
+  "label": "intelligence-red",
+  "heapMiB": 1024,
+  "peakOwnedTreeRssMiB": 0,
+  "peakGlobalSwapGrowthMiB": 0,
+  "swapWarning": false,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 236,
+  "peakProcesses": ""
+}

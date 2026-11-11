@@ -1,0 +1,9 @@
+{
+  "label": "live-history-red",
+  "heapMiB": 768,
+  "peakOwnedTreeRssMiB": 336.84375,
+  "stopReason": null,
+  "exitCode": 1,
+  "signal": null,
+  "elapsedMs": 3279
+}

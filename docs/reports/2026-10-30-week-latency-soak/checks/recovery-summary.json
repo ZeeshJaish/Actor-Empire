@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "restartTreasuryParity": true,
+  "faults": [
+    "Large-career real candidate quota failure preserves committed cash, week, gross, records and archive content",
+    "Large-career corrupted current is rejected and verified previous generation recovers through normal UI"
+  ],
+  "errors": [],
+  "resumed": {
+    "cash": 772252529,
+    "age": 38,
+    "week": 34,
+    "lastCinemaWeek": 1957
+  },
+  "studioCount": 1,
+  "npcStudioCount": 32,
+  "talentIncomeProfileCount": 100,
+  "settlementTitleCount": 379,
+  "credits": 37,
+  "posts": 200,
+  "recovered": {
+    "cash": 772252529,
+    "week": 34,
+    "lastCinemaWeek": 1957
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "engine": "system WebKit",
+  "results": [
+    "frozen issued UTF-16 signature oracle on this engine",
+    "exact large-value roundtrip with original signature",
+    "atomic next and retained previous",
+    "public load exports a complete player",
+    "previous-generation recovery",
+    "legacy signed save compatibility",
+    "unchanged immutable bytes reused without Blob allocations",
+    "quota failure preserves current",
+    "interrupted promotion preserves current and previous",
+    "live promotion binds the requested generation",
+    "restart ignores uncommitted candidate",
+    "inline corruption recovers verified backup",
+    "unsupported native shapes keep the monolithic structured clone",
+    "batch failure is atomic across slots",
+    "signed batch import hydrates both careers",
+    "public export contains complete plain players",
+    "slot deletion preserves other slots and shared archive data"
+  ]
+}

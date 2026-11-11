@@ -1,0 +1,15 @@
+{
+  "label": "latency-final-exact-parity",
+  "sharedBackgroundJobsAuthorized": true,
+  "hardOwnedRssMiB": 2560,
+  "minFreePercent": 20,
+  "swapWarning": false,
+  "peakGlobalSwapGrowthMiB": 0.06999999999970896,
+  "heapMiB": 1536,
+  "peakProcessBreakdown": "28197 28193  49536 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node\n28198 28197 2045008 /Users/zeesh/.nvm/versions/node/v24.11.1/bin/node",
+  "peakOwnedTreeRssMiB": 2010.015625,
+  "stopReason": null,
+  "exitCode": 0,
+  "signal": null,
+  "elapsedMs": 79533
+}
