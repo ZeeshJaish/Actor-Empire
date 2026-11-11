@@ -68,6 +68,16 @@ export const CampaignScene: React.FC<{
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [lit, setLit] = useState(0);
 
+  /* 2026-11-11: a scene leaving the page gives its canvases' memory back at once (iOS keeps a detached
+     canvas's pixels until it is collected, and a page of light shows ran out of memory) */
+  useLayoutEffect(() => {
+    /* captured while mounted: by a passive cleanup React has already let go of the refs */
+    const canvases = [led.current, glow.current, reflection.current];
+    return () => canvases.forEach(canvas => {
+      if (canvas) { canvas.width = 0; canvas.height = 0; }
+    });
+  }, []);
+
   /* cover the box, keeping the scene's focus in view */
   useLayoutEffect(() => {
     const element = box.current;

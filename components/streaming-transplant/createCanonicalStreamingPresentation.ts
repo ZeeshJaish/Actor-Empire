@@ -20,9 +20,9 @@ import type { BoardroomState } from './StreamingBoardroomExperience';
 import type { AppState } from './StreamingViewerExperience';
 import { readNetworkSignals } from '../../services/streamingNetworkSignals';
 import { normalizeStreamingRightsCalendarState } from '../../services/streamingRightsCalendar';
-import { getOwnedStreamingProgramEntries } from '../../services/streamingOriginals';
+import { getOwnedStreamingProgramEntries, getStreamingSlateCandidates } from '../../services/streamingOriginals';
 import { streamingLicenceWaitsForSlate } from '../../services/streamingCatalog';
-import { originalOnTheShelf, planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
+import { isStreamingOpeningProgrammeOpen, originalOnTheShelf, planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
 import { getStreamingViewerPersonal, getStreamingViewerPlans, getStreamingViewerQuality, streamingNetworkPictureTier } from '../../services/streamingViewerQuality';
 import { getStreamingViewerOutage } from '../../services/streamingViewerOutage';
 import { gameYearWeekShort } from '../../services/gameWeek';
@@ -76,6 +76,12 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
   const launchedAt = platform.launchCommit?.committedAtAbsoluteWeek ?? null;
   const live = platform.lifecycle === 'ACTIVE';
   const programme = new Map(launchedAt === null ? [] : getOwnedStreamingProgramEntries(player, context).map(entry => [entry.projectId, entry] as const));
+  /* Fix (2026-11-11): before launch the Slate plans the opening programme itself (the old
+     twelve-week page is gone). What can open is the opening slate's rule; the opening lock
+     (#253) keeps an approved plan as it is until opening night. */
+  const openingOpen = launchedAt === null && !live && isStreamingOpeningProgrammeOpen(player);
+  const openingCandidates = openingOpen ? new Set(getStreamingSlateCandidates(player).map(candidate => candidate.projectId)) : null;
+  const onOpeningSlate = new Set((platform.launchSlate?.entries ?? []).map(entry => entry.projectId));
   /* What was bought, week by week, and when each title joined the catalogue (Zeesh, 2026-11-09): every licence by its
      signing week, every Original by its commission week, every studio title by the week it was linked. */
   const HOW: Record<string, string> = {
@@ -129,7 +135,8 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       : CONTENT_AVAILABILITY_LABELS[availability.status].toUpperCase()) as ContentDeskState['titles'][number]['status'];
     /* on the shelves, not on the service: the slate can give it a premiere week */
     /* #291: a delivered Original too */
-    const schedulable = live && launchedAt !== null && availability.status === 'READY' && !programmed;
+    const schedulable = (live && launchedAt !== null && availability.status === 'READY' && !programmed)
+      || Boolean(openingCandidates?.has(projectId) && !onOpeningSlate.has(projectId));
     /* A permanent window or purchase is stored with an expiry of about 9e15
        weeks; it is a licence kept for good, not one ending in 9e15 weeks. */
     const perpetual = Boolean(license && (license.windowType === 'PERMANENT' || license.expiresAtAbsoluteWeek - absoluteWeek > 100_000));
@@ -220,8 +227,9 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       genre: resolveStreamingCatalogueReadTitle(context, entry.projectId)?.genre,
       rightsRisk: riskOf(entry.projectId, launchedAt === null ? null : at), at,
       format: formatOf(entry.projectId, entry.projectType),
-      /* a premiere still ahead that the slate set can be moved or taken off */
-      editable: launchedAt !== null && live && entry.source !== 'ORIGINAL' && at > absoluteWeek,
+      /* a premiere still ahead that the slate set can be moved or taken off; before
+         launch, anything on the opening programme while it can still be planned */
+      editable: (launchedAt !== null && live && entry.source !== 'ORIGINAL' && at > absoluteWeek) || openingOpen,
       ...(entry.source === 'LICENSED_WINDOW' ? windowOf(entry.projectId) : {}),
     };
   });
@@ -280,7 +288,13 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       scheduleFrom: absoluteWeek + 1,
       autoFill: titles.some(title => title.schedulable) ? planStreamingSlateAutoFill(player) : [],
       autoFillFresh: items.some(item => item.editable) ? planStreamingSlateAutoFill(player, { fresh: true }) : [],
+    } : openingOpen ? {
+      /* before launch: programme weeks, opening night (1) to week 12 */
+      scheduleFrom: 1,
+      autoFill: titles.some(title => title.schedulable) ? planStreamingSlateAutoFill(player) : [],
+      autoFillFresh: items.length ? planStreamingSlateAutoFill(player, { fresh: true }) : [],
     } : {}),
+    ...(launchedAt === null && !openingOpen && platform.infrastructureSetup ? { openingLocked: true } : {}),
   };
 };
 

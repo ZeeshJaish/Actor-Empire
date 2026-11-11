@@ -38,6 +38,14 @@ import {
 } from './regionMapCinematic';
 import { selectRegionMapPinLabelIds } from './regionMapLabels';
 import {
+    getLightBordersPath,
+    getLightCountryPath,
+    getLightLandPath,
+    getLightRegionGeometry,
+    getLightShelfPath,
+    getLightUnassignedLandPath,
+} from './worldMapLightGeometry';
+import {
     WORLD_VIEW,
     resolveRegionMapCountryTap,
     resolveRegionMapRegionTap,
@@ -133,8 +141,14 @@ export const InteractiveRegionMapV2: React.FC<InteractiveRegionMapProps> = ({
     showCountryFocus = true,
     showShelf = true,
     showRelief = true,
+    lightGeometry = false,
     className = '',
 }) => {
+    /* the layers this map draws: 1:50m by default, 1:110m when light (see worldMapLightGeometry.ts) */
+    const landPath = lightGeometry ? getLightLandPath() : WORLD_LAND_PATH;
+    const shelfPath = lightGeometry ? getLightShelfPath() : WORLD_SHELF_PATH;
+    const bordersPath = lightGeometry ? getLightBordersPath() : WORLD_BORDERS_PATH;
+    const countryPathOf = lightGeometry ? getLightCountryPath : getCountryPath;
     const drilldown = interaction === 'drilldown';
     const cinematicMode = interaction === 'cinematic';
     const viewportActive = drilldown || cinematicMode;
@@ -214,10 +228,10 @@ export const InteractiveRegionMapV2: React.FC<InteractiveRegionMapProps> = ({
     const warningRegionSet = useMemo(() => new Set(warningRegionIds), [warningRegionIds]);
     const summary = useMemo(() => getRegionMapSummary(selectedRegionIds), [selectedRegionIds]);
     const regions = useMemo(() => REGION_MAP_OVERLAYS.map(region => {
-        const geometry = getRegionGeometry(region.countryIds);
+        const geometry = lightGeometry ? getLightRegionGeometry(region.countryIds) : getRegionGeometry(region.countryIds);
         return { ...region, ...geometry };
-    }), []);
-    const unassignedLandPath = useMemo(() => getUnassignedLandPath(ASSIGNED_COUNTRY_IDS), []);
+    }), [lightGeometry]);
+    const unassignedLandPath = useMemo(() => (lightGeometry ? getLightUnassignedLandPath(ASSIGNED_COUNTRY_IDS) : getUnassignedLandPath(ASSIGNED_COUNTRY_IDS)), [lightGeometry]);
     const pins = useMemo<ResolvedPin[]>(() => presentedLocationPins.flatMap(pin => {
         const countryId = pin.countryId ?? (pin.countryCode ? WORLD_COUNTRY_NUMERIC_BY_ALPHA2[pin.countryCode.toUpperCase()] : undefined);
         const regionId = pin.regionId ?? getRegionIdForCountry(countryId);
@@ -412,12 +426,12 @@ export const InteractiveRegionMapV2: React.FC<InteractiveRegionMapProps> = ({
                 <g clipPath={`url(#${svgIds.frame})`}>
                     <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
                         {showGraticule && <path d={WORLD_GRATICULE_PATH} fill="none" stroke="#fff" strokeOpacity="0.07" strokeWidth="1" vectorEffect="non-scaling-stroke" />}
-                        {showShelf && !isProduction && ([[16, 0.07], [8, 0.1], [3, 0.15]] as Array<[number, number]>).map(([width, opacity]) => (
-                            <path key={width} d={WORLD_SHELF_PATH} fill="none" stroke="#bae6fd" strokeOpacity={opacity} strokeWidth={width} vectorEffect="non-scaling-stroke" />
+                        {showShelf && !isProduction && ((lightGeometry ? [[8, 0.16]] : [[16, 0.07], [8, 0.1], [3, 0.15]]) as Array<[number, number]>).map(([width, opacity]) => (
+                            <path key={width} d={shelfPath} fill="none" stroke="#bae6fd" strokeOpacity={opacity} strokeWidth={width} vectorEffect="non-scaling-stroke" />
                         ))}
                         {showRelief && !isProduction && <>
-                            <path d={WORLD_LAND_PATH} transform="translate(0,7)" fill="#075985" fillOpacity="0.28" />
-                            <path d={WORLD_LAND_PATH} transform="translate(0,12)" fill="#082f49" fillOpacity="0.18" />
+                            <path d={landPath} transform="translate(0,7)" fill="#075985" fillOpacity="0.28" />
+                            {!lightGeometry && <path d={landPath} transform="translate(0,12)" fill="#082f49" fillOpacity="0.18" />}
                         </>}
                         {unassignedLandPath && <path d={unassignedLandPath} fill={isProduction ? '#3b4452' : `url(#${svgIds.land})`} fillOpacity={isProduction ? 0.3 : 0.55} />}
 
@@ -442,7 +456,9 @@ export const InteractiveRegionMapV2: React.FC<InteractiveRegionMapProps> = ({
                                 const tap = () => handleRegionTap(region.id);
                                 const regionInteractive = !cinematicMode && level === 'world';
                                 return <g key={region.id}>
-                                    {selected && <path d={region.path} fill={region.accent} fillOpacity="0.22" stroke={region.accent} strokeOpacity="0.7" strokeWidth="8" filter={`url(#${svgIds.glow})`} />}
+                                    {/* 2026-11-11 (player report: cinema regions "can't click"): the glow's wide stroke lay over the
+                                        neighbouring regions and swallowed their taps; it is only a picture */}
+                                    {selected && <path d={region.path} fill={region.accent} fillOpacity="0.22" stroke={region.accent} strokeOpacity="0.7" strokeWidth="8" filter={lightGeometry ? undefined : `url(#${svgIds.glow})`} pointerEvents="none" />}
                                     <path
                                         d={region.path}
                                     className={`irm-region-base irm-hit${warning ? ' irm-region-warning' : ''}`}
@@ -475,7 +491,7 @@ export const InteractiveRegionMapV2: React.FC<InteractiveRegionMapProps> = ({
                             const strongCountryFocus = emphasizeFocusedCountry && level === 'country' && showCountryFocus;
                             return <path
                                 key={countryId}
-                                d={getCountryPath(countryId)}
+                                d={countryPathOf(countryId)}
                                 className={`irm-country${strongCountryFocus && countryFocused ? ' irm-country-focused' : ''}`}
                                 role={canOpenCountry ? 'button' : undefined}
                                 tabIndex={canOpenCountry ? 0 : undefined}
@@ -496,8 +512,8 @@ export const InteractiveRegionMapV2: React.FC<InteractiveRegionMapProps> = ({
                             />;
                         })}
 
-                        <path d={WORLD_LAND_PATH} fill={`url(#${svgIds.gloss})`} fillOpacity={showRelief && !isProduction ? 0.38 : 0.18} pointerEvents="none" />
-                        {showBorders && <path d={WORLD_BORDERS_PATH} fill="none" stroke="#f0fdfa" strokeOpacity={level === 'world' ? 0.18 : 0.34} strokeWidth="0.9" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                        <path d={landPath} fill={`url(#${svgIds.gloss})`} fillOpacity={showRelief && !isProduction ? 0.38 : 0.18} pointerEvents="none" />
+                        {showBorders && <path d={bordersPath} fill="none" stroke="#f0fdfa" strokeOpacity={level === 'world' ? 0.18 : 0.34} strokeWidth="0.9" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
 
                         {showRoutes && routes.map(({ from, to, route }, index) => {
                             const path = arcPath(from.point, to.point);

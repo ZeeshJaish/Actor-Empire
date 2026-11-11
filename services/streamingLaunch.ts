@@ -20,7 +20,7 @@ import { settleOwnedStreamingLaunchMarketingAtOpening } from './streamingLaunchM
 import { getStreamingCatalogLicenseStatus } from './streamingCatalog';
 import { getStreamingOriginalLiveStatus } from './streamingOriginals';
 import { resolveOwnedStreamingReach } from './streamingProgression';
-import { getStreamingLaunchDefinitionSignature } from './streamingLaunchProgram';
+import { getStreamingLaunchProgramView } from './streamingLaunchProgram';
 import { getStreamingOpeningProgrammeView } from './streamingOpeningProgramme';
 import { getStreamingOpeningCatalogueView } from './streamingOpeningCatalogue';
 import { getStreamingCatalogueReadContext, readStreamingCatalogueDerivedView, type StreamingCatalogueReadContext } from './streamingContentAvailability';
@@ -193,10 +193,9 @@ const buildStreamingLaunchReadiness = (player: Player, context: StreamingCatalog
     const openingMarketsReady = openingMarkets.length > 0 && openingMarkets.every(operation => ['READY', 'ACTIVE'].includes(operation.status));
     const openingProgramme = getStreamingOpeningProgrammeView(player, context);
     /* #253: the plan cannot change while it is being built, and a clearance finishing is not a change to it */
-    const definitionReady = openingProgramme.commissioned || Boolean(
-        platform.launchProgram.lastBlueprintSignature
-        && platform.launchProgram.lastBlueprintSignature === getStreamingLaunchDefinitionSignature(player),
-    );
+    /* 2026-11-11: the same rule as the HQ's Launch blueprint step (it autosaves) */
+    const definitionReady = openingProgramme.commissioned
+        || Boolean(getStreamingLaunchProgramView(player, context).milestones.find(item => item.id === 'LAUNCH_BLUEPRINT')?.complete);
 
     items.push(createItem(
         'opening-programme',
@@ -242,8 +241,8 @@ const buildStreamingLaunchReadiness = (player: Player, context: StreamingCatalog
         'launch-definition',
         'Launch blueprint',
         definitionReady
-            ? 'Markets, service identity, storefront, pricing and content match the saved blueprint.'
-            : 'Save or refresh the Launch Blueprint before final rehearsal.',
+            ? 'Markets, service identity, storefront, pricing and content are set.'
+            : 'Finish the launch definition: markets, ident, storefront, pricing and catalogue.',
         definitionReady ? 'READY' : 'BLOCKED',
         'HOME',
     ));

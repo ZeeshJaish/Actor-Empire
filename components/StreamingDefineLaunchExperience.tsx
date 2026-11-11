@@ -31,7 +31,10 @@ import {
   resolveStreamingMarketRequirement,
   resumeStreamingMarketClearance,
   saveStreamingMarketPlan,
+  withdrawStreamingOpeningMarket,
+  type StreamingMarketMutationResult,
 } from '../services/streamingMarkets';
+import { money as formatMoney } from './studio-finance/finance/format';
 import {
   getStreamingLaunchBudgetView,
   getStreamingIdentPurchaseView,
@@ -364,9 +367,21 @@ export const buildLaunchData = (player: Player, preparedContext?: StreamingCatal
     };
   });
   const opening = platform.marketOperations.filter(operation => (operations || operation.entryKind === 'OPENING') && operation.countryId && operation.status !== 'EXITED');
+  /* 2026-11-11: before the commission a market that has not cleared can leave the opening, so the
+     launch never waits on the slowest country (services/streamingMarkets.ts withdrawStreamingOpeningMarket) */
+  const canLeaveOpening = !operations && !platform.launchCommit && !platform.infrastructureSetup && !platform.openingProgrammeCommission && opening.length > 1;
+  const paidByOperation = new Map<string, number>();
+  platform.costCommitments.forEach(item => {
+    if (item.sourceReferenceId) paidByOperation.set(item.sourceReferenceId, (paidByOperation.get(item.sourceReferenceId) || 0) + (item.paidAmount || 0));
+  });
   const clearance = opening.map(operation => {
     const view = getStreamingMarketClearanceView(operation, absoluteWeek);
+    const declined = operation.clearance?.outcome === 'TEMPORARILY_REJECTED';
     return {
+      /* declined: the government's cooling period before a revised application (weeks pass with Age Up) */
+      refileInWeeks: declined ? Math.max(0, (operation.clearance?.resumeAllowedAtAbsoluteWeek || 0) - absoluteWeek) : undefined,
+      canWithdraw: canLeaveOpening && !['READY', 'ACTIVE'].includes(operation.status),
+      paid: paidByOperation.get(operation.id) || 0,
       countryId: operation.countryId!,
       outcome: mapClearanceOutcome(view.outcome, view.additionalPayment),
       stage: mapClearanceStage(view.stage),
@@ -632,7 +647,37 @@ function OpeningLaunchExperience(props: Props) {
     currentPlayerRef.current = current;
     props.onUpdatePlayer(current);
   };
-  const findOperation = (countryId: string) => currentPlayerRef.current.ownedStreamingPlatform.marketOperations.find(operation => operation.countryId === countryId && (props.operation || operation.entryKind === 'OPENING') && operation.status !== 'EXITED');
+  const operationOf = (player: Player, countryId: string) => player.ownedStreamingPlatform.marketOperations.find(operation => operation.countryId === countryId && (props.operation || operation.entryKind === 'OPENING') && operation.status !== 'EXITED');
+  const findOperation = (countryId: string) => operationOf(currentPlayerRef.current, countryId);
+  /* 2026-11-11: no clearance action fails silently any more; every refusal says why in the card */
+  const marketName = (countryId: string) => STREAMING_WORLD_MARKETS.find(market => market.id === countryId)?.country || countryId;
+  const refileWait = (operation: { clearance?: { resumeAllowedAtAbsoluteWeek?: number | null } | null }) => Math.max(1,
+    (operation.clearance?.resumeAllowedAtAbsoluteWeek || 0) - getAbsoluteWeek(currentPlayerRef.current.age, currentPlayerRef.current.currentWeek));
+  const refusal = (result: StreamingMarketMutationResult, fallback = 'This filing changed. Check its status above.') => ({
+    ok: false,
+    message: result.reason === 'INSUFFICIENT_ENERGY' ? `You need ${result.shortfall}E more. Energy refills when you Age Up.`
+      : result.reason === 'INSUFFICIENT_TREASURY' ? `${formatMoney(result.shortfall)} short in the company treasury. Add capital in Studio Finance.`
+        : result.reason === 'ALREADY_STARTED' ? 'Already filed. Its review is running.'
+          : fallback,
+  });
+  /* one tap for many markets: in order, stopping at the first that cannot go, and saying how far it got */
+  const runForEach = (countryIds: string[], act: (player: Player, operationId: string) => StreamingMarketMutationResult, verb: string) => {
+    let next = currentPlayerRef.current;
+    let done = 0;
+    let stopped: StreamingMarketMutationResult | null = null;
+    for (const countryId of countryIds) {
+      const operation = operationOf(next, countryId);
+      if (!operation) continue;
+      const result = act(next, operation.id);
+      if (!result.changed) { stopped = result; break; }
+      next = result.player;
+      done += 1;
+    }
+    if (done) update(next);
+    if (!stopped) return { ok: true, message: `${verb}: ${done} market${done === 1 ? '' : 's'}. Their reviews carry on.` };
+    const why = refusal(stopped).message;
+    return { ok: done > 0, message: done ? `${verb}: ${done} of ${countryIds.length}. ${why}` : why };
+  };
   const persistDraft = (draft: LaunchDraft) => {
     const absoluteWeek = getAbsoluteWeek(currentPlayerRef.current.age, currentPlayerRef.current.currentWeek);
     const persisted: OwnedStreamingDefineLaunchDraftState = {
@@ -767,20 +812,42 @@ function OpeningLaunchExperience(props: Props) {
         const filingBase = planResult.changed ? planResult.player : currentPlayerRef.current;
         const result = beginStreamingMarketClearance(filingBase, countryIds, entryKind);
         if (result.changed || planResult.changed) update(result.player);
-        if (result.reason === 'INSUFFICIENT_TREASURY') props.onOpenFinance();
+        if (result.reason === 'STARTED') return { ok: true, message: `${countryIds.length === 1 ? marketName(countryIds[0]) : `${countryIds.length} markets`} filed. Reviews take 4–6 weeks, and weeks pass when you Age Up.` };
+        if (result.reason === 'INSUFFICIENT_TREASURY') {
+          props.onOpenFinance();
+          return { ok: false, message: `${formatMoney(result.shortfall)} short in the company treasury. Add capital in Studio Finance.` };
+        }
+        return refusal(result);
       }}
       onSubmitRequirement={(countryId) => {
         const operation = findOperation(countryId);
-        if (!operation) return;
+        if (!operation) return { ok: false, message: `${marketName(countryId)} is no longer on the plan.` };
         const result = resolveStreamingMarketRequirement(currentPlayerRef.current, operation.id);
         if (result.changed) update(result.player);
-        if (result.reason === 'INSUFFICIENT_TREASURY') props.onOpenFinance();
+        if (result.reason === 'RESOLVED') return { ok: true, message: `Sent. ${marketName(countryId)}'s review carries on.` };
+        return refusal(result, `Nothing is owed on ${marketName(countryId)}'s filing any more.`);
       }}
       onFileRevisedApplication={(countryId) => {
         const operation = findOperation(countryId);
-        if (!operation) return;
+        if (!operation) return { ok: false, message: `${marketName(countryId)} is no longer on the plan.` };
         const result = resumeStreamingMarketClearance(currentPlayerRef.current, operation.id);
         if (result.changed) update(result.player);
+        if (result.reason === 'REAPPLIED') return { ok: true, message: `${marketName(countryId)} filed again. A fresh review has started.` };
+        if (result.reason === 'TOO_EARLY') {
+          const wait = refileWait(operation);
+          return { ok: false, message: `${marketName(countryId)} can file again in ${wait} week${wait === 1 ? '' : 's'}. Weeks pass when you Age Up.` };
+        }
+        return refusal(result, `${marketName(countryId)} is not waiting on a refile.`);
+      }}
+      onSubmitAllRequirements={(countryIds) => runForEach(countryIds, resolveStreamingMarketRequirement, 'Sent')}
+      onRefileAll={(countryIds) => runForEach(countryIds, resumeStreamingMarketClearance, 'Filed again')}
+      onWithdrawMarket={(countryId) => {
+        const operation = findOperation(countryId);
+        if (!operation) return { ok: false, message: `${marketName(countryId)} is no longer on the plan.` };
+        const result = withdrawStreamingOpeningMarket(currentPlayerRef.current, operation.id);
+        if (!result.changed) return { ok: false, message: result.reason === 'NO_MARKETS' ? 'The opening needs at least one market.' : `${marketName(countryId)} can't leave the opening now.` };
+        update(result.player);
+        return { ok: true, message: `${marketName(countryId)} left the opening plan.` };
       }}
       onSelectIdent={(soundId, packageId, customAudio) => {
         const usesCustomAudio = soundId === 'custom' && Boolean(customAudio);

@@ -726,6 +726,11 @@
 .mapVisual svg{display:block;width:100%;height:auto}
 .mapzone{cursor:pointer}
 .mapzone rect{transition:fill .3s ease,stroke .3s ease}
+/* 2026-11-11: the opening regions as buttons under the map */
+.regionChips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.regionChip{min-height:40px;padding:0 14px;border-radius:99px;background:rgba(255,255,255,.05);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);font-size:12px;font-weight:800;letter-spacing:.02em;color:#d8d0c2}
+.regionChipOn{background:rgba(240,160,70,.2);box-shadow:inset 0 0 0 1.5px rgba(245,175,90,.85);color:#fff}
 .mapread{display:flex;align-items:baseline;gap:8px;margin-top:12px;padding-top:11px;
   border-top:1px solid rgba(255,255,255,.09)}
 .mapread b{font-size:23px;font-weight:900;font-family:ui-monospace,Menlo,monospace}

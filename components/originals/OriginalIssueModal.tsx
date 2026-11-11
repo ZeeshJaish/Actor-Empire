@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { ChevronRight, Film, Loader2, MapPin, PlayCircle, Sparkles, Wallet } from 'lucide-react';
 import type { Player, ScheduledEvent } from '../../types';
-import { showAd } from '../../services/adLogic';
+import { eventRewardKey, useEventRewardRecovery } from '../../services/eventRewardAd';
 import { noteAdClosed } from '../../services/forcedAds';
 import { getOriginalsStudio } from '../../services/originalsStudios';
 import { answerOriginalIssue, getOriginalIssueView, originalIssueEventData, type OriginalIssueChoice } from '../../services/originalsIssues';
@@ -12,6 +12,7 @@ import { answerOriginalIssue, getOriginalIssueView, originalIssueEventData, type
 interface Props {
     player: Player;
     event: ScheduledEvent;
+    saveSlot?: number | null;
     onResolve: (player: Player, log: string) => void;
 }
 
@@ -19,13 +20,23 @@ const money = (value: number) => (value >= 1e6 ? `$${String(+(value / 1e6).toFix
 const KIND_ICON = { QUALITY: Sparkles, LOCATION: MapPin, BUDGET: Wallet };
 const KIND_WORDS = { QUALITY: 'A quality problem', LOCATION: 'A location problem', BUDGET: 'A money problem' };
 
-export const OriginalIssueModal: React.FC<Props> = ({ player, event, onResolve }) => {
+export const OriginalIssueModal: React.FC<Props> = ({ player, event, saveSlot, onResolve }) => {
     const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const data = originalIssueEventData(event);
     const view = data ? getOriginalIssueView(player, data) : null;
     /* the studio's card scans the catalogue once, as the popup opens */
     const studio = useMemo(() => (view ? getOriginalsStudio(player, view.studioId) : null), [view?.studioId]);
+
+    const answer = (choice: OriginalIssueChoice) => {
+        if (!data) return;
+        const result = answerOriginalIssue(player, data, choice);
+        if (result.changed) onResolve(result.player, result.log);
+        else setNotice(result.log);
+    };
+    const watchReward = useEventRewardRecovery(eventRewardKey(saveSlot, String(player.id || player.name), event.id), choice => {
+        if (view?.open && choice === 'AD') answer('AD');
+    });
 
     if (!data || !view || !view.open) {
         return (
@@ -39,17 +50,12 @@ export const OriginalIssueModal: React.FC<Props> = ({ player, event, onResolve }
         );
     }
 
-    const answer = (choice: OriginalIssueChoice) => {
-        const result = answerOriginalIssue(player, data, choice);
-        if (result.changed) onResolve(result.player, result.log);
-        else setNotice(result.log);
-    };
     const watchAd = async () => {
         if (busy) return;
         setBusy(true);
         setNotice(null);
         try {
-            const result = await showAd('REWARDED_BAILOUT');
+            const result = await watchReward('AD');
             if (result.success) answer('AD');
             else setNotice('The ad did not finish. Pick another answer.');
         } catch (error) {

@@ -33,6 +33,10 @@ declare global {
 }
 
 let initialized = false;
+let consentAllowsAds = false;
+let privacyOptionsOpen = false;
+let privacyOptionsRequired = false;
+const privacyOptionsListeners = new Set<() => void>();
 /* one start-up at a time: a second caller waits for the first instead of starting the SDK again */
 let initializing: Promise<void> | null = null;
 
@@ -45,6 +49,20 @@ export const isRewardedType = (type: AdType) => type !== 'INTERSTITIAL';
 const isNativeAds = () => Boolean(window.Capacitor?.isNativePlatform?.());
 const adPlatform = (): 'ios' | 'android' => (window.Capacitor?.getPlatform?.() === 'ios' ? 'ios' : 'android');
 
+export const getAdPrivacyOptionsRequired = () => privacyOptionsRequired;
+
+export const subscribeAdPrivacyOptions = (listener: () => void) => {
+    privacyOptionsListeners.add(listener);
+    return () => { privacyOptionsListeners.delete(listener); };
+};
+
+const updatePrivacyOptions = (status: string | undefined) => {
+    const required = adPlatform() === 'android' && status === 'REQUIRED';
+    if (required === privacyOptionsRequired) return;
+    privacyOptionsRequired = required;
+    privacyOptionsListeners.forEach(listener => listener());
+};
+
 /* Google's consent gate (UMP): ads may be requested only when the consent SDK says canRequestAds. A consent error,
    or a form the player has not answered, leaves the ad SDK unstarted, so nothing is loaded or shown; the next
    rewarded tap or the next launch asks again. A plugin too old to report canRequestAds falls back to the status. */
@@ -53,10 +71,12 @@ const requestConsent = async (): Promise<boolean> => {
 
     try {
         let info = await AdMob.requestConsentInfo();
+        updatePrivacyOptions(info?.privacyOptionsRequirementStatus);
         console.log('Consent status:', info?.status);
 
         if (info?.isConsentFormAvailable && info?.status === 'REQUIRED' && AdMob.showConsentForm) {
             info = await AdMob.showConsentForm();
+            updatePrivacyOptions(info?.privacyOptionsRequirementStatus);
             console.log('AdMob consent form shown');
         }
         return typeof info?.canRequestAds === 'boolean' ? info.canRequestAds : info?.status !== 'REQUIRED';
@@ -77,7 +97,7 @@ export const initAds = async () => {
         return;
     }
 
-    if (initialized) return;
+    if (privacyOptionsOpen || (initialized && consentAllowsAds)) return;
     if (initializing) return initializing;
 
     if (!AdMob?.initialize) {
@@ -86,18 +106,21 @@ export const initAds = async () => {
     }
 
     initializing = (async () => {
-        if (!(await requestConsent())) {
+        consentAllowsAds = await requestConsent();
+        if (!consentAllowsAds) {
             console.warn('AdMob not started: consent does not allow ad requests yet');
             return;
         }
         try {
             /* Ads must fit the store's age rating (Apple 2.5.18): the App Store lists
                the game 4+, Google Play lists it Teen. */
-            await AdMob.initialize({
-                maxAdContentRating: adPlatform() === 'ios' ? MaxAdContentRating.General : MaxAdContentRating.Teen,
-            });
-            initialized = true;
-            console.log('AdMob initialized after consent');
+            if (!initialized) {
+                await AdMob.initialize({
+                    maxAdContentRating: adPlatform() === 'ios' ? MaxAdContentRating.General : MaxAdContentRating.Teen,
+                });
+                initialized = true;
+                console.log('AdMob initialized after consent');
+            }
             preloadInterstitial();
             preloadRewarded();
         } catch (err) {
@@ -112,27 +135,31 @@ export const initAds = async () => {
    so one is prepared in the background and shown only when it is ready. */
 type InterstitialState = 'IDLE' | 'LOADING' | 'READY' | 'SHOWING';
 let interstitialState: InterstitialState = 'IDLE';
+let interstitialLoad: Promise<void> | null = null;
 let lastLoadFailedAt = 0;
 const LOAD_RETRY_MS = 45_000;
 const SHOW_SAFETY_MS = 120_000;
 
 export const preloadInterstitial = () => {
-    if (!isNativeAds() || !initialized || !AdMob?.prepareInterstitial) return;
+    if (!isNativeAds() || !initialized || !consentAllowsAds || privacyOptionsOpen || !AdMob?.prepareInterstitial) return;
     if (interstitialState !== 'IDLE') return;
     if (Date.now() - lastLoadFailedAt < LOAD_RETRY_MS) return;
     interstitialState = 'LOADING';
-    AdMob.prepareInterstitial({ adId: ADMOB_IDS[adPlatform()].interstitial })
+    interstitialLoad = AdMob.prepareInterstitial({ adId: ADMOB_IDS[adPlatform()].interstitial })
         .then(() => { interstitialState = 'READY'; })
         .catch(error => {
             interstitialState = 'IDLE';
             lastLoadFailedAt = Date.now();
             console.warn('Interstitial preload failed:', error);
-        });
+        })
+        .finally(() => { interstitialLoad = null; });
 };
 
 /** In development and on the web there is nothing to preload: the break is simulated or handled by the web ad API.
     While another ad is on screen (or a rewarded tap is waiting for one) the break is not ready. */
-export const isInterstitialReady = (): boolean => (isNativeAds() ? interstitialState === 'READY' && !activeAd : true);
+export const isInterstitialReady = (): boolean => (
+    isNativeAds() ? consentAllowsAds && !privacyOptionsOpen && interstitialState === 'READY' && !activeAd : true
+);
 
 /** Shows the preloaded interstitial and resolves when it closes (true) or could not show (false). Never loads on demand. */
 export const showPreloadedInterstitial = async (label = 'break'): Promise<boolean> => {
@@ -150,7 +177,7 @@ export const showPreloadedInterstitial = async (label = 'break'): Promise<boolea
         return true;
     }
     /* never over another ad: a rewarded ad on screen, or a rewarded tap still fetching one */
-    if (activeAd) return false;
+    if (activeAd || privacyOptionsOpen || !consentAllowsAds) return false;
     if (interstitialState !== 'READY' || !AdMob?.showInterstitial) {
         preloadInterstitial();
         return false;
@@ -206,7 +233,7 @@ const REWARDED_SHOW_SAFETY_MS = 180_000;
 const isRewardedFresh = () => rewardedState === 'READY' && Date.now() - rewardedLoadedAt < REWARDED_MAX_AGE_MS;
 
 const loadRewarded = (): Promise<boolean> => {
-    if (!isNativeAds() || !initialized || !AdMob?.prepareRewardVideoAd) return Promise.resolve(false);
+    if (!isNativeAds() || !initialized || !consentAllowsAds || privacyOptionsOpen || !AdMob?.prepareRewardVideoAd) return Promise.resolve(false);
     if (isRewardedFresh()) return Promise.resolve(true);
     if (rewardedState === 'SHOWING') return Promise.resolve(false);
     if (rewardedLoad) return rewardedLoad;
@@ -234,6 +261,36 @@ export const preloadRewarded = () => {
     if (rewardedState === 'LOADING' || rewardedState === 'SHOWING' || isRewardedFresh()) return;
     if (Date.now() - lastRewardedLoadFailedAt < LOAD_RETRY_MS) return;
     void loadRewarded();
+};
+
+export const openAdPrivacyOptions = async () => {
+    if (!privacyOptionsRequired || privacyOptionsOpen || activeAd || initializing) return false;
+    privacyOptionsOpen = true;
+    try {
+        await AdMob.showPrivacyOptionsForm();
+        consentAllowsAds = false;
+        const info = await AdMob.requestConsentInfo();
+        consentAllowsAds = info.canRequestAds === true;
+        updatePrivacyOptions(info.privacyOptionsRequirementStatus);
+        return true;
+    } catch (error) {
+        console.warn('Could not update ad privacy options:', error);
+        return false;
+    } finally {
+        // Discard ads prepared under the old choices, including loads already in flight.
+        await Promise.all([interstitialLoad, rewardedLoad]);
+        interstitialState = 'IDLE';
+        rewardedState = 'IDLE';
+        lastLoadFailedAt = 0;
+        lastRewardedLoadFailedAt = 0;
+        privacyOptionsOpen = false;
+        if (initialized) {
+            preloadInterstitial();
+            preloadRewarded();
+        } else if (consentAllowsAds) {
+            void initAds();
+        }
+    }
 };
 
 const settleWithin = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => new Promise<T>(resolve => {
@@ -323,7 +380,7 @@ export const showAd = async (type: AdType, options: ShowAdOptions = {}): Promise
     if (isNativeAds()) {
         await initAds();
 
-        if (!AdMob || !initialized) return { success: false, reason: 'UNAVAILABLE' };
+        if (!AdMob || !initialized || !consentAllowsAds || privacyOptionsOpen) return { success: false, reason: 'UNAVAILABLE' };
         /* one ad at a time: a second request while an ad is up, or while the first tap is still fetching one, gets
            "no ad", never a second show (and never a second reward). The slot is taken before the first wait. */
         if (activeAd || rewardedState === 'SHOWING') return { success: false, reason: 'UNAVAILABLE' };

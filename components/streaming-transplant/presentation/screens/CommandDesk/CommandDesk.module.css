@@ -353,3 +353,12 @@
 .hq .heroTap:hover{opacity:.78}
 .hq .heroTap:active{opacity:.62}
 .hq .heroTap:focus-visible{outline:2px solid var(--epx-hq-c);outline-offset:5px}
+
+/* 2026-11-11 (player report, old Android WebView in an emulator): engines without color-mix() (Android
+   WebView < 111, iOS < 16.2) accept these declarations when reading the CSS (they hold var()) and drop them
+   when drawing, leaving cards see-through and buttons blank. Plain colours for those engines only; a current
+   engine never applies this block. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  .hq .launchCommandRow { background: #0b0d12; border-color: rgba(255,255,255,.14); }
+  .hq .launchCommandRow:active { background: #10131a; }
+}

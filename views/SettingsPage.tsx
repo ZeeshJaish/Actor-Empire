@@ -1,9 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, CheckCircle2, ChevronRight, FileText, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
 import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
+import { getAdPrivacyOptionsRequired, openAdPrivacyOptions, subscribeAdPrivacyOptions } from '../services/adLogic';
 import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type ChangelogEntry, type ChangelogUpdateType } from '../services/changelog';
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '../services/newPlayerTutorial';
@@ -74,6 +75,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     });
   }, [sentIssueId]);
   const [supportNotice, setSupportNotice] = useState<string | null>(null);
+  const [adPrivacyNotice, setAdPrivacyNotice] = useState('');
+  const [adPrivacyBusy, setAdPrivacyBusy] = useState(false);
+  const showAdPrivacy = useSyncExternalStore(subscribeAdPrivacyOptions, getAdPrivacyOptionsRequired);
   const [transferNotice, setTransferNotice] = useState<string | null>(null);
   const [isTransferBusy, setIsTransferBusy] = useState(false);
   const [selectedChangelogVersion, setSelectedChangelogVersion] = useState(APP_DISPLAY_VERSION);
@@ -463,6 +467,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
       </div>
 
       <div className="space-y-4">
+        {entry.highlights?.length ? (
+          <div className="rounded-2xl border border-white/5 bg-zinc-950/60 p-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">Highlights</div>
+            <ul className="mt-3 space-y-2 text-sm leading-relaxed text-zinc-300">
+              {entry.highlights.map(item => (
+                <li key={item.title} className="flex gap-2">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300/80" aria-hidden="true" />
+                  <span><span className="font-bold text-white">{item.title}.</span> {item.text}</span>
+                </li>
+              ))}
+            </ul>
+            {entry.note && <p className="mt-3 text-xs leading-relaxed text-zinc-500">{entry.note}</p>}
+          </div>
+        ) : null}
         {entry.sections.map(section => (
           <div key={section.heading} className="rounded-2xl border border-white/5 bg-zinc-950/60 p-4">
             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">{section.heading}</div>
@@ -1106,6 +1124,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           tone="support"
           onClick={() => setMode('SUPPORT')}
         />
+        {showAdPrivacy && (
+          <>
+            <SettingsRow
+              icon={ShieldCheck}
+              title="Ad Privacy Choices"
+              subtitle="Review or change your advertising consent"
+              onClick={async () => {
+                if (adPrivacyBusy) return;
+                setAdPrivacyBusy(true);
+                setAdPrivacyNotice('');
+                try {
+                  if (!(await openAdPrivacyOptions())) setAdPrivacyNotice('Ad privacy choices could not open. Try again.');
+                } finally {
+                  setAdPrivacyBusy(false);
+                }
+              }}
+            />
+            {adPrivacyNotice && <p role="status" className="px-4 pb-2 text-xs text-amber-300">{adPrivacyNotice}</p>}
+          </>
+        )}
         <SettingsRow
           icon={MessageCircle}
           title={tr('settings.community')}

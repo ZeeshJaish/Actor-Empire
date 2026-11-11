@@ -36,11 +36,14 @@ Date.now = () => now;
 const listeners = new Map();
 const calls = { prepare: 0, show: 0, interstitialShow: 0 };
 const script = { prepare: () => Promise.resolve({}), show: () => new Promise(() => {}) };
+let canRequestAds = true;
+let closePrivacyForm;
 const emit = (event, data) => { for (const fn of [...(listeners.get(event) || [])]) fn(data); };
 globalThis.__admobMock = {
   AdMob: {
     initialize: async () => {},
-    requestConsentInfo: async () => ({ status: 'NOT_REQUIRED', isConsentFormAvailable: false }),
+    requestConsentInfo: async () => ({ status: 'OBTAINED', canRequestAds, privacyOptionsRequirementStatus: 'REQUIRED' }),
+    showPrivacyOptionsForm: () => new Promise(resolve => { closePrivacyForm = resolve; }),
     prepareInterstitial: async () => ({}),
     showInterstitial: async () => { calls.interstitialShow += 1; },
     prepareRewardVideoAd: () => { calls.prepare += 1; return script.prepare(); },
@@ -219,6 +222,32 @@ await check('the interstitial beside it still shows and settles', async () => {
   emit(I.Dismissed);
   assert.equal(await settles(shown, 1_000), true);
   assert.equal(calls.interstitialShow, shows + 1);
+});
+
+await check('privacy choices pause both ad formats and discard ads from before the update', async () => {
+  await advance(3_000);
+  assert.equal(ads.getAdPrivacyOptionsRequired(), true);
+  assert.equal(ads.isInterstitialReady(), true);
+  const loads = calls.prepare;
+  const close = ads.openAdPrivacyOptions();
+  await flush();
+  assert.equal(await ads.showPreloadedInterstitial(), false);
+  assert.deepEqual(await ads.showAd('REWARDED_CASH'), { success: false, reason: 'UNAVAILABLE' });
+  canRequestAds = false;
+  closePrivacyForm();
+  assert.equal(await close, true);
+  assert.equal(ads.isInterstitialReady(), false);
+  assert.deepEqual(await ads.showAd('REWARDED_CASH'), { success: false, reason: 'UNAVAILABLE' });
+  assert.equal(calls.prepare, loads);
+
+  const reopen = ads.openAdPrivacyOptions();
+  await flush();
+  canRequestAds = true;
+  closePrivacyForm();
+  assert.equal(await reopen, true);
+  await flush();
+  assert.equal(calls.prepare, loads + 1);
+  assert.equal(ads.isInterstitialReady(), true);
 });
 
 console.info(`Rewarded ad lifecycle audit passed (${results.length} cases).`);

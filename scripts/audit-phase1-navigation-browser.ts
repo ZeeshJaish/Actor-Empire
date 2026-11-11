@@ -17,7 +17,7 @@ try {
   fixture.id = 'phase-one-synthetic-career';
   await page.addInitScript((player: typeof fixture) => {
     localStorage.clear();
-    localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.25');
+    localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.27');
     localStorage.setItem('actorEmpireSave_1', JSON.stringify(player));
     localStorage.setItem('actorEmpireSave_1_meta', JSON.stringify({
       playerName: player.name, age: player.age, week: player.currentWeek,

@@ -874,7 +874,12 @@ export const getDividendPayout = (
                 : ((normalizeStockPrice(stock, stock.price) * stock.dividendYield * item.shares) / 4);
             const allocations = getStockHoldingAllocations(item);
             if (allocations.corporate.length) {
-                mixedPersonalTotal += splitStockReceipt(item, item.shares, Math.floor(gross)).receipts.find(row => !row.ownerStudioId)?.proceeds || 0;
+                /* 2026-11-11 (1.0.27 hotfix): a split that cannot be made pays the personal part by share count */
+                try {
+                    mixedPersonalTotal += splitStockReceipt(item, item.shares, Math.floor(gross)).receipts.find(row => !row.ownerStudioId)?.proceeds || 0;
+                } catch {
+                    if (item.shares > 0 && Number.isFinite(gross)) total += gross * (allocations.personalShares / item.shares);
+                }
             } else total += gross;
         }
     });
@@ -887,8 +892,12 @@ export const getCorporateStockDividendReceipts = (player: Player, week: number):
         const stock = player.stocks.find(candidate => candidate.id === item.stockId);
         if (!stock || stock.dividendYield <= 0 || !hasDividendDue(stock, week, player)
             || isStockRetiredByMerger(player, stock) || isStockRetiredBySale(player, stock)) continue;
+        /* 2026-11-11 (1.0.27 hotfix): a holding with no company shares has no company receipt (same result as
+           before, without the split), and a split that cannot be made skips that one receipt instead of the week */
+        if (!getStockHoldingAllocations(item).corporate.length) continue;
         const amount = Math.floor(getEstimatedAnnualDividend(player, stock, item.shares) / 4);
-        const split = splitStockReceipt(item, item.shares, amount);
+        let split: ReturnType<typeof splitStockReceipt>;
+        try { split = splitStockReceipt(item, item.shares, amount); } catch { continue; }
         for (const row of split.receipts) if (row.ownerStudioId && row.proceeds > 0) receipts.push({ ownerStudioId: row.ownerStudioId, stockId: stock.id, amount: row.proceeds });
     }
     return receipts;

@@ -52,6 +52,18 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
   const activeRegionName = mapView.regionId
     ? regions.find(region => region.id === mapView.regionId)?.label ?? 'Theatrical region'
     : 'Theatrical world';
+  /* 1.0.27 (player report: "glitches in the region section ... distribution"): the last region left cannot be
+     dropped (a release opens somewhere), and that tap did nothing on screen. It now says why. */
+  const [regionHint, setRegionHint] = useState<string | null>(null);
+  const toggleRegion = (regionId: string) => {
+    const region = regions.find(item => item.id === regionId);
+    if (region?.selected && selectedRegionCount <= 1) {
+      setRegionHint(`A release opens in at least one region. Pick another region first, then drop ${region.label}.`);
+      return;
+    }
+    setRegionHint(null);
+    onToggleRegion(regionId);
+  };
   useEffect(() => {
     if (mapView.level === 'world') return undefined;
     const returnTimer = window.setTimeout(() => setMapView(WORLD_VIEW), 1100);
@@ -73,7 +85,7 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
         />
         <InteractiveRegionMap
           selectedRegionIds={mapModel.selectedRegionIds}
-          onSelectRegion={regionId => onToggleRegion(regionId)}
+          onSelectRegion={regionId => toggleRegion(regionId)}
           visualTone="release"
           interaction={mapModel.interaction}
           maximumViewLevel={mapModel.maximumViewLevel}
@@ -86,8 +98,19 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
           compact
           showPreview={false}
           ariaLabel="Interactive theatrical release map"
+          lightGeometry
         />
       </div>
+      {/* the same choice as buttons: a sure tap on any phone, and every region's state at a glance */}
+      <div className={css.regionChips} role="group" aria-label="Opening regions">
+        {regions.map(region => (
+          <button type="button" key={region.id} aria-pressed={region.selected} className={join(css.regionChip, region.selected && css.regionChipOn)}
+            onClick={() => toggleRegion(region.id)}>
+            {region.selected ? '✓ ' : '+ '}{region.label}
+          </button>
+        ))}
+      </div>
+      {regionHint && <p className={css.secnote} role="status" data-region-hint>{regionHint}</p>}
       <div className={css.mapread}><b>{selectedRegionCount}</b><span>regions</span><em>{totalScreens.toLocaleString()} screens</em></div>
     </section>
 

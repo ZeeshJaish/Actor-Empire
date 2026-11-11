@@ -20,7 +20,11 @@ export interface StudioAiWeekResult {
     news: NewsItem[];
     socialPosts: XPost[];
     logs: string[];
+    /** 2026-11-11: rival companies whose week stopped on bad data and sat the week out (see below). */
+    skipped?: Array<{ companyId: string; step: string; error: string }>;
 }
+
+const errorText = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 200);
 
 const publicSignal = (name: string, status: StudioAiCompanyStatus) => {
     if (status === 'DISTRESSED') return {
@@ -55,9 +59,26 @@ export const processStudioAiWeek = (
     const news: NewsItem[] = [];
     const socialPosts: XPost[] = [];
     const logs: string[] = [];
+    const skipped: NonNullable<StudioAiWeekResult['skipped']> = [];
 
+    /* 2026-11-11 (1.0.27 hotfix, "Week N was not applied"): one rival studio with bad data used to stop the
+       player's whole week. Each studio now runs on its own: if its week throws, that studio and the industry
+       productions go back to how they were before it, it sits this week out, and the rest of the week goes on.
+       The steps below never change the shared world in place, so the two restores are the whole undo. A studio
+       that works is untouched by this. */
     Object.keys(nextWorld.studios || {}).sort().forEach(studioId => {
         const prior = nextWorld.studios![studioId];
+        const productionsBefore = nextWorld.industryProductions;
+        try {
+            runStudioWeek(studioId, prior);
+        } catch (error) {
+            nextWorld.studios![studioId] = prior;
+            nextWorld.industryProductions = productionsBefore;
+            skipped.push({ companyId: studioId, step: 'studio_week', error: errorText(error) });
+        }
+    });
+
+    function runStudioWeek(studioId: string, prior: NonNullable<WorldState['studios']>[string]) {
         const priorStatus = prior.ai?.status || 'ACTIVE';
         let controlled = reconcileStudioAiController(prior, player, absoluteWeek);
         const proposalIdsBefore = new Set(controlled.ai?.intelligence?.proposals.map(item => item.id) || []);
@@ -135,9 +156,15 @@ export const processStudioAiWeek = (
             sentiment: 'INDUSTRY',
         });
         logs.push(`${processed.name}'s finances changed materially this week.`);
-    });
+    }
 
-    const productionExecution = executeStudioAiProductionWeek({ player: { ...player, world: nextWorld }, world: nextWorld, absoluteWeek });
-    logs.push(...productionExecution.logs);
-    return { world: productionExecution.world, news, socialPosts, logs };
+    /* the same rule for the rivals' productions: if this step throws, they stay where they were for a week */
+    try {
+        const productionExecution = executeStudioAiProductionWeek({ player: { ...player, world: nextWorld }, world: nextWorld, absoluteWeek });
+        logs.push(...productionExecution.logs);
+        return { world: productionExecution.world, news, socialPosts, logs, ...(skipped.length ? { skipped } : {}) };
+    } catch (error) {
+        skipped.push({ companyId: 'industry_productions', step: 'production_week', error: errorText(error) });
+        return { world: nextWorld, news, socialPosts, logs, skipped };
+    }
 };

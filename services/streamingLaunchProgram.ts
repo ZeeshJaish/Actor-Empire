@@ -910,12 +910,13 @@ const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatal
     );
     const catalogueCoverage = getStreamingOpeningCatalogueView(player, context);
     const hasCatalogue = Boolean(platform.starterCatalog && catalogueCoverage.titles.some(title => title.available));
-    const launchDefinitionSignature = getStreamingLaunchDefinitionSignature(player, context);
-    /* #253: once commissioned the plan is locked: see getStreamingOpeningLock */
-    const blueprintSaved = Boolean(platform.infrastructureSetup) || Boolean(
-        platform.launchProgram.lastBlueprintSignature
-        && platform.launchProgram.lastBlueprintSignature === launchDefinitionSignature,
-    );
+    /* #253: once commissioned the plan is locked: see getStreamingOpeningLock.
+       2026-11-11: the blueprint autosaves, so it is current whenever the definition is
+       complete. Comparing a stored signature went stale on every slate, price or
+       clearance change, and the HQ sent players back to a page that already said
+       "All 6 objectives are settled". */
+    const blueprintSaved = Boolean(platform.infrastructureSetup)
+        || Boolean(marketsChosen && hasIdent && hasStorefront && hasPricing && hasCatalogue);
 
     const draft = platform.infrastructureSetupDraft;
     const commissioned = platform.infrastructureSetup;
@@ -1071,10 +1072,6 @@ const buildStreamingLaunchProgramView = (player: Player, context: StreamingCatal
     if (platform.localizationOperations.jobs.some(job => job.status !== 'READY') || !catalogueCoverage.qualityReady) warnings.push({
         id: 'launch-warning:localization', milestoneId: 'OPENING_CATALOGUE', tone: 'WARNING',
         message: 'Optional language coverage is incomplete. This does not block launch, but reach may be lower in affected markets.',
-    });
-    if (platform.launchProgram.lastBlueprintSignature && !blueprintSaved) warnings.push({
-        id: 'launch-warning:blueprint-stale', milestoneId: 'LAUNCH_BLUEPRINT', tone: 'WARNING',
-        message: 'The launch definition changed after its last checkpoint. Resolve the changed requirement and rehearse again.',
     });
 
     const blockerByMilestone = new Map(blockers.map(blocker => [blocker.milestoneId, blocker]));

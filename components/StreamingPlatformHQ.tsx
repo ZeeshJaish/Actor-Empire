@@ -1,3 +1,4 @@
+import { recordNonFatal } from '../services/firebaseService';
 import { markQuietPlayerUpdate } from '../services/quietPlayerUpdates';
 import { hasStreamingPlus } from '../services/streamingPlusPack';
 import { runTaskAd } from '../services/forcedAds';
@@ -56,7 +57,6 @@ import type { StreamingIdentPreviewId } from '../services/streamingIdentAudio';
 import { gameWeekLabel } from '../services/gameWeek';
 import { openingNightInputs, openingNightTitles } from './streaming-transplant/opening-night/nightInputs';
 import { streamingPlatformBrand } from './streaming-transplant/streamingPlatformBrand';
-import StreamingSlatePlanner from './StreamingSlatePlanner';
 import StreamingViewerMode from './StreamingViewerMode';
 import StreamingLaunchReceipt from './StreamingLaunchReceipt';
 import StreamingAnalyticsCenter from './StreamingAnalyticsCenter';
@@ -305,7 +305,7 @@ interface Props {
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   /** #75: STATUS opens the Platform room on its STATUS tab (the incident popup's "Open STATUS") */
-  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE';
+  initialDestination?: 'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE' | 'RIGHTS';
   initialContentMarketOfferId?: string;
   onContentMarketOfferConsumed?: () => void;
 }
@@ -564,7 +564,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* #173, #188: MARKETS' Ring the bell opens the listing */
   const [showListing, setShowListing] = useState(false);
   const [showIncidentCommand, setShowIncidentCommand] = useState(false);
-  const [showSlatePlanner, setShowSlatePlanner] = useState(false);
   const [showOriginalReveal, setShowOriginalReveal] = useState(Boolean(pendingOriginalReveal));
   const [showViewerMode, setShowViewerMode] = useState(false);
   /* #116: the brand studio, opened from the HQ logo */
@@ -1506,6 +1505,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* #75: the incident popup's "Open STATUS" lands on the Platform room's STATUS tab, once */
   const openedStatus = useRef(false);
   useEffect(() => {
+    /* 2026-11-11: the Rights Desk notice lands on Content › Rights, before or after launch (it opened the
+       film studio's property market, "Error: Studio not found" without a studio) */
+    if (!openedStatus.current && initialDestination === 'RIGHTS') {
+      openedStatus.current = true;
+      setContentInitialTab('RIGHTS');
+      setActiveSection('CONTENT');
+      return;
+    }
     if (openedStatus.current || !readPlatform.launchCommit) return;
     /* #210: a decision's door opens its Boardroom room */
     if (initialDestination === 'TEAM' || initialDestination === 'OWNERSHIP') {
@@ -1798,6 +1805,20 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     if (prepared.player.energy.current < quote.filingEnergy) {
       return { ok: false, message: 'Not enough energy remains to file every opening-market application.' };
     }
+    /* 2026-11-11 (player report "it kicks me back"): the quote leaves out the Build's own validation
+       (Streaming+ servers without the pack, the price ladder, the load test), so a refusal only came
+       after the 26-second cutscene. The commit itself runs here as a dry run (its result is thrown
+       away; about 40 ms), so the cutscene plays only when the commit will pass. */
+    const dryRun = commissionStreamingOpeningProgramme(prepared.player, {
+      infrastructureDraft: prepared.draft,
+      marketingForecast: launchMarketing().forecast,
+      openingCountryIds: buildMarkets().map(market => market.id),
+      expectedLaunchDefinitionSignature: getStreamingLaunchDefinitionSignature(prepared.player),
+    });
+    if (!dryRun.changed && dryRun.reason !== 'ALREADY_COMMISSIONED') {
+      recordNonFatal(new Error(dryRun.message), 'streaming_commission_refused', { reason: dryRun.reason, stage: 'pre_check' });
+      return { ok: false, message: dryRun.message };
+    }
     return { ok: true, message: 'The exact tested setup is ready to commission.' };
   };
 
@@ -1823,6 +1844,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       expectedLaunchDefinitionSignature: getStreamingLaunchDefinitionSignature(withDraft),
     });
     if (!committed.changed && committed.reason !== 'ALREADY_COMMISSIONED') {
+      recordNonFatal(new Error(committed.message), 'streaming_commission_refused', { reason: committed.reason, stage: 'commit' });
       setCompanyFeedback(committed.message);
       return { ok: false, message: committed.message } as const;
     }
@@ -2331,7 +2353,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         state={cinematicContentState()}
         initialTab={contentInitialTab}
         onAddContent={() => whenCatalogueOpen(() => setShowContentMarket(true))}
-        onOpenSlate={() => whenCatalogueOpen(() => setShowSlatePlanner(true))}
         onBack={() => {
           if (catalogueReturnToLaunch) {
             setCatalogueReturnToLaunch(false);
@@ -2398,9 +2419,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           persistCanonical(result.player);
           const name = result.player.ownedStreamingPlatform.launchSlate?.entries.find(entry => entry.projectId === projectId)?.title
             ?? result.player.ownedStreamingPlatform.originalCommissions.find(item => item.canonicalProjectId === projectId)?.title ?? 'It';
+          /* before launch the week is a programme week of the opening (fix 2026-11-11) */
+          const opening = !platform.launchCommit;
+          const openingCount = result.player.ownedStreamingPlatform.launchSlate?.entries.length ?? 0;
           return { ok: true, message: rhythm
             ? (rhythm === 'WEEKLY' ? `${name} comes out an episode a week.` : `${name} comes out all at once.`)
-            : `${name} premieres in year ${Math.floor(absoluteWeek / 52) + 1}, week ${(absoluteWeek % 52) + 1}.` };
+            : opening
+              ? `${name} ${absoluteWeek === 1 ? 'opens the service on opening night' : `premieres in week ${absoluteWeek} of the opening`}.${openingCount < 3 ? ` The opening needs 3 titles: ${openingCount} of 3.` : ' The opening programme is ready.'}`
+              : `${name} premieres in year ${Math.floor(absoluteWeek / 52) + 1}, week ${(absoluteWeek % 52) + 1}.` };
         }}
         onUnscheduleTitle={projectId => {
           const name = player.ownedStreamingPlatform.launchSlate?.entries.find(entry => entry.projectId === projectId)?.title
@@ -2408,6 +2434,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           const result = unscheduleStreamingSlateTitle(player, projectId);
           if (!result.changed) return { ok: false, message: STREAMING_SLATE_REFUSAL_COPY[result.reason ?? 'UNKNOWN_TITLE'] };
           persistCanonical(result.player);
+          if (!platform.launchCommit) return { ok: true, message: `${name} is off the opening and back on your shelves.` };
           return { ok: true, message: getStreamingSlateFallback(result.player, projectId) === 'LICENCE_START'
             ? `${name} is off the slate. It goes live when its licence starts.`
             : `${name} is off the slate and back on your shelves.` };
@@ -2417,12 +2444,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           if (!result.changed) return { ok: false, message: 'Nothing on your shelves fits a week right now.' };
           persistCanonical(result.player);
           if (!result.scheduled.length) return { ok: true, message: 'Your planned premieres are off the slate; nothing fits a week right now.' };
-          return { ok: true, message: `${fresh ? 'Planned anew. ' : ''}Scheduled ${result.scheduled.length}: ${result.scheduled.map(item => `${item.title} (W${(item.absoluteWeek % 52) + 1})`).join(', ')}.` };
+          const weekOf = (item: { absoluteWeek: number }) => (platform.launchCommit ? `W${(item.absoluteWeek % 52) + 1}` : item.absoluteWeek === 1 ? 'opening night' : `W${item.absoluteWeek}`);
+          return { ok: true, message: `${fresh ? 'Planned anew. ' : ''}Scheduled ${result.scheduled.length}: ${result.scheduled.map(item => `${item.title} (${weekOf(item)})`).join(', ')}.` };
         }}
         onClearSlatePlans={() => {
           const result = clearStreamingSlatePlans(player);
           if (!result.changed) return { ok: false, message: 'Nothing is planned to take off.' };
           persistCanonical(result.player);
+          if (!platform.launchCommit) return { ok: true, message: `Took ${result.removed.length} title${result.removed.length === 1 ? '' : 's'} off the opening. The opening needs 3 titles again.` };
           return { ok: true, message: `Took ${result.removed.length} planned premiere${result.removed.length === 1 ? '' : 's'} off the slate. Setup and studio titles are back on your shelves; licences bought after setup go live at their rights start.` };
         }}
         /* Localization by region: set a region up (cash, once), then raise its
@@ -2756,9 +2785,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             ? resolveStreamingMarketRequirement(player, operationId)
             : resumeStreamingMarketClearance(player, operationId);
           if (result.changed) persist(result.player);
+          /* 2026-11-11: say what is short, and when a declined market can file again */
           else setCompanyFeedback(result.reason === 'TOO_EARLY'
-            ? 'This revised application is still inside its cooling period.'
-            : 'That government request cannot be resolved yet.');
+            ? `This market can file again in ${Math.max(1, (operation.clearance.resumeAllowedAtAbsoluteWeek || 0) - getAbsoluteWeek(player.age, player.currentWeek))} week(s). Weeks pass when you Age Up.`
+            : result.reason === 'INSUFFICIENT_ENERGY'
+              ? `You need ${result.shortfall}E more. Energy refills when you Age Up.`
+              : result.reason === 'INSUFFICIENT_TREASURY'
+                ? `${formatMoney(result.shortfall)} short in the company treasury. Add capital in the Boardroom.`
+                : 'That government request cannot be resolved yet.');
         }}
         onOpeningNight={openCinematicPremiere}
       />
@@ -3075,7 +3109,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   /* the screen in front of the player is a desk (a section), not a room opened over it */
   const deckOnScreen = !showListing && !showContentMarket && !showCatalogSetup && !showOriginalsDesk && !showCommissionWizard && !showRightsExchange
     && !showFinanceRoom && !showTechnologyCampus
-    && !showCampusConstruction && !showSlatePlanner
+    && !showCampusConstruction
     && !(showIncidentCommand && incidentCommand().available)
     && !(showAnalyticsCenter && platform.launchCommit)
     && !(showTitleDossier && platform.launchCommit);
@@ -3241,7 +3275,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           }}
           onOpenFinance={() => openFinanceRoom('CAPITAL', 'INJECT')}
           onCommission={() => setShowOriginalsDesk(true)}
-          onResumeLegacy={() => { setCatalogSetupInitialStep(undefined); setShowCatalogSetup(true); }}
+          /* 2026-11-11: no "Resume your saved opening agreement" door: it opened the old catalogue setup page,
+             and old pages are no longer reachable (Zeesh). The Content Market is the one way to build the catalogue. */
           onExistingNegotiations={() => setShowRightsExchange(true)}
           onReview={() => {
             if (platform.starterCatalog) {
@@ -3294,8 +3329,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             } else if (action === 'slate') {
               setOriginalDetailId(null);
               setShowOriginalsDesk(false);
-              /* before the service opens, the opening programme is the Slate */
-              if (!platform.launchCommit) return whenCatalogueOpen(() => setShowSlatePlanner(true));
+              /* before the service opens the Slate tab plans the opening programme too (fix 2026-11-11: the old page is gone) */
               setContentInitialTab('SLATE');
               setContentDeskOpening(value => value + 1);
               setActiveSection('CONTENT');
@@ -3377,13 +3411,6 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             setShowIncidentCommand(false);
             setShowTechnologyCampus(true);
           }}
-        />
-      ) : null}
-      {showSlatePlanner ? (
-        <StreamingSlatePlanner
-          player={player}
-          onUpdatePlayer={onUpdatePlayer!}
-          onClose={() => setShowSlatePlanner(false)}
         />
       ) : null}
       {showAnalyticsCenter && platform.launchCommit ? (

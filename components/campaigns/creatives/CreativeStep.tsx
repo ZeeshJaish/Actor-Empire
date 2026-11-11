@@ -234,7 +234,11 @@ export const CreativeStep: React.FC<{
       {noImage.map(id => <p key={id} className={css.noImage}>{NO_IMAGE_LINE[id] ?? `${CAMPAIGN_FORMATS[id].name}: no image.`}</p>)}
       {cropping && (
         <CreativeCropper image={cropping.image} frame={cropping.frame} accent={accent} onCancel={closeCrop}
-          onDone={canvas => { onKeep(cropping.frame.key, { mediaId: keepCreative(canvas), canvas }); closeCrop(); }} />
+          onDone={canvas => {
+            const key = cropping.frame.key;
+            onKeep(key, { mediaId: keepCreative(canvas, text => setProblem({ key, text })), canvas });
+            closeCrop();
+          }} />
       )}
       {live && (
         <CreativeLive sceneId={live.sceneId} label={`${kept[live.frame.key] ? 'Your image' : 'Made for you'} · ${live.frame.name} ${live.frame.key}`}

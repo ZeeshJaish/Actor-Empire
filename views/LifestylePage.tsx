@@ -31,7 +31,7 @@ interface LifestylePageProps {
   onPremiumPurchase: (productId: PremiumProductId) => void;
   onReturnHome?: () => void;
   onNavVisibilityChange?: (visible: boolean) => void;
-  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'STREAMING_SLATE' | 'UPCOMING_PACKS';
+  initialView?: 'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'STREAMING_SLATE' | 'STREAMING_RIGHTS' | 'UPCOMING_PACKS';
   onInitialViewConsumed?: () => void;
   onOpenBank?: () => void;
   initialRightsMarketOpportunityId?: string;
@@ -69,7 +69,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
   const [purchaseCelebrationAsset, setPurchaseCelebrationAsset] = useState<ShareableAsset | null>(null);
   const [streamingOriginalTarget, setStreamingOriginalTarget] = useState<{ studioId: string; scriptId: string; commissionId: string } | null>(null);
-  const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE'>('HOME');
+  const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE' | 'RIGHTS'>('HOME');
   /* #252: a title sent to the player's own service from the rights floor */
   const [shelfNotice, setShelfNotice] = useState<StreamingShelfNoticeModel | null>(null);
   const language = getPlayerLanguage(player);
@@ -93,9 +93,10 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   useEffect(() => {
       if (!initialView) return;
-      if (initialView === 'STREAMING_FINANCE' || initialView === 'STREAMING_STATUS' || initialView === 'STREAMING_TEAM' || initialView === 'STREAMING_OWNERSHIP' || initialView === 'STREAMING_SLATE') {
-          /* #75: the incident popup's "Open STATUS" opens the Platform room on STATUS; #210: a decision's door, its Boardroom room */
-          setStreamingDestination(initialView === 'STREAMING_STATUS' ? 'STATUS' : initialView === 'STREAMING_TEAM' ? 'TEAM' : initialView === 'STREAMING_OWNERSHIP' ? 'OWNERSHIP' : initialView === 'STREAMING_SLATE' ? 'SLATE' : 'FINANCE');
+      if (initialView === 'STREAMING_FINANCE' || initialView === 'STREAMING_STATUS' || initialView === 'STREAMING_TEAM' || initialView === 'STREAMING_OWNERSHIP' || initialView === 'STREAMING_SLATE' || initialView === 'STREAMING_RIGHTS') {
+          /* #75: the incident popup's "Open STATUS" opens the Platform room on STATUS; #210: a decision's door, its Boardroom room;
+             2026-11-11: the Rights Desk notice opens Content › Rights */
+          setStreamingDestination(initialView === 'STREAMING_STATUS' ? 'STATUS' : initialView === 'STREAMING_TEAM' ? 'TEAM' : initialView === 'STREAMING_OWNERSHIP' ? 'OWNERSHIP' : initialView === 'STREAMING_SLATE' ? 'SLATE' : initialView === 'STREAMING_RIGHTS' ? 'RIGHTS' : 'FINANCE');
           setView('STREAMING_PLATFORM');
       } else {
           if (initialView === 'STREAMING_PLATFORM') setStreamingDestination('HOME');

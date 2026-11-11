@@ -49,7 +49,7 @@ async function verifySurface(page: any, label: string, viewport: Viewport, actio
       };
       await page.addInitScript(({ player }: { player: typeof INITIAL_PLAYER }) => {
         localStorage.clear();
-        localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.25');
+        localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.27');
         localStorage.setItem('aeMigrationCarePackageLedgerV1', JSON.stringify({ globalClaimed: true, fingerprints: [] }));
         localStorage.setItem('actorEmpireSave_1', JSON.stringify(player));
         localStorage.setItem('actorEmpireSave_1_meta', JSON.stringify({ playerName: player.name, age: player.age, week: player.currentWeek, fame: player.stats.fame, totalPlayTimeMs: 0, savedAt: Date.now() }));

@@ -428,8 +428,16 @@ export const SlatePlanner: React.FC<{
   const byId = React.useMemo(() => new Map(titles.map(title => [title.id, title])), [titles]);
   const ready = React.useMemo(() => titles.filter(title => title.schedulable).sort((left, right) => left.title.localeCompare(right.title)), [titles]);
   const planned = slate.flatMap(week => week.releases).filter(release => release.editable).length;
+  /* before launch the weeks are the opening programme (no calendar year): week 1 is opening night */
+  const programme = slate.length > 0 && slate[0].year === undefined;
+  /* before launch: an Original in production is on the rail but is not ready to open yet */
+  const making = programme ? ready.filter(title => title.kind === 'ORIGINAL' && title.status === 'IN PRODUCTION') : [];
+  const openNow = ready.length - making.length;
+  const onOpening = programme ? slate.flatMap(week => week.releases).length : 0;
   const tag = (week: SlateWeek) => `W${week.weekOfYear ?? week.week}`;
-  const when = (week: SlateWeek) => (week.now ? 'Now' : week.week === now + 1 ? 'Next' : `in ${week.week - now}w`);
+  const when = (week: SlateWeek) => (programme
+    ? (week.week === 1 ? 'Opening' : `+${week.week - 1}w`)
+    : week.now ? 'Now' : week.week === now + 1 ? 'Next' : `in ${week.week - now}w`);
   const report = (key: string, result: SlateActionResult) => { if (result) setNote({ key, ...result }); };
   const toggle = (key: string, firstWeek: number | null = null) => {
     setOpenKey(current => (current === key ? null : key));
@@ -530,12 +538,23 @@ export const SlatePlanner: React.FC<{
             </span>
           )}
           <div className={css.planReadyText}>
-            <p>
-              {ready.length > 0
-                ? <><b>{ready.length} title{ready.length === 1 ? ' is' : 's are'} on your shelves</b> but not on the service. </>
-                : <>Everything on your shelves is scheduled. </>}
-              {planned > 0 ? `${planned} premiere${planned === 1 ? '' : 's'} planned.` : 'Tap a week to add, or let Auto-fill place them.'}
-            </p>
+            {programme ? (
+              <p>
+                {/* the launch needs three titles on the opening (services/streamingLaunch.ts) */}
+                <b>{onOpening >= 3 ? 'Opening programme ready' : `The opening needs 3 titles · ${onOpening} of 3`}</b>
+                {openNow > 0 ? ` · ${openNow} more title${openNow === 1 ? '' : 's'} can open. ` : '. '}
+                {/* an Original still being made can go on, but the launch waits until it is finished */}
+                {making.length > 0 ? `${making.length === 1 ? `${making[0].title} is` : `${making.length} Originals are`} still being made. ` : ''}
+                {planned > 0 ? 'Every change saves at once.' : 'Tap a week to add, or let Auto-fill place them.'}
+              </p>
+            ) : (
+              <p>
+                {ready.length > 0
+                  ? <><b>{ready.length} title{ready.length === 1 ? ' is' : 's are'} on your shelves</b> but not on the service. </>
+                  : <>Everything on your shelves is scheduled. </>}
+                {planned > 0 ? `${planned} premiere${planned === 1 ? '' : 's'} planned.` : 'Tap a week to add, or let Auto-fill place them.'}
+              </p>
+            )}
             <div className={css.planTools}>
               {onAutoFill && (autoFill.length > 0 || autoFillFresh.length > 0) && (
                 <button type="button" className={css.autoBtn} aria-expanded={step === 'choose' || step === 'keep' || step === 'fresh'}
@@ -572,12 +591,15 @@ export const SlatePlanner: React.FC<{
           <div className={css.autoPlan}>
             <header>
               <b>{step === 'fresh' ? 'Auto-fill · start fresh' : 'Auto-fill plan'}</b>
-              <small>{step === 'fresh' ? `Your ${planned} planned premiere${planned === 1 ? '' : 's'} come off first. ` : ''}Closes the silent weeks first, about one premiere every third week, inside each title's rights.</small>
+              <small>{step === 'fresh' ? `Your ${planned} planned premiere${planned === 1 ? '' : 's'} come off first. ` : ''}{programme
+                ? 'Your best title opens the night, then about one premiere every third week.'
+                : 'Closes the silent weeks first, about one premiere every third week, inside each title\'s rights.'}</small>
             </header>
             {plan.map(item => (
               <div key={item.projectId} className={css.autoRow}>
                 <span>{item.title}</span>
-                <em>Year {Math.floor(item.absoluteWeek / 52) + 1} · W{(item.absoluteWeek % 52) + 1}</em>
+                {/* before launch absoluteWeek holds the programme week */}
+                <em>{programme ? (item.absoluteWeek === 1 ? 'Opening night' : `Week ${item.absoluteWeek}`) : `Year ${Math.floor(item.absoluteWeek / 52) + 1} · W${(item.absoluteWeek % 52) + 1}`}</em>
               </div>
             ))}
             <div className={css.autoActions}>
@@ -591,7 +613,9 @@ export const SlatePlanner: React.FC<{
         <div className={cx(css.autoPlan, css.clearPlan)}>
           <header>
             <b>Remove all {planned} planned premiere{planned === 1 ? '' : 's'}?</b>
-            <small>The slate goes back to empty. Setup and studio titles return to your shelves; a licence bought after setup goes live again when its rights start. Originals are not touched.</small>
+            <small>{programme
+              ? 'The opening programme goes back to empty and every title returns to your shelves. The opening needs 3 titles again.'
+              : 'The slate goes back to empty. Setup and studio titles return to your shelves; a licence bought after setup goes live again when its rights start. Originals are not touched.'}</small>
           </header>
           <div className={css.autoActions}>
             <button type="button" className={css.link} onClick={() => setStep(null)}>Cancel</button>

@@ -212,7 +212,16 @@ export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player
         onPlatformCommissionConsumed?.();
     }, [initialPlatformCommission, onPlatformCommissionConsumed, player.world.platformAiPlayerCommissionOffers, studioGroup.allStudios]);
 
-    if (!studio) return <div className="p-10 text-white">Error: Studio not found.</div>;
+    /* 1.0.27 (player reports [13, 21] and a later Discord report): a door into the studio for a career without
+       one showed "Error: Studio not found." on a black screen with no way out, so the game had to be restarted.
+       Any such door now lands here with a way back. */
+    if (!studio) return (
+        <div className="flex min-h-full flex-col items-center justify-center gap-3 px-8 py-16 text-center text-white" data-studio-missing>
+            <p className="text-base font-black">Studio not available</p>
+            <p className="max-w-xs text-sm font-semibold leading-relaxed text-zinc-400">This page needs a production house you own. Nothing was changed.</p>
+            <button type="button" onClick={onBack} className="mt-2 min-h-11 rounded-xl bg-white px-6 text-sm font-black text-black">Go back</button>
+        </div>
+    );
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
 

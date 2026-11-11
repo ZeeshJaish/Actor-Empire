@@ -5,6 +5,15 @@ export interface ChangelogSection {
   items: string[];
 }
 
+export type ChangelogHighlightIcon = 'STREAMING' | 'GLOBE' | 'TROPHY' | 'BOARDROOM' | 'SPARKLES' | 'FILM' | 'NEWS' | 'FIX';
+
+/** A headline feature, shown as a tile in the update popup (2026-11-09). */
+export interface ChangelogHighlight {
+  icon: ChangelogHighlightIcon;
+  title: string;
+  text: string;
+}
+
 export interface ChangelogEntry {
   version: string;
   title: string;
@@ -12,6 +21,10 @@ export interface ChangelogEntry {
   releaseLabel: string;
   summary: string;
   sections: ChangelogSection[];
+  /** headline features: tiles in the popup, a list in Settings */
+  highlights?: ChangelogHighlight[];
+  /** one short line under the highlights */
+  note?: string;
 }
 
 const changelogEntry = (
@@ -21,6 +34,8 @@ const changelogEntry = (
   releaseLabel: string,
   summary: string,
   sections: ChangelogSection[],
+  highlights?: ChangelogHighlight[],
+  note?: string,
 ): ChangelogEntry => ({
   version,
   title,
@@ -28,6 +43,8 @@ const changelogEntry = (
   releaseLabel,
   summary,
   sections,
+  ...(highlights ? { highlights } : {}),
+  ...(note ? { note } : {}),
 });
 
 const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntry => changelogEntry(
@@ -49,6 +66,90 @@ const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntr
 );
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  /* 1.0.27 (2026-11-11): the hotfix from the first players' reports on 1.0.26, player-facing only. The summary also says
+     how streaming unlocks, for players who update straight from 1.0.25 and see this entry first. */
+  changelogEntry(
+    '1.0.27',
+    'Streaming Update Fixes',
+    'PATCH',
+    'November 2026',
+    'Fixes for the Streaming Update, from your reports. New here? Streaming unlocks at $150M, 65 Fame and 55 Reputation, in Lifestyle.',
+    [
+      {
+        heading: 'Streaming fixes',
+        items: [
+          'Plan and lock your opening in Content › Slate. The old planner is gone.',
+          'The launch blueprint completes once your launch is defined.',
+          'Market clearance: see when a declined market can file again, drop a stuck country before you commission, and file or pay for every market in one tap.',
+          'The Pay button on clearance requests works again, and stuck saves are repaired.',
+          'Commission checks everything before the cutscene and tells you what to fix. Nothing is charged if it cannot go ahead.',
+          'The launch campaign shows where your money goes, with Add capital and Open without a campaign.',
+          "Rights notices open your service's Rights tab instead of a black screen.",
+        ],
+      },
+      {
+        heading: 'Films and saves',
+        items: [
+          'Older careers no longer stop with "Week was not applied".',
+          'After a cinema run, the campaign, festivals and calendar scroll again, and the bid room no longer freezes the game.',
+          'Pick cinema regions with a tap on the map or the new region buttons.',
+          'Faster location maps in Greenlight and Commission.',
+          'Campaign pictures no longer go black while you scroll.',
+          'Faster late-game weeks, and fewer freezes after taps on big careers.',
+          'Fixes for older phones: see-through cards and blank buttons.',
+        ],
+      },
+    ],
+    [
+      { icon: 'STREAMING', title: 'Open your service', text: 'Slate, clearances, Pay and Commission work again.' },
+      { icon: 'FIX', title: 'Old saves play again', text: 'Weeks no longer stop on older careers.' },
+      { icon: 'FILM', title: 'Release films smoothly', text: 'Tap cinema regions, scroll the campaign, no frozen bid room.' },
+      { icon: 'SPARKLES', title: 'Faster and smoother', text: 'Quicker late-game weeks and lighter maps.' },
+    ],
+    'Thank you for every report. Keep them coming.',
+  ),
+  /* 1.0.26: everything since 1.0.25 (App Store 6 Aug 2026, Play 27 Jul 2026; GitHub 907e0271..HEAD), player-facing only */
+  changelogEntry(
+    '1.0.26',
+    'The Streaming Update',
+    'MAJOR',
+    'November 2026',
+    'Build your own streaming empire. It unlocks at $150M, 65 Fame and 55 Reputation, in Lifestyle.',
+    [
+      {
+        heading: 'Also new',
+        items: [
+          'A shared cinema market: your films fight every other release for the same audiences.',
+          'More varied scripts, genres and movie titles.',
+          'Livelier News, X and YouTube: critics with their own voices, a new critic called Red Exclusive, and far fewer repeated headlines.',
+          'Believable follower, subscriber and view counts on Instagram, X and YouTube.',
+          'A new director to work with: James Wilson.',
+          'A redesigned Store, with the optional Streaming+ Pack.',
+          'Ads now wait for natural breaks and never cover a decision.',
+          'Smoother late-game weeks and faster saves.',
+        ],
+      },
+      {
+        heading: 'Fixes',
+        items: [
+          'Studio and company values now follow real earnings, and stock prices follow real results.',
+          'Emmy and Golden Globe nominations work again.',
+          'Dating partners keep their gender, so couples can start a family again.',
+          "Your studio's own series are no longer cancelled at random.",
+          'Fixed the hidden Begin Career button and the stuck "ad playing" screen.',
+          'Screens stay clear of the notch and the home bar on modern phones.',
+          'Better start-up and many stability fixes.',
+        ],
+      },
+    ],
+    [
+      { icon: 'STREAMING', title: 'Your own streaming service', text: 'Name it, design its app, and set your plans and prices.' },
+      { icon: 'GLOBE', title: 'Launch worldwide', text: 'Pick countries, wire servers in 194 cities, go live on launch night.' },
+      { icon: 'TROPHY', title: 'Fight for the Top 10', text: 'Originals, licensing auctions, ad campaigns and rival platforms.' },
+      { icon: 'BOARDROOM', title: 'Run the boardroom', text: 'Hire your team, raise money from investors and grow your value.' },
+    ],
+    'Streaming is brand new and still being finished. More is on the way.',
+  ),
   changelogEntry(
     '1.0.25',
     'Living Productions & Fairer Competition',

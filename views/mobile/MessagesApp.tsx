@@ -75,6 +75,8 @@ interface MessagesAppProps {
   onMarkRead: (id: string) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
   onOpenStreamingContentOffer?: (offerId: string) => void;
+  /** 2026-11-11: a streaming rights notice opens the service's Content › Rights, not the film studio's property market */
+  onOpenStreamingRights?: () => void;
   onOpenStudioAcquisition?: (studioId?: string, studioName?: string) => void;
   onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
   onDeclinePlatformCommission?: (offerId: string) => void;
@@ -85,7 +87,7 @@ interface MessagesAppProps {
   onImmersiveReviewChange?: (active: boolean) => void;
 }
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStreamingContentOffer, onOpenStudioAcquisition, onOpenStudioContinuation, onDeclinePlatformCommission, onResolveShareholderVote, onImmersiveReviewChange }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStreamingContentOffer, onOpenStreamingRights, onOpenStudioAcquisition, onOpenStudioContinuation, onDeclinePlatformCommission, onResolveShareholderVote, onImmersiveReviewChange }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeShareholderVoteId, setActiveShareholderVoteId] = useState<string | null>(null);
@@ -109,6 +111,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   } | null>(null);
 
   const messages = player.inbox || [];
+  /* 2026-11-11: the streaming Rights Desk notice shares the property report's card, not its door */
+  const streamingRightsNotice = selectedMessage?.type === 'RIGHTS_REPORT' && selectedMessage.data?.kind === 'STREAMING_RIGHTS_URGENT';
   const selectedRightsStatus = selectedMessage?.type === 'RIGHTS_NEGOTIATION'
       ? selectedMessage.data?.negotiation?.status
       : undefined;
@@ -805,8 +809,8 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                         <FileSearch size={22} />
                                     </div>
                                     <div>
-                                        <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">Studio Intelligence</div>
-                                        <div className="text-xs text-zinc-400">Confidential market review</div>
+                                        <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-300">{streamingRightsNotice ? 'Rights Desk' : 'Studio Intelligence'}</div>
+                                        <div className="text-xs text-zinc-400">{streamingRightsNotice ? 'Your streaming service' : 'Confidential market review'}</div>
                                     </div>
                                 </div>
                                 <h2 className="max-w-[85%] text-2xl font-black leading-tight">{selectedMessage.subject}</h2>
@@ -850,16 +854,18 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
                                     </>
                                 )}
                                 <button
-                                    onClick={() => onOpenRightsMarket?.(selectedMessage.data?.opportunityId)}
+                                    onClick={() => (streamingRightsNotice ? onOpenStreamingRights?.() : onOpenRightsMarket?.(selectedMessage.data?.opportunityId))}
                                     className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 bg-slate-900 px-4 text-xs font-black uppercase tracking-[0.14em] text-white"
                                 >
-                                    Open Property File <ChevronRight size={17} />
+                                    {streamingRightsNotice ? 'Open the Rights tab' : 'Open Property File'} <ChevronRight size={17} />
                                 </button>
 
                                 <div className="mt-6 flex items-center gap-3 border-t border-black/15 pt-5">
                                     <ShieldCheck size={20} className="shrink-0 text-amber-700" />
                                     <p className="text-xs font-bold leading-relaxed text-slate-600">
-                                        Review the full file in Development Lab → Market → Properties.
+                                        {streamingRightsNotice
+                                            ? 'Renew, buy out or let each licence go on your service: Content › Rights.'
+                                            : 'Review the full file in Development Lab → Market → Properties.'}
                                     </p>
                                 </div>
                             </div>

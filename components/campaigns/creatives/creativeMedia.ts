@@ -10,6 +10,7 @@
  *  - a kept creative is read back as an image for the scenes and thumbnails (a campaign whose image is gone shows the
  *    made-for-you one instead).
  */
+import { recordNonFatal } from '../../../services/firebaseService';
 import { useEffect, useState } from 'react';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../../services/mediaStorage';
 import { creativeOutputSize, cropSource, type CreativeCrop } from './creativeFrames';
@@ -47,15 +48,23 @@ export const renderCrop = (image: HTMLImageElement, ratio: number, crop: Creativ
 export const newCreativeId = () => `campaign_creative_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
 /** Keeps a creative: returns its media id now; the store writes in the background. */
-export const keepCreative = (canvas: HTMLCanvasElement): string => keepCreativeAs(newCreativeId(), canvas);
+export const keepCreative = (canvas: HTMLCanvasElement, onFail?: (message: string) => void): string => keepCreativeAs(newCreativeId(), canvas, onFail);
+
+/* 2026-11-11 (player reports: an uploaded picture "did not stick"): a failed write was swallowed, so the
+   picture showed until the next restart and then quietly turned back into the made-for-you art. */
+const SAVE_FAILED = 'This picture could not be saved on this device (its storage may be full). It shows now, but after a restart the made-for-you picture returns. Free some space and upload it again.';
 
 /** Keeps a picture under a media id made earlier (#149: a campaign's picture, its id already on the campaign). */
-export const keepCreativeAs = (id: string, canvas: HTMLCanvasElement): string => {
+export const keepCreativeAs = (id: string, canvas: HTMLCanvasElement, onFail?: (message: string) => void): string => {
+  const fail = (error: unknown) => {
+    recordNonFatal(error, 'campaign_creative_save_failed', { width: canvas.width, height: canvas.height });
+    onFail?.(SAVE_FAILED);
+  };
   canvas.toBlob(blob => {
-    if (!blob) return;
+    if (!blob) { fail(new Error('The picture could not be encoded.')); return; }
     saveMediaBlob(id, blob, { kind: 'campaign_creative', width: canvas.width, height: canvas.height })
       .then(() => pruneMediaStore('campaign_creative', KEEP))
-      .catch(() => { /* the campaign falls back to its made-for-you creative */ });
+      .catch(fail);
   }, 'image/jpeg', JPEG_QUALITY);
   return id;
 };

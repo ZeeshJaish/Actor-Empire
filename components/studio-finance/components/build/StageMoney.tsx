@@ -530,6 +530,13 @@ export function StageMoney({ data, draft: build, totals, plan, handlers, campaig
           brandHue={brandHue}
           accent={marketing.accent || '#3b82f6'}
           spare={Math.max(0, data.treasury.available - ((plan.commissionNow ?? 0) - (draft.weeks ? ceiling : 0)) - (totals?.weeklyCost ?? 0) * 12)}
+          spareBreakdown={{
+            treasury: data.treasury.available,
+            network: Math.max(0, (plan.commissionNow ?? 0) - (draft.weeks ? ceiling : 0)),
+            reserve: (totals?.weeklyCost ?? 0) * 12,
+          }}
+          onInjectCapital={handlers.onOpenStudioFinance ? () => { setBuildingCampaign(false); handlers.onOpenStudioFinance?.(); } : undefined}
+          onOpenWithout={() => { setMarketing({ budgetCeiling: 0, openingNight: 0 }); setBuildingCampaign(false); }}
           onCancel={() => setBuildingCampaign(false)}
           onSave={(patch) => { setMarketing(patch); setBuildingCampaign(false); }}
         />

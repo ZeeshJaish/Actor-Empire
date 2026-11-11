@@ -65,6 +65,42 @@ export const canCreditCorporateStockReceipt = (player: Player, ownerStudioId: st
         .every(value => Number.isFinite(value) && Number.isSafeInteger(Math.round((value + amount) * 100)) && Math.round(((value + amount) - value) * 100) === Math.round(amount * 100));
 };
 
+/**
+ * 2026-11-11 (1.0.27 hotfix, "Week N was not applied"): the weekly company dividend must never stop a week.
+ * It takes the exact credit below whenever that works, so a normal career is unchanged. When it cannot (a
+ * company balance or statement past safe cents, or shares still booked to a company that no longer exists),
+ * the company gets a plain rounded addition, or, with no company left, its owner, the player. Anything still
+ * impossible skips that one dividend instead of throwing.
+ */
+export const creditCorporateDividendSafely = (player: Player, ownerStudioId: string, amount: number, stockId: string): Player => {
+    if (!Number.isFinite(amount) || amount <= 0) return player;
+    try {
+        if (canCreditCorporateStockReceipt(player, ownerStudioId, amount, 'DIVIDEND')) {
+            return creditCorporateStockReceipt(player, ownerStudioId, amount, 'DIVIDEND', stockId);
+        }
+    } catch { /* the plain addition below */ }
+    try {
+        const cents = (value: number) => Math.round(value * 100) / 100;
+        const plus = (value: number) => (Number.isFinite(value) ? cents(value + amount) : value);
+        const owner = player.businesses.find(item => item.id === ownerStudioId);
+        if (owner && Number.isFinite(owner.balance)) {
+            return {
+                ...player,
+                businesses: player.businesses.map(business => (business.id !== ownerStudioId ? business : {
+                    ...business,
+                    balance: cents(business.balance + amount),
+                    ...(business.stats ? { stats: { ...business.stats,
+                        weeklyRevenue: plus(business.stats.weeklyRevenue),
+                        weeklyProfit: plus(business.stats.weeklyProfit),
+                        lifetimeRevenue: plus(business.stats.lifetimeRevenue) } } : {}),
+                })),
+            };
+        }
+        if (!owner && Number.isFinite(player.money)) return { ...player, money: cents(player.money + amount) };
+    } catch { /* skipped below */ }
+    return player;
+};
+
 /** Company investments pay their company treasury; an impossible credit aborts the caller's atomic action. */
 export const creditCorporateStockReceipt = (player: Player, ownerStudioId: string, amount: number, kind: 'SALE' | 'DIVIDEND', stockId: string): Player => {
     if (amount <= 0) return player;

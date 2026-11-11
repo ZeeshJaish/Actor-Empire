@@ -14,11 +14,11 @@ const assert = (condition: unknown, message: string) => {
 
 const latest = getLatestChangelogEntry();
 assert(latest.version === APP_DISPLAY_VERSION, `latest changelog ${latest.version} does not match app version ${APP_DISPLAY_VERSION}`);
-assert(APP_DISPLAY_VERSION === '1.0.25', `app version should be 1.0.25, got ${APP_DISPLAY_VERSION}`);
-const expectedVersions = Array.from({ length: 26 }, (_, index) => `1.0.${25 - index}`);
+assert(APP_DISPLAY_VERSION === '1.0.27', `app version should be 1.0.27, got ${APP_DISPLAY_VERSION}`);
+const expectedVersions = Array.from({ length: 28 }, (_, index) => `1.0.${27 - index}`);
 assert(
   CHANGELOG_ENTRIES.map(entry => entry.version).join('|') === expectedVersions.join('|'),
-  `changelog should include every version from 1.0.25 through 1.0.0 in order`,
+  `changelog should include every version from 1.0.27 through 1.0.0 in order`,
 );
 
 const seenVersions = new Set<string>();
@@ -64,6 +64,17 @@ assert(!/loophole|calculation|formula/i.test(entryText('1.0.24')), '1.0.24 shoul
 assert(entryText('1.0.25').includes('background casts'), '1.0.25 should include background cast planning');
 assert(entryText('1.0.25').includes('refresh every three weeks'), '1.0.25 should include rotating crew markets');
 assert(entryText('1.0.25').includes('stronger competition'), '1.0.25 should include tougher world competition');
+/* 1.0.26 (2026-11-09): the streaming update, with four headline tiles for the popup */
+const streamingUpdate = CHANGELOG_ENTRIES.find(item => item.version === '1.0.26');
+assert(streamingUpdate?.type === 'MAJOR' && streamingUpdate.title === 'The Streaming Update', '1.0.26 should be the major streaming update');
+assert(streamingUpdate?.highlights?.length === 4, '1.0.26 should show four headline tiles');
+assert(/\$150M, 65 Fame and 55 Reputation/.test(streamingUpdate?.summary || ''), '1.0.26 should say when streaming unlocks');
+assert(!/loophole|calculation|formula|sandbox/i.test(entryText('1.0.26')), '1.0.26 should describe player-facing changes only');
+/* 1.0.27 (2026-11-11): the hotfix from players' reports; it also says how streaming unlocks, for players coming from 1.0.25 */
+const hotfix = CHANGELOG_ENTRIES.find(item => item.version === '1.0.27');
+assert(hotfix?.type === 'PATCH' && hotfix.highlights?.length === 4, '1.0.27 should be a patch with four headline tiles');
+assert(/\$150M, 65 Fame and 55 Reputation/.test(hotfix?.summary || ''), '1.0.27 should still say when streaming unlocks');
+assert(!/loophole|calculation|formula|sandbox/i.test(entryText('1.0.27')), '1.0.27 should describe player-facing changes only');
 
 const settingsPage = read('views/SettingsPage.tsx');
 assert(settingsPage.includes("'CHANGELOG'"), 'SettingsPage must include CHANGELOG mode');
@@ -81,6 +92,7 @@ assert(!settingsPage.includes("tr('settings.gameplayRules')"), 'Mods Pack must n
 const app = read('App.tsx');
 assert(app.includes('getLatestChangelogEntry'), 'App must render latest changelog in startup What\'s New');
 assert(app.includes('previousChangelogEntries'), 'App must render previous updates in startup What\'s New');
+assert(app.includes('<WhatsNewModal'), 'App must show the short update popup');
 
 const startMenu = read('views/StartMenu.tsx');
 assert(startMenu.includes('totalPlayTimeMs'), 'StartMenu must pass total play time to save slots');
@@ -98,23 +110,23 @@ const savedPlayTime = migratePlayerSave({ ...INITIAL_PLAYER, totalPlayTimeMs: 3_
 assert(savedPlayTime.totalPlayTimeMs === 3_726_500, 'valid accumulated play time must survive migration');
 
 const packageJson = JSON.parse(read('package.json'));
-assert(packageJson.version === '1.0.25', 'package.json version must be 1.0.25');
+assert(packageJson.version === '1.0.27', 'package.json version must be 1.0.27');
 assert(packageJson.scripts?.['audit:changelog-version'], 'package.json must expose audit:changelog-version');
 
 const packageLock = JSON.parse(read('package-lock.json'));
-assert(packageLock.version === '1.0.25', 'package-lock root version must be 1.0.25');
-assert(packageLock.packages?.['']?.version === '1.0.25', 'package-lock package version must be 1.0.25');
+assert(packageLock.version === '1.0.27', 'package-lock root version must be 1.0.27');
+assert(packageLock.packages?.['']?.version === '1.0.27', 'package-lock package version must be 1.0.27');
 
 const androidGradle = read('android/app/build.gradle');
-assert(androidGradle.includes('versionCode 21'), 'Android versionCode must be 21');
-assert(androidGradle.includes('versionName "1.0.25"'), 'Android versionName must be 1.0.25');
+assert(androidGradle.includes('versionCode 27'), 'Android versionCode must be 27');
+assert(androidGradle.includes('versionName "1.0.27"'), 'Android versionName must be 1.0.27');
 
 const androidMetadata = read('android/app/release/output-metadata.json');
-assert(androidMetadata.includes('"versionCode": 21'), 'Android output metadata versionCode must be 21');
-assert(androidMetadata.includes('"versionName": "1.0.25"'), 'Android output metadata versionName must be 1.0.25');
+assert(androidMetadata.includes('"versionCode": 27'), 'Android output metadata versionCode must be 27');
+assert(androidMetadata.includes('"versionName": "1.0.27"'), 'Android output metadata versionName must be 1.0.27 (rewritten by the release build)');
 
 const iosProject = read('ios/App/App.xcodeproj/project.pbxproj');
-assert((iosProject.match(/CURRENT_PROJECT_VERSION = 21;/g) || []).length >= 2, 'iOS build number must be 21');
-assert((iosProject.match(/MARKETING_VERSION = 1.0.25;/g) || []).length >= 2, 'iOS marketing version must be 1.0.25');
+assert((iosProject.match(/CURRENT_PROJECT_VERSION = 27;/g) || []).length >= 2, 'iOS build number must be 27');
+assert((iosProject.match(/MARKETING_VERSION = 1.0.27;/g) || []).length >= 2, 'iOS marketing version must be 1.0.27');
 
 console.log('Changelog and version audit passed.');

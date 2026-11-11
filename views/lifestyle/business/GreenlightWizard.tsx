@@ -3359,6 +3359,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                                     onSelectLocation={() => {}}
                                     visualTone="release"
                                     accentColor="#fb7185"
+                                    lightGeometry
                                     interaction={mapModel.interaction}
                                     maximumViewLevel={mapModel.maximumViewLevel}
                                     minimumPinViewLevel={mapModel.minimumPinViewLevel}

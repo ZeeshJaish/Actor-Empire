@@ -9,7 +9,7 @@ import {
     streamingIncidentEventData,
     type StreamingIncidentEventChoice,
 } from '../services/streamingIncidentEvent';
-import { showAd } from '../services/adLogic';
+import { eventRewardKey, useEventRewardRecovery } from '../services/eventRewardAd';
 import { noteAdClosed } from '../services/forcedAds';
 
 /* #75: a new incident on STATUS as the week's popup (Zeesh: "us popup ka use karke"), with STATUS's three
@@ -18,6 +18,7 @@ import { noteAdClosed } from '../services/forcedAds';
 interface Props {
     player: Player;
     event: ScheduledEvent;
+    saveSlot?: number | null;
     /** the answer taken (or the incident already settled): close the popup with this player */
     onResolve: (player: Player, log: string) => void;
     /** "Open STATUS": close the popup and open the page */
@@ -34,7 +35,7 @@ const costLine = (option: StreamingIncidentRepairOption, takedown: boolean) => (
             : `Free · ${weeksWords(option.weeks)} ${takedown ? 'on pirate sites' : 'of damage'}`
 );
 
-export const StreamingIncidentEventModal: React.FC<Props> = ({ player, event, onResolve, onOpenStatus }) => {
+export const StreamingIncidentEventModal: React.FC<Props> = ({ player, event, saveSlot, onResolve, onOpenStatus }) => {
     const [busy, setBusy] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
     const data = streamingIncidentEventData(event);
@@ -50,13 +51,19 @@ export const StreamingIncidentEventModal: React.FC<Props> = ({ player, event, on
         if (result.changed) onResolve(result.player, result.message);
         else setNotice(result.message);
     };
+    const watchReward = useEventRewardRecovery(eventRewardKey(saveSlot, String(player.id || player.name), event.id), choice => {
+        if (view?.open && choice === 'AD') answer('AD');
+    });
     const watchAd = async () => {
         if (busy) return;
         setBusy(true);
         try {
-            const result = await showAd('REWARDED_BAILOUT');
+            const result = await watchReward('AD');
             if (result.success) answer('AD');
             else setNotice('The ad did not finish. Pick another way to answer it.');
+        } catch (error) {
+            console.error('Event ad reward failed:', error);
+            setNotice('The ad reward could not be applied. Try again.');
         } finally {
             setBusy(false);
             // as the Store's rewarded ads do: the forced ads' minutes start again, so none lands right after this one

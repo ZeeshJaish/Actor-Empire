@@ -160,6 +160,12 @@ export interface ClearanceState {
   note?: string;
   /** What the player has to hand over to move it along. */
   requirement?: { label: string; cost?: number };
+  /** Declined: weeks until a revised application can go in (weeks pass with Age Up). */
+  refileInWeeks?: number;
+  /** Before the commission, a market that has not cleared can leave the opening. */
+  canWithdraw?: boolean;
+  /** What its filing has cost so far (fees stay spent if it leaves). */
+  paid?: number;
 }
 
 /* --- 4 · ident -------------------------------------------------------------------- */
@@ -529,6 +535,12 @@ export function resolveLaunchDraftAfterDetour(
   };
 }
 
+/** What a paid action did, said in the player's words: shown under the button, never silent. */
+export interface LaunchActionResult {
+  ok: boolean;
+  message?: string;
+}
+
 export interface LaunchHandlers {
   onExit?: () => void;
   /** Funding is Studio Finance's job — this wizard never duplicates it. */
@@ -536,9 +548,14 @@ export interface LaunchHandlers {
   onSaveFootprint?: (countryIds: string[]) => void;
   /** plannedCountryIds lets filing save the visible draft before the paid
       action runs, so a player never has to discover a hidden Save step. */
-  onBeginMarketEntry?: (countryIds: string[], plannedCountryIds?: string[]) => void;
-  onSubmitRequirement?: (countryId: string) => void;
-  onFileRevisedApplication?: (countryId: string) => void;
+  onBeginMarketEntry?: (countryIds: string[], plannedCountryIds?: string[]) => LaunchActionResult | void;
+  onSubmitRequirement?: (countryId: string) => LaunchActionResult | void;
+  onFileRevisedApplication?: (countryId: string) => LaunchActionResult | void;
+  /** 2026-11-11: one tap for every government request, and every declined market whose wait is over */
+  onSubmitAllRequirements?: (countryIds: string[]) => LaunchActionResult | void;
+  onRefileAll?: (countryIds: string[]) => LaunchActionResult | void;
+  /** 2026-11-11: a stuck market leaves the opening (before the commission) */
+  onWithdrawMarket?: (countryId: string) => LaunchActionResult | void;
   onSelectIdent?: (soundId: string, packageId: string, customAudio?: IdentCustomAudio | null) => void;
   /** Reaching for a locked option abandons the current choice: the stage ends
       with nothing selected rather than silently keeping the previous pick. */

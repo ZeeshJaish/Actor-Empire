@@ -1679,3 +1679,14 @@
   .hq-tour-spot { transition: none; }
   .hq-tour-body, .hq-tour-dim { animation: none; }
 }
+
+/* 2026-11-11 (player report, old Android WebView in an emulator): engines without color-mix() (Android
+   WebView < 111, iOS < 16.2) accept these declarations when reading the CSS (they hold var()) and drop them
+   when drawing, leaving cards see-through and buttons blank. Plain colours for those engines only; a current
+   engine never applies this block. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  .hq-tour-spot { box-shadow: 0 0 0 200vmax rgba(3,3,7,.74), 0 0 0 1.5px var(--hq-accent, #8b5cf6); }
+  .hq-tour-card { border-color: rgba(255,255,255,.16); background: #111117; }
+  .hq-eyebrow { color: var(--hq-accent, #a78bfa); }
+  .hq-original-command, .hq-slate-command { border-color: var(--hq-line, rgba(255,255,255,.12)); }
+}

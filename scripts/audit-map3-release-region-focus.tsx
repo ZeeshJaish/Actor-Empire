@@ -26,7 +26,8 @@ const regions: TheatricalRegionModel[] = [
 
 const worldModel = createTheatricalRegionMapModel(regions, WORLD_VIEW);
 assert.deepEqual(worldModel.selectedRegionIds, ['NORTH_AMERICA']);
-assert.equal(worldModel.interaction, 'drilldown');
+/* 2026-11-11: a tap selects or clears in place (it zoomed for 1.1 s while nothing could be tapped) */
+assert.equal(worldModel.interaction, 'toggle');
 assert.equal(worldModel.maximumViewLevel, 'region');
 assert.equal(worldModel.drilldownRegionSelection, 'toggle');
 assert.deepEqual(worldModel.view, WORLD_VIEW);
@@ -64,6 +65,8 @@ assert.match(emptyMarkup, /disabled=""/);
 assert.match(emptyMarkup, /data-map-navigation-toolbar="theatrical"/);
 assert.match(emptyMarkup, />THEATRICAL WORLD</);
 assert.match(emptyMarkup, />0 SELECTED</);
+assert.match(emptyMarkup, /aria-label="Opening regions"/, 'the regions are buttons under the map too');
+assert.match(emptyMarkup, /aria-pressed="false"[^>]*>\+ North America</);
 assert.match(emptyMarkup, />50%<\/i>/);
 assert.doesNotMatch(emptyMarkup, /50¢/);
 

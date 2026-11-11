@@ -18,7 +18,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type Key } from 'react';
 import type { CloudProviderId, Facility, ServerTier } from '../../finance/build';
 import {
-  CLOUD_PROVIDERS, CLOUD_PROVIDER_IDS, CLOUD_WEEKLY_PER_RACK, OPEN_TIERS, SERVER_TIERS, cloudProviderServes,
+  CLOUD_PROVIDERS, CLOUD_PROVIDER_IDS, CLOUD_WEEKLY_PER_RACK, OPEN_TIERS, SERVER_TIERS, SERVICE_COPY, cloudProviderServes,
   cloudWeeklyCost, computeRacks, facilityRacks, listingFor, rackBuildCost, tierCapacity, tiersOf,
 } from '../../finance/build';
 import {
@@ -233,6 +233,8 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
   liveDesk?: StageProps['liveDesk'];
 }) {
   const { region, setup, peak, served, cloudServed, once, weekly, readyWeeks, word, tone, landed, countries, unservable, coverageAvailable } = report;
+  /* 2026-11-11 (player reports): "N need attention" named no country and no reason */
+  const attention = countries.filter(country => country.state !== 'READY').sort((left, right) => left.share - right.share);
   /* #96: what stands here, against which − sells back and + builds */
   const standing = liveDesk?.standing(region.id) ?? null;
   const resale = liveDesk ? Math.round(liveDesk.resaleRate(region.id) * 100) : 0;
@@ -433,6 +435,21 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               <b>{unservable.markets.map(market => market.name).join(' and ')}</b>
               {` ${unservable.markets.length === 1 ? 'insists' : 'insist'} on rooms inside ${unservable.markets.length === 1 ? 'its' : 'their'} borders, and nobody rents there — ${pct(share(unservable.peak, peak) * 100, 0)} of the night cannot be served from anywhere.`}
             </p>
+          )}
+          {rooms.length > 0 && attention.length > 0 && (
+            <div className="bw-rg-attention" role="status">
+              <p><b>{attention.length} {attention.length === 1 ? 'country needs' : 'countries need'} attention.</b> Add servers or cloud in {region.name} until {attention.length === 1 ? 'it reads' : 'they read'} Ready.</p>
+              <ul>
+                {/* kept short: the servers below are the controls that fix them (audit-streaming-launch-s5-ui) */}
+                {attention.slice(0, 4).map(country => (
+                  <li key={country.id} className={`is-${SERVICE_COPY[country.state].tone}`}>
+                    <b>{country.name}</b>
+                    <em>{SERVICE_COPY[country.state].label} · {country.coverageAvailable ? `${pct(country.share * 100, 0)} served` : 'coverage unavailable'}</em>
+                  </li>
+                ))}
+                {attention.length > 4 && <li className="is-more">+{attention.length - 4} more in the country list further down</li>}
+              </ul>
+            </div>
           )}
           {/* #96: a live region's own controls (Suggest, or the build under way) sit above its levers, not under them */}
           {live && extra}

@@ -1,7 +1,7 @@
 {
   "name": "pr-6.6.3",
   "private": true,
-  "version": "1.0.26",
+  "version": "1.0.27",
   "type": "module",
   "scripts": {
     "audit:fictional-names": "node scripts/run-fictional-name-audit.mjs",
@@ -661,6 +661,9 @@
     "audit:opening-night": "esbuild scripts/audit-opening-night.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-opening-night.cjs && node --max-old-space-size=4096 /tmp/audit-opening-night.cjs",
     "audit:screen-update-speed": "esbuild scripts/audit-screen-update-speed.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-screen-update-speed.cjs && node --max-old-space-size=4096 /tmp/audit-screen-update-speed.cjs",
     "audit:listing-smooth": "esbuild scripts/audit-listing-smooth.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-listing-smooth.cjs && node --max-old-space-size=6000 /tmp/audit-listing-smooth.cjs",
+    "audit:clearance-player-fixes": "esbuild scripts/audit-clearance-player-fixes.tsx --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --loader:.png=empty --loader:.jpg=empty --loader:.svg=empty --loader:.webp=empty --outfile=/tmp/audit-clearance-player-fixes.cjs && node --max-old-space-size=6000 /tmp/audit-clearance-player-fixes.cjs",
+    "audit:old-save-week-repair": "esbuild scripts/audit-old-save-week-repair.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --loader:.png=empty --loader:.jpg=empty --loader:.svg=empty --loader:.webp=empty --outfile=/tmp/audit-old-save-week-repair.cjs && node --max-old-space-size=6000 /tmp/audit-old-save-week-repair.cjs",
+    "audit:week-safety": "esbuild scripts/audit-week-safety.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --loader:.png=empty --loader:.jpg=empty --loader:.svg=empty --loader:.webp=empty --outfile=/tmp/audit-week-safety.cjs && node --max-old-space-size=6000 /tmp/audit-week-safety.cjs",
     "audit:opening-lock": "esbuild scripts/audit-opening-lock.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-opening-lock.cjs && node --max-old-space-size=6000 /tmp/audit-opening-lock.cjs",
     "audit:offer-projection": "esbuild scripts/audit-offer-projection.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-offer-projection.cjs && node --max-old-space-size=3000 /tmp/audit-offer-projection.cjs",
     "audit:activity-log": "esbuild scripts/audit-activity-log.ts --bundle --platform=node --format=cjs --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-activity-log.cjs && node --max-old-space-size=3000 /tmp/audit-activity-log.cjs",

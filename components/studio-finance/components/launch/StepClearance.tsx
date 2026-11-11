@@ -44,11 +44,27 @@ const STAGE_WORD: Record<ClearanceStage, string> = {
   FILED: 'Filed', RIGHTS: 'Access', REGULATORY: 'Review', COMPLIANCE: 'Data', APPROVAL: 'Approval',
 };
 
-export function StepClearance({ data, draft, chosen, free, handlers, initialCountryId, operations }: StepProps) {
+/* 2026-11-11 (player reports): a declined market showed an active "File again"
+   that the government refused for two weeks, with no word on screen; a Pay
+   button greyed out on a money rule while its label still said "Pay"; and a
+   stuck country could never leave the opening. Now the wait is a countdown,
+   every short button says what is short and where to fix it, every action
+   says what happened, a market that has not cleared can be dropped before
+   the commission, and the requests and refiles go in one tap. */
+const weeks = (n: number) => `${n} week${n === 1 ? '' : 's'}`;
+type Note = { ok: boolean; message: string; countryId?: string };
+
+export function StepClearance({ data, draft, chosen, free, handlers, initialCountryId, operations, patch }: StepProps) {
   const byCountry = new Map(data.clearance.map((c) => [c.countryId, c]));
   const firstCountry = chosen.find(country=>country.id===initialCountryId) || chosen.find(country=>NEEDS_PLAYER.includes(byCountry.get(country.id)?.outcome || 'NOT_FILED')) || chosen[0];
   const [openId, setOpenId] = useState<string | undefined>(firstCountry?.id);
   const [region, setRegion] = useState(firstCountry?.region || data.regions[0]);
+  const [note, setNote] = useState<Note | null>(null);
+  const [dropping, setDropping] = useState<string | null>(null);
+  const say = (result: { ok: boolean; message?: string } | void, countryId?: string) => {
+    if (result && result.message) setNote({ ok: result.ok, message: result.message, countryId });
+  };
+  const toFinance = () => handlers.onOpenStudioFinance?.();
 
   if (chosen.length === 0) {
     return <p className="lw-empty">{operations ? 'Plan a market entry first. Its filing and clearance will appear here.' : 'Choose opening markets first — there is nothing to clear yet.'}</p>;
@@ -61,12 +77,44 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
   const cleared = states.filter((s) => s === 'APPROVED' || s === 'CONDITIONS').length;
   const waiting = states.filter((s) => s === 'IN_REVIEW' || s === 'DELAYED').length;
   const needsYou = states.filter((s) => NEEDS_PLAYER.includes(s)).length;
+  /* declined and still in the government's cooling period: nothing to do but wait (or drop it) */
+  const cooling = chosen.filter((c) => (stateOf(c.id).refileInWeeks || 0) > 0);
+  const soonest = cooling.length ? Math.min(...cooling.map((c) => stateOf(c.id).refileInWeeks || 0)) : 0;
+  const actionable = needsYou - cooling.length;
+  const energy = data.energy.current;
+  /* one tap for every request that is owed, cheapest first, as far as the free treasury and energy go */
+  const owed = chosen.filter((c) => stateOf(c.id).requirement)
+    .sort((left, right) => (stateOf(left.id).requirement?.cost || 0) - (stateOf(right.id).requirement?.cost || 0));
+  let owedSpend = 0;
+  const payable: typeof owed = [];
+  for (const country of owed) {
+    const cost = stateOf(country.id).requirement?.cost || 0;
+    if (owedSpend + cost > free || (payable.length + 1) * STREAMING_MARKET_REQUIREMENT_ENERGY > energy) break;
+    owedSpend += cost;
+    payable.push(country);
+  }
+  const refilable = chosen.filter((c) => {
+    const st = stateOf(c.id);
+    return (st.outcome === 'REJECTED' || st.outcome === 'REVISABLE') && !(st.refileInWeeks || 0);
+  });
+  const refileNow = refilable.slice(0, Math.floor(energy / STREAMING_MARKET_REAPPLICATION_ENERGY));
   const unfiled = chosen.filter((c) => stateOf(c.id).outcome === 'NOT_FILED');
   const due = unfiled.reduce((sum, c) => sum + c.rightsEstimate + c.complianceCost, 0);
   const filingEnergy = quoteStreamingMarketFilingEnergy(unfiled.map(country => country.id));
   const short = Math.max(0, due - free);
 
-  const visibleCountries = operations ? chosen.filter(country=>country.region===region) : chosen;
+  /* 2026-11-11: with up to 197 markets the strip leads with the ones that need the player, then the
+     ones still in review, then the unfiled, then the cleared (they were in pick order before) */
+  const rank = (id: string) => {
+    const st = stateOf(id);
+    if (NEEDS_PLAYER.includes(st.outcome)) return (st.refileInWeeks || 0) > 0 ? 1 : 0;
+    if (st.outcome === 'IN_REVIEW' || st.outcome === 'DELAYED') return 2;
+    return st.outcome === 'NOT_FILED' ? 3 : 4;
+  };
+  const ordered = chosen.map((country, index) => ({ country, index }))
+    .sort((left, right) => rank(left.country.id) - rank(right.country.id) || left.index - right.index)
+    .map((item) => item.country);
+  const visibleCountries = operations ? ordered.filter(country=>country.region===region) : ordered;
   const active = visibleCountries.find((c) => c.id === openId) ?? visibleCountries[0] ?? chosen[0];
   const state = stateOf(active.id);
   const singleFilingEnergy = quoteStreamingMarketFilingEnergy([active.id]);
@@ -74,6 +122,21 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
   const stageIndex = CLEARANCE_STAGES.findIndex((s) => s.id === state.stage);
   const walking = state.outcome !== 'NOT_FILED';
   const done = state.outcome === 'APPROVED' || state.outcome === 'CONDITIONS';
+  const coolingWeeks = state.refileInWeeks || 0;
+  const fileCost = active.rightsEstimate + active.complianceCost;
+  const drop = () => {
+    const result = handlers.onWithdrawMarket?.(active.id);
+    setDropping(null);
+    if (result && result.ok) {
+      /* the wizard's own draft drops it too, so its autosave never plans it again */
+      patch({ selectedCountryIds: draft.selectedCountryIds.filter((id) => id !== active.id) });
+      /* the next market that still needs the player, or the first left */
+      setOpenId((ordered.find((c) => c.id !== active.id && rank(c.id) <= 1) ?? ordered.find((c) => c.id !== active.id))?.id);
+      say(result);
+      return;
+    }
+    say(result, active.id);
+  };
 
   return (
     <>
@@ -107,16 +170,55 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
         </ul>
 
         <p className="cl-hero-note">
-          {needsYou > 0
-            ? `${needsYou} market${needsYou > 1 ? 's are' : ' is'} waiting on you.`
+          {actionable > 0
+            ? `${actionable} market${actionable > 1 ? 's are' : ' is'} waiting on you.${cooling.length ? ` ${cooling.length} declined: the first can file again in ${weeks(soonest)}.` : ''}`
+            : cooling.length > 0
+              ? `${cooling.length} declined market${cooling.length > 1 ? 's' : ''}: the first can file again in ${weeks(soonest)}. Weeks pass when you Age Up${chosen.some((c) => stateOf(c.id).canWithdraw) ? ', or drop a market from the opening' : ''}.`
             : cleared === chosen.length
               ? (operations ? 'All filed markets are cleared. Review a country below for its ongoing obligations.' : 'Every market is cleared for opening day.')
               : waiting > 0
-                ? `${waiting} under review. Everything else stays open while you wait.`
+                ? `${waiting} under review. Reviews move a stage each week you Age Up.`
                 : unfiled.length === chosen.length
                   ? 'Nothing filed yet. Reviews run 4–6 weeks once they start.'
                   : `${unfiled.length} still to file.`}
         </p>
+
+        {/* 2026-11-11: the players' "do it all at once" */}
+        {(owed.length > 1 || refilable.length > 1) && (
+          <div className="cl-bulk">
+            {owed.length > 1 && (
+              <button
+                type="button"
+                className="sf-btn sf-btn--primary"
+                disabled={!payable.length && energy < STREAMING_MARKET_REQUIREMENT_ENERGY}
+                onClick={() => (payable.length ? say(handlers.onSubmitAllRequirements?.(payable.map((c) => c.id))) : toFinance())}
+              >
+                {payable.length === owed.length
+                  ? `Pay all ${owed.length} requests · ${money(owedSpend)} · ${owed.length * STREAMING_MARKET_REQUIREMENT_ENERGY}E`
+                  : payable.length
+                    ? `Pay ${payable.length} of ${owed.length} now · ${money(owedSpend)} · ${payable.length * STREAMING_MARKET_REQUIREMENT_ENERGY}E`
+                    : energy < STREAMING_MARKET_REQUIREMENT_ENERGY
+                      ? `${STREAMING_MARKET_REQUIREMENT_ENERGY - energy}E short to pay requests`
+                      : `${money((stateOf(owed[0].id).requirement?.cost || 0) - free)} short · Add capital`}
+              </button>
+            )}
+            {refilable.length > 1 && (
+              <button
+                type="button"
+                className="sf-btn sf-btn--ghost"
+                disabled={!refileNow.length}
+                onClick={() => say(handlers.onRefileAll?.(refileNow.map((c) => c.id)))}
+              >
+                {refileNow.length === refilable.length
+                  ? `File all ${refilable.length} again · ${refilable.length * STREAMING_MARKET_REAPPLICATION_ENERGY}E`
+                  : refileNow.length
+                    ? `File ${refileNow.length} of ${refilable.length} again · ${refileNow.length * STREAMING_MARKET_REAPPLICATION_ENERGY}E`
+                    : `${STREAMING_MARKET_REAPPLICATION_ENERGY - energy}E short to file again`}
+              </button>
+            )}
+          </div>
+        )}
+        {note && !note.countryId && <p className={`cl-msg ${note.ok ? 'is-ok' : 'is-bad'}`} role="status">{note.message}</p>}
       </section>
 
       {/* --- the markets as a strip, not a stack --------------------------- */}
@@ -138,7 +240,7 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
               aria-selected={on}
               className={on ? 'cl-tab is-on' : 'cl-tab'}
               style={{ ['--terr-accent' as string]: flagAccent(country.code) ?? 'var(--sf-brand-on)' }}
-              onClick={() => setOpenId(country.id)}
+              onClick={() => { setOpenId(country.id); setDropping(null); setNote(null); }}
             >
               <span className="cl-tab-flag" aria-hidden="true"><FlagField code={country.code} src={country.flagSrc} /></span>
               <span className="cl-tab-code">{country.code}</span>
@@ -162,7 +264,7 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
             <span className="sf-terr-tag">{active.code}</span>
             <span className="sf-terr-name">{active.name}</span>
           </span>
-          <span className={`cl-panel-pill sf-tone-${outcome.tone}`}>{outcome.label}</span>
+          <span className={`cl-panel-pill sf-tone-${coolingWeeks ? 'bad' : outcome.tone}`}>{coolingWeeks ? `Declined · ${weeks(coolingWeeks)} wait` : outcome.label}</span>
         </div>
 
         <div className="cl-panel-body">
@@ -187,16 +289,37 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
           <p className={`cl-stage${state.outcome === 'IN_REVIEW' ? ' is-filed' : ''}`}>
             {done
               ? 'Cleared for opening day'
+              : state.outcome === 'REVISABLE' || state.outcome === 'REJECTED'
+                ? (coolingWeeks
+                  ? `Declined for now · can file again in ${weeks(coolingWeeks)}. Weeks pass when you Age Up.`
+                  : 'Declined for now · you can file a revised application today.')
               : walking
                 ? <><span aria-hidden="true">✓</span> {CLEARANCE_STAGES[stageIndex].label}{state.weeksRemaining ? ` · ${state.weeksRemaining} weeks left` : ''}</>
                 : `Not filed · ${active.dossier.approvalWeeks} once it starts`}
           </p>
 
+          {/* filed: what it cost and what the next step takes, not a "To file" price it will never charge again */}
           <div className="cl-costs">
             <span><em>Market access</em><b>{money(active.rightsEstimate)}</b></span>
             <span><em>Compliance</em><b>{money(active.complianceCost)}</b></span>
-            <span><em>Founder time alone</em><b>{singleFilingEnergy}E</b></span>
-            <span className="is-total"><em>To file</em><b>{money(active.rightsEstimate + active.complianceCost)}</b></span>
+            {walking ? (
+              <>
+                <span>
+                  <em>{state.outcome === 'REVISABLE' || state.outcome === 'REJECTED' ? 'To file again' : state.requirement ? 'Request' : 'Review left'}</em>
+                  <b>{state.outcome === 'REVISABLE' || state.outcome === 'REJECTED'
+                    ? `${STREAMING_MARKET_REAPPLICATION_ENERGY}E`
+                    : state.requirement
+                      ? money(state.requirement.cost || 0)
+                      : done ? '—' : state.weeksRemaining ? weeks(state.weeksRemaining) : '—'}</b>
+                </span>
+                <span className="is-total"><em>Paid so far</em><b>{money(state.paid ?? fileCost)}</b></span>
+              </>
+            ) : (
+              <>
+                <span><em>Founder time alone</em><b>{singleFilingEnergy}E</b></span>
+                <span className="is-total"><em>To file</em><b>{money(fileCost)}</b></span>
+              </>
+            )}
           </div>
 
           {state.note && <p className="cl-note">{state.note}</p>}
@@ -207,14 +330,16 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
               <button
                 type="button"
                 className="sf-btn sf-btn--ghost"
-                disabled={(state.requirement.cost || 0) > free || data.energy.current < STREAMING_MARKET_REQUIREMENT_ENERGY}
-                onClick={() => handlers.onSubmitRequirement?.(active.id)}
+                disabled={energy < STREAMING_MARKET_REQUIREMENT_ENERGY}
+                onClick={() => ((state.requirement?.cost || 0) > free ? toFinance() : say(handlers.onSubmitRequirement?.(active.id), active.id))}
               >
-                {data.energy.current < STREAMING_MARKET_REQUIREMENT_ENERGY
-                  ? `${STREAMING_MARKET_REQUIREMENT_ENERGY - data.energy.current}E short`
-                  : state.requirement.cost
-                    ? `Pay ${money(state.requirement.cost)} · ${STREAMING_MARKET_REQUIREMENT_ENERGY}E`
-                    : `Send it · ${STREAMING_MARKET_REQUIREMENT_ENERGY}E`}
+                {energy < STREAMING_MARKET_REQUIREMENT_ENERGY
+                  ? `${STREAMING_MARKET_REQUIREMENT_ENERGY - energy}E short`
+                  : (state.requirement.cost || 0) > free
+                    ? `${money((state.requirement.cost || 0) - free)} short · Add capital`
+                    : state.requirement.cost
+                      ? `Pay ${money(state.requirement.cost)} · ${STREAMING_MARKET_REQUIREMENT_ENERGY}E`
+                      : `Send it · ${STREAMING_MARKET_REQUIREMENT_ENERGY}E`}
               </button>
             </div>
           )}
@@ -223,14 +348,14 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
             <button
               type="button"
               className="sf-btn sf-btn--primary"
-              disabled={active.rightsEstimate + active.complianceCost > free || data.energy.current < singleFilingEnergy}
-              onClick={() => handlers.onBeginMarketEntry?.([active.id], draft.selectedCountryIds)}
+              disabled={energy < singleFilingEnergy}
+              onClick={() => (fileCost > free ? toFinance() : say(handlers.onBeginMarketEntry?.([active.id], draft.selectedCountryIds), active.id))}
             >
-              {data.energy.current < singleFilingEnergy
-                ? `${singleFilingEnergy - data.energy.current}E short for ${active.name}`
-                : active.rightsEstimate + active.complianceCost > free
-                ? `${money(active.rightsEstimate + active.complianceCost - free)} short for ${active.name}`
-                : `File ${active.name} · ${money(active.rightsEstimate + active.complianceCost)} · ${singleFilingEnergy}E`}
+              {energy < singleFilingEnergy
+                ? `${singleFilingEnergy - energy}E short for ${active.name}`
+                : fileCost > free
+                ? `${money(fileCost - free)} short for ${active.name} · Add capital`
+                : `File ${active.name} · ${money(fileCost)} · ${singleFilingEnergy}E`}
             </button>
           )}
 
@@ -238,14 +363,35 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
             <button
               type="button"
               className="sf-btn sf-btn--ghost"
-              disabled={data.energy.current < STREAMING_MARKET_REAPPLICATION_ENERGY}
-              onClick={() => handlers.onFileRevisedApplication?.(active.id)}
+              disabled={coolingWeeks > 0 || energy < STREAMING_MARKET_REAPPLICATION_ENERGY}
+              onClick={() => say(handlers.onFileRevisedApplication?.(active.id), active.id)}
             >
-              {data.energy.current < STREAMING_MARKET_REAPPLICATION_ENERGY
-                ? `${STREAMING_MARKET_REAPPLICATION_ENERGY - data.energy.current}E short to refile`
+              {coolingWeeks > 0
+                ? `Can file again in ${weeks(coolingWeeks)}`
+                : energy < STREAMING_MARKET_REAPPLICATION_ENERGY
+                ? `${STREAMING_MARKET_REAPPLICATION_ENERGY - energy}E short to refile`
                 : `File again · ${STREAMING_MARKET_REAPPLICATION_ENERGY}E`}
             </button>
           )}
+
+          {note?.countryId === active.id && <p className={`cl-msg ${note.ok ? 'is-ok' : 'is-bad'}`} role="status">{note.message}</p>}
+
+          {state.canWithdraw && !done && (dropping === active.id ? (
+            <div className="cl-drop-confirm" role="group" aria-label={`Drop ${active.name} from the opening`}>
+              <p>
+                {active.name} leaves the opening plan, and the launch no longer waits on it.
+                {(state.paid || 0) > 0 ? ` The ${money(state.paid || 0)} already paid stays spent.` : ' Nothing has been paid for it yet.'}
+              </p>
+              <div>
+                <button type="button" className="sf-btn sf-btn--ghost" onClick={() => setDropping(null)}>Keep it</button>
+                <button type="button" className="sf-btn sf-btn--ghost cl-drop-go" onClick={drop}>Drop {active.name}</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="cl-drop" onClick={() => { setDropping(active.id); setNote(null); }}>
+              Drop {active.name} from the opening
+            </button>
+          ))}
         </div>
       </section>
 
@@ -256,13 +402,13 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
         <button
           type="button"
           className="sf-btn sf-btn--primary"
-          disabled={short > 0 || data.energy.current < filingEnergy}
-          onClick={() => handlers.onBeginMarketEntry?.(unfiled.map((c) => c.id), draft.selectedCountryIds)}
+          disabled={energy < filingEnergy}
+          onClick={() => (short > 0 ? toFinance() : say(handlers.onBeginMarketEntry?.(unfiled.map((c) => c.id), draft.selectedCountryIds)))}
         >
-          {data.energy.current < filingEnergy
-            ? `${filingEnergy - data.energy.current}E short to file all ${unfiled.length}`
+          {energy < filingEnergy
+            ? `${filingEnergy - energy}E short to file all ${unfiled.length}`
             : short > 0
-            ? `${money(short)} short to file all ${unfiled.length}`
+            ? `${money(short)} short to file all ${unfiled.length} · Add capital`
             : `File all ${unfiled.length} · ${money(due)} · ${filingEnergy}E`}
         </button>
       )}

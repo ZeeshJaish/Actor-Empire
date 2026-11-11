@@ -29,7 +29,7 @@ import { completeOfferedCinemaCast, normalizeCinemaTitle } from './boxOffice/box
 import { recordStudioSaleEarnings } from './studioSaleHistory';
 import { retainBankTransactionHistory } from './bankTransactionHistory';
 import { getCorporateStockDividendReceipts } from './stockLogic';
-import { creditCorporateStockReceipt } from './stockCashOwnership';
+import { creditCorporateDividendSafely } from './stockCashOwnership';
 import { hasTalentUses, mergeParentStudioTalentRosters, settleTalentContractWeek, talentAmountOutstanding } from './talentRoster';
 import { restoreContractActorProfiles, retainReferencedNpcProfiles } from './npcRetention';
 import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
@@ -142,7 +142,7 @@ import {
     generateReleaseSocialReactions,
     generateRoleAwareCriticReview,
 } from './releaseMediaNarrative';
-import { addBreadcrumb, isWeekLoopCheckpointStage, setCrashContext, trackGameEvent } from './firebaseService';
+import { addBreadcrumb, isWeekLoopCheckpointStage, recordNonFatal, setCrashContext, trackGameEvent } from './firebaseService';
 import { applyOpportunityIdentityToProject, enrichAuditionOpportunity, getCharacterIdentityLabels, inferStoryCompass, suggestCharacterIdentity } from './characterIdentityLogic';
 import { formatCharacterStoryFitLabel } from './characterStoryFit';
 import { getRoleOfferMessageLine } from './roleMarketDemand';
@@ -1962,8 +1962,11 @@ export const processGameWeek = async (
         if (safeAmount === 0) return;
         if (category === 'DIVIDEND') {
             const settlement = settleStockCash(nextPlayer.money, safeAmount);
-            if (!settlement.success) throw new RangeError('Stock dividend cannot be credited safely; the previous save remains available.');
-            nextPlayer.money = settlement.balance;
+            /* 2026-11-11: a dividend never fails the week. Above about $90T (old 1.0.25 economies) whole cents
+               cannot be kept exactly, so it is added as a plain number and the week goes on (it threw). */
+            nextPlayer.money = settlement.success
+                ? settlement.balance
+                : ensureFiniteNumber(nextPlayer.money) + Math.round(ensureFiniteNumber(safeAmount) * 100) / 100;
         } else nextPlayer.money = ensureFiniteNumber(nextPlayer.money) + safeAmount;
         nextPlayer.finance.history.unshift({
             id: `tx_${Date.now()}_${Math.random()}`,
@@ -6582,6 +6585,14 @@ export const processGameWeek = async (
     );
     nextPlayer = streamingIndustryResult.player;
     nextPlayer.world = streamingIndustryResult.world;
+    /* 2026-11-11 (1.0.27 hotfix): a rival that sat the week out is reported, never shown to the player */
+    if (streamingIndustryResult.skipped?.length) {
+        const first = streamingIndustryResult.skipped[0];
+        emitLoopStage('industry_company_skipped', { count: streamingIndustryResult.skipped.length, company_id: first.companyId, step: first.step });
+        recordNonFatal(new Error(first.error), 'industry_company_week_skipped', {
+            count: streamingIndustryResult.skipped.length, company_id: first.companyId, step: first.step, absolute_week: enteredStreamingAbsoluteWeek,
+        });
+    }
     const industryWorldMs = performance.now() - industryWorldStarted;
     await yieldWeekProcessingFrame();
     const cinemaStarted = performance.now();
@@ -7350,8 +7361,9 @@ export const processGameWeek = async (
 
     // Corporate dividends belong to company shareholders. Post after weekly operations
     // reset their scalar statistics, before recording the completed earnings statement.
+    /* 2026-11-11 (1.0.27 hotfix): the safe credit never throws; a normal company dividend is the exact credit as before */
     for (const receipt of corporateStockDividends) {
-        nextPlayer = creditCorporateStockReceipt(nextPlayer, receipt.ownerStudioId, receipt.amount, 'DIVIDEND', receipt.stockId);
+        nextPlayer = creditCorporateDividendSafely(nextPlayer, receipt.ownerStudioId, receipt.amount, receipt.stockId);
     }
     nextPlayer = markStockDividendsSettled(nextPlayer, player.currentWeek, player.age);
     // Persist the full completed-week statement after theatrical, soundtrack, platform and subsidiary flows.

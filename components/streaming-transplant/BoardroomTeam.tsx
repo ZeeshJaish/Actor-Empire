@@ -408,7 +408,8 @@ const Dossier = ({ seat, team, actions, onClose }: {
                 <div key={job.id} className={cx(css.job, !job.available && css.jobOff)}>
                     <div className={css.jobId}>
                         <b>{job.label}</b>
-                        <span>{job.available ? job.line : 'After the company lists'}</span>
+                        {/* 2026-11-11 (player report [34]): the greyed switch read as broken; say what unlocks it */}
+                        <span>{job.available ? job.line : 'Locked: unlocks when the company lists on the stock market (Ownership › Public markets)'}</span>
                     </div>
                     {/* one size for every switch: a mode the job does not have leaves its slot empty */}
                     <div className={css.seg} role="radiogroup" aria-label={job.label}>

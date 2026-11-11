@@ -61,6 +61,7 @@ import {
   recordPendingRewardAdStep,
   type PendingRewardAdReceipt,
 } from './services/rewardedAdRecovery';
+import { clearEventReward, eventRewardKey, readEventReward } from './services/eventRewardAd';
 import { ensureTrackingPermission } from './services/trackingService';
 import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
@@ -71,6 +72,7 @@ import { sanitizeAwardRecords } from './services/awardLogic';
 import { RoleType } from './types';
 import { applyParenthoodAbandonment, getPregnancyFeedbackCopy } from './services/familyLogic';
 import { APP_DISPLAY_VERSION } from './services/appVersion';
+import { WhatsNewModal } from './views/WhatsNewModal';
 import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry } from './services/changelog';
 import { calculateInstagramPostOutcome, clampInstagramStat, INSTAGRAM_POST_CONFIGS } from './services/instagramLogic';
 import { normalizeUniverseMap } from './services/universeLogic';
@@ -169,6 +171,19 @@ const WHATS_NEW_STORAGE_KEY = 'actorEmpireSeenWhatsNewVersion';
 const PREMIUM_ENTITLEMENTS_STORAGE_KEY = 'actorEmpirePremiumEntitlements';
 const PREMIUM_SAVE_SLOT_IDS = [1, 2, 3] as const;
 const AUTOSAVE_DEBOUNCE_MS = 750;
+/* 1.0.27 (2026-11-11, player report: "every button takes about 30 seconds"): on a big career and a slow phone one
+   full save (integrity check, IndexedDB write, read-back check) holds the screen for many seconds, and a save
+   started 0.75 s after every change, so a player tapping through a week met one save after another. Where this
+   device's last autosave took a second or more, changes now gather while the player keeps tapping: the save
+   waits for a quiet moment (3× the last save, at most 30 s) and never more than 8× the last save (10 s to 2
+   minutes) after the first unsaved change. A save under a second keeps the 0.75 s. Purchases, ad rewards,
+   events with rewards, every week and hiding the app still save at once, so only plain taps wait. */
+const getAutosaveDelayMs = (lastAutosaveMs: number, unsavedForMs: number): number => {
+    if (!(lastAutosaveMs >= 1_000)) return AUTOSAVE_DEBOUNCE_MS;
+    const quiet = Math.min(30_000, lastAutosaveMs * 3);
+    const longest = Math.min(120_000, Math.max(10_000, lastAutosaveMs * 8));
+    return Math.max(AUTOSAVE_DEBOUNCE_MS, Math.min(quiet, longest - unsavedForMs));
+};
 const PLAYTIME_FLUSH_INTERVAL_MS = 60_000;
 /* Zedbury Studios ident — the approved timing, kept verbatim from the design:
    the mark holds for 1150ms, then fades out over 320ms. The frame it leaves is
@@ -600,7 +615,7 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 export const App: React.FC = () => {
   const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
-  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | null>(null);
+  const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'STREAMING_SLATE' | 'STREAMING_RIGHTS' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
   const [streamingContentOfferId, setStreamingContentOfferId] = useState<string | null>(null);
   const [studioContinuationTarget, setStudioContinuationTarget] = useState<{ studioId: string; scriptId: string } | null>(null);
@@ -694,6 +709,9 @@ export const App: React.FC = () => {
   const [adTotalSteps, setAdTotalSteps] = useState(1);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveDueRef = useRef(false);
+  /* 1.0.27: how long this device's last autosave took, and since when changes have waited (getAutosaveDelayMs) */
+  const lastAutosaveMsRef = useRef(0);
+  const firstUnsavedChangeAtRef = useRef<number | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const purchaseUpdateHandlerRef = useRef<(update: IOSPurchaseUpdate) => void>(() => {});
   /* iOS purchases StoreKit hands over outside a purchase tap (Ask to Buy approved later, a purchase finished while the
@@ -1523,13 +1541,24 @@ export const App: React.FC = () => {
     // change still waiting for its save (the cleanup above cleared its timer) is saved as usual.
     if (isQuietPlayerUpdate(player) && !autosaveDueRef.current) return;
     autosaveDueRef.current = true;
+    const changedAt = Date.now();
+    /* a mark older than the longest wait belongs to changes another save already carried (a week, the app
+       hiding): this change starts a new batch */
+    if (firstUnsavedChangeAtRef.current === null || changedAt - firstUnsavedChangeAtRef.current > 125_000) {
+        firstUnsavedChangeAtRef.current = changedAt;
+    }
+    const autosaveDelay = getAutosaveDelayMs(lastAutosaveMsRef.current, changedAt - firstUnsavedChangeAtRef.current);
 
     autosaveTimerRef.current = window.setTimeout(() => {
         autosaveDueRef.current = false;
+        firstUnsavedChangeAtRef.current = null;
         setSaveSlots(prev => ({ ...prev, [currentSlot]: player }));
-        void persistSlotSave(currentSlot, player);
+        const saveStartedAt = performance.now();
+        void persistSlotSave(currentSlot, player).finally(() => {
+            lastAutosaveMsRef.current = performance.now() - saveStartedAt;
+        });
         autosaveTimerRef.current = null;
-    }, AUTOSAVE_DEBOUNCE_MS);
+    }, autosaveDelay);
 
     return () => {
         if (autosaveTimerRef.current) {
@@ -1568,7 +1597,17 @@ export const App: React.FC = () => {
       // Lag round (2026-11-09): the once-a-minute play-time count rides with the next real save
       // instead of starting a full save every minute (seconds of freeze on a late career).
       // Leaving or hiding the app still saves it at once (persistImmediately).
-      if (!persistImmediately) markQuietPlayerUpdate(updatedPlayer);
+      if (persistImmediately) {
+        /* 1.0.27: this save carries every change still waiting for the (now longer) autosave, so that
+           autosave is dropped instead of running again, with a freeze, when the app comes back */
+        if (autosaveTimerRef.current) {
+          window.clearTimeout(autosaveTimerRef.current);
+          autosaveTimerRef.current = null;
+        }
+        autosaveDueRef.current = false;
+        firstUnsavedChangeAtRef.current = null;
+      }
+      markQuietPlayerUpdate(updatedPlayer);
       setPlayer(updatedPlayer);
       setSaveSlots(prev => ({ ...prev, [currentSlot]: updatedPlayer }));
       if (persistImmediately) void persistSlotSave(currentSlot, updatedPlayer);
@@ -3454,11 +3493,22 @@ export const App: React.FC = () => {
               ...(updatedPlayer.logs || sourcePlayer.logs || [])
           ].slice(0, 50);
 
-          handleUpdatePlayer({
+          const nextPlayer = {
               ...updatedPlayer,
               pendingEvents: newPendingEvents,
               logs: nextLogs
-          });
+          };
+          const receiptKey = eventRewardKey(currentSlot, String(sourcePlayer.id || sourcePlayer.name), resolvedEventId);
+          if (currentSlot && receiptKey && readEventReward(receiptKey) !== null) {
+              const prepared = prepareExternalPlayerUpdateForUi(nextPlayer);
+              setPlayer(prepared);
+              void persistSlotSave(currentSlot, prepared, { rethrow: true, reason: 'LIFE_EVENT_RESOLUTION' }).then(
+                  () => clearEventReward(receiptKey),
+                  error => console.error('Could not save the recovered event ad reward:', error)
+              );
+          } else {
+              handleUpdatePlayer(nextPlayer);
+          }
       } catch (error) {
           console.error('Queued event resolution failed:', error);
           setToastMessage({
@@ -3811,6 +3861,7 @@ export const App: React.FC = () => {
       {player.pendingEvents && player.pendingEvents.length > 0 && (player.pendingEvents[0].type === 'PRODUCTION_CRISIS' || player.pendingEvents[0].type === 'DIRECTOR_DECISION') && (
           <ProductionCrisisModal
               key={player.pendingEvents[0].id}
+              saveSlot={currentSlot}
               player={player}
               event={player.pendingEvents[0]}
               onChoice={(idx) => {
@@ -3824,6 +3875,7 @@ export const App: React.FC = () => {
       {player.pendingEvents && player.pendingEvents.length > 0 && player.pendingEvents[0].type === 'STREAMING_INCIDENT' && (
           <StreamingIncidentEventModal
               key={player.pendingEvents[0].id}
+              saveSlot={currentSlot}
               player={player}
               event={player.pendingEvents[0]}
               onResolve={(updatedPlayer, log) => resolveQueuedEventSafely(player, updatedPlayer, player.pendingEvents?.[0]?.id, log)}
@@ -3840,6 +3892,7 @@ export const App: React.FC = () => {
       {player.pendingEvents && player.pendingEvents.length > 0 && player.pendingEvents[0].type === 'ORIGINAL_ISSUE' && (
           <OriginalIssueModal
               key={player.pendingEvents[0].id}
+              saveSlot={currentSlot}
               player={player}
               event={player.pendingEvents[0]}
               onResolve={(updatedPlayer, log) => resolveQueuedEventSafely(player, updatedPlayer, player.pendingEvents?.[0]?.id, log)}
@@ -3880,6 +3933,7 @@ export const App: React.FC = () => {
          player.pendingEvents[0].type === 'UNDERWORLD_OFFER') && (
           <LifeEventModal
               key={player.pendingEvents[0].id}
+              saveSlot={currentSlot}
               player={player}
               event={player.pendingEvents[0]}
               onChoice={(updatedPlayer, log) => {
@@ -4021,98 +4075,14 @@ export const App: React.FC = () => {
       )}
 
       {showWhatsNewModal && gameStatus === 'PLAYING' && (
-          <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md overflow-y-auto custom-scrollbar px-3 sm:px-6 animate-in fade-in duration-200" style={{ paddingTop: 'max(20px, calc(12px + env(safe-area-inset-top)))', paddingBottom: 'max(20px, calc(12px + env(safe-area-inset-bottom)))' }}>
-              {/* clear of the status bar and the home indicator: the card fits between them */}
-              <div className="bg-zinc-900 border border-zinc-700 rounded-3xl w-full max-w-xl mx-auto shadow-2xl flex flex-col relative overflow-hidden" style={{ maxHeight: 'calc(100dvh - max(20px, calc(12px + env(safe-area-inset-top))) - max(20px, calc(12px + env(safe-area-inset-bottom))))' }}>
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500"></div>
-                  <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-5 pb-4 sm:p-7">
-                      <div className="mb-5">
-                          <div className="flex items-center justify-between gap-3 mb-4">
-                              <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400">{tr('app.whatsNew.eyebrow')}</div>
-                              <div className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">{getChangelogTypeLabel(latestChangelogEntry.type)}</div>
-                          </div>
-                          <h3 className="text-3xl sm:text-4xl font-black text-white mb-3 leading-none">{tr('app.whatsNew.version', { version: APP_DISPLAY_VERSION })}</h3>
-                          <div className="mb-2 text-sm font-black uppercase tracking-[0.2em] text-zinc-500">{latestChangelogEntry.title}</div>
-                          <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-                              {latestChangelogEntry.summary}
-                          </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-3 text-sm text-zinc-200">
-                          {latestChangelogEntry.sections.map(section => (
-                              <div key={section.heading} className="rounded-2xl border border-white/10 bg-zinc-950/70 px-4 py-4 shadow-inner shadow-black/20">
-                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-3">{section.heading}</div>
-                                  <ul className="space-y-2 leading-relaxed text-zinc-200">
-                                      {section.items.map(item => (
-                                          <li key={item} className="flex gap-2">
-                                              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-300/80" aria-hidden="true" />
-                                              <span>{item}</span>
-                                          </li>
-                                      ))}
-                                  </ul>
-                              </div>
-                          ))}
-
-                          <button
-                              type="button"
-                              onClick={() => setShowPreviousWhatsNewNotes(prev => !prev)}
-                              className="w-full rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-3 text-left transition-colors hover:bg-zinc-900"
-                          >
-                              <div className="flex items-center justify-between gap-3">
-                                  <div>
-                                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300">Previous Updates</div>
-                                      <p className="mt-1 text-xs leading-relaxed text-zinc-500">Open the earlier major and patch notes.</p>
-                                  </div>
-                                  <span className="text-lg font-black text-zinc-400">{showPreviousWhatsNewNotes ? '-' : '+'}</span>
-                              </div>
-                          </button>
-
-                          {showPreviousWhatsNewNotes && (
-                              <div className="space-y-3">
-                                  {previousChangelogEntries.map(entry => (
-                                      <div key={entry.version} className="rounded-2xl border border-white/10 bg-zinc-950/80 px-4 py-4">
-                                          <div className="flex flex-wrap items-center justify-between gap-2">
-                                              <div>
-                                                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">v{entry.version}</div>
-                                                  <div className="mt-1 font-black text-white">{entry.title}</div>
-                                              </div>
-                                              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-zinc-300">
-                                                  {getChangelogTypeLabel(entry.type)}
-                                              </span>
-                                          </div>
-                                          <p className="mt-2 text-xs leading-relaxed text-zinc-400">{entry.summary}</p>
-                                          <div className="mt-3 space-y-3">
-                                              {entry.sections.map(section => (
-                                                  <div key={section.heading}>
-                                                      <div className="text-[9px] font-black uppercase tracking-[0.18em] text-zinc-500">{section.heading}</div>
-                                                      <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-400">
-                                                          {section.items.map(item => (
-                                                              <li key={item} className="flex gap-2">
-                                                                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-zinc-500" aria-hidden="true" />
-                                                                  <span>{item}</span>
-                                                              </li>
-                                                          ))}
-                                                      </ul>
-                                                  </div>
-                                              ))}
-                                          </div>
-                                      </div>
-                                  ))}
-                              </div>
-                          )}
-                      </div>
-                  </div>
-
-                  <div className="shrink-0 bg-zinc-900/95 backdrop-blur px-5 pb-5 pt-3 sm:px-6 sm:pb-6 border-t border-white/5">
-                      <button
-                          onClick={handleDismissWhatsNew}
-                          className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-zinc-200 transition-colors"
-                      >
-	                          {tr('common.continue')}
-                      </button>
-                  </div>
-              </div>
-          </div>
+          <WhatsNewModal
+              entry={latestChangelogEntry}
+              previous={previousChangelogEntries}
+              version={APP_DISPLAY_VERSION}
+              eyebrow={tr('app.whatsNew.eyebrow')}
+              continueLabel={tr('common.continue')}
+              onDismiss={handleDismissWhatsNew}
+          />
       )}
 
       {/* Persistent Debt Warning Banner (When modal is closed but still in debt) */}
@@ -4164,6 +4134,10 @@ export const App: React.FC = () => {
                             onOpenStreamingContentOffer={(offerId) => {
                                 setStreamingContentOfferId(offerId);
                                 setLifestyleInitialView('STREAMING_PLATFORM');
+                                setActivePage(Page.LIFESTYLE);
+                            }}
+                            onOpenStreamingRights={() => {
+                                setLifestyleInitialView('STREAMING_RIGHTS');
                                 setActivePage(Page.LIFESTYLE);
                             }}
                             onOpenStudioContinuation={(studioId, scriptId) => {

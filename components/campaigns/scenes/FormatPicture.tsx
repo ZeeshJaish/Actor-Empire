@@ -17,22 +17,21 @@ import { ONLINE_SCENES, OnlineScene, type LaunchDoorSceneId, type OnlineFormatId
 
 type Creative = HTMLCanvasElement | HTMLImageElement;
 
-/** whether a card on screen: built the first time, moving only while seen */
+/** whether a card is near the screen. 2026-11-11 (player reports: black tiles and lag on the How step): a
+    scene stayed built once seen, and each light show holds two backdrop-sized canvases (1024×1536, about
+    12 MB), so scrolling a page of cards filled a phone's memory. A scene is now built only while its card
+    is near the screen and let go when it scrolls away. */
 const useOnScreen = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const [seen, setSeen] = useState(false);
-  const [onScreen, setOnScreen] = useState(false);
+  const [near, setNear] = useState(false);
   useEffect(() => {
     const element = ref.current;
-    if (!element || typeof IntersectionObserver === 'undefined') { setSeen(true); setOnScreen(true); return undefined; }
-    const observer = new IntersectionObserver(([entry]) => {
-      setOnScreen(entry.isIntersecting);
-      if (entry.isIntersecting) setSeen(true);
-    }, { rootMargin: '120px 0px' });
+    if (!element || typeof IntersectionObserver === 'undefined') { setNear(true); return undefined; }
+    const observer = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), { rootMargin: '360px 0px' });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  return { ref, seen, onScreen };
+  return { ref, seen: near, onScreen: near };
 };
 
 export const FormatPicture: React.FC<{

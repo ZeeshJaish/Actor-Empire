@@ -117,7 +117,7 @@ const inspect = async (page: any, label: string): Promise<PageMetrics> => page.e
       page.on('pageerror', (error: Error) => runtimeErrors.push(error.message));
       await page.addInitScript(({ player }) => {
         localStorage.clear();
-        localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.25');
+        localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.27');
         localStorage.setItem('aeMigrationCarePackageLedgerV1', JSON.stringify({ globalClaimed: true, fingerprints: [] }));
         localStorage.setItem('actorEmpireSave_1', JSON.stringify(player));
         localStorage.setItem('actorEmpireSave_1_meta', JSON.stringify({

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Player, ScheduledEvent } from '../types';
 import { AlertTriangle, Film, ChevronRight, Activity, Clapperboard, PlayCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { showAd } from '../services/adLogic';
+import { eventRewardKey, useEventRewardRecovery } from '../services/eventRewardAd';
 import { noteAdClosed } from '../services/forcedAds';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { LocalizedTextVars } from '../types';
@@ -10,10 +10,11 @@ import { LocalizedTextVars } from '../types';
 interface ProductionCrisisModalProps {
     player: Player;
     event: ScheduledEvent;
+    saveSlot?: number | null;
     onChoice: (choiceIndex: number) => void;
 }
 
-export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ player, event, onChoice }) => {
+export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ player, event, saveSlot, onChoice }) => {
     const [isProcessingAd, setIsProcessingAd] = useState(false);
     const [resolveError, setResolveError] = useState('');
     const { options = [], projectId } = event.data || {};
@@ -24,6 +25,19 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
     const eventVars = event.data?.textVars as LocalizedTextVars | undefined;
     const title = localizeText(event.title, event.data?.titleKey, eventVars);
     const description = localizeText(event.description || '', event.data?.descriptionKey, eventVars);
+
+    const applyChoice = (index: number) => {
+        try {
+            onChoice(index);
+        } catch (error) {
+            console.error('Production event choice failed:', error);
+            setResolveError(tr('production.modal.errorClose'));
+        }
+    };
+    const watchReward = useEventRewardRecovery(eventRewardKey(saveSlot, String(player.id || player.name), event.id), choice => {
+        const option = options.find((opt: { isGolden?: boolean; index: number }) => opt.isGolden && String(opt.index) === choice);
+        if (project && option) applyChoice(option.index);
+    });
 
     if (!project) {
         const handleDismissMissingProject = () => {
@@ -62,14 +76,9 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
         if (opt.isGolden) {
             setIsProcessingAd(true);
             try {
-                const result = await showAd('REWARDED_BAILOUT');
+                const result = await watchReward(String(opt.index));
                 if (result.success) {
-                    try {
-                        onChoice(opt.index);
-                    } catch (error) {
-                        console.error('Production event choice failed:', error);
-                        setResolveError(tr('production.modal.errorClose'));
-                    }
+                    applyChoice(opt.index);
                 } else {
                     // AE-005: say why nothing happened; every choice stays open
                     setResolveError(tr(result.reason === 'NOT_COMPLETED' ? 'app.rewards.goldenNotFinished' : 'app.rewards.goldenUnavailable'));
@@ -83,12 +92,7 @@ export const ProductionCrisisModal: React.FC<ProductionCrisisModalProps> = ({ pl
                 noteAdClosed();
             }
         } else {
-            try {
-                onChoice(opt.index);
-            } catch (error) {
-                console.error('Production event choice failed:', error);
-                setResolveError(tr('production.modal.errorClose'));
-            }
+            applyChoice(opt.index);
         }
     };
 

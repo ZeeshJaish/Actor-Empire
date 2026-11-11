@@ -76,6 +76,7 @@ interface MobilePageProps {
   onUpdatePlayer?: (player: Player) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
   onOpenStreamingContentOffer?: (offerId: string) => void;
+  onOpenStreamingRights?: () => void;
   onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
   onOpenPlatformCommission?: (studioId: string, offerId: string) => void;
   onNavVisibilityChange?: (visible: boolean) => void;
@@ -953,6 +954,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onMarkRead={handleMarkMessageRead}
                         onOpenRightsMarket={props.onOpenRightsMarket}
                         onOpenStreamingContentOffer={props.onOpenStreamingContentOffer}
+                        onOpenStreamingRights={props.onOpenStreamingRights}
                         onOpenStudioContinuation={props.onOpenStudioContinuation}
                         onDeclinePlatformCommission={handleDeclinePlatformCommission}
                         onOpenStudioAcquisition={(studioId, studioName) => {

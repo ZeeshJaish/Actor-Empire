@@ -2180,7 +2180,23 @@ export function gates(data: BuildData, draft: BuildDraft): Gate[] {
     ? services.filter(service => (service.geographicCoveredShare ?? service.coveredShare) < STREAMING_SERVED_COVERAGE_SHARE)
     : [];
 
+  /* 2026-11-11 (player report "it kicks me back"): the commission refuses Titan servers and Meridian Edge
+     cloud without the Streaming+ Pack, but no check here said so: the list read "ready to sign" and the
+     refusal came only after the cutscene. Now it is an open check before signing. */
+  const packLocked = Boolean(data.streamingPlus && !data.streamingPlus.owned);
+  const titanRacks = packLocked ? draft.facilities.reduce((sum, facility) => sum + tiersOf(facility).TITAN, 0) : 0;
+  const meridianRooms = packLocked ? draft.facilities.filter(facility => facility.tenure === 'CLOUD' && facility.provider === 'MERIDIAN').length : 0;
+  const packGate: Gate[] = packLocked ? [{
+    id: 'streaming-plus', stage: 'network', label: 'Streaming+ kit',
+    value: titanRacks || meridianRooms
+      ? [titanRacks ? `${titanRacks} Titan ${titanRacks === 1 ? 'rack' : 'racks'}` : '', meridianRooms ? `${meridianRooms} Meridian Edge ${meridianRooms === 1 ? 'site' : 'sites'}` : '']
+        .filter(Boolean).join(' and ') + ' need the Streaming+ Pack: swap them for Workhorses or other cloud'
+      : 'No pack kit in the plan',
+    ok: titanRacks === 0 && meridianRooms === 0,
+  }] : [];
+
   return [
+    ...packGate,
     /* The team-plan gate went with the team path (#103): nobody drafts the
        network for you, so there is nothing to approve. */
     {

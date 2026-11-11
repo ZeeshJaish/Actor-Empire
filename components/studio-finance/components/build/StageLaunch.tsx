@@ -149,15 +149,17 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump, commi
     [totals, plan, cityList, data.company.name, data.company.signatoryName],
   );
   const commit = useCallback(() => {
-    if (done) return;
+    if (done) return true;
     const result = handlers.onCommission?.(draft);
     if (result && !result.ok) {
       setCommitError(result.message);
       setRolling(false);
-      return;
+      /* the cutscene shows no "Commissioned" card for a refused commit */
+      return false;
     }
     setCommitError('');
     setDone(true);
+    return true;
   }, [done, handlers, draft]);
 
   const beginCommission = () => {
@@ -230,6 +232,30 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump, commi
           checks of which eleven are fine is eleven cards saying so and three
           saying something. The open ones are the page now; the cleared ones are
           one line you can open — the same rule the rehearsal screen learned. */}
+      {/* 2026-11-11: a refusal is the first thing on the page, with the way to fix it (it was a small
+          red line under the Commission button, below the fold after the cutscene closed) */}
+      {commitError && (
+        <section className="bw-commit-error" role="alert">
+          <b>Not commissioned. Nothing was charged.</b>
+          <p>{commitError}</p>
+          <div className="bw-commit-error-actions">
+            {/Streaming\+|Titan|Meridian|server|facilit|rack/i.test(commitError) && (
+              <button type="button" className="sf-btn sf-btn--ghost" onClick={() => { setCommitError(''); onJump('network'); }}>Change the network</button>
+            )}
+            {/load test|rehears/i.test(commitError) && (
+              <button type="button" className="sf-btn sf-btn--ghost" onClick={() => { setCommitError(''); onJump('test'); }}>Run the load test</button>
+            )}
+            {/treasury|cash|cover/i.test(commitError) && handlers.onOpenStudioFinance && (
+              <button type="button" className="sf-btn sf-btn--ghost" onClick={handlers.onOpenStudioFinance}>Add capital</button>
+            )}
+            {/price|Basic|Premium|Family/i.test(commitError) && handlers.onEditPricing && (
+              <button type="button" className="sf-btn sf-btn--ghost" onClick={handlers.onEditPricing}>Fix the prices</button>
+            )}
+            {/energy/i.test(commitError) && <em>Energy refills when you Age Up.</em>}
+          </div>
+        </section>
+      )}
+
       <section id="bw-commission-guidance" className={blocked ? 'bw-sign is-blocked' : 'bw-sign'}>
         <p className="kit-title">
           <b>Before you sign</b>
@@ -410,7 +436,6 @@ export function StageLaunch({ data, draft, totals, plan, handlers, onJump, commi
         </div>
       )}
 
-      {commitError && <p className="bw-commit-error" role="alert">{commitError}</p>}
 
     </>
   );

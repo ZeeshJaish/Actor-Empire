@@ -549,3 +549,11 @@
   .nd-desk *::before, .nd-desk *::after { animation: none !important; }
   .nd-desk .nd-check::after { transform: rotate(45deg) scale(1); }
 }
+
+/* 2026-11-11 (player report, old Android WebView in an emulator): engines without color-mix() (Android
+   WebView < 111, iOS < 16.2) accept these declarations when reading the CSS (they hold var()) and drop them
+   when drawing, leaving cards see-through and buttons blank. Plain colours for those engines only; a current
+   engine never applies this block. */
+@supports not (color: color-mix(in srgb, red 50%, blue)) {
+  .nd-desk .nd-bar-build, .nd-desk .nd-test-play { background: var(--sf-brand); }
+}

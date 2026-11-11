@@ -151,8 +151,11 @@ export interface ContentDeskState {
   slate: SlateWeek[];
   /** PROGRAMME: weeks counted from opening night (before launch) · WEEKS: the calendar */
   calendar?: 'PROGRAMME' | 'WEEKS';
-  /** once live: the first absolute week a premiere can be set in (next week) */
+  /** once live: the first absolute week a premiere can be set in (next week);
+      before launch: 1 (programme weeks of the opening) while the opening can be planned */
   scheduleFrom?: number;
+  /** before launch: the approved opening is locked until opening night (#253) */
+  openingLocked?: boolean;
   /** once live: where Auto-fill would premiere the titles on the shelves, around the plan */
   autoFill?: Array<{ projectId: string; title: string; absoluteWeek: number; marketingPlan: 'LEAN' | 'STANDARD' | 'EVENT' }>;
   /** once live: the same, starting fresh (the planned premieres taken off first) */
@@ -313,8 +316,10 @@ export const ContentDesk: React.FC<{
   const kept = useMemo(() => state.titles.filter(t => (t.rightsState ?? (t.rights ? 'WINDOW' : 'KEPT')) === 'KEPT'), [state.titles]);
   const lapsed = useMemo(() => state.titles.filter(t => t.rightsState === 'LAPSED'), [state.titles]);
   const warnings = useMemo(() => slateWarnings(state.slate, state.titles), [state.slate, state.titles]);
-  /* once live, the Slate tab plans the calendar itself */
-  const planning = state.calendar === 'WEEKS' && state.live && state.scheduleFrom !== undefined;
+  /* the Slate tab plans the calendar itself: once live a year ahead, and (fix 2026-11-11)
+     before launch the opening programme, so the old twelve-week page is never needed */
+  const planning = state.scheduleFrom !== undefined;
+  const openingPlanning = planning && state.calendar === 'PROGRAMME';
   const byViews = useMemo(() => [...state.titles].sort((a, b) => (b.views ?? -1) - (a.views ?? -1)), [state.titles]);
   const titleById = useMemo(() => new Map(state.titles.map(t => [t.id, t])), [state.titles]);
   const history = state.history ?? [];
@@ -564,10 +569,10 @@ export const ContentDesk: React.FC<{
         {/* ── SLATE — the release weeks ── */}
         {tab === 'SLATE' && (
           <section className={s.cdsec}>
-            {/* once live the schedule is planned right here; the opening slate before launch keeps its planner */}
-            <div className={s.cdhead}><h2>Release schedule</h2>{planning
-              ? <span>a year ahead · tap a week</span>
-              : onOpenSlate && <button className={s.cdadd} onClick={onOpenSlate}>OPEN SLATE PLANNER</button>}</div>
+            {/* the schedule is planned right here: the opening before launch, the calendar once live */}
+            <div className={s.cdhead}><h2>{openingPlanning || state.calendar === 'PROGRAMME' ? 'Opening programme' : 'Release schedule'}</h2>{planning
+              ? <span>{openingPlanning ? 'opening night + 11 weeks · tap a week' : 'a year ahead · tap a week'}</span>
+              : state.openingLocked ? <span>locked until opening night</span> : null}</div>
             {warnings.length > 0 && (
               <div className={s.warnlist}>
                 {warnings.map(w => (

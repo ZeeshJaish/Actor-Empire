@@ -760,10 +760,17 @@ const advanceCountries = (
 ): { countries: Record<string, WorldStreamingCustomerCountryState>; movements: WorldStreamingCustomerMovement[] } => {
     const elapsedWeeks = Math.max(1, absoluteWeek - previous.lastProcessedAbsoluteWeek);
     const allMovements: WorldStreamingCustomerMovement[] = [];
+    /* 1.0.27 (2026-11-11, week speed): the desired cohorts are grouped by country once instead of filtering
+       the whole list for every country. Each country gets the same rows in the same order, in its own array. */
+    const desiredByCountry = new Map<string, DesiredCohort[]>();
+    for (const item of desired) {
+        const group = desiredByCountry.get(item.countryId);
+        if (group) group.push(item); else desiredByCountry.set(item.countryId, [item]);
+    }
     const countries = Object.fromEntries(Object.keys(player.world.worldAudienceEconomy!.countries).sort().map(countryId => {
         const previousCountry = previous.countries[countryId];
         const population = player.world.worldPopulation!.countries[countryId];
-        const rows = desired.filter(item => item.countryId === countryId);
+        const rows = desiredByCountry.get(countryId) || [];
         const billed = switchBilling && previousCountry ? switchPlayerBilling(previousCountry.cohorts, rows) : previousCountry?.cohorts;
         const results = rows.map(row => advanceCohort(
             row,

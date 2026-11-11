@@ -210,6 +210,11 @@
 .totals small{font-size:8.5px;font-weight:700;line-height:1.3;color:#8b93a5}
 .totals p{grid-column:1 / -1;margin-top:4px;font-size:10px;line-height:1.5;color:#b4bcc9}
 .totals p b{color:#fff}
+/* 2026-11-11: the ways out when nothing is left for a campaign */
+.totals div.totalsActions{grid-column:1 / -1;flex-direction:row;flex-wrap:wrap;gap:8px}
+.totalsActions button{flex:1 1 140px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06);font:800 10px/1 'Archivo','Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#fff}
+.totalsActions button:first-child{background:var(--cs-accent,#3b82f6);border-color:transparent}
 /* #160: a campaign the treasury cannot pay for in full */
 .totals div b.bad{color:#ff8a7a}
 .totals p.short{margin-top:2px;padding:9px 11px;border-radius:12px;background:rgba(255,92,72,.1);border:1px solid rgba(255,92,72,.28);font-weight:700;color:#ffc2b8}

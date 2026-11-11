@@ -390,9 +390,13 @@ const projectRivalViewing = (
     priorEntitlements.filter(item => item.kind === 'PURCHASE' || (item.expiresAtAbsoluteWeek || 0) > absoluteWeek)
         .forEach(item => entitlementMap.set(`${item.platformId}:${item.countryId}:${item.titleId}:${item.kind}`, { ...item }));
 
+    /* 1.0.27 (2026-11-11, week speed): the rival offers and their countries are read once, not rebuilt and
+       scanned with includes() for every one of about 200 countries. Same offers, same order. */
+    const rivalOffers = [...offers.values()].filter(offer => !offer.isPlayer);
+    const rivalOfferCountries = new Map(rivalOffers.map(offer => [offer, new Set(offer.activeCountryIds)]));
     Object.values(customers.countries).forEach(country => {
         const platformRows: Record<string, WorldStreamingViewingCountryPlatformSummary> = {};
-        [...offers.values()].filter(offer => !offer.isPlayer && offer.activeCountryIds.includes(country.countryId))
+        rivalOffers.filter(offer => rivalOfferCountries.get(offer)!.has(country.countryId))
             .forEach(offer => {
             const customer: WorldStreamingCustomerPlatformSummary | undefined = country.platformSummaries
                 .find(row => row.platformId === offer.platformId);

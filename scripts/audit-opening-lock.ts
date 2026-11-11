@@ -15,6 +15,7 @@ import { commitOwnedStreamingLaunch, getStreamingLaunchReadiness } from '../serv
 import { getContentMarketCollections, getContentMarketListings, linkContentMarketOwnedTitles, purchaseContentMarketCollection, purchaseContentMarketListing, submitContentMarketPrivateOffer } from '../services/streamingContentMarket';
 import { openStreamingRightsNegotiation, signStreamingRightsDeal } from '../services/streamingRightsMarketplace';
 import { programStreamingLaunchSlate } from '../services/streamingOriginals';
+import { autoFillStreamingSlate, clearStreamingSlatePlans, planStreamingSlateAutoFill, scheduleStreamingSlateTitle, unscheduleStreamingSlateTitle } from '../services/streamingSlateProgramming';
 import { applyStreamingBrandLook, getStreamingBrandStudioView } from '../services/streamingBrandStudio';
 import { resolveStreamingMarketRequirement, resumeStreamingMarketClearance } from '../services/streamingMarkets';
 import { getStreamingNetworkMapView } from '../services/streamingNetworkMapView';
@@ -53,6 +54,15 @@ async function main() {
     }
     refused(signStreamingRightsDeal(built, 'any-negotiation'), 'sign a deal');
     refused(programStreamingLaunchSlate(built, built.ownedStreamingPlatform.launchSlate!), 'the opening slate');
+    /* 2026-11-11: the Content Desk slate plans the opening before launch; while the crews build it refuses too */
+    const opening = built.ownedStreamingPlatform.launchSlate!.entries[0];
+    const moved = scheduleStreamingSlateTitle(built, { projectId: opening.projectId, absoluteWeek: opening.launchWeek === 1 ? 2 : 1, marketingPlan: 'STANDARD' });
+    refused(moved, 'move a title in the opening programme');
+    assert.equal(moved.reason, 'OPENING_LOCKED');
+    refused(unscheduleStreamingSlateTitle(built, opening.projectId), 'take a title off the opening');
+    refused(clearStreamingSlatePlans(built), 'remove all from the opening');
+    refused(autoFillStreamingSlate(built, { fresh: true }), 'auto-fill the opening');
+    assert.deepEqual(planStreamingSlateAutoFill(built, { fresh: true }), [], 'no auto-fill offer while locked');
     const look = getStreamingBrandStudioView(built).look!;
     const rebrand = applyStreamingBrandLook(built, { ...look, primaryColor: look.primaryColor === '#112233' ? '#223344' : '#112233' });
     refused(rebrand, 'the brand');
@@ -126,9 +136,11 @@ async function main() {
 
     /* ---- the doors */
     const hq = readFileSync('components/StreamingPlatformHQ.tsx', 'utf8');
-    for (const door of ['onAddContent={() => whenCatalogueOpen', 'onOpenSlate={() => whenCatalogueOpen', "chip === 'MARKETPLACE') return whenCatalogueOpen", 'onManageMarkets={() => whenPlanOpen', 'onOpenBrandStudio={() => whenPlanOpen', "editBeforeLaunch: () => whenPlanOpen"]) {
+    for (const door of ['onAddContent={() => whenCatalogueOpen', "chip === 'MARKETPLACE') return whenCatalogueOpen", 'onManageMarkets={() => whenPlanOpen', 'onOpenBrandStudio={() => whenPlanOpen', "editBeforeLaunch: () => whenPlanOpen"]) {
         assert.ok(hq.includes(door), `HQ: ${door}`);
     }
+    /* 2026-11-11: the old slate page is gone; the Content Desk's Slate tab is the one planner (it refuses while locked, above) */
+    assert.ok(!hq.includes('<StreamingSlatePlanner'), 'HQ: the old slate page is not mounted');
     const deck = readFileSync('components/streaming-transplant/StreamingPlatformCommandDeck.tsx', 'utf8');
     assert.ok(deck.includes('state.launchProgram && !state.openingBuild'), 'the two wizard cards give way to the one card');
     assert.ok(deck.includes('opening-build-card'));

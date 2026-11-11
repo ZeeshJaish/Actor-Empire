@@ -50,15 +50,22 @@
 }
 
 .bw-commit-error {
-  margin: var(--sf-3) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-2);
+  margin: 0 0 var(--sf-3);
   padding: var(--sf-3);
   border: 1px solid var(--sf-bad-line);
   border-radius: var(--sf-r-card);
-  color: var(--sf-bad);
+  color: var(--sf-bad-tint);
   background: var(--sf-bad-wash);
   font-size: var(--sf-t-2);
   line-height: 1.45;
 }
+.bw-commit-error b { font-size: var(--sf-t-3); color: var(--sf-bad); }
+.bw-commit-error p { margin: 0; }
+.bw-commit-error-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sf-2); }
+.bw-commit-error-actions em { font-style: normal; color: var(--sf-fg-3); }
 
 /* --- supply colours ------------------------------------------------------------
    Power is amber, cooling is blue, fibre is green — everywhere they appear, in

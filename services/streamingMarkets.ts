@@ -117,13 +117,17 @@ export const saveStreamingMarketPlan = (player: Player, countryIds: string[], en
     const selectedSet = new Set(selected);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const mutableStatuses = new Set(['NOT_ENTERED', 'EVALUATING', 'PLANNED', 'AWAITING_FUNDING']);
+    /* 2026-11-11 (player reports [07, 36]): a market with a filing on record, such as a government
+       request waiting on payment, is not a plan any more. A plan save reset it to PLANNED, and its
+       Pay was then refused for ever (the request needs AWAITING_FUNDING), with no word on screen. */
+    const mutable = (operation: OwnedStreamingMarketOperation) => mutableStatuses.has(operation.status) && !operation.clearance;
     const retained = platform.marketOperations.filter(operation => {
         if (operation.scope !== 'COUNTRY' || operation.entryKind !== entryKind || !operation.countryId) return true;
-        return !mutableStatuses.has(operation.status) || selectedSet.has(operation.countryId);
+        return !mutable(operation) || selectedSet.has(operation.countryId);
     });
     const planned = selected.flatMap((countryId): OwnedStreamingMarketOperation[] => {
         const existing = existingByCountry.get(countryId);
-        if (existing && !mutableStatuses.has(existing.status)) return [existing];
+        if (existing && !mutable(existing)) return [existing];
         if (existing && existing.entryKind !== entryKind) return [existing];
         const profile = existing?.countryProfile || getStreamingCountryMarketProfile(countryId);
         if (!profile) return [];
@@ -173,8 +177,12 @@ export const beginStreamingMarketClearance = (player: Player, countryIds: string
         return startStreamingMarketOperation({ ...operation, countryProfile: profile }, absoluteWeek);
     });
     const byId = new Map(started.map(operation => [operation.id, operation]));
+    const existingCommitmentKeys = new Set(platform.costCommitments.map(item => item.idempotencyKey));
+    /* 2026-11-11: a market dropped from the opening and picked again keeps its id; its second filing is its own payment */
+    const paidKey = (operation: OwnedStreamingMarketOperation) => (existingCommitmentKeys.has(`market-paid:${operation.id}`)
+        ? `market-paid:${operation.id}:${absoluteWeek}` : `market-paid:${operation.id}`);
     const commitments: OwnedStreamingCostCommitment[] = targets.map(operation => ({
-        id: createDeterministicId('streaming_launch_cost', platform.simulationSeed, `market-paid:${operation.id}`), idempotencyKey: `market-paid:${operation.id}`,
+        id: createDeterministicId('streaming_launch_cost', platform.simulationSeed, paidKey(operation)), idempotencyKey: paidKey(operation),
         category: 'MARKET', label: `${countryName(operation)} market entry`, status: 'PAID', plannedAmount: operation.plannedCosts.total,
         committedAmount: operation.plannedCosts.total, paidAmount: operation.plannedCosts.total, weeklyAmount: operation.weeklyOperatingCost,
         createdAtAbsoluteWeek: operation.plannedAtAbsoluteWeek, committedAtAbsoluteWeek: absoluteWeek, paidAtAbsoluteWeek: absoluteWeek, sourceReferenceId: operation.id,
@@ -184,7 +192,6 @@ export const beginStreamingMarketClearance = (player: Player, countryIds: string
         idempotencyKey: `market-clearance:${entryKind}:${absoluteWeek}:${targets.map(item => item.countryId).join('-')}`, absoluteWeek, type: 'MARKET_CLEARANCE_STARTED',
         summary: `${targets.length} market clearance ${targets.length === 1 ? 'file' : 'files'} entered government review.`, source: 'PLAYER_ACTION', metadata: { marketCount: targets.length, cost: amount, entryKind },
     };
-    const existingCommitmentKeys = new Set(platform.costCommitments.map(item => item.idempotencyKey));
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({ ...platform, treasuryCash: platform.treasuryCash - amount,
         launchProgram: platform.launchCommit ? platform.launchProgram : { ...platform.launchProgram, status: 'PLANNING', defineCurrentStep: 'CLEARANCE', configurationRevision: platform.launchProgram.configurationRevision + 1 },
         marketOperations: platform.marketOperations.map(operation => targetIds.has(operation.id) ? byId.get(operation.id)! : operation),
@@ -249,6 +256,32 @@ export const resumeStreamingMarketClearance = (player: Player, operationIdValue:
     const nextPlayer = { ...player, energy: { ...player.energy }, flags: { ...player.flags }, ownedStreamingPlatform: nextPlatform };
     spendPlayerEnergy(nextPlayer, STREAMING_MARKET_REAPPLICATION_ENERGY, `Market reapplication: ${countryName(updated)}`);
     return { player: nextPlayer, changed: true, reason: 'REAPPLIED', shortfall: 0, amount: 0, energyCost: STREAMING_MARKET_REAPPLICATION_ENERGY };
+};
+
+/** 2026-11-11: before the commission, a market that has not cleared can leave the opening, so the launch
+ * never waits on the slowest or unluckiest country. What was paid stays paid (government fees are not
+ * refunded); nothing more is charged for it, and the opening plan keeps at least one market. */
+export const withdrawStreamingOpeningMarket = (player: Player, operationIdValue: string): StreamingMarketMutationResult => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const operation = platform.marketOperations.find(item => item.id === operationIdValue);
+    if (!operation || operation.scope !== 'COUNTRY' || operation.entryKind !== 'OPENING' || !operation.countryId
+        || platform.launchCommit || platform.infrastructureSetup || platform.openingProgrammeCommission
+        || ['READY', 'ACTIVE', 'EXITED'].includes(operation.status)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0, amount: 0 };
+    const kept = platform.marketOperations.filter(item => item.scope === 'COUNTRY' && item.entryKind === 'OPENING' && item.status !== 'EXITED' && item.id !== operation.id);
+    if (!kept.length) return { player, changed: false, reason: 'NO_MARKETS', shortfall: 0, amount: 0 };
+    const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+    const exited: OwnedStreamingMarketOperation = { ...operation, status: 'EXITED', exitedAtAbsoluteWeek: absoluteWeek, approvalReadyAtAbsoluteWeek: null };
+    const ledger = ledgerEntry(platform, exited, absoluteWeek, `withdrawn:${absoluteWeek}`, 'MARKET_CLEARANCE_UPDATED',
+        `${countryName(exited)} left the opening plan.`, { countryId: exited.countryId, paid: operation.committedCosts.total });
+    const nextPlatform = compactOwnedStreamingPlatformForPersistence({
+        ...platform,
+        launchProgram: { ...platform.launchProgram, status: 'PLANNING', defineCurrentStep: 'CLEARANCE', configurationRevision: platform.launchProgram.configurationRevision + 1 },
+        marketOperations: platform.marketOperations.map(item => item.id === exited.id ? exited : item),
+        /* the fee stays in the books; the weekly running cost it carried does not */
+        costCommitments: platform.costCommitments.map(item => item.sourceReferenceId === exited.id ? { ...item, weeklyAmount: 0 } : item),
+        eventLedger: platform.eventLedger.some(item => item.idempotencyKey === ledger.idempotencyKey) ? platform.eventLedger : [...platform.eventLedger, ledger],
+    }, player.id);
+    return { player: { ...player, ownedStreamingPlatform: nextPlatform }, changed: true, reason: 'SAVED', shortfall: 0, amount: 0 };
 };
 
 type AdvanceResult = { operation: OwnedStreamingMarketOperation; ledger: OwnedStreamingLedgerEntry[]; news: NewsItem[] };

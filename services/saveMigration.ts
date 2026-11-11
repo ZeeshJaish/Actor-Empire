@@ -1,3 +1,4 @@
+import { repairRunawayRivalEconomy } from './worldEconomyRepair';
 import {migrateBuiltinNames} from './builtinNameMigration';
 import { rollUpStreamingBreakdowns, rollUpTheatricalBreakdowns } from './boxOffice/pastProjectBreakdownRollup';
 import { ensureActorCareerBalance } from './actorCareerBalance';
@@ -1116,7 +1117,8 @@ const withCinemaMigration = (player: Player): Player => {
     return migrateBuiltinNames(synchronized);
 };
 export const migratePlayerSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean } = {}): Player => (
-    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : settleLegacySocialCounts(advanceOriginalPitches(healCopiedEpisodeRatings(migrateSave(input, options)))))
+    /* 2026-11-11: repairRunawayRivalEconomy bounds the old 1.0.25 rival economy that blocked weeks in 1.0.26 */
+    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : settleLegacySocialCounts(advanceOriginalPitches(healCopiedEpisodeRatings(repairRunawayRivalEconomy(migrateSave(input, options)).player))))
 );
 
 const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean }): Player => {

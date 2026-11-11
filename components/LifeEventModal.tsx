@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { EventImpactSignal, Player, ScheduledEvent, LifeEvent, LifeEventImpactResult, LifeEventOption, LocalizedTextVars } from '../types';
 import { AlertTriangle, ShieldAlert, Scale, User, Zap, ChevronRight, PlayCircle, Loader2, CheckCircle, Activity, Newspaper } from 'lucide-react';
 import { motion } from 'motion/react';
-import { showAd } from '../services/adLogic';
+import { eventRewardKey, useEventRewardRecovery } from '../services/eventRewardAd';
 import { noteAdClosed } from '../services/forcedAds';
 import { addBreadcrumb, recordNonFatal, setCrashContext, trackGameEvent } from '../services/firebaseService';
 import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/youtubeEventLogic';
@@ -13,10 +13,11 @@ import { generateLegalHearing } from '../services/lifeEventLogic';
 interface LifeEventModalProps {
     player: Player;
     event: ScheduledEvent;
+    saveSlot?: number | null;
     onChoice: (updatedPlayer: Player, log: string) => void;
 }
 
-export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, onChoice }) => {
+export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, saveSlot, onChoice }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: string, vars?: LocalizedTextVars) => t(language, key, vars);
     const localizeText = (fallback: string | undefined, key?: string, vars?: LocalizedTextVars) =>
@@ -36,6 +37,7 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
     const mountedRef = useRef(true);
 
     useEffect(() => {
+        mountedRef.current = true;
         return () => {
             mountedRef.current = false;
         };
@@ -99,6 +101,12 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
         return getFallbackImpact(lifeEvent, idx, pCopy, option);
     };
 
+    const rewardChoice = (option: LifeEventOption, idx: number) => option.id ? `id:${option.id}` : `index:${idx}`;
+    const watchReward = useEventRewardRecovery(eventRewardKey(saveSlot, String(player.id || player.name), event.id), choice => {
+        const index = lifeEvent?.options?.findIndex((option, idx) => option.isGolden && rewardChoice(option, idx) === choice) ?? -1;
+        if (index >= 0) applyOption(lifeEvent.options[index], index);
+    });
+
     const handleOptionClick = async (option: LifeEventOption, idx: number) => {
         setAdNotice('');
         setCrashContext(player, {
@@ -120,22 +128,11 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
             option_index: idx,
             golden: !!option.isGolden,
         });
-        let impactResult;
-
         if (option.isGolden) {
             setIsProcessingAd(true);
             try {
-                const result = await showAd('REWARDED_BAILOUT');
-                if (result.success) {
-                    // Deep clone to prevent mutation issues, but preserve functions for the current session
-                    const pCopy = JSON.parse(JSON.stringify(player));
-                    // Restore functions for pendingEvents to allow subsequent events to work in the same session
-                    if (player.pendingEvents) {
-                        pCopy.pendingEvents = [...player.pendingEvents];
-                    }
-
-                    impactResult = executeOptionImpact(option, idx, pCopy, true);
-                } else {
+                const result = await watchReward(rewardChoice(option, idx));
+                if (!result.success) {
                     // AE-005: say why nothing happened; every choice stays open
                     setAdNotice(tr(result.reason === 'NOT_COMPLETED' ? 'app.rewards.goldenNotFinished' : 'app.rewards.goldenUnavailable'));
                     return;
@@ -149,17 +146,14 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, o
                 // as the Store's rewarded ads do: the forced ads' minutes start again, so none lands right after this one
                 noteAdClosed();
             }
-        } else {
-            // Deep clone to prevent mutation issues
-            const pCopy = JSON.parse(JSON.stringify(player));
-            // Restore functions for pendingEvents
-            if (player.pendingEvents) {
-                pCopy.pendingEvents = [...player.pendingEvents];
-            }
-
-            impactResult = executeOptionImpact(option, idx, pCopy, false);
         }
+        applyOption(option, idx);
+    };
 
+    const applyOption = (option: LifeEventOption, idx: number) => {
+        const pCopy = JSON.parse(JSON.stringify(player));
+        if (player.pendingEvents) pCopy.pendingEvents = [...player.pendingEvents];
+        const impactResult = executeOptionImpact(option, idx, pCopy, Boolean(option.isGolden));
         if (impactResult) {
             const { updatedPlayer, log, feedbackDelay, feedbackType, effects } = impactResult;
             const localizedLog = getImpactLog(impactResult);

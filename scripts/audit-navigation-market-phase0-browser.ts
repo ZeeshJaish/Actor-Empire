@@ -105,7 +105,7 @@ const gameSample = async (browser: any, player: Player) => {
   page.on('pageerror', (error: Error) => errors.push(error.message));
   await page.addInitScript(({ fixture }: { fixture: Player }) => {
     localStorage.clear();
-    localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.25');
+    localStorage.setItem('actorEmpireSeenWhatsNewVersion', '1.0.27');
     localStorage.setItem('actorEmpireSave_1', JSON.stringify(fixture));
     localStorage.setItem('actorEmpireSave_1_meta', JSON.stringify({
       playerName: fixture.name, age: fixture.age, week: fixture.currentWeek,

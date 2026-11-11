@@ -43,7 +43,10 @@ export const getReleaseWizardPhase = (
   releaseType: ReleaseType | null,
   isPostTheatricalBidding = false,
 ): ReleaseWizardPhase => {
-  if (isPostTheatricalBidding) return 'WAR';
+  /* 2026-11-11 (player reports [20, 22]): after a cinema run only the bidding step is the war room.
+     It held WAR for every step, so Continue from the bids led to a Campaign, Festivals, Calendar and
+     Finalize that sat in the war room's fixed, non-scrolling layout and could not be finished. */
+  if (isPostTheatricalBidding && step <= 2) return 'WAR';
   if (step <= 1) return 'DISTRIBUTION';
   if (step === 2) return releaseType === 'THEATRICAL' ? 'DESK' : 'WAR';
   if (step === 3) return 'CAMPAIGN';

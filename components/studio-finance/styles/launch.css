@@ -1109,6 +1109,46 @@
 .cl-req span { font-size: var(--sf-t-3); line-height: 1.45; color: var(--sf-warn-tint); }
 .cl-req > .sf-btn { align-self: flex-end; }
 
+/* 2026-11-11: one tap for every request or refile, a line after every action
+   (nothing fails silently), and a stuck market can leave the opening. */
+.cl-bulk { display: flex; flex-wrap: wrap; gap: var(--sf-2); margin-top: var(--sf-3); }
+.cl-bulk > .sf-btn { flex: 1 1 180px; }
+.cl-msg {
+  margin-top: var(--sf-2);
+  padding: var(--sf-2) var(--sf-3);
+  border: 1px solid var(--sf-good-line);
+  border-radius: var(--sf-r-chip);
+  background: var(--sf-good-wash);
+  font-size: var(--sf-t-2);
+  line-height: 1.45;
+  color: var(--sf-good-tint);
+}
+.cl-msg.is-bad { border-color: var(--sf-bad-line); background: var(--sf-bad-wash); color: var(--sf-bad-tint); }
+.cl-drop {
+  align-self: flex-start;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  font-size: var(--sf-t-2);
+  font-weight: 600;
+  color: var(--sf-fg-3);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.cl-drop-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sf-2);
+  padding: var(--sf-3);
+  border: 1px solid var(--sf-bad-line);
+  border-radius: var(--sf-r-card);
+  background: var(--sf-bad-wash);
+}
+.cl-drop-confirm p { font-size: var(--sf-t-3); line-height: 1.45; color: var(--sf-bad-tint); }
+.cl-drop-confirm div { display: flex; justify-content: flex-end; gap: var(--sf-2); }
+.cl-drop-confirm .cl-drop-go { border-color: var(--sf-bad-line); color: var(--sf-bad-tint); }
+
 /* --- 6 · catalogue --------------------------------------------------------------------- */
 
 .lw-coverage { display: flex; flex-direction: column; gap: 6px; }

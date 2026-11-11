@@ -32,11 +32,14 @@ import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle, streamingLicenceWaitsForSlate } from './streamingCatalog';
-import { getOwnedStreamingProgramEntries, getStreamingSlateCandidates } from './streamingOriginals';
+import { getOwnedStreamingProgramEntries, getStreamingOriginalLiveStatus, getStreamingSlateCandidates } from './streamingOriginals';
 import { ORIGINAL_LICENCE_WEEKS } from './originalsDeal';
+import { getStreamingOpeningLock } from './streamingOpeningLock';
 
 /** How far ahead a premiere can be set: one year of weeks from next week. */
 export const STREAMING_SLATE_HORIZON_WEEKS = 52;
+/** Before launch the slate is the opening programme: opening night (week 1) to week 12. */
+export const STREAMING_OPENING_PROGRAMME_WEEKS = 12;
 
 export type StreamingSlateScheduleRefusal =
     | 'NOT_LIVE'
@@ -47,10 +50,14 @@ export type StreamingSlateScheduleRefusal =
     | 'WEEK_OUT_OF_RANGE'
     | 'BEFORE_RIGHTS_START'
     | 'RIGHTS_END_FIRST'
-    | 'EARLY_ACCESS_RUNNING';
+    | 'EARLY_ACCESS_RUNNING'
+    | 'OPENING_LOCKED'
+    | 'OPENING_WEEK_OUT_OF_RANGE';
 
 export const STREAMING_SLATE_REFUSAL_COPY: Record<StreamingSlateScheduleRefusal, string> = {
-    NOT_LIVE: 'The service is not live yet. Plan the opening slate first.',
+    NOT_LIVE: 'Set up the service before planning its programme.',
+    OPENING_LOCKED: 'Locked until opening night. The crews are building the plan you approved.',
+    OPENING_WEEK_OUT_OF_RANGE: `Pick a week from opening night to week ${STREAMING_OPENING_PROGRAMME_WEEKS}.`,
     UNKNOWN_TITLE: 'That title is not on your shelves.',
     ORIGINAL_USES_RELEASE: 'An Original on the opening slate keeps its opening week.',
     ORIGINAL_NOT_READY: 'It is still being made. It can go on the Slate once it is delivered.',
@@ -128,6 +135,171 @@ const withSlate = (player: Player, entries: OwnedStreamingSlateEntry[], now: num
             launchSlate: { entries, revision, programmedAtAbsoluteWeek: now },
             eventLedger: [...platform.eventLedger, ledger],
         }, player.id),
+    };
+};
+
+/* ── Before launch: the opening programme ────────────────────────────────────
+   Fix (2026-11-11): the opening slate is planned here too. Before launch the
+   slate counts programme weeks (week 1 is opening night, up to week 12) and
+   every change saves at once, so the slate the launch checks is always what the
+   player sees. It replaces the old twelve-week page, whose Lock button sat off
+   screen. What can go on it is the opening slate's own rule
+   (getStreamingSlateCandidates); after commissioning, the opening lock (#253)
+   keeps it as approved, unless the slate itself is what blocks the launch. */
+type OpeningProgramme =
+    | { open: true; platform: Player['ownedStreamingPlatform'] }
+    | { open: false; reason: StreamingSlateScheduleRefusal };
+
+/** True before the service goes live: the slate is the opening programme. */
+const beforeLaunch = (player: Player) => !player.ownedStreamingPlatform?.launchCommit
+    && player.ownedStreamingPlatform?.lifecycle !== 'ACTIVE';
+
+const openingProgramme = (player: Player): OpeningProgramme => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    if (platform.launchCommit || platform.lifecycle === 'ACTIVE' || !platform.identity) return { open: false, reason: 'NOT_LIVE' };
+    if (getStreamingOpeningLock(player).catalogueLocked) return { open: false, reason: 'OPENING_LOCKED' };
+    return { open: true, platform };
+};
+
+/** Before launch: can the opening programme be planned right now? */
+export const isStreamingOpeningProgrammeOpen = (player: Player): boolean => openingProgramme(player).open;
+
+const openingWeekLabel = (week: number) => (week === 1 ? 'opening night' : `week ${week} of the opening`);
+
+const openingEntry = (
+    platform: Player['ownedStreamingPlatform'],
+    candidate: ReturnType<typeof getStreamingSlateCandidates>[number],
+    week: number,
+    existing: OwnedStreamingSlateEntry | undefined,
+    input: { marketingPlan?: StreamingSlateMarketingPlan; releasePattern?: StreamingOriginalReleasePattern } = {},
+): OwnedStreamingSlateEntry => ({
+    id: existing?.id || createDeterministicId('streaming_slate_entry', platform.simulationSeed, candidate.projectId),
+    projectId: candidate.projectId,
+    title: candidate.title,
+    source: candidate.source,
+    projectType: candidate.projectType,
+    genre: candidate.genre,
+    launchWeek: week,
+    releasePattern: candidate.projectType !== 'SERIES'
+        ? 'SINGLE_PREMIERE'
+        : input.releasePattern && SERIES_PATTERNS.includes(input.releasePattern) ? input.releasePattern
+            : existing && SERIES_PATTERNS.includes(existing.releasePattern) ? existing.releasePattern
+                : candidate.source === 'ORIGINAL' ? 'WEEKLY' : 'FULL_SEASON',
+    /* the planner sends Standard; an Original keeps the event campaign the opening gives it */
+    marketingPlan: existing?.marketingPlan
+        ?? (candidate.source === 'ORIGINAL' ? 'EVENT' : input.marketingPlan && MARKETING_PLANS.includes(input.marketingPlan) ? input.marketingPlan : 'STANDARD'),
+});
+
+const writeOpening = (player: Player, entries: OwnedStreamingSlateEntry[], key: string, summary: string, metadata: Record<string, string | number>): Player => {
+    const now = getAbsoluteWeek(player.age, player.currentWeek);
+    const sorted = [...entries].sort((left, right) => left.launchWeek - right.launchWeek || left.title.localeCompare(right.title));
+    const next = withSlate(player, sorted, now, `opening:${key}`, summary, metadata);
+    /* the old page's unsaved draft goes: the slate itself is the plan now */
+    return { ...next, ownedStreamingPlatform: { ...next.ownedStreamingPlatform, launchSlateDraft: null } };
+};
+
+const scheduleOpeningTitle = (
+    player: Player,
+    input: { projectId: string; absoluteWeek: number; marketingPlan?: StreamingSlateMarketingPlan; releasePattern?: StreamingOriginalReleasePattern },
+): Result => {
+    const state = openingProgramme(player);
+    if ('reason' in state) return { player, changed: false, reason: state.reason };
+    const { platform } = state;
+    const week = Math.round(Number(input.absoluteWeek));
+    if (!Number.isFinite(week) || week < 1 || week > STREAMING_OPENING_PROGRAMME_WEEKS) return { player, changed: false, reason: 'OPENING_WEEK_OUT_OF_RANGE' };
+    const candidate = getStreamingSlateCandidates(player).find(item => item.projectId === input.projectId);
+    if (!candidate) return { player, changed: false, reason: 'UNKNOWN_TITLE' };
+    const current = platform.launchSlate?.entries || [];
+    const existing = current.find(item => item.projectId === candidate.projectId);
+    const entry = openingEntry(platform, candidate, week, existing, input);
+    const entries = existing ? current.map(item => (item.projectId === candidate.projectId ? entry : item)) : [...current, entry];
+    return {
+        player: writeOpening(player, entries, `${candidate.projectId}:${week}`,
+            `${candidate.title} ${existing ? 'moved to' : 'programmed for'} ${openingWeekLabel(week)}.`,
+            { projectId: candidate.projectId, programmeWeek: week }),
+        changed: true,
+    };
+};
+
+const unscheduleOpeningTitle = (player: Player, projectId: string): Result => {
+    const state = openingProgramme(player);
+    if ('reason' in state) return { player, changed: false, reason: state.reason };
+    const current = state.platform.launchSlate?.entries || [];
+    const entry = current.find(item => item.projectId === projectId);
+    if (!entry) return { player, changed: false, reason: 'UNKNOWN_TITLE' };
+    return {
+        player: writeOpening(player, current.filter(item => item.projectId !== projectId), `${projectId}:off`,
+            `${entry.title} taken off the opening programme.`, { projectId }),
+        changed: true,
+    };
+};
+
+/* The launch's own rule (services/streamingLaunch.ts): a finished Original can
+   open the service, one still being made holds the launch until it is done. */
+const originalReadyToOpen = (player: Player, projectId: string) => {
+    const commission = player.ownedStreamingPlatform.originalCommissions.find(item => item.canonicalProjectId === projectId);
+    if (!commission) return false;
+    const status = getStreamingOriginalLiveStatus(player, commission);
+    return status === 'DELIVERED' || status === 'RELEASED';
+};
+
+/* opening night first, then one premiere every third week, then the weeks between */
+const OPENING_FILL_ORDER = [1, 4, 7, 10, 2, 5, 8, 11, 3, 6, 9, 12];
+
+/** Auto-fill before launch: titles that can open go into the free programme weeks, an
+    Original (delivered) on opening night, then the best rated. One title a week. */
+const planOpeningAutoFill = (player: Player, fresh: boolean): StreamingSlateAutoFillItem[] => {
+    const state = openingProgramme(player);
+    if (!state.open) return [];
+    const kept = fresh ? [] : (state.platform.launchSlate?.entries || []);
+    const busy = new Set(kept.map(entry => entry.launchWeek));
+    const onSlate = new Set(kept.map(entry => entry.projectId));
+    const shelf = getStreamingSlateCandidates(player)
+        .filter(candidate => !onSlate.has(candidate.projectId))
+        /* an Original still being made is the player's call, not Auto-fill's */
+        .filter(candidate => candidate.source !== 'ORIGINAL' || originalReadyToOpen(player, candidate.projectId))
+        .map(candidate => ({ ...candidate, rating: resolveStreamingCatalogTitle(player, candidate.projectId)?.rating ?? 0 }))
+        .sort((left, right) => (Number(right.source === 'ORIGINAL') - Number(left.source === 'ORIGINAL'))
+            || (right.rating - left.rating) || left.title.localeCompare(right.title));
+    const plan: StreamingSlateAutoFillItem[] = [];
+    for (const title of shelf) {
+        const week = OPENING_FILL_ORDER.find(candidate => !busy.has(candidate));
+        if (week === undefined) break;
+        busy.add(week);
+        plan.push({ projectId: title.projectId, title: title.title, absoluteWeek: week, marketingPlan: title.source === 'ORIGINAL' ? 'EVENT' : 'STANDARD' });
+    }
+    return plan.sort((left, right) => left.absoluteWeek - right.absoluteWeek);
+};
+
+const autoFillOpening = (player: Player, fresh: boolean): { player: Player; changed: boolean; scheduled: StreamingSlateAutoFillItem[] } => {
+    const state = openingProgramme(player);
+    if (!state.open) return { player, changed: false, scheduled: [] };
+    const current = state.platform.launchSlate?.entries || [];
+    const plan = planOpeningAutoFill(player, fresh);
+    if (!plan.length && !(fresh && current.length)) return { player, changed: false, scheduled: [] };
+    const candidates = new Map(getStreamingSlateCandidates(player).map(candidate => [candidate.projectId, candidate]));
+    const added = plan.flatMap(item => {
+        const candidate = candidates.get(item.projectId);
+        return candidate ? [openingEntry(state.platform, candidate, item.absoluteWeek, undefined, { marketingPlan: item.marketingPlan })] : [];
+    });
+    const entries = [...(fresh ? [] : current), ...added];
+    return {
+        player: writeOpening(player, entries, `autofill:${fresh ? 'fresh' : 'keep'}`,
+            `Opening programme auto-filled: ${added.length} title${added.length === 1 ? '' : 's'}.`, { added: added.length }),
+        changed: true,
+        scheduled: plan,
+    };
+};
+
+const clearOpening = (player: Player): { player: Player; changed: boolean; removed: string[] } => {
+    const state = openingProgramme(player);
+    if (!state.open) return { player, changed: false, removed: [] };
+    const current = state.platform.launchSlate?.entries || [];
+    if (!current.length) return { player, changed: false, removed: [] };
+    return {
+        player: writeOpening(player, [], 'clear', `${current.length} title${current.length === 1 ? '' : 's'} taken off the opening programme.`, { removed: current.length }),
+        changed: true,
+        removed: current.map(entry => entry.title),
     };
 };
 
@@ -232,6 +404,8 @@ export const scheduleStreamingSlateTitle = (
         releasePattern?: StreamingOriginalReleasePattern;
     },
 ): Result => {
+    /* before launch the same call plans the opening programme (input.absoluteWeek is its programme week) */
+    if (beforeLaunch(player)) return scheduleOpeningTitle(player, input);
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const launchAt = platform.launchCommit?.committedAtAbsoluteWeek;
     if (launchAt === undefined || platform.lifecycle !== 'ACTIVE') return { player, changed: false, reason: 'NOT_LIVE' };
@@ -310,6 +484,7 @@ export const getStreamingSlateFallback = (player: Player, projectId: string): St
 /** Take a title that has not premiered yet off the slate: back to the shelves, or (a
     licence bought after setup) back to going live when its rights start. */
 export const unscheduleStreamingSlateTitle = (player: Player, projectId: string): Result => {
+    if (beforeLaunch(player)) return unscheduleOpeningTitle(player, projectId);
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const launchAt = platform.launchCommit?.committedAtAbsoluteWeek;
     if (launchAt === undefined || platform.lifecycle !== 'ACTIVE') return { player, changed: false, reason: 'NOT_LIVE' };
@@ -378,6 +553,7 @@ const plannedEntries = (player: Player) => {
 /** Remove all: every premiere still ahead that the slate set comes off at once, back to
     the shelves (or, a licence bought after setup, back to going live at its rights start). */
 export const clearStreamingSlatePlans = (player: Player): { player: Player; changed: boolean; removed: string[] } => {
+    if (beforeLaunch(player)) return clearOpening(player);
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     if (!platform.launchCommit || platform.lifecycle !== 'ACTIVE') return { player, changed: false, removed: [] };
     const planned = plannedEntries(player);
@@ -397,6 +573,8 @@ export const clearStreamingSlatePlans = (player: Player): { player: Player; chan
 
 /** Plan Auto-fill around the premieres already planned, or (fresh) as if none were. */
 export const planStreamingSlateAutoFill = (player: Player, options: { fresh?: boolean } = {}): StreamingSlateAutoFillItem[] => {
+    /* before launch: programme weeks of the opening (absoluteWeek holds the programme week) */
+    if (beforeLaunch(player)) return planOpeningAutoFill(player, Boolean(options.fresh));
     if (options.fresh) {
         const cleared = clearStreamingSlatePlans(player);
         if (cleared.changed) return planStreamingSlateAutoFill(cleared.player);
@@ -449,6 +627,7 @@ export const planStreamingSlateAutoFill = (player: Player, options: { fresh?: bo
 /** Schedules the auto-fill plan, title by title through the same checks as a manual
     premiere. Fresh: the planned premieres come off first and everything is planned anew. */
 export const autoFillStreamingSlate = (player: Player, options: { fresh?: boolean } = {}): { player: Player; changed: boolean; scheduled: StreamingSlateAutoFillItem[] } => {
+    if (beforeLaunch(player)) return autoFillOpening(player, Boolean(options.fresh));
     const cleared = options.fresh ? clearStreamingSlatePlans(player) : null;
     let next = cleared?.player ?? player;
     const scheduled: StreamingSlateAutoFillItem[] = [];

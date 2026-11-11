@@ -134,9 +134,20 @@ export const getCinemaProjectFinance = (source: CinemaFinanceSource): CinemaFina
         studioReturnPercent: riskCents > 0 ? studioProfitCents / riskCents * 100 : null };
 };
 
-/** NPC treasuries use millions; cash moves retain ticket cents across coarse budget quotes. */
+/** The largest NPC treasury (millions) whole cents can hold: about $90 trillion. */
+export const NPC_CINEMA_CASH_LIMIT_MILLIONS=Math.floor(Number.MAX_SAFE_INTEGER/100_000_000);
+let npcCashSaturations=0;
+/** How many rival cash moves were held at the limit this session (tests and diagnostics). */
+export const getNpcCinemaCashSaturations=()=>npcCashSaturations;
+/** NPC treasuries use millions; cash moves retain ticket cents across coarse budget quotes.
+    2026-11-11: it threw past about $90T ("NPC cinema cash overflow"), and one rival's bookkeeping then
+    failed the player's whole week on every retry. The load repair (services/worldEconomyRepair.ts) keeps
+    rivals far below this; as a safety net a move past it is held at the limit, never thrown. */
 export const moveCinemaNpcCash=(balanceMillions:number,deltaMillions:number):number=>{
-    const base=Math.round(balanceMillions*100_000_000),delta=Math.round(deltaMillions*100_000_000),next=base+delta;
-    if(!Number.isSafeInteger(base)||!Number.isSafeInteger(delta)||!Number.isSafeInteger(next))throw new RangeError('NPC cinema cash overflow');
-    return next/100_000_000;
+    const balance=Number.isFinite(balanceMillions)?balanceMillions:0,change=Number.isFinite(deltaMillions)?deltaMillions:0;
+    const base=Math.round(balance*100_000_000),delta=Math.round(change*100_000_000),next=base+delta;
+    if(Number.isSafeInteger(base)&&Number.isSafeInteger(delta)&&Number.isSafeInteger(next)&&balance===balanceMillions&&change===deltaMillions)return next/100_000_000;
+    npcCashSaturations+=1;
+    const plain=balance+change;
+    return Math.round(Math.max(-NPC_CINEMA_CASH_LIMIT_MILLIONS,Math.min(NPC_CINEMA_CASH_LIMIT_MILLIONS,Number.isFinite(plain)?plain:0))*100)/100;
 };

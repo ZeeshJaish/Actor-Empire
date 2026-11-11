@@ -1067,12 +1067,14 @@ export const processStreamingRightsCalendarWeek = (
         ? [...resolvedCalendar.urgentNoticeKeys, urgentKey].slice(-100)
         : resolvedCalendar.urgentNoticeKeys;
     if (shouldDeliverUrgent) {
-        const titles = urgentCases.slice(0, 3).map(candidate => candidate.title).join(', ');
+        /* 2026-11-11: each title once (a title with several windows was listed several times) */
+        const uniqueTitles = [...new Set(urgentCases.map(candidate => candidate.title))];
+        const titles = uniqueTitles.slice(0, 3).join(', ');
         const urgentMessage: Message = {
             id: urgentKey,
             sender: 'Rights Desk',
             subject: `${urgentCases.length} rights ${urgentCases.length === 1 ? 'decision' : 'decisions'} due`,
-            text: `${titles}${urgentCases.length > 3 ? ` and ${urgentCases.length - 3} more` : ''} require a decision before their current windows close.`,
+            text: `${titles}${uniqueTitles.length > 3 ? ` and ${uniqueTitles.length - 3} more` : ''} ${uniqueTitles.length === 1 ? 'needs' : 'need'} a decision before ${uniqueTitles.length === 1 ? 'its' : 'their'} current window closes. Decide on your service's Rights tab.`,
             type: 'RIGHTS_REPORT',
             data: { kind: 'STREAMING_RIGHTS_URGENT', caseIds: urgentCases.map(candidate => candidate.id) },
             isRead: false,

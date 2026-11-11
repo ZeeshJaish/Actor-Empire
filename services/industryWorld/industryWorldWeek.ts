@@ -36,6 +36,8 @@ export interface IndustryWorldWeekResult {
     absoluteWeek: number;
     processed: boolean;
     executionOrder: IndustryWorldExecutionStage[];
+    /** 2026-11-11: rival companies that sat this week out because their own step threw (studioAiWeek). */
+    skipped?: Array<{ companyId: string; step: string; error: string }>;
 }
 
 type IndustryWorldWeekDiagnostics = { onPhase?: (name: string, elapsedMs: number) => void };
@@ -163,6 +165,7 @@ function* industryWorldWeekSteps(
         absoluteWeek,
         processed: true,
         executionOrder,
+        ...(studio.skipped?.length ? { skipped: studio.skipped } : {}),
     };
 }
 

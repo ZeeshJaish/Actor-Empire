@@ -312,7 +312,12 @@ const normalizeMarketOperation = (value: unknown): OwnedStreamingMarketOperation
     if (!scopeId) return null;
     const idempotencyKey = text(source.idempotencyKey, `market:${scope.toLowerCase()}:${scopeId}`, 120);
     const countryId = scope === 'COUNTRY' ? text(source.countryId, scopeId, 12).toUpperCase() : null;
-    const status = oneOf(source.status, MARKET_STATUSES, 'EVALUATING');
+    const savedStatus = oneOf(source.status, MARKET_STATUSES, 'EVALUATING');
+    /* 2026-11-11 repair: a market plan save used to reset a market waiting on a government request to
+       PLANNED, and its Pay was refused for ever (player reports [07, 36]). A request on file means the
+       market is awaiting that payment. */
+    const status: StreamingMarketOperationStatus = asRecord(source.clearance).outcome === 'ADDITIONAL_REQUIREMENT'
+        && (savedStatus === 'PLANNED' || savedStatus === 'EVALUATING' || savedStatus === 'NOT_ENTERED') ? 'AWAITING_FUNDING' : savedStatus;
     const profile = countryId ? normalizeCountryProfile(source.countryProfile, countryId) : null;
     const committedAtAbsoluteWeek = nullableWeek(source.committedAtAbsoluteWeek);
     const approvalReadyAtAbsoluteWeek = nullableWeek(source.approvalReadyAtAbsoluteWeek);

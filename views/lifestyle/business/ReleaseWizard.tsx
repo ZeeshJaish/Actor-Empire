@@ -656,7 +656,19 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
        so every tick started a full save: ~45 saves per room on a late career, some of which failed
        ("Save Was Not Replaced"). A tick now stays in memory and rides along with the next real save;
        opening, taking, finishing and leaving the room save as before. */
-    const persistBiddingSessionTick = (session: StreamingBiddingSession) => persistBiddingSession(session, true);
+    /* 2026-11-11 (lag reports): even quiet, a tick replaced player.world, so the whole app redrew every
+       second while a room was open. The clock now moves in the room's own state (the room reads only
+       that); the world copy follows when the room's status changes, or every 15 seconds, and every real
+       action (open, take, finish, leave) still saves at once. */
+    const lastTickPersistRef = React.useRef<{ status: string; at: number }>({ status: '', at: 0 });
+    const persistBiddingSessionTick = (session: StreamingBiddingSession) => {
+        setBiddingSession(session);
+        const now = Date.now();
+        const last = lastTickPersistRef.current;
+        if (session.status === last.status && now - last.at < 15_000) return;
+        lastTickPersistRef.current = { status: session.status, at: now };
+        persistBiddingSession(session, true);
+    };
 
     /* Beta report (2026-11-10): the room and the signature price a film for each buyer the same way.
        These are the room's own inputs: the bidder market, the shelf value (#315) and the quote. */

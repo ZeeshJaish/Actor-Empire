@@ -1031,6 +1031,16 @@
   color: var(--sf-fg-4);
 }
 .sf .bw-rg-dead b { font-weight: 700; color: var(--sf-fg-2); }
+/* 2026-11-11: the countries behind "need attention", each with its reason */
+.sf .bw-rg-attention { margin: 8px 0 0; padding: 10px 12px; border: 1px solid var(--sf-warn-line); border-radius: var(--sf-r-chip); background: var(--sf-warn-wash); }
+.sf .bw-rg-attention p { margin: 0 0 6px; font: 500 var(--sf-t-2)/1.45 var(--sf-font-ui); color: var(--sf-fg-3); }
+.sf .bw-rg-attention p b { color: var(--sf-warn-tint); font-weight: 700; }
+.sf .bw-rg-attention ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.sf .bw-rg-attention li { display: flex; justify-content: space-between; gap: 10px; font: 500 var(--sf-t-2)/1.35 var(--sf-font-ui); }
+.sf .bw-rg-attention li b { min-width: 0; overflow-wrap: anywhere; color: var(--sf-fg-2); font-weight: 700; }
+.sf .bw-rg-attention li em { flex: none; font-style: normal; color: var(--sf-warn-tint); }
+.sf .bw-rg-attention li.is-bad em { color: var(--sf-bad-tint); }
+.sf .bw-rg-attention li.is-more { color: var(--sf-fg-4); }
 
 /* --- motion (#107): things arrive, meters read, words stamp ---------------
    Nothing here decorates. A bar sweeps in because a meter is being read; a

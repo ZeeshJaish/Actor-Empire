@@ -94,5 +94,8 @@ export interface InteractiveRegionMapProps {
     showCountryFocus?: boolean;
     showShelf?: boolean;
     showRelief?: boolean;
+    /** 2026-11-11: Natural Earth 1:110m, one shelf stroke and no blur, for maps that stop at the region
+        level on phones (the Greenlight location picker lagged and crashed on the 1:50m layers) */
+    lightGeometry?: boolean;
     className?: string;
 }

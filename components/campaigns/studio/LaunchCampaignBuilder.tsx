@@ -136,6 +136,11 @@ export interface LaunchCampaignBuilderProps {
   accent: string;
   /** what the treasury can spare for the campaign */
   spare: number;
+  /** 2026-11-11: where spare comes from (company treasury, the network at commission, 12 weeks of running costs) */
+  spareBreakdown?: { treasury: number; network: number; reserve: number };
+  /** 2026-11-11: the ways out when nothing is left for a campaign (a campaign is optional) */
+  onInjectCapital?: () => void;
+  onOpenWithout?: () => void;
   onCancel: () => void;
   onSave: (patch: Partial<OwnedStreamingLaunchMarketingDraft>) => void;
   /** where it opens (an audit, a fixture); the builder opens on What */
@@ -143,7 +148,7 @@ export interface LaunchCampaignBuilderProps {
 }
 
 export const LaunchCampaignBuilder: React.FC<LaunchCampaignBuilderProps> = props => {
-  const { draft, channels, forecastFor, rateCardFor, maxWeeks, countries, hasFlagshipOriginal, hasSellablePlan, priceHook, flagship, catalogue, serviceName, brandHue, accent, spare, onCancel, onSave, initialStep } = props;
+  const { draft, channels, forecastFor, rateCardFor, maxWeeks, countries, hasFlagshipOriginal, hasSellablePlan, priceHook, flagship, catalogue, serviceName, brandHue, accent, spare, onCancel, onSave, initialStep, spareBreakdown, onInjectCapital, onOpenWithout } = props;
   const channelOf = (id: StreamingLaunchMarketingChannelId) => channels.find(channel => channel.id === id);
   const longest = Math.max(1, Math.min(LAUNCH_CAMPAIGN_MAX_WEEKS, Math.round(maxWeeks) || 1));
   const [step, setStep] = useState<Step>(initialStep ?? 'WHAT');
@@ -261,7 +266,21 @@ export const LaunchCampaignBuilder: React.FC<LaunchCampaignBuilderProps> = props
       <div><span>IN ALL</span><b>{money(budget)}</b><small>{runs ? `${weeksWord(plan.weeks)} before opening` : 'opening night'}</small></div>
       <div><span>A WEEK</span><b>{runs ? money(plan.weekly) : '—'}</b><small>{runs ? STRENGTH_WORDS[strength].name : 'no weeks'}</small></div>
       <div><span>OPENING NIGHT</span><b>{plan.night ? money(plan.night) : '—'}</b><small>{nights.length ? `${nights.length} big ${nights.length === 1 ? 'moment' : 'moments'}` : 'no big moment'}</small></div>
-      <p>{budget > spare ? `The treasury can spare ${money(spare)} and keep the service running: fewer weeks, or less.` : `It is paid week by week up to opening; ${money(spare - budget)} is left to spare.`}</p>
+      {/* 2026-11-11 (player report "why's it not letting me"): at $0 spare no smaller plan fits, so "fewer weeks,
+          or less" sent players round in circles. Say where the money goes, and give the two ways out. */}
+      <p>{spare <= 0
+        ? spareBreakdown
+          ? `Your company treasury has ${money(spareBreakdown.treasury)}. The network takes ${money(spareBreakdown.network)} and ${money(spareBreakdown.reserve)} is kept for 12 weeks of running costs, so nothing is left for a campaign.`
+          : 'Nothing is left in the company treasury for a campaign after the network and its running costs.'
+        : budget > spare
+          ? `The treasury can spare ${money(spare)} and keep the service running: fewer weeks, or less.`
+          : `It is paid week by week up to opening; ${money(spare - budget)} is left to spare.`}</p>
+      {budget > spare && (onInjectCapital || (spare <= 0 && onOpenWithout)) && (
+        <div className={css.totalsActions}>
+          {onInjectCapital && <button type="button" onClick={onInjectCapital}>Inject capital</button>}
+          {spare <= 0 && onOpenWithout && <button type="button" onClick={onOpenWithout}>Open without a campaign</button>}
+        </div>
+      )}
     </section>
   );
 

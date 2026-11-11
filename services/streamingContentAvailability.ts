@@ -295,10 +295,17 @@ export const createPlayerStreamingTitleRouteEvaluator = (player: Player, absolut
     const activeCountryIds = new Set(getOwnedPlatformPackageCountryIds(platform));
     const ownedTitleIds = new Set<string>();
     const titles = new Map<string, ReturnType<typeof prepareTitleRouteContext>>();
+    /* 1.0.27 (2026-11-11, week speed): the unprepared title lookup rebuilt every saved release in the career
+       (collectSavedReleasedTitles) and re-normalised the platform for each new title, so a late streaming
+       week did that work once per title. The prepared read index gives the same title with the same
+       precedence (resolveStreamingCatalogTitle's prepared branch); it is built once, on first need, from this
+       same unchanging player and platform. */
+    let titleIndex: ReturnType<typeof createStreamingCatalogTitleReadIndex> | undefined;
     return (projectId: string, countryId: string, route: StreamingTitleAccessRoute): StreamingTitleAccessDecision => {
         let title = titles.get(projectId);
         if (!title) {
-            const owned = resolveStreamingCatalogTitle(player, projectId)?.source === 'OWNED_LIBRARY';
+            titleIndex ??= createStreamingCatalogTitleReadIndex(player, platform);
+            const owned = resolveStreamingCatalogTitle(player, projectId, platform, titleIndex)?.source === 'OWNED_LIBRARY';
             if (owned) ownedTitleIds.add(projectId);
             title = prepareTitleRouteContext(player, projectId, absoluteWeek, platform, owned);
             titles.set(projectId, title);

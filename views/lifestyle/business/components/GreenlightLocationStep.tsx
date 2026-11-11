@@ -197,6 +197,7 @@ export const GreenlightLocationStep: React.FC<GreenlightLocationStepProps> = ({
                         onViewChange={setView}
                         frameHeight={620}
                         className="irm-greenlight-location"
+                        lightGeometry
                         compact
                     />
                 </div>

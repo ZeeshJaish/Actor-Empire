@@ -13,7 +13,7 @@
    the final frame of each beat, which still reads.
    ========================================================================== */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { brandVars } from '../../finance/brand';
 
@@ -32,8 +32,9 @@ export function Cutscene({ beats, finale, brandHex, onComplete, onClose, closeLa
   beats: Beat[];
   finale: React.ReactNode;
   brandHex?: string;
-  /** Fired exactly once, the moment the sequence reaches its end card. */
-  onComplete?: () => void;
+  /** Fired exactly once, the moment the sequence reaches its end card. Returning false says the
+      moment did not happen (a refused commission): the end card is not shown. */
+  onComplete?: () => void | boolean;
   onClose: () => void;
   closeLabel?: string;
   /** 'paper' lets a finale be a printed object rather than another dark card. */
@@ -49,8 +50,15 @@ export function Cutscene({ beats, finale, brandHex, onComplete, onClose, closeLa
   /* The state change belongs to the sequence, not to the button at the end.
      Fired once. */
   const fired = useRef(false);
-  useEffect(() => {
-    if (ended && !fired.current) { fired.current = true; onComplete?.(); }
+  /* 2026-11-11: the end card waits for the result. It showed "Commissioned" the moment the beats ended,
+     and a refused commit then closed it a frame later (the player's "it kicks me back"). A layout
+     effect runs before paint, so a successful moment shows its card with no blank frame between. */
+  const [confirmed, setConfirmed] = useState(false);
+  useLayoutEffect(() => {
+    if (ended && !fired.current) {
+      fired.current = true;
+      if (onComplete?.() !== false) setConfirmed(true);
+    }
   }, [ended, onComplete]);
 
   useEffect(() => {
@@ -108,7 +116,7 @@ export function Cutscene({ beats, finale, brandHex, onComplete, onClose, closeLa
         </>
       )}
 
-      {ended && (
+      {ended && confirmed && (
         <div className={finaleTone === 'paper' ? 'cine-finale is-paper' : 'cine-finale'}>
           <div className="cine-finale-body">{finale}</div>
           <button type="button" className="sf-btn sf-btn--primary cine-finale-btn" onClick={onClose}>
