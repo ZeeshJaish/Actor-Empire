@@ -184,14 +184,22 @@ const WEEK_AHEAD_SLOT_KEY = 'actorEmpire.weekAhead.slowWeekMs.';
 const WEEK_AHEAD_FORCE_KEY = 'actorEmpire.weekAhead.force';
 /* Memory (2026-11-12, Redmi test): the worker holds a second copy of the career (+65–220 MB on a 66 MB career).
    Week Ahead runs only where the device reports 4 GB of memory or more (navigator.deviceMemory: Android WebView,
-   Chrome). Where the device does not report it (the iOS WebView), it stays off until it is tested there. */
+   Chrome). The iOS WebView does not report it, so the iOS app writes the phone's RAM in GiB into
+   window.__aeDeviceMemoryGB (ios/App/App/ViewController.swift). iOS closes a WebView that uses too much memory
+   sooner than Android does, so iPhones need 6 GB or more (a 6 GB iPhone reports about 5.4 GiB, a 4 GB one 3.7). */
 const WEEK_AHEAD_MIN_DEVICE_GB = 4;
+const WEEK_AHEAD_MIN_IOS_GIB = 5;
 const deviceAffordsWeekAhead = (): boolean => {
     const gb = Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory);
-    return Number.isFinite(gb) && gb >= WEEK_AHEAD_MIN_DEVICE_GB;
+    if (Number.isFinite(gb) && gb > 0) return gb >= WEEK_AHEAD_MIN_DEVICE_GB;
+    const iosGiB = Number((window as Window & { __aeDeviceMemoryGB?: number }).__aeDeviceMemoryGB);
+    return Number.isFinite(iosGiB) && iosGiB >= WEEK_AHEAD_MIN_IOS_GIB;
 };
+/* After a memory warning from the system (iOS didReceiveMemoryWarning → 'actor-empire-memory-warning'), Week Ahead
+   stays off until the app restarts: the worker's copy of the career is the first memory the game can give back. */
+let weekAheadOffForSession = false;
 const readWeekAheadWanted = (slot: number | null): boolean => {
-    if (!slot || typeof Worker !== 'function') return false;
+    if (!slot || typeof Worker !== 'function' || weekAheadOffForSession) return false;
     try {
         const forced = localStorage.getItem(WEEK_AHEAD_FORCE_KEY);
         if (forced === 'on') return true;
@@ -1601,6 +1609,16 @@ export const App: React.FC = () => {
   useEffect(() => {
     setWeekAheadOn(gameStatus === 'PLAYING' && readWeekAheadWanted(currentSlot));
   }, [gameStatus, currentSlot]);
+  useEffect(() => {
+    const stopWeekAheadOnMemoryWarning = () => {
+      if (weekAheadOffForSession) return;
+      weekAheadOffForSession = true;
+      addBreadcrumb('week_ahead:off_memory_warning', {});
+      setWeekAheadOn(false);
+    };
+    window.addEventListener('actor-empire-memory-warning', stopWeekAheadOnMemoryWarning);
+    return () => window.removeEventListener('actor-empire-memory-warning', stopWeekAheadOnMemoryWarning);
+  }, []);
   useEffect(() => {
     if (!weekAheadOn || gameStatus !== 'PLAYING' || !currentSlot) return;
     const saveKey = `actorEmpireSave_${currentSlot}`;

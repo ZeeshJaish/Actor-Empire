@@ -132,7 +132,7 @@ assert(androidMetadata.includes('"versionCode": 28'), 'Android output metadata v
 assert(androidMetadata.includes('"versionName": "1.0.28"'), 'Android output metadata versionName must be 1.0.28 (rewritten by the release build)');
 
 const iosProject = read('ios/App/App.xcodeproj/project.pbxproj');
-assert((iosProject.match(/CURRENT_PROJECT_VERSION = 28;/g) || []).length >= 2, 'iOS build number must be 28');
+assert((iosProject.match(/CURRENT_PROJECT_VERSION = 29;/g) || []).length >= 2, 'iOS build number must be 29 (1.0.28 build 28 was replaced by 29 with Week Ahead on iPhone)');
 assert((iosProject.match(/MARKETING_VERSION = 1.0.28;/g) || []).length >= 2, 'iOS marketing version must be 1.0.28');
 
 console.log('Changelog and version audit passed.');
