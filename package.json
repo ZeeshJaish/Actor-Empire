@@ -1,7 +1,7 @@
 {
   "name": "pr-6.6.3",
   "private": true,
-  "version": "1.0.27",
+  "version": "1.0.28",
   "type": "module",
   "scripts": {
     "audit:fictional-names": "node scripts/run-fictional-name-audit.mjs",

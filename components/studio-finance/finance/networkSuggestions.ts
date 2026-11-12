@@ -42,7 +42,14 @@ export type NetworkSuggestionResult = { status: 'READY'; proposal: NetworkSugges
 export interface NetworkSuggestionControl {
   signal?: AbortSignal;
   onProgress?: (progress: { evaluated: number; maximum: number }) => void;
+  /** 2026-11-12 (player reports: "Suggest network buffers forever"): wall-clock budget for the whole
+      comparison. On a late career each candidate's canonical quote can take seconds on a phone; past
+      the budget the best plan found so far is returned as a partial suggestion. */
+  timeBudgetMs?: number;
+  /** Clock for tests. */
+  now?: () => number;
 }
+export const NETWORK_SUGGESTION_TIME_BUDGET_MS = 20_000;
 export type NetworkSuggestionValidation = { ok: true; patch: Pick<BuildDraft, 'facilities' | 'rehearsal'> }
   | { ok: false; message: string };
 
@@ -191,18 +198,34 @@ export async function createNetworkSuggestion(data: BuildData, draft: BuildDraft
     const maximum = regions.length * sizes.length * 9;
     let evaluated = 0;
     let capLimited = false;
+    let timeLimited = false;
+    const clock = control.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
+    const startedAt = clock();
+    const budgetMs = control.timeBudgetMs ?? NETWORK_SUGGESTION_TIME_BUDGET_MS;
     const generatedByRegion = new Map<string, Facility[]>();
-    for (const region of regions) {
+    for (const [regionIndex, region] of regions.entries()) {
       let regionBest = best;
       let regionDraft = bestDraft;
       let regionRooms: Facility[] = [];
       const others = [...retained, ...[...generatedByRegion.values()].flat()];
+      /* Each region gets its share of the budget; time a region does not use passes on. */
+      const regionDeadline = startedAt + budgetMs * (regionIndex + 1) / regions.length;
+      /* A mix whose smaller size was already complete (or already over a limit) cannot do better at a
+         larger size: it only costs more. Skipping those keeps the result identical and saves the most
+         expensive candidates. In Premium a larger size still counts while it can add a city (up to 2). */
+      const settledMix = new Set<number>();
       // Use each real listing as authorized by BuildData; never turn a research
       // listing into an available room, or fabricate a fallback career facility.
-      for (const size of sizes) for (let mix = 0; mix < 9; mix += 1) {
+      regionSearch: for (const size of sizes) for (let mix = 0; mix < 9; mix += 1) {
         control.onProgress?.({ evaluated, maximum });
         await yieldWork();
         if (control.signal?.aborted) return { status: 'CANCELLED' };
+        if (settledMix.has(mix)) { evaluated += 1; continue; }
+        if (clock() > regionDeadline) {
+          timeLimited = true;
+          evaluated = (regionIndex + 1) * sizes.length * 9;
+          break regionSearch;
+        }
         const setup: RegionSetup = emptySetup();
         if (mix < 3) setup.servers[(['SCOUT', 'WORKHORSE', 'TITAN'] as const)[mix]] = size;
         else if (mix < 6) setup.cloud = { provider: CLOUD_PROVIDER_IDS[mix - 3], compute: size };
@@ -231,10 +254,12 @@ export async function createNetworkSuggestion(data: BuildData, draft: BuildDraft
         evaluated += 1;
         if (structuralError(data, draft, request, candidate)) continue;
         const current = evidence(data, candidate, multiplier);
-        if (!affordable(data, request, current)) { capLimited = true; continue; }
+        /* over a limit here means over it at every larger size of this mix too */
+        if (!affordable(data, request, current)) { capLimited = true; settledMix.add(mix); continue; }
         const cost = (value: Evidence) => value.upfront + value.weekly * (request.mode === 'BUDGET' ? 52 : 26);
         const diversity = (value: Evidence) => request.mode === 'PREMIUM' ? Math.min(2, value.regional[region.id]?.cities ?? 0) : 0;
         const currentRegional = current.regional[region.id];
+        if (currentRegional?.complete && (request.mode !== 'PREMIUM' || diversity(current) >= 2)) settledMix.add(mix);
         const bestRegional = regionBest.regional[region.id];
         const currentScore = (currentRegional?.score ?? 0) + diversity(current) * .001;
         const bestScore = (bestRegional?.score ?? 0) + diversity(regionBest) * .001;
@@ -255,6 +280,7 @@ export async function createNetworkSuggestion(data: BuildData, draft: BuildDraft
     if (inputIdentity(data, draft, request) !== identity) return fail('Inputs changed while generating. Generate again.');
     if (!affordable(data, request, best)) return fail('The current quote exceeds a limit. Generate again.');
     const warnings: string[] = [];
+    if (timeLimited) warnings.push(`Partial suggestion: the comparison stopped after ${Math.round(budgetMs / 1000)} seconds to keep the game responsive. Apply it and add the rest by hand, or generate again.`);
     if (!best.complete) warnings.push('Partial suggestion: no complete plan was found in the bounded comparison.');
     const gaps = best.services.filter(service => !countryServiceCoverageValid(service) || service.coveredShare < .999999);
     if (gaps.length) warnings.push(`${gaps.length} markets still have service gaps. Check the regions below for geography, local capacity or site limits.`);

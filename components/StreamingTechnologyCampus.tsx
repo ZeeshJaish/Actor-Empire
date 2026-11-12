@@ -541,7 +541,7 @@ export default function StreamingTechnologyCampus({
         <article><UsersRound size={19} /><span>Engineering capacity</span><strong>{campus.availableEngineeringStaff} staff</strong><small>Derived from the active stack and CTO</small></article>
         <article><Wrench size={19} /><span>Installed projects</span><strong>{campus.completedProjectCount}</strong><small>Permanent company technology</small></article>
         <article><WalletCards size={19} /><span>Campus run rate</span><strong>{formatMoney(campus.totalWeeklyOperatingCost)}/wk</strong><small>Added to weekly operations</small></article>
-        <article className={campus.technicalDebt >= 20 ? 'is-warning' : ''}><AlertTriangle size={19} /><span>Technical debt</span><strong>{campus.technicalDebt}</strong><small>Reduces service health until hardened</small></article>
+        <article className={campus.technicalDebt >= 20 ? 'is-warning' : ''}><AlertTriangle size={19} /><span>Technical debt</span><strong>{campus.technicalDebt}</strong><small>{/* 2026-11-12 (player question: "what removes tech debt after launch?") */}Lowers service health. Projects that harden or refactor cut it; launching does not</small></article>
       </section>
     </>
   );

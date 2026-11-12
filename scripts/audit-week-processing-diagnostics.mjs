@@ -128,8 +128,13 @@ for (const stage of requiredStages) {
   }
 }
 
-if (!appSource.includes('persistCurrentSlotSnapshot(syncedPlayerState, {')) {
-  failures.push('Age Up flow must pass the week run id into persistence diagnostics.');
+// Week Ahead (2026-11-12): the week is saved on one of two paths (the prepared week, or the week App plays);
+// both pass the week run id into persistence diagnostics.
+for (const call of ['persistCurrentSlotSnapshot(sync.player, {', 'persistCurrentSlotSnapshot(preparedWeekPlayer, {']) {
+  const at = appSource.indexOf(call);
+  if (at < 0 || !appSource.slice(at, at + 200).includes('runId: weekRunId')) {
+    failures.push(`Age Up flow must pass the week run id into persistence diagnostics (${call}).`);
+  }
 }
 
 if (failures.length > 0) {

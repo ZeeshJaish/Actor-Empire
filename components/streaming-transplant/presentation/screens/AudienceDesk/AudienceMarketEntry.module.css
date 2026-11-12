@@ -15,7 +15,9 @@
 @keyframes entryIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
 /* ── the top bar ── */
-.top{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;padding:14px 14px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
+/* 2026-11-12 (player report: "the exit/back button is cut off and completely unusable"): the top bar
+   now clears the status bar / Dynamic Island, by the house rule */
+.top{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;padding:max(14px,calc(10px + env(safe-area-inset-top))) 14px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
 /* #139: the Audience room's back tile (.ad .adback): 34 px, the arrow centred */
 .top.top .back{display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border-radius:11px;
   background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font:400 17px/1 'Inter',system-ui,sans-serif;color:#d4dae4;

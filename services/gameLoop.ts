@@ -669,7 +669,12 @@ const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback:
    nothing left open that would keep the process alive. */
 let weekYieldChannel: MessageChannel | null = null;
 const weekYieldWaiting: Array<() => void> = [];
+/* Week Ahead (2026-11-12): the background worker has no screen to keep painting. It installs its own pause
+   here, which also lets a newer request stop a week it no longer needs. Unset on the main thread. */
+let weekProcessingYieldOverride: (() => Promise<void>) | null = null;
+export const setWeekProcessingYield = (override: (() => Promise<void>) | null): void => { weekProcessingYieldOverride = override; };
 const yieldWeekProcessingFrame = (): Promise<void> => {
+    if (weekProcessingYieldOverride) return weekProcessingYieldOverride();
     const host = globalThis as {
         scheduler?: { yield?: () => Promise<void> };
         setImmediate?: (callback: () => void) => unknown;

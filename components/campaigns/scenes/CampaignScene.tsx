@@ -98,6 +98,8 @@ export const CampaignScene: React.FC<{
       glow.current.height = scene.height;
       glow.current.getContext('2d')!.drawImage(source, 0, 0);
     };
+    /* a format card draws no light show (see the canvases below): nothing to read or draw */
+    if (compact && scene.kind !== 'QUAD') return undefined;
     if (scene.kind === 'DRONES') {
       if (!led.current || !reflection.current) return undefined;
       fleet.current = droneFleet(scene, label, hue);
@@ -296,9 +298,14 @@ export const CampaignScene: React.FC<{
             {scene.kind !== 'QUAD' && (
               <>
                 {scene.kind !== 'DRONES' && <i className={css.skyGlow} ref={sky} style={tint} />}
-                <canvas className={css.ledReflection} ref={reflection} />
+                {/* 2026-11-12 (player reports: the campaign list crashes and reloads while scrolling, "as many
+                    times you do"): a format card (compact) no longer draws the light show. Each of these
+                    canvases is scene-sized (up to 1024×1536, ~6 MB), a card held two, and a screen of
+                    landmark cards passed iOS's canvas memory limit. The card shows the landmark; the full
+                    preview still lights it. */}
+                {!compact && <canvas className={css.ledReflection} ref={reflection} />}
                 {!compact && <canvas className={css.ledGlow} ref={glow} />}
-                <canvas className={cx(css.led, scene.kind === 'DRONES' && css.drones)} ref={led} />
+                {!compact && <canvas className={cx(css.led, scene.kind === 'DRONES' && css.drones)} ref={led} />}
               </>
             )}
           </div>

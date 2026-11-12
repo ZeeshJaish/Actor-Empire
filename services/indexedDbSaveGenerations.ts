@@ -1,5 +1,5 @@
 import type {Player} from '../types';
-import type {SaveGenerationStore, SaveGenerationKeys, StoredSaveGeneration, WriteVerifiedGenerationInput} from './saveGenerations';
+import type {SaveGenerationStore, SaveGenerationKeys, StoredSaveGeneration, WriteVerifiedGenerationInput, StageVerifiedGenerationInput, StagedSaveGeneration, PromoteStagedGenerationInput} from './saveGenerations';
 import {verifySaveIntegrity, type SaveIntegrityManifest} from './saveIntegrity';
 import {waitForIndexedDbTransaction} from './indexedDbResilience';
 import {packSavePlayer, materializeSaveRecord, createImmutableSaveRecordReadBatch, SavePayloadCorruptionError} from './savePayloadBlocks';
@@ -29,8 +29,9 @@ interface SaveHead {
     newest: SlotName;
     /** Manifest digest of the copy in each slot, as written by this layer. */
     digests: Partial<Record<SlotName, string>>;
-    /** Changes on every head write, so a session can tell its own last head from anyone else's. */
-    token: string;
+    /** Changes on every head write, so a session can tell its own last head from anyone else's.
+     *  (A staged next week, below, keeps the token: only digests gains the staged slot.) */
+    token: string|null;
 }
 const isHead = (value: unknown): value is SaveHead => Boolean(value && typeof value === 'object'
     && (value as SaveHead).kind === 'ACTOR_EMPIRE_SAVE_HEAD' && (value as SaveHead).formatVersion === 1
@@ -197,6 +198,63 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
             });
         });
     };
+    /* Week Ahead (2026-11-12): a week prepared before Age Up Week is tapped is written ahead into the slot that
+       holds the older copy, read back and checked there, and the head notes its digest without making it live:
+       the live copy, the head's newest slot and its token stay as they were, so every reader and every other
+       write sees nothing new. Tapping then makes it live with promoteStagedGeneration, which only rewrites the
+       small head, and only if nothing was written since (same token, same staged digest). Until then the older
+       slot holds this prepared week instead of the week before; a later save simply writes over it. */
+    const stageVerifiedGeneration=async({keys,generation:next,expectedCandidateDigest,live}:StageVerifiedGenerationInput):Promise<StagedSaveGeneration>=>{
+        const headKey=keys.current+HEAD_SUFFIX;let staged:StagedSaveGeneration|null=null;
+        await mutate('stage verified save generation',store=>{
+            readSnapshot(store,[headKey,keys.integrity],rawHead=>{
+                const head=isHead(rawHead[0])?rawHead[0] as SaveHead:null;
+                const liveSlot:SlotName=head?.newest==='PREVIOUS'?'PREVIOUS':'CURRENT';
+                const otherSlot:SlotName=liveSlot==='CURRENT'?'PREVIOUS':'CURRENT';
+                const liveDigest=liveSlot==='CURRENT'?digestOf(rawHead[1]):head?.digests?.PREVIOUS;
+                // Only on top of the live copy the caller's session verified, with nothing written since.
+                if(!liveDigest||liveDigest!==live.digest||(head?.token??null)!==live.token){store.transaction.abort();return;}
+                if(otherSlot==='CURRENT'){store.put(next.player,keys.current);store.put(next.manifest,keys.integrity);}
+                else store.put(generation(next.player,next.manifest,next.needsRecoveryCheckpoint===true),keys.previous);
+                readSnapshot(store,otherSlot==='CURRENT'?[keys.current,keys.integrity]:[keys.previous],raw=>{
+                    prepareInTransaction(store,async()=>{
+                        let stored:unknown,manifest:unknown;
+                        if(otherSlot==='CURRENT'){stored=await materializeSaveRecord(raw[0]);manifest=raw[1];}
+                        else{const record=await materializeSaveRecord(raw[0]) as any;stored=record?.player;manifest=record?.manifest;}
+                        if(!valid(stored,manifest))throw Error('Staged generation failed independent read-back verification');
+                        if(digestOf(manifest)!==expectedCandidateDigest)throw Error('Staged generation no longer matches the requested generation');
+                        return ()=>{
+                            const token=head?.token??null;
+                            store.put({kind:'ACTOR_EMPIRE_SAVE_HEAD',formatVersion:1,newest:liveSlot,
+                                digests:{[liveSlot]:liveDigest,[otherSlot]:expectedCandidateDigest},token} satisfies SaveHead,headKey);
+                            staged={slot:otherSlot,digest:expectedCandidateDigest,token};
+                        };
+                    });
+                });
+            });
+        });
+        if(!staged)throw Error('Staged generation was not written');
+        return staged;
+    };
+    /** Makes a staged generation live by rewriting only the head, if nothing was written since it was staged. */
+    const promoteStagedGeneration=async({keys,staged}:PromoteStagedGenerationInput):Promise<{digest:string;token:string}>=>{
+        const headKey=keys.current+HEAD_SUFFIX;let committed:{digest:string;token:string}|null=null;
+        await mutate('promote staged save generation',store=>{
+            readSnapshot(store,[headKey],raw=>{
+                const head=isHead(raw[0])?raw[0] as SaveHead:null;
+                if(!head||(head.token??null)!==staged.token||head.newest===staged.slot||head.digests?.[staged.slot]!==staged.digest){store.transaction.abort();return;}
+                const kept=head.newest,keptDigest=head.digests?.[kept];
+                if(!keptDigest){store.transaction.abort();return;}
+                const token=newToken();
+                store.put({kind:'ACTOR_EMPIRE_SAVE_HEAD',formatVersion:1,newest:staged.slot,
+                    digests:{[kept]:keptDigest,[staged.slot]:staged.digest},token} satisfies SaveHead,headKey);
+                committed={digest:staged.digest,token};
+            });
+        });
+        if(!committed)throw Error('Staged generation could not be promoted');
+        verifiedLive.set(keys.current,committed);
+        return committed;
+    };
     const writeVerifiedGeneration=async({keys,generation:next,retainPrevious,expectedCandidateDigest}:WriteVerifiedGenerationInput)=>{
         const headKey=keys.current+HEAD_SUFFIX;let committed:{digest:string;token:string|null}|null=null;
         await mutate('write and verify atomic save generation',store=>{
@@ -258,9 +316,17 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
         read:async key=>(await readMany([key]))[0],readMany,
         // Physical block transport remains an opt-in experiment on its existing
         // staging path. Production keeps exactly the same plain current layout.
-        ...(options.blockPayloads?{}:{writeVerifiedGeneration}),
+        ...(options.blockPayloads?{}:{writeVerifiedGeneration,stageVerifiedGeneration,promoteStagedGeneration}),
         rememberVerifiedCurrent:(key:string,digest:string)=>{
             if(seenHeadTokens.has(key))verifiedLive.set(key,{digest,token:seenHeadTokens.get(key)??null});
+        },
+        /* Week Ahead (2026-11-12): the Week Ahead worker writes the week's save with its own store. It is handed
+           what this session has verified about the live copy (the same trust rule: the head token must still
+           match, or the copy is read and checked as before), and hands back what its write committed. */
+        exportVerifiedLive:(key:string)=>{const known=verifiedLive.get(key);return known?{...known}:null;},
+        importVerifiedLive:(key:string,info:{digest:string;token:string|null}|null)=>{
+            if(info&&typeof info.digest==='string')verifiedLive.set(key,{digest:info.digest,token:info.token??null});
+            else verifiedLive.delete(key);
         },
         write:async(key,value)=>{
             let physical=value;

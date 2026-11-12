@@ -77,8 +77,11 @@ const checks = [
   {
     name: 'medical prompts throttle minor and moderate repeat alerts',
     pass: () => {
-      const source = read('App.tsx');
-      return source.includes('getMedicalPromptCooldownWeeks')
+      // Week Ahead (2026-11-12): the post-week step moved, unchanged, to postWeekSync.ts; App runs it after the week.
+      const app = read('App.tsx');
+      const source = read('services/weekAhead/postWeekSync.ts');
+      return app.includes('syncPlayerAfterWeek(newPlayerState, previousHealthConditionIds)')
+        && source.includes('getMedicalPromptCooldownWeeks')
         && source.includes('getMedicalPromptSeverityRank')
         && source.includes('lastMedicalPromptAbsoluteWeek')
         && source.includes('promptCooldownWeeks === 0')

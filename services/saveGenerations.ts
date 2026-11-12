@@ -37,6 +37,27 @@ export interface WriteVerifiedGenerationInput {
     expectedCandidateDigest: string;
 }
 
+/** Week Ahead (2026-11-12): a generation written ahead into the older slot, not live yet. */
+export interface StagedSaveGeneration {
+    slot: 'CURRENT' | 'PREVIOUS';
+    digest: string;
+    /** The head token when it was staged; any later write changes or removes it. */
+    token: string | null;
+}
+
+export interface StageVerifiedGenerationInput {
+    keys: SaveGenerationKeys;
+    generation: StoredSaveGeneration;
+    expectedCandidateDigest: string;
+    /** The live copy this session verified: it must still be the live one, with the same head token. */
+    live: { digest: string; token: string | null };
+}
+
+export interface PromoteStagedGenerationInput {
+    keys: SaveGenerationKeys;
+    staged: StagedSaveGeneration;
+}
+
 export interface RecoverSaveGenerationInput {
     keys: SaveGenerationKeys;
 }
@@ -58,6 +79,14 @@ export interface SaveGenerationStore {
     /** Optional: tells an A/B backend that this session just verified the live copy on load,
      * so its next write need not read that copy back and check it again. */
     rememberVerifiedCurrent?(currentKey: string, digest: string): void;
+    /** Optional (Week Ahead): what this session verified about the live copy, to hand to another thread. */
+    exportVerifiedLive?(currentKey: string): { digest: string; token: string | null } | null;
+    /** Optional (Week Ahead): take over what another thread of this session verified or committed. */
+    importVerifiedLive?(currentKey: string, info: { digest: string; token: string | null } | null): void;
+    /** Optional (Week Ahead): write a verified generation ahead into the older slot without making it live. */
+    stageVerifiedGeneration?(input: StageVerifiedGenerationInput): Promise<StagedSaveGeneration>;
+    /** Optional (Week Ahead): make a staged generation live (head only), if nothing was written since. */
+    promoteStagedGeneration?(input: PromoteStagedGenerationInput): Promise<{ digest: string; token: string }>;
     remove(key: string): Promise<void>;
     promoteGeneration(input: PromoteSaveGenerationInput): Promise<void>;
     recoverGeneration(input: RecoverSaveGenerationInput): Promise<void>;
@@ -114,6 +143,43 @@ const runExclusiveSave = async <T>(
         if (queues.get(currentKey) === marker) queues.delete(currentKey);
     }
 };
+
+/** Week Ahead (2026-11-12): writes a prepared next week ahead (not live). Same candidate rule as a save. */
+export const stageVerifiedGameData = async (
+    store: SaveGenerationStore,
+    currentKey: string,
+    player: Player,
+    manifest: SaveIntegrityManifest,
+    live: { digest: string; token: string | null },
+    options: { needsRecoveryCheckpoint?: boolean } = {},
+): Promise<StagedSaveGeneration> => runExclusiveSave(store, currentKey, async () => {
+    if (!store.stageVerifiedGeneration) throw new Error('This save store cannot stage a generation.');
+    if (!wasManifestIssuedFor(player, manifest)) {
+        const initialVerification = verifySaveIntegrity(player, manifest);
+        if ('violations' in initialVerification) throw new Error(`Candidate integrity failed before staging: ${initialVerification.violations.join('; ')}`);
+    }
+    return store.stageVerifiedGeneration({
+        keys: getSaveGenerationKeys(currentKey),
+        generation: { kind: 'ACTOR_EMPIRE_SAVE_GENERATION', formatVersion: SAVE_INTEGRITY_FORMAT_VERSION, player, manifest, needsRecoveryCheckpoint: options.needsRecoveryCheckpoint === true },
+        expectedCandidateDigest: manifest.digest,
+        live,
+    });
+});
+
+/** Week Ahead (2026-11-12): makes a staged week live, if nothing was written since it was staged. */
+export const promoteStagedGameData = async (
+    store: SaveGenerationStore,
+    currentKey: string,
+    staged: StagedSaveGeneration,
+): Promise<{ digest: string; token: string }> => runExclusiveSave(store, currentKey, async () => {
+    if (!store.promoteStagedGeneration) throw new Error('This save store cannot promote a staged generation.');
+    return store.promoteStagedGeneration({ keys: getSaveGenerationKeys(currentKey), staged });
+});
+
+/** Week Ahead (2026-11-12): work on this key's save done elsewhere (the worker writes the week) waits its turn
+ *  behind saves already started here, and saves started here meanwhile wait for it. */
+export const runInSaveQueue = <T>(store: SaveGenerationStore, currentKey: string, operation: () => Promise<T>): Promise<T> =>
+    runExclusiveSave(store, currentKey, operation);
 
 const isPlayer = (value: unknown): value is Player => Boolean(
     value

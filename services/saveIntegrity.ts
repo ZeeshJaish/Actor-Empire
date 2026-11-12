@@ -123,6 +123,12 @@ const rememberIssuedManifest = (player: Player, manifest: SaveIntegrityManifest)
     if (player && typeof player === 'object') issuedManifestDigests.set(player, manifest.digest);
     return manifest;
 };
+/** Week Ahead (2026-11-12): the background worker signed this career with this manifest, and the object
+ *  arrived here as its structured copy, so the pre-write hash is skipped exactly as for a manifest issued in
+ *  this thread. The stored copy is still read back and verified inside the write transaction. */
+export const adoptIssuedManifest = (player: Player, manifest: SaveIntegrityManifest): void => {
+    rememberIssuedManifest(player, manifest);
+};
 /** True when this exact object was just signed with this manifest by createSaveIntegrityManifest
  *  or createCheckedSaveIntegrityManifest. Verification after the write is never skipped. */
 export const wasManifestIssuedFor = (player: Player, manifest: SaveIntegrityManifest): boolean => Boolean(

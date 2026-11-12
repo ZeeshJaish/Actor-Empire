@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => {
          at two bytes a character; as ASCII the browser keeps it at one, about 16 MB less memory
          from start-up on. The file grows by about 0.1 MB and the game reads the same text. */
       esbuild: { charset: 'ascii' },
+      /* Week Ahead (2026-11-12): its worker loads the game code only after the main thread's portraits arrive
+         (services/weekAhead/weekAhead.worker.ts), so workers are built as modules that can load a chunk. */
+      worker: { format: 'es' },
       server: {
         port: 3000,
         host: '0.0.0.0',

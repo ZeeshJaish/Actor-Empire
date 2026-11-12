@@ -14,6 +14,8 @@ interface Props {
   onPlaySlot?: (slotIndex: number) => void;
   /** Delete this save and keep the save-slot screen in place */
   onDeleteSlot?: (slotIndex: number) => void;
+  /** Send this slot's save, as stored, to the developer (2026-11-12) */
+  onSendToDeveloper?: (slotIndex: number) => Promise<{ ok: boolean; message: string } | void>;
   /** Import a signed transfer file on the save-slot screen */
   onImportData?: () => Promise<SaveTransferResult | void>;
   /** Create the career with the chosen options */
@@ -39,6 +41,7 @@ export default function IntroFlow({
   slots = DEMO_SLOTS,
   onPlaySlot,
   onDeleteSlot,
+  onSendToDeveloper,
   onImportData,
   onBeginCareer,
   skipIntro = false,
@@ -120,6 +123,7 @@ export default function IntroFlow({
           onPlaySlot?.(i);
         }}
         onDeleteSlot={onDeleteSlot}
+        onSendToDeveloper={onSendToDeveloper}
         onImportData={onImportData}
         onCreateNew={(i) => {
           setPendingCreateSlot(i);

@@ -9,6 +9,7 @@ import { resolveYoutubeEventChoice, YoutubeEventResolution } from '../services/y
 import { getPlayerLanguage, t } from '../services/i18n';
 import { resolveLifeEventFallback } from '../services/lifeEventFallback';
 import { generateLegalHearing } from '../services/lifeEventLogic';
+import { createCopyOnTouch } from '../services/copyOnTouch';
 
 interface LifeEventModalProps {
     player: Player;
@@ -151,21 +152,29 @@ export const LifeEventModal: React.FC<LifeEventModalProps> = ({ player, event, s
     };
 
     const applyOption = (option: LifeEventOption, idx: number) => {
-        const pCopy = JSON.parse(JSON.stringify(player));
+        /* 2026-11-12 (player report: "if something like this pops up & I choose, most of the time it crashes"):
+           this was a full JSON copy of the career; on a late career that alone could get the game killed for
+           memory. The impact gets the same freely-changeable copy, but only the parts it touches are copied
+           (services/copyOnTouch.ts). */
+        const copy = createCopyOnTouch(player);
+        const pCopy = copy.draft;
         if (player.pendingEvents) pCopy.pendingEvents = [...player.pendingEvents];
-        const impactResult = executeOptionImpact(option, idx, pCopy, Boolean(option.isGolden));
+        const rawResult = executeOptionImpact(option, idx, pCopy, Boolean(option.isGolden));
+        const impactResult = rawResult ? { ...rawResult, updatedPlayer: copy.finish(rawResult.updatedPlayer) as Player } : rawResult;
         if (impactResult) {
-            const { updatedPlayer, log, feedbackDelay, feedbackType, effects } = impactResult;
+            const { log, feedbackDelay, feedbackType, effects } = impactResult;
+            let { updatedPlayer } = impactResult;
             const localizedLog = getImpactLog(impactResult);
 
-            // Handle delayed feedback if any
+            // Handle delayed feedback if any (a new flags object: untouched parts are shared with the live career)
             if (feedbackDelay && feedbackType) {
-                if (!updatedPlayer.flags) updatedPlayer.flags = {};
-                if (!updatedPlayer.flags.pendingFeedback) updatedPlayer.flags.pendingFeedback = [];
-                updatedPlayer.flags.pendingFeedback.push({
-                    type: feedbackType,
-                    weeksLeft: feedbackDelay
-                });
+                updatedPlayer = {
+                    ...updatedPlayer,
+                    flags: {
+                        ...(updatedPlayer.flags || {}),
+                        pendingFeedback: [...(updatedPlayer.flags?.pendingFeedback || []), { type: feedbackType, weeksLeft: feedbackDelay }],
+                    },
+                };
             }
 
             setFeedback({

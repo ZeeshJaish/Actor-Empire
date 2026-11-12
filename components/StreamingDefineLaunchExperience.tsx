@@ -28,6 +28,7 @@ import { getStreamingMarketSubRegion } from '../services/streamingMarketSubRegio
 import {
   beginStreamingMarketClearance,
   getStreamingMarketClearanceView,
+  isFiledStreamingMarketOperation,
   resolveStreamingMarketRequirement,
   resumeStreamingMarketClearance,
   saveStreamingMarketPlan,
@@ -380,7 +381,11 @@ export const buildLaunchData = (player: Player, preparedContext?: StreamingCatal
     return {
       /* declined: the government's cooling period before a revised application (weeks pass with Age Up) */
       refileInWeeks: declined ? Math.max(0, (operation.clearance?.resumeAllowedAtAbsoluteWeek || 0) - absoluteWeek) : undefined,
-      canWithdraw: canLeaveOpening && !['READY', 'ACTIVE'].includes(operation.status),
+      /* 2026-11-12: an approved market can leave too (players took unservable islands off the plan
+         and could not drop them); only a live market cannot */
+      canWithdraw: canLeaveOpening && operation.status !== 'ACTIVE',
+      /* a filed opening market stays listed until it is dropped (finance/launch.ts selectedCountries) */
+      held: !operations && operation.entryKind === 'OPENING' && isFiledStreamingMarketOperation(operation),
       paid: paidByOperation.get(operation.id) || 0,
       countryId: operation.countryId!,
       outcome: mapClearanceOutcome(view.outcome, view.additionalPayment),
@@ -693,11 +698,14 @@ function OpeningLaunchExperience(props: Props) {
     const draftResult = saveStreamingDefineLaunchDraft(next, persisted);
     if (draftResult.changed) next = draftResult.player;
 
-    const desiredMarkets = [...persisted.selectedCountryIds].sort();
-    const currentMarkets = next.ownedStreamingPlatform.marketOperations
-      .filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED')
-      .map(operation => operation.countryId!)
-      .sort();
+    const liveOpening = next.ownedStreamingPlatform.marketOperations
+      .filter(operation => operation.entryKind === 'OPENING' && operation.countryId && operation.status !== 'EXITED');
+    /* 2026-11-12: a filed market stays in the opening until it is dropped, so it counts as wanted here.
+       Without it every draft save saw a difference, re-saved the plan, bumped the plan revision and sent
+       the wizard back to Markets. */
+    const heldMarkets = liveOpening.filter(isFiledStreamingMarketOperation).map(operation => operation.countryId!);
+    const desiredMarkets = [...new Set([...persisted.selectedCountryIds, ...heldMarkets])].sort();
+    const currentMarkets = liveOpening.map(operation => operation.countryId!).sort();
     if (JSON.stringify(desiredMarkets) !== JSON.stringify(currentMarkets)) {
       const marketResult = saveStreamingMarketPlan(next, desiredMarkets, 'OPENING');
       if (marketResult.changed) next = marketResult.player;

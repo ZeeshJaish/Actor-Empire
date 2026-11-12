@@ -18,6 +18,8 @@ interface StartMenuProps {
   saveSlots: Record<number, SaveSlotSummary | null>;
   onSelectSlot: (slot: number) => void;
   onDeleteSlot: (slot: number) => void;
+  /** 2026-11-12: send a slot's save, exactly as stored, to the developer */
+  onSendToDeveloper?: (slot: number) => Promise<{ ok: boolean; message: string } | void>;
   onImportData: () => Promise<SaveTransferResult | void>;
   onCreateCareerFromIntro: (data: NewCareerData, slot: number) => void;
   skipIntro?: boolean;
@@ -73,7 +75,7 @@ const toIntroSlots = (saveSlots: Record<number, SaveSlotSummary | null>): SlotEn
   })
 );
 
-export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, onDeleteSlot, onImportData, onCreateCareerFromIntro, skipIntro = false }) => {
+export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, onDeleteSlot, onSendToDeveloper, onImportData, onCreateCareerFromIntro, skipIntro = false }) => {
   const [pushStatus, setPushStatus] = useState(getFirebasePushStatus);
   const [isPushPromptDismissed, setIsPushPromptDismissed] = useState(false);
   const [isEnablingPush, setIsEnablingPush] = useState(false);
@@ -115,6 +117,7 @@ export const StartMenu: React.FC<StartMenuProps> = ({ saveSlots, onSelectSlot, o
             skipIntro={skipIntro}
             onPlaySlot={(slotIndex) => onSelectSlot(slotIndex + 1)}
             onDeleteSlot={(slotIndex) => onDeleteSlot(slotIndex + 1)}
+            onSendToDeveloper={onSendToDeveloper ? (slotIndex) => onSendToDeveloper(slotIndex + 1) : undefined}
             onImportData={onImportData}
             onBeginCareer={(data, slotIndex) => onCreateCareerFromIntro(data, slotIndex + 1)}
             /* AE-006: the alerts invite sits in the save-slot screen's flow. As a bottom overlay it covered Start on the

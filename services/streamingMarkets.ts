@@ -94,6 +94,13 @@ export const getStreamingMarketClearanceView = (operation: OwnedStreamingMarketO
     };
 };
 
+const PLAN_ONLY_MARKET_STATUSES = new Set(['NOT_ENTERED', 'EVALUATING', 'PLANNED', 'AWAITING_FUNDING']);
+/** A market with a filing on record (or past planning). A plan save never removes it: it leaves the
+ * opening only through withdrawStreamingOpeningMarket, so every screen must keep showing it. */
+export const isFiledStreamingMarketOperation = (operation: OwnedStreamingMarketOperation): boolean => (
+    !PLAN_ONLY_MARKET_STATUSES.has(operation.status) || Boolean(operation.clearance)
+);
+
 /** Selecting markets is free planning. An empty selection clears only mutable
  * plans; filed or paid market operations remain as historical commitments. A
  * country can have only one live record, regardless of entry kind. */
@@ -266,7 +273,8 @@ export const withdrawStreamingOpeningMarket = (player: Player, operationIdValue:
     const operation = platform.marketOperations.find(item => item.id === operationIdValue);
     if (!operation || operation.scope !== 'COUNTRY' || operation.entryKind !== 'OPENING' || !operation.countryId
         || platform.launchCommit || platform.infrastructureSetup || platform.openingProgrammeCommission
-        || ['READY', 'ACTIVE', 'EXITED'].includes(operation.status)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0, amount: 0 };
+        /* 2026-11-12: an approved (READY) market can leave before the commission too; only a live one cannot */
+        || ['ACTIVE', 'EXITED'].includes(operation.status)) return { player, changed: false, reason: 'INVALID_STATE', shortfall: 0, amount: 0 };
     const kept = platform.marketOperations.filter(item => item.scope === 'COUNTRY' && item.entryKind === 'OPENING' && item.status !== 'EXITED' && item.id !== operation.id);
     if (!kept.length) return { player, changed: false, reason: 'NO_MARKETS', shortfall: 0, amount: 0 };
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);

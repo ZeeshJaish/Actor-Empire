@@ -6,9 +6,22 @@ import {
     getProfilePart,
 } from './profileBuilder';
 import { exportProfilePortrait } from '../views/avatar/profilePortraitRenderer';
+import { WEEK_AHEAD_LOAD_PORTRAITS_GLOBAL } from './weekAhead/weekAheadProtocol';
 
 const avatarCache = new Map<string, string>();
 const MAX_GENERATED_AVATARS = 96;
+
+/* Week Ahead (2026-11-12): the background worker that prepares the next week has no canvas, so its portraits
+   must be the main thread's. The main thread keeps every portrait it hands out here (the strings the NPCs
+   already hold; no extra copies) and gives them to the worker before the worker loads the game code. While
+   the worker loads, and while it runs a week, a provider answers here instead: a portrait the main thread
+   handed out, or a pending mark the main thread replaces with its portrait before that week is saved. */
+type GeneratedAvatarProvider = (gender: Gender, nameSeed: string, cacheKey: string) => string;
+let generatedAvatarProvider: GeneratedAvatarProvider | null = null;
+export const setGeneratedAvatarProvider = (provider: GeneratedAvatarProvider | null): void => { generatedAvatarProvider = provider; };
+const handedOutPortraits = new Map<string, string>();
+/** The main thread's portraits by cache key, for the Week Ahead worker. */
+export const getHandedOutPortraits = (): Array<[string, string]> => [...handedOutPortraits];
 
 export const clearGeneratedAvatarCache = (): void => { avatarCache.clear(); };
 export const getGeneratedAvatarCacheSize = (): number => avatarCache.size;
@@ -79,11 +92,7 @@ ${mouth}
     return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-/** The shared portrait source for every NPC-facing surface. */
-export const getGenderedAvatar = (gender: Gender, nameSeed: string): string => {
-    const seed = nameSeed.replace(/\s/g, '');
-    const profileGender = toProfileBuilderGender(gender);
-    const cacheKey = `${profileGender}:${seed}`;
+const drawGenderedAvatar = (profileGender: ProfileBuilderGender, seed: string, cacheKey: string): string => {
     const cached = avatarCache.get(cacheKey);
     if (cached) {
         avatarCache.delete(cacheKey);
@@ -102,4 +111,17 @@ export const getGenderedAvatar = (gender: Gender, nameSeed: string): string => {
 
     const portrait = createFallbackPortrait(profileGender, seed);
     return rememberGeneratedAvatar(cacheKey, portrait);
+};
+
+/** The shared portrait source for every NPC-facing surface. */
+export const getGenderedAvatar = (gender: Gender, nameSeed: string): string => {
+    const seed = nameSeed.replace(/\s/g, '');
+    const profileGender = toProfileBuilderGender(gender);
+    const cacheKey = `${profileGender}:${seed}`;
+    const provider = generatedAvatarProvider
+        || ((globalThis as Record<string, unknown>)[WEEK_AHEAD_LOAD_PORTRAITS_GLOBAL] as GeneratedAvatarProvider | undefined);
+    if (provider) return provider(gender, nameSeed, cacheKey);
+    const portrait = drawGenderedAvatar(profileGender, seed, cacheKey);
+    if (typeof document !== 'undefined') handedOutPortraits.set(cacheKey, portrait);
+    return portrait;
 };

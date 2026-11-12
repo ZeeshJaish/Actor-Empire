@@ -63,7 +63,7 @@ import {
 } from './services/rewardedAdRecovery';
 import { clearEventReward, eventRewardKey, readEventReward } from './services/eventRewardAd';
 import { ensureTrackingPermission } from './services/trackingService';
-import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousGameData, recoverPreviousGameData, saveVerifiedGameData, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
+import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, getVerifiedLiveSave, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousGameData, recoverPreviousGameData, runInVerifiedSaveQueue, saveVerifiedGameData, setVerifiedLiveSave, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { getStreamingEstate, handoffOwnedStreamingPlatformToHeir, type StreamingHandoffChoice } from './services/streamingLegacy';
 import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, hasPremiumProduct, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
@@ -86,18 +86,22 @@ import { applyIndustryMediaCampaignParticipation } from './services/industryWorl
 import { yieldForWeekProcessingPaint } from './services/weekProcessingScheduler';
 import { describeWeekProcessingFailure } from './services/weekProcessingRecovery';
 import { checkpointNativeMemoryPressure } from './services/nativeMemoryCheckpoint';
-import { exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
+import { exportSaveSlotForSupport, exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
+import { noteSessionClean, noteSessionLive, takeUncleanPreviousSession } from './services/sessionBreadcrumb';
+import { createCopyOnTouch } from './services/copyOnTouch';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
 import { externalizeCustomPostersInPlayer, hasEmbeddedCustomPosters } from './services/customPosterMedia';
 import { compactPlayerForPersistence } from './services/saveCompaction';
 import { prepareLocalStorageMirror } from './services/saveMirror';
 import { estimateSaveJsonBytes, prepareVerifiedPlayerForPersistence } from './services/savePreparation';
-import type { SaveIntegrityReason } from './services/saveIntegrity';
+import { adoptIssuedManifest, type SaveIntegrityManifest, type SaveIntegrityReason } from './services/saveIntegrity';
 import { buildAvailableNewPlayerTutorialState, writeNewPlayerTutorialState, type NewPlayerTutorialState } from './services/newPlayerTutorial';
 import { acceptOutsideProducerInvestmentOffer, counterOutsideProducerInvestmentOffer } from './services/outsideProductions';
 import { PHASE_ONE_ENERGY_COSTS } from './services/energyCosts';
 import { detectDeviceGameLanguage, getPlayerLanguage, isSupportedGameLanguage, t } from './services/i18n';
-import { getHealthConditionLabel } from './services/healthConditions';
+import { syncPlayerAfterWeek, type PostWeekSync } from './services/weekAhead/postWeekSync';
+import { createWeekAheadBrowserWorker, createWeekAheadClient, type WeekAheadClient, type WeekAheadTake, type WeekAheadWriteOutcome } from './services/weekAhead/weekAheadClient';
+import { applyNpcChanges } from './services/weekAhead/weekAheadEngine';
 import { applyProjectPromotionAttribution } from './services/projectPromotionAttribution';
 import { quoteRealEstateSale } from './services/realEstateLogic';
 import {
@@ -152,20 +156,6 @@ type PendingWeekProcessingFailure = {
   failures: string[];
 };
 
-const getMedicalPromptCooldownWeeks = (severity?: string) => {
-  if (severity === 'MINOR') return 2;
-  if (severity === 'MODERATE') return 4;
-  return 0;
-};
-
-const getMedicalPromptSeverityRank = (severity?: string) => {
-  if (severity === 'CRITICAL') return 4;
-  if (severity === 'SEVERE') return 3;
-  if (severity === 'MODERATE') return 2;
-  if (severity === 'MINOR') return 1;
-  return 0;
-};
-
 const PREGNANCY_TERM_WEEKS = 39;
 const WHATS_NEW_STORAGE_KEY = 'actorEmpireSeenWhatsNewVersion';
 const PREMIUM_ENTITLEMENTS_STORAGE_KEY = 'actorEmpirePremiumEntitlements';
@@ -185,6 +175,36 @@ const getAutosaveDelayMs = (lastAutosaveMs: number, unsavedForMs: number): numbe
     return Math.max(AUTOSAVE_DEBOUNCE_MS, Math.min(quiet, longest - unsavedForMs));
 };
 const PLAYTIME_FLUSH_INTERVAL_MS = 60_000;
+/* Week Ahead (2026-11-12): on a career whose week takes the device 0.9 s or more, a background worker prepares
+   the next week while the player reads the current one (services/weekAhead). It is switched on per save slot
+   by the last week this device ran itself; 'on'/'off' in actorEmpire.weekAhead.force overrides that for tests. */
+const WEEK_AHEAD_MIN_WEEK_MS = 900;
+const WEEK_AHEAD_TAKE_TIMEOUT_MS = 90_000;
+const WEEK_AHEAD_SLOT_KEY = 'actorEmpire.weekAhead.slowWeekMs.';
+const WEEK_AHEAD_FORCE_KEY = 'actorEmpire.weekAhead.force';
+/* Memory (2026-11-12, Redmi test): the worker holds a second copy of the career (+65–220 MB on a 66 MB career).
+   Week Ahead runs only where the device reports 4 GB of memory or more (navigator.deviceMemory: Android WebView,
+   Chrome). Where the device does not report it (the iOS WebView), it stays off until it is tested there. */
+const WEEK_AHEAD_MIN_DEVICE_GB = 4;
+const deviceAffordsWeekAhead = (): boolean => {
+    const gb = Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory);
+    return Number.isFinite(gb) && gb >= WEEK_AHEAD_MIN_DEVICE_GB;
+};
+const readWeekAheadWanted = (slot: number | null): boolean => {
+    if (!slot || typeof Worker !== 'function') return false;
+    try {
+        const forced = localStorage.getItem(WEEK_AHEAD_FORCE_KEY);
+        if (forced === 'on') return true;
+        if (forced === 'off') return false;
+        if (!deviceAffordsWeekAhead()) return false;
+        return Number(localStorage.getItem(WEEK_AHEAD_SLOT_KEY + slot)) >= WEEK_AHEAD_MIN_WEEK_MS;
+    } catch {
+        return false;
+    }
+};
+const rememberSlotWeekMs = (slot: number, weekMs: number) => {
+    try { localStorage.setItem(WEEK_AHEAD_SLOT_KEY + slot, String(Math.round(weekMs))); } catch { /* optional */ }
+};
 /* Zedbury Studios ident — the approved timing, kept verbatim from the design:
    the mark holds for 1150ms, then fades out over 320ms. The frame it leaves is
    black, which is already the loading screen's frame, so no transition device
@@ -732,7 +752,34 @@ export const App: React.FC = () => {
   const [iosPurchaseUpdatesWaiting, setIosPurchaseUpdatesWaiting] = useState(0);
   /* Android: Play reported a purchase with none open in the game (a pending payment completed); collected like Restore */
   const [androidPurchaseUpdatesWaiting, setAndroidPurchaseUpdatesWaiting] = useState(0);
+  const weekAheadRef = useRef<WeekAheadClient | null>(null);
+  const weekAheadFocusRef = useRef(false);
+  const [weekAheadOn, setWeekAheadOn] = useState(false);
   const rewardAdGrantInFlightRef = useRef<Set<string>>(new Set());
+  /* 2026-11-12 (F9): a session that ended while the game was open (a memory kill) is reported once on
+     the next start, with its last screen, save time and memory (services/sessionBreadcrumb.ts) */
+  useEffect(() => {
+    const previous = takeUncleanPreviousSession();
+    if (previous) {
+      recordNonFatal(new Error('The previous session ended while the game was open'), 'session_ended_unexpectedly', {
+        last_screen: previous.screen || 'unknown',
+        last_week: previous.week || 'unknown',
+        last_save_ms: previous.lastSaveMs ?? -1,
+        last_heap_mb: previous.heapMb ?? -1,
+        minutes_ago: Math.round((Date.now() - previous.at) / 60_000),
+        last_version: previous.version || 'unknown',
+      });
+    }
+    noteSessionLive({ version: APP_DISPLAY_VERSION });
+    const onVisibility = () => (document.visibilityState === 'hidden' ? noteSessionClean() : noteSessionLive());
+    window.addEventListener('pagehide', noteSessionClean);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', noteSessionClean);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+  useEffect(() => { noteSessionLive({ screen: gameStatus }); }, [gameStatus]);
   useEffect(() => {
     const shell = shellRef.current;
     const viewport = window.visualViewport;
@@ -874,6 +921,9 @@ export const App: React.FC = () => {
           sourceByteEstimate?: number;
           /** Internal: this is the one retry after a failed write. */
           retriedWrite?: boolean;
+          /** Week Ahead: nextPlayer is already prepared (compacted and signed) by the worker with this manifest;
+           *  alreadyWritten: the worker also wrote it as this slot's save (read back and checked there). */
+          preparedWeek?: { manifest: SaveIntegrityManifest; retainPrevious: boolean; needsRecoveryCheckpoint: boolean; alreadyWritten?: boolean };
       } = {}
   ): Promise<Player> => {
       if (options.weekDiagnostic) {
@@ -886,10 +936,20 @@ export const App: React.FC = () => {
       }
       let prepared: ReturnType<typeof prepareVerifiedPlayerForPersistence>;
       try {
-          prepared = prepareVerifiedPlayerForPersistence(nextPlayer, options.reason || 'AUTOSAVE', {
-              currentIsUnverified: options.currentIsUnverified === true,
-              sourceByteEstimate: options.sourceByteEstimate,
-          });
+          prepared = options.preparedWeek
+              ? {
+                  player: nextPlayer,
+                  manifest: options.preparedWeek.manifest,
+                  comparison: { ok: true },
+                  estimatedSourceBytes: null,
+                  oversizedLegacy: false,
+                  retainPrevious: options.preparedWeek.retainPrevious,
+                  needsRecoveryCheckpoint: options.preparedWeek.needsRecoveryCheckpoint,
+              }
+              : prepareVerifiedPlayerForPersistence(nextPlayer, options.reason || 'AUTOSAVE', {
+                  currentIsUnverified: options.currentIsUnverified === true,
+                  sourceByteEstimate: options.sourceByteEstimate,
+              });
       } catch (error) {
           recordNonFatal(error, 'save_preparation_integrity_failed', {
               slot,
@@ -921,10 +981,12 @@ export const App: React.FC = () => {
           });
       }
       try {
-          await saveVerifiedGameData(`actorEmpireSave_${slot}`, playerToSave, prepared.manifest, {
-              retainPrevious: prepared.retainPrevious,
-              needsRecoveryCheckpoint: prepared.needsRecoveryCheckpoint,
-          });
+          if (!options.preparedWeek?.alreadyWritten) {
+              await saveVerifiedGameData(`actorEmpireSave_${slot}`, playerToSave, prepared.manifest, {
+                  retainPrevious: prepared.retainPrevious,
+                  needsRecoveryCheckpoint: prepared.needsRecoveryCheckpoint,
+              });
+          }
       } catch (error) {
           recordNonFatal(error, 'verified_save_failed', {
               slot,
@@ -1005,12 +1067,14 @@ export const App: React.FC = () => {
   const persistCurrentSlotSnapshot = async (
       nextPlayer: Player,
       weekDiagnostic?: { runId: string; screen: string; onStage?: (stage: string) => void },
+      preparedWeek?: { manifest: SaveIntegrityManifest; retainPrevious: boolean; needsRecoveryCheckpoint: boolean; alreadyWritten?: boolean },
   ): Promise<Player> => {
       if (!currentSlot) return preparePlayerForPersistence(nextPlayer);
       const playerToSave = await persistSlotSave(currentSlot, nextPlayer, {
           rethrow: true,
           weekDiagnostic,
           reason: 'PROCESS_WEEK',
+          preparedWeek,
       });
       setSaveSlots(prev => ({ ...prev, [currentSlot]: playerToSave }));
       return playerToSave;
@@ -1531,6 +1595,49 @@ export const App: React.FC = () => {
     };
   }, [activePage, currentSlot, gameStatus]);
 
+  /* Week Ahead (2026-11-12): a slot whose week takes this device 0.9 s or more gets a background worker that
+     prepares the next week while the player reads (services/weekAhead). It starts once the career is open,
+     never on a tap, and stops when the career closes. */
+  useEffect(() => {
+    setWeekAheadOn(gameStatus === 'PLAYING' && readWeekAheadWanted(currentSlot));
+  }, [gameStatus, currentSlot]);
+  useEffect(() => {
+    if (!weekAheadOn || gameStatus !== 'PLAYING' || !currentSlot) return;
+    const saveKey = `actorEmpireSave_${currentSlot}`;
+    const client = createWeekAheadClient(
+      createWeekAheadBrowserWorker,
+      (event, detail) => addBreadcrumb(event, detail || {}),
+      // The prepared week is written ahead on top of the live copy this session verified (none: written on the tap).
+      () => { const live = getVerifiedLiveSave(saveKey); return live ? { key: saveKey, live } : null; },
+    );
+    weekAheadRef.current = client;
+    client.setOnHome(weekAheadFocusRef.current);
+    client.noteCareer(playerRef.current);
+    return () => {
+      client.dispose();
+      if (weekAheadRef.current === client) weekAheadRef.current = null;
+    };
+  }, [weekAheadOn, gameStatus, currentSlot]);
+  useEffect(() => {
+    if (!weekProcessingLockRef.current) weekAheadRef.current?.noteCareer(player);
+  }, [player]);
+  /* Age Up Week can be tapped only on Home with no decision open: the next week is prepared only then (battery
+     and heat; services/weekAhead). The same open-decision test as the week-break ad (setForcedAdContext). */
+  const weekAheadFocus = activePage === Page.HOME && !(
+      player.pendingEvents?.length || player.pendingEvent || showDebtModal || pendingMedicalPrompt
+      || pendingBabyNaming || activeSocialEvent || activePressEvent || showProtectionPrompt
+  );
+  weekAheadFocusRef.current = weekAheadFocus;
+  useEffect(() => {
+    weekAheadRef.current?.setOnHome(weekAheadFocus);
+  }, [weekAheadFocus, weekAheadOn, gameStatus, currentSlot]);
+  useEffect(() => {
+    // No background weeks while the app is in the background (battery and heat).
+    const onVisibility = () => weekAheadRef.current?.setHidden(document.visibilityState === 'hidden');
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
   // Auto-save logic
   useEffect(() => {
     if (autosaveTimerRef.current) {
@@ -1562,6 +1669,7 @@ export const App: React.FC = () => {
         const saveStartedAt = performance.now();
         void persistSlotSave(currentSlot, player).finally(() => {
             lastAutosaveMsRef.current = performance.now() - saveStartedAt;
+            noteSessionLive({ lastSaveMs: Math.round(lastAutosaveMsRef.current), week: `${player.age}:${player.currentWeek}` });
         });
         autosaveTimerRef.current = null;
     }, autosaveDelay);
@@ -1755,13 +1863,19 @@ export const App: React.FC = () => {
                     } catch { /* An incompatible previous save must not replace the current original. */ }
                 }
             }
-            recordNonFatal(error, 'selected_save_load_failed', { save_slot: slot });
+            /* 2026-11-12 (player reports: "inconsistent stock register" on 1.0.27): say which holding and
+               which rule, in Crashlytics and on screen, so a blocked career can be diagnosed and repaired */
+            const stockIssues = isStockSaveRecoveryError(error)
+                ? error.issues.slice(0, 4).map(issue => `${issue.code}:${issue.stockId || 'wallet'}`).join(',')
+                : '';
+            recordNonFatal(error, 'selected_save_load_failed', { save_slot: slot, ...(stockIssues ? { stock_issues: stockIssues } : {}) });
             setCurrentSlot(null);
             setToastMessage({
                 title: 'Save Could Not Open',
-                subtext: error instanceof Error
+                subtext: (error instanceof Error
                     ? error.message
-                    : 'Your save was left untouched. Please try opening this slot again.',
+                    : 'Your save was left untouched. Please try opening this slot again.')
+                    + (stockIssues ? ` (${stockIssues}). Nothing was changed. Use Send to developer on this slot so we can repair it.` : ''),
             });
             return;
         } finally {
@@ -1811,6 +1925,18 @@ export const App: React.FC = () => {
     if (isRecoveringSave) return;
     setPendingSaveRecovery(null);
     setCurrentSlot(null);
+  };
+
+  /* 2026-11-12: a slot's save exactly as stored (it never opens it), so even a career that cannot
+     open can reach the developer for repair */
+  const handleSendSlotToDeveloper = async (slot: number) => {
+    const storageKey = saveSlotSummaries[slot]?.storageKey || `actorEmpireSave_${slot}`;
+    try {
+      return await exportSaveSlotForSupport(storageKey, slot);
+    } catch (error) {
+      recordNonFatal(error, 'support_save_export_failed', { save_slot: slot });
+      throw error;
+    }
   };
 
   const handleDeleteSlot = async (slot: number) => {
@@ -2235,8 +2361,10 @@ export const App: React.FC = () => {
       setPlayer(prepared);
   };
 
-  const commitProcessedWeekPlayer = (processedPlayer: Player) => {
-      setPlayer(prepareProcessedWeekForUi(processedPlayer));
+  const commitProcessedWeekPlayer = (processedPlayer: Player): Player => {
+      const onScreen = prepareProcessedWeekForUi(processedPlayer);
+      setPlayer(onScreen);
+      return onScreen;
   };
 
   const handleQueueBabyNamingCheat = () => {
@@ -2429,134 +2557,152 @@ export const App: React.FC = () => {
           week: player.currentWeek,
           screen: activePage,
         });
-        activeWeekStageRef.current = 'game_loop_start';
-        markWeekProcessingStage('game_loop_start', player, {
-            run_id: weekRunId,
-            screen: activePageName,
-            save_slot: currentSlot,
-        });
-        const { player: newPlayerState, triggerAd } = await processGameWeek(player, {
-            onStage: (stage, context) => {
-                activeWeekStageRef.current = `loop_${stage}`;
-                markWeekProcessingStage(`loop_${stage}`, player, {
-                    ...context,
-                    run_id: weekRunId,
+        /* Week Ahead (2026-11-12): when the background worker has prepared this exact career's week (or is still
+           preparing it), that week is taken. It was played, finished and prepared for saving by the same code App
+           runs below, on a structured copy, and it is saved here through the same verified path (written, read
+           back, checked) before it is shown, so a closed app never shows a week that was not saved. Otherwise, or
+           if anything about it fails, App plays the week itself exactly as before. */
+        const weekAhead = weekAheadRef.current;
+        const weekSaveKey = `actorEmpireSave_${currentSlot}`;
+        let aheadTaken: WeekAheadTake | null = null;
+        let aheadWritten: WeekAheadWriteOutcome | null = null;
+        if (weekAhead && currentSlot) {
+            activeWeekStageRef.current = 'week_ahead_take';
+            markWeekProcessingStage('week_ahead_take', player, {
+                run_id: weekRunId,
+                screen: activePageName,
+                save_slot: currentSlot,
+            });
+            // The worker writes the week as this slot's save while this thread reads it. This slot's save queue
+            // is held until that write is confirmed, so no other save of the slot can land before or across it.
+            aheadTaken = await runInVerifiedSaveQueue(weekSaveKey, async () => {
+                const taken = await weekAhead.take(player, WEEK_AHEAD_TAKE_TIMEOUT_MS, { key: weekSaveKey, live: getVerifiedLiveSave(weekSaveKey) });
+                if (taken?.written) aheadWritten = await taken.written;
+                return taken;
+            });
+        }
+        let triggerAd = false;
+        let weekSync: Omit<PostWeekSync, 'player'> = { shouldTriggerBabyQa: false, babyNamingDue: null, medicalPromptToShow: null };
+        let persistedPlayerState: Player | null = null;
+        if (aheadTaken) {
+            const { result } = aheadTaken;
+            markWeekProcessingStage('week_ahead_taken', player, {
+                run_id: weekRunId,
+                screen: activePageName,
+                save_slot: currentSlot,
+                elapsed_ms: Math.round(performance.now() - startedAt),
+                waited_ms: aheadTaken.waitedMs,
+                prepared_ms: result.timings.totalMs,
+            });
+            const preparedWeekPlayer = result.player;
+            adoptIssuedManifest(preparedWeekPlayer, result.manifest);
+            const written = aheadWritten as WeekAheadWriteOutcome | null;
+            if (written && written.ok === true) setVerifiedLiveSave(weekSaveKey, written.committed);
+            else if (written && written.ok === false) recordNonFatal(new Error(written.message), 'week_ahead_write_failed', { age: player.age, week: player.currentWeek });
+            try {
+                activeWeekStageRef.current = 'persist_prepare_start';
+                persistedPlayerState = await persistCurrentSlotSnapshot(preparedWeekPlayer, {
+                    runId: weekRunId,
                     screen: activePageName,
-                    save_slot: currentSlot,
-                    elapsed_ms: Math.round(performance.now() - startedAt),
+                    onStage: stage => { activeWeekStageRef.current = stage; },
+                }, {
+                    manifest: result.manifest,
+                    retainPrevious: result.retainPrevious,
+                    needsRecoveryCheckpoint: result.needsRecoveryCheckpoint,
+                    // A write the worker could not confirm is written here instead, the usual way.
+                    alreadyWritten: written?.ok === true,
                 });
-            },
-        });
-        activeWeekStageRef.current = 'post_week_sync_start';
-        markWeekProcessingStage('game_loop_done', newPlayerState, {
-            run_id: weekRunId,
-            screen: activePageName,
-            save_slot: currentSlot,
-            elapsed_ms: Math.round(performance.now() - startedAt),
-        });
-        const shouldTriggerBabyQa = !!newPlayerState.flags?.qaBabyNamingNextWeek;
-        let syncedPlayerState = shouldTriggerBabyQa
-            ? {
-                ...newPlayerState,
-                flags: {
-                    ...newPlayerState.flags,
-                    qaBabyNamingNextWeek: false,
-                }
+            } catch (error) {
+                recordNonFatal(error, 'week_ahead_save_failed', { age: player.age, week: player.currentWeek });
+                weekAhead?.abandon();
+                persistedPlayerState = null;
             }
-            : newPlayerState;
-        let babyNamingDue: PendingBabyNaming | null = null;
-        markWeekProcessingStage('post_week_sync_start', syncedPlayerState, {
-            run_id: weekRunId,
-            screen: activePageName,
-            save_slot: currentSlot,
-            elapsed_ms: Math.round(performance.now() - startedAt),
-        });
-
-        if (syncedPlayerState.activePregnancy) {
-            const pregnancy = syncedPlayerState.activePregnancy;
-            const currentAbsoluteWeek = getAbsoluteWeek(syncedPlayerState.age, syncedPlayerState.currentWeek);
-            const weeksLeft = typeof pregnancy.birthWeekAbsolute === 'number'
-                ? pregnancy.birthWeekAbsolute - currentAbsoluteWeek
-                : (pregnancy.weeksLeft || 1) - 1;
-
-            if (weeksLeft <= 0) {
-                const partnerName = pregnancy.partnerName
-                    || syncedPlayerState.relationships.find(rel => rel.id === pregnancy.partnerId)?.name
-                    || 'Your partner';
-                babyNamingDue = {
-                    partnerId: pregnancy.partnerId,
-                    partnerName,
-                    pregnancyCarrier: pregnancy.pregnancyCarrier || 'PARTNER',
-                    babyGender: pregnancy.babyGender || (Math.random() > 0.5 ? 'MALE' : 'FEMALE'),
-                    suggestedFirstName: pregnancy.suggestedFirstName || (Math.random() > 0.5 ? 'Leo' : 'Mia'),
-                    birthWeekAbsolute: currentAbsoluteWeek,
-                    eventWeek: syncedPlayerState.currentWeek,
-                    eventYear: syncedPlayerState.age,
-                    shouldCreateScandalNews: !!pregnancy.shouldCreateScandalNews,
-                };
-                syncedPlayerState = {
-                    ...syncedPlayerState,
-                    activePregnancy: undefined,
-                    logs: [
-                        { week: syncedPlayerState.currentWeek, year: syncedPlayerState.age, message: `🍼 The baby with ${partnerName} is here. Time to choose a name.`, type: 'positive' as const },
-                        ...syncedPlayerState.logs,
-                    ].slice(0, 50),
+            if (persistedPlayerState) {
+                applyNpcChanges(result.npcChanges, result.npcLength);
+                result.nonFatals.forEach(report => {
+                    const reported = new Error(report.message);
+                    reported.name = report.name;
+                    recordNonFatal(reported, report.label, report.context);
+                });
+                // The week's own analytics events (game_loop_completed, marketing_reality), sent for this week only.
+                result.gameEvents.forEach(([name, params]) => trackGameEvent(name, params));
+                triggerAd = result.triggerAd;
+                weekSync = {
+                    shouldTriggerBabyQa: result.shouldTriggerBabyQa,
+                    babyNamingDue: result.babyNamingDue,
+                    medicalPromptToShow: result.medicalPromptToShow,
                 };
             } else {
-                syncedPlayerState = {
-                    ...syncedPlayerState,
-                    activePregnancy: {
-                        ...pregnancy,
-                        weeksLeft,
-                        birthWeekAbsolute: pregnancy.birthWeekAbsolute || currentAbsoluteWeek + weeksLeft,
-                    },
-                };
+                aheadTaken = null;
             }
         }
-        const newMedicalCondition = (Array.isArray(syncedPlayerState.activeHealthConditions) ? syncedPlayerState.activeHealthConditions : [])
-            .filter(condition => condition?.id && !previousHealthConditionIds.has(condition.id))
-            .sort((a, b) => getMedicalPromptSeverityRank(b.severity) - getMedicalPromptSeverityRank(a.severity))[0];
-        let medicalPromptToShow: PendingMedicalPrompt | null = null;
+        if (!persistedPlayerState) {
+            activeWeekStageRef.current = 'game_loop_start';
+            markWeekProcessingStage('game_loop_start', player, {
+                run_id: weekRunId,
+                screen: activePageName,
+                save_slot: currentSlot,
+            });
+            const loopStartedAt = performance.now();
+            const { player: newPlayerState, triggerAd: loopTriggerAd } = await processGameWeek(player, {
+                onStage: (stage, context) => {
+                    activeWeekStageRef.current = `loop_${stage}`;
+                    markWeekProcessingStage(`loop_${stage}`, player, {
+                        ...context,
+                        run_id: weekRunId,
+                        screen: activePageName,
+                        save_slot: currentSlot,
+                        elapsed_ms: Math.round(performance.now() - startedAt),
+                    });
+                },
+            });
+            activeWeekStageRef.current = 'post_week_sync_start';
+            markWeekProcessingStage('game_loop_done', newPlayerState, {
+                run_id: weekRunId,
+                screen: activePageName,
+                save_slot: currentSlot,
+                elapsed_ms: Math.round(performance.now() - startedAt),
+            });
+            markWeekProcessingStage('post_week_sync_start', newPlayerState, {
+                run_id: weekRunId,
+                screen: activePageName,
+                save_slot: currentSlot,
+                elapsed_ms: Math.round(performance.now() - startedAt),
+            });
+            // The same post-week step the Week Ahead worker runs (services/weekAhead/postWeekSync.ts).
+            const sync = syncPlayerAfterWeek(newPlayerState, previousHealthConditionIds);
+            markWeekProcessingStage('post_week_sync_done', sync.player, {
+                run_id: weekRunId,
+                screen: activePageName,
+                save_slot: currentSlot,
+                elapsed_ms: Math.round(performance.now() - startedAt),
+            });
 
-        if (newMedicalCondition) {
-            const currentMedicalPromptWeek = getAbsoluteWeek(syncedPlayerState.age, syncedPlayerState.currentWeek);
-            const lastMedicalPromptWeek = Number(syncedPlayerState.flags?.lastMedicalPromptAbsoluteWeek ?? -999);
-            const promptCooldownWeeks = getMedicalPromptCooldownWeeks(newMedicalCondition.severity);
-            const shouldShowMedicalPrompt = promptCooldownWeeks === 0 || currentMedicalPromptWeek - lastMedicalPromptWeek >= promptCooldownWeeks;
-
-            if (shouldShowMedicalPrompt) {
-                const conditionName = getHealthConditionLabel(newMedicalCondition, getPlayerLanguage(syncedPlayerState));
-                syncedPlayerState = {
-                    ...syncedPlayerState,
-                    flags: {
-                        ...(syncedPlayerState.flags || {}),
-                        lastMedicalPromptAbsoluteWeek: currentMedicalPromptWeek,
-                    },
-                };
-                medicalPromptToShow = {
-                    conditionName,
-                    severity: newMedicalCondition.severity,
-                    healthCap: newMedicalCondition.healthCap,
-                };
+            activeWeekStageRef.current = 'persist_prepare_start';
+            persistedPlayerState = await persistCurrentSlotSnapshot(sync.player, {
+                runId: weekRunId,
+                screen: activePageName,
+                onStage: stage => { activeWeekStageRef.current = stage; },
+            });
+            triggerAd = loopTriggerAd;
+            weekSync = {
+                shouldTriggerBabyQa: sync.shouldTriggerBabyQa,
+                babyNamingDue: sync.babyNamingDue,
+                medicalPromptToShow: sync.medicalPromptToShow,
+            };
+            if (currentSlot) {
+                // How long this device takes for this career's week decides whether Week Ahead helps next time.
+                const weekMs = performance.now() - loopStartedAt;
+                rememberSlotWeekMs(currentSlot, weekMs);
+                if (weekMs >= WEEK_AHEAD_MIN_WEEK_MS && !weekAheadOn && readWeekAheadWanted(currentSlot)) setWeekAheadOn(true);
             }
         }
-        markWeekProcessingStage('post_week_sync_done', syncedPlayerState, {
-            run_id: weekRunId,
-            screen: activePageName,
-            save_slot: currentSlot,
-            elapsed_ms: Math.round(performance.now() - startedAt),
-        });
-
-        activeWeekStageRef.current = 'persist_prepare_start';
-        const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {
-            runId: weekRunId,
-            screen: activePageName,
-            onStage: stage => { activeWeekStageRef.current = stage; },
-        });
-        syncedPlayerState = persistedPlayerState;
+        const syncedPlayerState: Player = persistedPlayerState;
+        const { shouldTriggerBabyQa, babyNamingDue, medicalPromptToShow } = weekSync;
         activeWeekStageRef.current = 'commit_verified_week';
         suppressNextAutosaveRef.current = true;
-        commitProcessedWeekPlayer(persistedPlayerState);
+        const weekOnScreen = commitProcessedWeekPlayer(persistedPlayerState);
+        if (aheadTaken) weekAhead?.committed(weekOnScreen);
         weekTapGuardRef.current = false;
         addBreadcrumb('process_week:persisted', {
             age: syncedPlayerState.age,
@@ -2641,6 +2787,7 @@ export const App: React.FC = () => {
         });
     } catch (error) {
         console.error('Week processing failed:', error);
+        weekAheadRef.current?.abandon();
         const failurePresentation = describeWeekProcessingFailure(activeWeekStageRef.current, error);
         setPendingWeekProcessingFailure({
             age: player.age,
@@ -2863,7 +3010,10 @@ export const App: React.FC = () => {
       if (receiptId) rewardAdGrantInFlightRef.current.add(receiptId);
 
       handleGenericUpdate(prev => {
-          const p = JSON.parse(JSON.stringify(prev)) as Player;
+          /* 2026-11-12: a reward used to copy the whole career (JSON) first; on a late career that alone could
+             get the game killed right after an ad. Only the parts the reward touches are copied now. */
+          const copy = createCopyOnTouch(prev);
+          const p = copy.draft as Player;
           if (!p.flags) p.flags = {};
           const grantedRewardAdIds = Array.isArray(p.flags.grantedRewardAdIds)
               ? p.flags.grantedRewardAdIds as string[]
@@ -2871,7 +3021,7 @@ export const App: React.FC = () => {
           if (receiptId && grantedRewardAdIds.includes(receiptId)) {
               clearPendingRewardAd(receiptId);
               rewardAdGrantInFlightRef.current.delete(receiptId);
-              return p;
+              return copy.finish(p) as Player;
           }
           if (receiptId) {
               p.flags.grantedRewardAdIds = [...grantedRewardAdIds, receiptId].slice(-80);
@@ -2921,8 +3071,9 @@ export const App: React.FC = () => {
           }
 
           setToastMessage({ title: toastTitle, subtext: toastSub });
+          const granted = copy.finish(p) as Player;
           if (receiptId && currentSlot) {
-              void persistSlotSave(currentSlot, p, { rethrow: true })
+              void persistSlotSave(currentSlot, granted, { rethrow: true })
                   .then(savedPlayer => {
                       setSaveSlots(previous => ({ ...previous, [currentSlot]: savedPlayer }));
                       clearPendingRewardAd(receiptId);
@@ -2936,7 +3087,7 @@ export const App: React.FC = () => {
                       });
                   });
           }
-          return p;
+          return granted;
       });
   };
 
@@ -4105,6 +4256,7 @@ export const App: React.FC = () => {
                 saveSlots={saveSlotSummaries}
                 onSelectSlot={handleSelectSlot}
                 onDeleteSlot={handleDeleteSlot}
+                onSendToDeveloper={handleSendSlotToDeveloper}
                 onImportData={handleImportGameData}
                 onCreateCareerFromIntro={handleStartGameFromIntro}
                 skipIntro={skipStartMenuIntro}

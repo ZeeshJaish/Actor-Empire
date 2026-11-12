@@ -860,7 +860,10 @@ export function regionReport(data: BuildData, draft: BuildDraft, services: reado
       code: service.code,
       peak: Number.isFinite(service.peak) ? Math.max(0, service.peak) : 0,
       served: countryServiceCoverageValid(service) ? service.coveredPeak : 0,
-      share: countryServiceCoverageValid(service) && service.peak > 0 ? service.coveredPeak / service.peak : 0,
+      /* 2026-11-12 (Vatican City "Watch it · 0% served"): a country so small its peak rounds to 0 read 0%
+         served even when covered. Its served share is the geographic one then. */
+      share: !countryServiceCoverageValid(service) ? 0
+        : service.peak > 0 ? service.coveredPeak / service.peak : Math.min(1, Math.max(0, service.coveredShare)),
       state: service.state,
       coverageAvailable: countryServiceCoverageValid(service),
     }))

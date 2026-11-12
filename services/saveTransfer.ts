@@ -1,7 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { APP_DISPLAY_VERSION } from './appVersion';
 import { BRIDGE_CHUNK_CHARS, splitForBridge } from './bridgeChunks';
-import { exportPublicGameData, replaceAllVerifiedGameData } from './storage';
+import { exportPublicGameData, loadGameData, replaceAllVerifiedGameData } from './storage';
 import { migratePlayerSave } from './saveMigration';
 import { grantMigrationCarePackageIfEligible, markSaveTransferImported } from './migrationCarePackage';
 import { compactPlayerForTransfer, FULL_LOCAL_MIRROR_BUDGET_BYTES } from './saveCompaction';
@@ -337,6 +337,44 @@ const shareArchive = async (filename: string, content: string) => {
   }
 
   downloadArchiveInBrowser(filename, content);
+};
+
+/* --- Send to developer (2026-11-12) ---------------------------------------------------------------
+   One slot, exactly as stored (never opened, migrated or repaired, so a career that cannot open can
+   still be sent), gzip-compressed where the web view can and written as base64 text so it travels the
+   proven text share paths (Android bridge, Web Share, download). A late career of 70–80 MB becomes a
+   file small enough for Discord. It is a support file, not a transfer: it never imports in the game. */
+export const SUPPORT_SAVE_HEADER = 'ACTOR-EMPIRE-SUPPORT 1';
+
+const bytesToBase64 = (bytes: Uint8Array): string => {
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary);
+};
+
+export const encodeSupportSave = async (payload: unknown): Promise<string> => {
+  const json = JSON.stringify(payload);
+  if (typeof CompressionStream === 'undefined' || typeof Blob === 'undefined' || typeof Response === 'undefined') {
+    return `${SUPPORT_SAVE_HEADER} json\n${json}`;
+  }
+  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+  const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  return `${SUPPORT_SAVE_HEADER} gzip-base64\n${bytesToBase64(bytes)}`;
+};
+
+export const exportSaveSlotForSupport = async (storageKey: string, slotNumber: number): Promise<{ ok: boolean; message: string }> => {
+  const raw = await loadGameData(storageKey).catch(() => null);
+  if (!raw) return { ok: false, message: 'This slot has no save that could be read.' };
+  const content = await encodeSupportSave({
+    format: 'actor-empire-support', formatVersion: 1, appVersion: APP_DISPLAY_VERSION, storageKey,
+    exportedAt: new Date().toISOString(), player: raw,
+  });
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  await shareArchive(`actor-empire-slot${slotNumber}-${stamp}.aesupport.txt`, content);
+  const megabytes = Math.max(0.1, Math.round(content.length / 104_857.6) / 10);
+  return { ok: true, message: `Save file ready (${megabytes} MB). Send it to the developer on Discord or by email.` };
 };
 
 export const exportSignedSaveArchive = async (): Promise<SaveTransferResult> => {

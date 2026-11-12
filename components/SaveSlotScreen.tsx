@@ -11,6 +11,8 @@ interface Props {
   slots: SlotEntry[];
   onPlay?: (slotIndex: number) => void;
   onDeleteSlot?: (slotIndex: number) => void;
+  /** 2026-11-12: send this slot's save, exactly as stored, to the developer (works for a save that cannot open) */
+  onSendToDeveloper?: (slotIndex: number) => Promise<{ ok: boolean; message: string } | void>;
   onImportData?: () => Promise<SaveTransferResult | void>;
   onCreateNew?: (slotIndex: number) => void;
   onBack?: () => void;
@@ -31,6 +33,7 @@ export default function SaveSlotScreen({
   slots,
   onPlay,
   onDeleteSlot,
+  onSendToDeveloper,
   onImportData,
   onCreateNew,
   onBack,
@@ -39,6 +42,21 @@ export default function SaveSlotScreen({
   notice,
 }: Props) {
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState<number | null>(null);
+  const [sendingSlot, setSendingSlot] = useState<number | null>(null);
+  const [sendNotice, setSendNotice] = useState<{ slot: number; text: string } | null>(null);
+  const handleSend = async (slotIndex: number) => {
+    if (!onSendToDeveloper || sendingSlot !== null) return;
+    setSendingSlot(slotIndex);
+    setSendNotice({ slot: slotIndex, text: 'Preparing the save file…' });
+    try {
+      const result = await onSendToDeveloper(slotIndex);
+      setSendNotice({ slot: slotIndex, text: (result && result.message) || 'Save file ready.' });
+    } catch (error) {
+      setSendNotice({ slot: slotIndex, text: error instanceof Error ? error.message : 'The save file could not be prepared.' });
+    } finally {
+      setSendingSlot(null);
+    }
+  };
   const [isImportingSave, setIsImportingSave] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const showSaveImport = isAndroidSaveTransferSurface() && !!onImportData;
@@ -117,7 +135,18 @@ export default function SaveSlotScreen({
                       {confirmDeleteSlot === i ? 'Confirm' : 'Delete'}
                     </button>
                   )}
+                  {onSendToDeveloper && (
+                    <button
+                      type="button"
+                      className="slot-delete slot-send"
+                      disabled={sendingSlot !== null}
+                      onClick={(event) => { event.stopPropagation(); void handleSend(i); }}
+                    >
+                      {sendingSlot === i ? 'Preparing…' : 'Send to dev'}
+                    </button>
+                  )}
                 </div>
+                {sendNotice?.slot === i && <div className="slot-send-note" role="status" onClick={(event) => event.stopPropagation()}>{sendNotice.text}</div>}
                 <div className="slot-name">{slot.name}</div>
                 <div className="slot-stats">
                   {slot.isPendingSummary ? (

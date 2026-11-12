@@ -527,12 +527,31 @@ export const processOwnedStreamingPlatformWeek = (
         || (normalizedPlatform.lastProcessedAbsoluteWeek !== null && absoluteWeek <= normalizedPlatform.lastProcessedAbsoluteWeek)
         || normalizedPlatform.processedWeekKeys.includes(weekKey)
     ) {
+        /* 2026-11-12 (player report: executives trained before the launch stayed "training" and never
+           levelled up): training can be bought before the launch, but it only finished in the live week
+           below. It now finishes when its week comes, launched or not. */
+        let trainingFinished = false;
+        if (normalizedPlatform.lifecycle !== 'ACTIVE' || !launchCommit) {
+            const current = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+            const due = completeDueStreamingExecutiveDevelopment(current, absoluteWeek);
+            if (due.completedPrograms.length) {
+                trainingFinished = true;
+                player = {
+                    ...player,
+                    ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
+                        ...due.platform,
+                        eventLedger: [...due.platform.eventLedger, ...due.ledgerEntries],
+                    }, player.id),
+                };
+            }
+        }
         return {
             player,
             processed: auctionsChanged
                 || privateOffers.resolvedOfferIds.length > 0
                 || launchMarketing.processed
-                || infrastructureCompletion.changed,
+                || infrastructureCompletion.changed
+                || trainingFinished,
             snapshot: null,
         };
     }

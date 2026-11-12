@@ -2253,10 +2253,11 @@ export function gates(data: BuildData, draft: BuildDraft): Gate[] {
     {
       id: 'rehearsal', stage: 'test', label: 'Rehearsal',
       value: !coverageAvailable ? 'Coverage unavailable — verify the network'
-        : !rehearsal ? 'Not run'
-        : rehearsalStale(data, draft) ? 'Out of date — the drawing changed'
+        /* 2026-11-12 (F18): say where to go, not only what is missing */
+        : !rehearsal ? 'Not run yet — run the rehearsal in Test'
+        : rehearsalStale(data, draft) ? 'Out of date — the network changed; run it again in Test'
           : rehearsal.verdict === 'HELD' ? 'It held'
-            : rehearsal.verdict === 'RENTED' ? 'Held by renting' : 'It broke',
+            : rehearsal.verdict === 'RENTED' ? 'Held by renting' : 'It broke — add capacity, then run it again in Test',
       ok: Boolean(coverageAvailable && rehearsal && !rehearsalStale(data, draft) && rehearsal.verdict !== 'BROKE'),
     },
   ];

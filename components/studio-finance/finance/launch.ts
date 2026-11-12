@@ -162,8 +162,11 @@ export interface ClearanceState {
   requirement?: { label: string; cost?: number };
   /** Declined: weeks until a revised application can go in (weeks pass with Age Up). */
   refileInWeeks?: number;
-  /** Before the commission, a market that has not cleared can leave the opening. */
+  /** Before the commission, a market can leave the opening (approved ones too, since 2026-11-12). */
   canWithdraw?: boolean;
+  /** 2026-11-12: a filed opening market. Its filing stands until it is dropped, so it stays on the
+      list even when the player takes it off the plan (it used to vanish while the checks still counted it). */
+  held?: boolean;
   /** What its filing has cost so far (fees stay spent if it leaves). */
   paid?: number;
 }
@@ -607,7 +610,16 @@ export function countriesById(data: LaunchData): Map<string, Country> {
 
 export function selectedCountries(data: LaunchData, draft: LaunchDraft): Country[] {
   const map = countriesById(data);
-  return draft.selectedCountryIds
+  /* 2026-11-12 (player reports: "Clear the markets" open with 6/6 cleared, removed countries still
+     rehearsed): a filed market taken off the plan keeps its filing, and the launch checks, the Build
+     and the launch all count it. It stays on this list (and so on the Clearance page, with Drop)
+     until it is dropped. */
+  const ids = [...draft.selectedCountryIds];
+  const listed = new Set(ids);
+  for (const row of data.clearance) {
+    if (row.held && !listed.has(row.countryId)) { ids.push(row.countryId); listed.add(row.countryId); }
+  }
+  return ids
     .map((id) => map.get(id))
     .filter((c): c is Country => Boolean(c));
 }

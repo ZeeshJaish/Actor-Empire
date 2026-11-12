@@ -56,7 +56,9 @@ type Note = { ok: boolean; message: string; countryId?: string };
 
 export function StepClearance({ data, draft, chosen, free, handlers, initialCountryId, operations, patch }: StepProps) {
   const byCountry = new Map(data.clearance.map((c) => [c.countryId, c]));
-  const firstCountry = chosen.find(country=>country.id===initialCountryId) || chosen.find(country=>NEEDS_PLAYER.includes(byCountry.get(country.id)?.outcome || 'NOT_FILED')) || chosen[0];
+  const firstCountry = chosen.find(country=>country.id===initialCountryId)
+    || chosen.find(country=>!operations && !draft.selectedCountryIds.includes(country.id))
+    || chosen.find(country=>NEEDS_PLAYER.includes(byCountry.get(country.id)?.outcome || 'NOT_FILED')) || chosen[0];
   const [openId, setOpenId] = useState<string | undefined>(firstCountry?.id);
   const [region, setRegion] = useState(firstCountry?.region || data.regions[0]);
   const [note, setNote] = useState<Note | null>(null);
@@ -105,8 +107,11 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
 
   /* 2026-11-11: with up to 197 markets the strip leads with the ones that need the player, then the
      ones still in review, then the unfiled, then the cleared (they were in pick order before) */
+  /* 2026-11-12: filed markets the player took off the plan lead the strip, so they are found and dropped */
+  const isOffPlan = (id: string) => !operations && !draft.selectedCountryIds.includes(id);
   const rank = (id: string) => {
     const st = stateOf(id);
+    if (isOffPlan(id)) return -1;
     if (NEEDS_PLAYER.includes(st.outcome)) return (st.refileInWeeks || 0) > 0 ? 1 : 0;
     if (st.outcome === 'IN_REVIEW' || st.outcome === 'DELAYED') return 2;
     return st.outcome === 'NOT_FILED' ? 3 : 4;
@@ -122,6 +127,7 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
   const stageIndex = CLEARANCE_STAGES.findIndex((s) => s.id === state.stage);
   const walking = state.outcome !== 'NOT_FILED';
   const done = state.outcome === 'APPROVED' || state.outcome === 'CONDITIONS';
+  const offPlan = isOffPlan(active.id);
   const coolingWeeks = state.refileInWeeks || 0;
   const fileCost = active.rightsEstimate + active.complianceCost;
   const drop = () => {
@@ -376,10 +382,21 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
 
           {note?.countryId === active.id && <p className={`cl-msg ${note.ok ? 'is-ok' : 'is-bad'}`} role="status">{note.message}</p>}
 
-          {state.canWithdraw && !done && (dropping === active.id ? (
+          {/* 2026-11-12: a filed market taken off the plan used to vanish from this page while the launch
+              checks, the Build and the launch still counted it. It stays here, marked, until it is dropped. */}
+          {offPlan && (
+            <p className="cl-msg is-bad" role="status">
+              You took {active.name} off the plan, but its filing still stands, so the launch still counts it.
+              {state.canWithdraw ? ' Drop it below to leave it out.' : ''}
+            </p>
+          )}
+
+          {state.canWithdraw && (dropping === active.id ? (
             <div className="cl-drop-confirm" role="group" aria-label={`Drop ${active.name} from the opening`}>
               <p>
-                {active.name} leaves the opening plan, and the launch no longer waits on it.
+                {done
+                  ? `${active.name} leaves the opening plan and will not open on launch night.`
+                  : `${active.name} leaves the opening plan, and the launch no longer waits on it.`}
                 {(state.paid || 0) > 0 ? ` The ${money(state.paid || 0)} already paid stays spent.` : ' Nothing has been paid for it yet.'}
               </p>
               <div>

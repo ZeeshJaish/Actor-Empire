@@ -697,9 +697,13 @@ export const generateLifeEvent = (player: Player): LifeEvent | null => {
     // 1. UNDERWORLD / CRIME (Shady Deals)
     if (!isMinor && roll < 0.15 && fame > 20) {
         // Dynamic reward: scales with player wealth. At least $250k, or 10% of their money if they are rich.
+        /* 2026-11-13 (player report: "I was getting offered like 18b for it"): 10% of a late career's money was
+           billions for one private appearance. The fee still grows with wealth, but a star's fame sets its
+           ceiling: $100K per fame point (a 100-fame star tops out at $10M). */
         const baseReward = 250000;
-        const wealthScaling = Math.floor(player.money * 0.1);
-        const dynamicReward = Math.max(baseReward, wealthScaling);
+        const wealthScaling = Math.floor(Math.max(0, Number(player.money) || 0) * 0.1);
+        const fameCeiling = Math.max(baseReward, Math.round((Number(player.stats?.fame) || 0) * 100_000));
+        const dynamicReward = Math.min(fameCeiling, Math.max(baseReward, wealthScaling));
         const formattedReward = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(dynamicReward);
 
         return {

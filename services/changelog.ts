@@ -66,6 +66,54 @@ const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntr
 );
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  /* 1.0.28 (2026-11-13): the second hotfix from players' reports (Discord, Telegram, X, DMs) plus Week Ahead, the faster
+     late-game week. Player-facing only; it repeats how streaming unlocks for players updating from 1.0.25 or 1.0.26. */
+  changelogEntry(
+    '1.0.28',
+    'Faster Weeks & Fixes',
+    'PATCH',
+    'November 2026',
+    'Much faster weeks on big careers, and the fixes you asked for. New here? Streaming unlocks at $150M, 65 Fame and 55 Reputation, in Lifestyle.',
+    [
+      {
+        heading: 'Faster and steadier',
+        items: [
+          'Weeks on big careers are much faster: the next week is prepared while you play.',
+          'Choosing an option in a life event no longer crashes big careers.',
+          'The campaign list no longer crashes while you scroll through the ad types.',
+          'Fewer freezes while you browse the Content Market and plan a release.',
+          'A week no longer jumps back on screen a minute after you play it.',
+        ],
+      },
+      {
+        heading: 'Streaming fixes',
+        items: [
+          '"Clear the markets" no longer stays open when every market is cleared: a filed market you took off the plan now shows on Clearance, and you can drop it.',
+          'Approved markets can be dropped before you commission.',
+          'Suggest network no longer gets stuck, and its Generate button is never hidden behind the bar.',
+          'Executives trained before launch now level up on time.',
+          'The back button in Enter new markets is no longer under the status bar.',
+          'Tiny countries like Vatican City show their real coverage instead of 0%.',
+          'Clearer hints for the rehearsal and for technical debt.',
+        ],
+      },
+      {
+        heading: 'Saves and events',
+        items: [
+          'Send to dev: send a save to the developer from the save slots, even one that cannot open.',
+          'If a save cannot open, the message now says which holding is the problem.',
+          'The Private Performance offer is now in line with your fame.',
+        ],
+      },
+    ],
+    [
+      { icon: 'SPARKLES', title: 'Faster weeks', text: 'Big careers move to the next week much faster.' },
+      { icon: 'FIX', title: 'No more crashes', text: 'Life events and the campaign list stay steady.' },
+      { icon: 'STREAMING', title: 'Launch your service', text: 'Clear the markets, Suggest network and training fixed.' },
+      { icon: 'FILM', title: 'Send to dev', text: 'Send us any save, even one that will not open.' },
+    ],
+    'Thank you for every report. Keep them coming.',
+  ),
   /* 1.0.27 (2026-11-11): the hotfix from the first players' reports on 1.0.26, player-facing only. The summary also says
      how streaming unlocks, for players who update straight from 1.0.25 and see this entry first. */
   changelogEntry(

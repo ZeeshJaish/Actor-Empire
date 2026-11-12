@@ -1325,6 +1325,13 @@
 .sf .bw-suggest-entry small { font:500 var(--sf-t-2)/1.4 var(--sf-font-ui); color:var(--sf-fg-3); }
 .sf .bw-suggest-entry svg { flex:none; color:var(--sf-brand-on); }
 .sf .bw-suggest-entry:hover { background:var(--sf-raised); border-color:var(--sf-brand-line); }
+/* 2026-11-12: the suggestion sheet opens in a portal on <body>, above the Build shell (z-index 9000/9010).
+   The wrapper only carries the .sf scope; it draws nothing and lets taps through outside the sheet. */
+.sf.sf-portal {
+  position:fixed; inset:0; z-index:9600; display:block; width:auto; max-width:none; height:auto;
+  min-height:0; margin:0; overflow:visible; background:none; pointer-events:none;
+}
+.sf.sf-portal .bw-suggest-backdrop { pointer-events:auto; }
 .sf .bw-suggest-backdrop {
   position:fixed; inset:0; z-index:1800; display:flex; align-items:flex-end;
   justify-content:center; background:var(--sf-scrim); padding:var(--sf-3) var(--sf-3) 0;

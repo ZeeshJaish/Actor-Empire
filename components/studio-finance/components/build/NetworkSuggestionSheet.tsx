@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import AccessibleDialog from '../../../AccessibleDialog';
 import type { BuildData, BuildDraft } from '../../finance/build';
 import { NetworkSuggestionResultView } from './NetworkSuggestionResultView';
@@ -90,7 +91,7 @@ export function NetworkSuggestionSheet({ data, draft, onApply, onClose }: Props)
     if (result.ok === false) { setMessage(result.message); setProposal(null); return; }
     onApply(result.patch); onClose();
   };
-  return <div className="bw-suggest-backdrop">
+  const sheet = <div className="bw-suggest-backdrop">
     <AccessibleDialog className="bw-suggest-sheet" aria-labelledby="bw-suggest-title" onEscape={close} initialFocusSelector="#bw-suggest-close">
       <header><div><p>THE BUILD · NETWORK</p><h2 id="bw-suggest-title">{proposal ? 'Your network plan' : 'Suggest network'}</h2></div><button id="bw-suggest-close" type="button" onClick={close} aria-label="Close network suggestions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
       {!proposal && <>
@@ -120,4 +121,10 @@ export function NetworkSuggestionSheet({ data, draft, onApply, onClose }: Props)
       </div>}
     </AccessibleDialog>
   </div>;
+  /* 2026-11-12 (player reports: "I can't scroll down, it's blocking something I'm supposed to confirm";
+     "accessing Generate suggestion is impossible"): inside the Build the sheet was trapped in the page's
+     scroll area, under the Build header and the pinned bar. It now opens on <body>, above the whole
+     Build, in its own Studio Finance scope (.sf.sf-portal in network.css). */
+  if (typeof document === 'undefined') return sheet;
+  return createPortal(<div className="sf sf-portal">{sheet}</div>, document.body);
 }

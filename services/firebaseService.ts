@@ -879,7 +879,13 @@ export const bootstrapFirebaseAuth = async () => {
   }
 };
 
+/* Week Ahead (2026-11-12): analytics events sent from inside the worker's week (game_loop_completed,
+   marketing_reality) are collected there and sent by the main thread only for the week the player takes. */
+let gameEventSink: ((name: string, params: Record<string, unknown>) => void) | null = null;
+export const setGameEventSink = (sink: typeof gameEventSink): void => { gameEventSink = sink; };
+
 export const trackGameEvent = (name: string, params: Record<string, unknown> = {}) => {
+  if (gameEventSink) { gameEventSink(name, params); return; }
   if (!isNativeTelemetry()) return;
   void runSafely(`analytics:${name}`, () =>
     FirebaseAnalytics.logEvent({
@@ -1249,11 +1255,17 @@ export const recoverInterruptedWeekProcessingTrace = (
   return snapshot;
 };
 
+/* Week Ahead (2026-11-12): inside the background worker there is no native bridge. The worker collects these
+   reports and the main thread sends them on when the week is used. Unset on the main thread. */
+let nonFatalSink: ((error: unknown, label: string, context: Record<string, unknown>) => void) | null = null;
+export const setNonFatalSink = (sink: typeof nonFatalSink): void => { nonFatalSink = sink; };
+
 export const recordNonFatal = (
   error: unknown,
   label: string,
   context: Record<string, unknown> = {}
 ) => {
+  if (nonFatalSink) { nonFatalSink(error, label, context); return; }
   if (!isNativeTelemetry()) return;
   const message = getErrorMessage(error);
   const safeContext = sanitizeParams({ ...getCompactTraceParams(), ...context });

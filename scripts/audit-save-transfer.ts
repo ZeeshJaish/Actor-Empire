@@ -559,9 +559,13 @@ assert(
 );
 
 const appSource = readFileSync('App.tsx', 'utf8');
+// Week Ahead (2026-11-12): both week paths (the prepared week, the week App plays) await persistence, and the week
+// is shown only after both, where commitProcessedWeekPlayer runs.
+const weekAheadSave = appSource.indexOf('persistedPlayerState = await persistCurrentSlotSnapshot(preparedWeekPlayer, {');
+const playedWeekSave = appSource.indexOf('persistedPlayerState = await persistCurrentSlotSnapshot(sync.player, {');
+const weekShown = appSource.indexOf('const weekOnScreen = commitProcessedWeekPlayer(persistedPlayerState);');
 assert(
-  appSource.includes('const persistedPlayerState = await persistCurrentSlotSnapshot(syncedPlayerState, {')
-    && appSource.includes('commitProcessedWeekPlayer(persistedPlayerState);'),
+  weekAheadSave > 0 && playedWeekSave > weekAheadSave && weekShown > playedWeekSave,
   'Week advance should await persistence before showing the processed week.'
 );
 assert(

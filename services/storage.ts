@@ -12,6 +12,10 @@ import {
   stageVerifiedGameDataBatch as stageVerifiedGenerationBatch,
   promoteStagedGameDataBatch as promoteStagedGenerationBatch,
   deleteSaveGenerationFamily,
+  runInSaveQueue,
+  stageVerifiedGameData as stageVerifiedGeneration,
+  promoteStagedGameData as promoteStagedGeneration,
+  type StagedSaveGeneration,
   type VerifiedGameLoad,
   type VerifiedSaveBatchEntry,
 } from './saveGenerations';
@@ -135,6 +139,22 @@ export const saveVerifiedGameData = async (
   manifest: SaveIntegrityManifest,
   options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean } = {},
 ): Promise<void> => saveVerifiedGeneration(indexedDbGenerationStore, key, player, manifest, options);
+
+/* Week Ahead (2026-11-12): the worker writes the week's save with its own store (services/weekAhead). */
+export const getVerifiedLiveSave = (key: string) => indexedDbGenerationStore.exportVerifiedLive?.(key) ?? null;
+export const setVerifiedLiveSave = (key: string, info: { digest: string; token: string | null } | null) => {
+  indexedDbGenerationStore.importVerifiedLive?.(key, info);
+};
+export const runInVerifiedSaveQueue = <T,>(key: string, operation: () => Promise<T>): Promise<T> => (
+  runInSaveQueue(indexedDbGenerationStore, key, operation)
+);
+export const stageVerifiedGameData = (
+  key: string, player: Player, manifest: SaveIntegrityManifest, live: { digest: string; token: string | null },
+  options: { needsRecoveryCheckpoint?: boolean } = {},
+): Promise<StagedSaveGeneration> => stageVerifiedGeneration(indexedDbGenerationStore, key, player, manifest, live, options);
+export const promoteStagedGameData = (key: string, staged: StagedSaveGeneration) => (
+  promoteStagedGeneration(indexedDbGenerationStore, key, staged)
+);
 
 export const loadVerifiedGameData = async (key: string): Promise<VerifiedGameLoad> => (
   loadVerifiedGeneration(indexedDbGenerationStore, key)
