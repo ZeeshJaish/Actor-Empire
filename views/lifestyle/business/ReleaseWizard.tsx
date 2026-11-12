@@ -470,7 +470,11 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
         const timer = window.setTimeout(() => {
             const nextPlayer = writeReleasePlanningDraft(player, draft);
             lastPersistedDraftRef.current = comparableDraft;
-            onUpdatePlayer(nextPlayer);
+            /* 2026-11-12 (player report: "slow to do things like release strategy"): the plan being edited is a quiet
+               UI-memory change. Before, each choice started a full save of the career a moment later (seconds on a
+               big career and a slow phone). It rides along with the next real save; leaving the wizard, locking the
+               release and hiding the app still save at once. */
+            onUpdatePlayer(markQuietPlayerUpdate(nextPlayer));
         }, 250);
 
         return () => window.clearTimeout(timer);

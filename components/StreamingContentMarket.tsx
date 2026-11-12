@@ -17,7 +17,6 @@ import { getHistoricalCatalogueTitles } from '../services/historicalCatalogue';
 import { getStreamingDayOneMarket } from '../services/streamingDayOneMarkets';
 import { establishContentMarketCatalogue, getContentMarketAuctionAssignments, getContentMarketListings, getContentMarketCollections, getContentMarketOwnedTitles, getContentMarketFunds, getContentMarketSupplySummary,
     linkContentMarketOwnedTitles, purchaseContentMarketListing, purchaseContentMarketCollection, saveContentMarketStrategy, searchContentMarketLibrary, submitContentMarketPrivateOffer } from '../services/streamingContentMarket';
-import { normalizeOwnedStreamingPlatformState, compactOwnedStreamingPlatformForPersistence } from '../services/ownedStreamingPlatform';
 import { PHASE_ONE_ENERGY_COSTS } from '../services/energyCosts';
 import { acceptStreamingRightsCounter, reviseStreamingRightsNegotiation,
     signStreamingRightsDeal, withdrawStreamingRightsNegotiation, type StreamingRightsTermsInput } from '../services/streamingRightsMarketplace';
@@ -38,15 +37,22 @@ import { OfferClauseHelp, OfferUsdInput } from '../content-market-exact/OfferCon
 import { parseOfferUsd, type OfferScope } from '../content-market-exact/model';
 import type { Lot as ExactContentMarketLot, Offer as ExactContentMarketOffer } from '../content-market-exact/model';
 import '../styles/streaming-content-market.css';
+import { markQuietPlayerUpdate } from '../services/quietPlayerUpdates';
+import { normalizeOwnedStreamingPlatformState, compactOwnedStreamingPlatformForPersistence } from '../services/ownedStreamingPlatform';
 
 const money = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(2).replace(/\.00$/, '')}M` : `$${Math.round(n).toLocaleString()}`;
 const countries = (ids: string[]) => ids.length ? ids.map(id => getStreamingDayOneMarket(id)?.country || id).join(', ') : 'Worldwide';
 type Draft = NonNullable<Player['ownedStreamingPlatform']['contentMarketDraft']>;
+/* 2026-11-12 (player report: "slow when bidding content on streaming"): where the player is in the market (tab,
+   selected title, search) is a quiet UI-memory change. Before, a moment after every tap there it started a full
+   save of the career (seconds on a big career and a slow phone). The draft now rides along with the next real save
+   (leaving or hiding the app saves at once). It still normalises the platform as before (a loaded legacy platform
+   is made canonical on the first draft, which keeps later renders cheap). */
 export function persistContentMarketDraft(player: Player, draft: Draft, onUpdatePlayer: (player: Player) => void): boolean {
     const savedDraft = player.ownedStreamingPlatform.contentMarketDraft;
     if (sameStreamingContentMarketDraft(savedDraft, draft)) return false;
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    onUpdatePlayer({ ...player, ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({ ...platform, contentMarketDraft: draft }, player.id) });
+    onUpdatePlayer(markQuietPlayerUpdate({ ...player, ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({ ...platform, contentMarketDraft: draft }, player.id) }));
     return true;
 }
 interface Props {
