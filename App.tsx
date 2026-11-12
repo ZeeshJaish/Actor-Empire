@@ -4,7 +4,7 @@ import { acknowledgeStockControlNotice } from './services/stockControlNotices';
 import { isStockSaveRecoveryError } from './services/stockSaveCompatibility';
 import {applyCareerAuditionApplication,acceptCareerPartTimeJob} from './services/careerApplicationActions';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { INITIAL_PLAYER, Player, Page, Commitment, PressInteraction, SocialEvent, ActorSkills, AdType, Relationship, ProjectDetails, ActiveRelease, PastProject, StreamingState, PregnancyCarrier, ScheduledEvent, SponsorshipOffer } from './types';
 import './components/layout-adapters/actorEmpireShell.css';
@@ -613,7 +613,18 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
 }
 
 export const App: React.FC = () => {
-  const [player, setPlayer] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
+  const [player, setPlayerState] = useState<Player>(() => migratePlayerSave(INITIAL_PLAYER));
+  /* 2026-11-12: playerRef is the newest player handed to React, set the moment it is handed over. The once-a-minute
+     play-time count, leaving the app and the memory checkpoint build on it or save it. It used to be set by an
+     effect after the next render, so a minute landing between a new week (or any change) and that effect wrote the
+     older player back: the screen went back a week while the save held the new one (seen on a Redmi, reproduced
+     every time in the browser). Updaters run here, in order, on that newest player, as React would run them. */
+  const playerRef = useRef(player);
+  const setPlayer = useCallback((next: React.SetStateAction<Player>) => {
+      const value = typeof next === 'function' ? next(playerRef.current) : next;
+      playerRef.current = value;
+      setPlayerState(value);
+  }, []);
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
   const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'STREAMING_SLATE' | 'STREAMING_RIGHTS' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
@@ -721,7 +732,6 @@ export const App: React.FC = () => {
   const [iosPurchaseUpdatesWaiting, setIosPurchaseUpdatesWaiting] = useState(0);
   /* Android: Play reported a purchase with none open in the game (a pending payment completed); collected like Restore */
   const [androidPurchaseUpdatesWaiting, setAndroidPurchaseUpdatesWaiting] = useState(0);
-  const playerRef = useRef(player);
   const rewardAdGrantInFlightRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const shell = shellRef.current;
@@ -743,10 +753,6 @@ export const App: React.FC = () => {
   }, [gameStatus, isStartupLoadingVisible]);
 
   const activePlayStartedAtRef = useRef<number | null>(null);
-
-  useEffect(() => {
-      playerRef.current = player;
-  }, [player]);
 
   useEffect(() => {
       const persistStorage = navigator.storage?.persist;
