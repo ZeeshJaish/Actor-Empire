@@ -16,6 +16,12 @@ export interface CinemaCraftInput {
     backgroundAuthenticity: number; backgroundReliability: number; backgroundSetCare: number;
 }
 
+/** What the background cast adds to craft quality: at most ±3 points. Greenlight and a renewed season read the same rule. */
+export const backgroundCraftEffect = (authenticity: unknown, reliability: unknown, setCare: unknown): number => Math.max(-3, Math.min(3,
+    (finite(authenticity, 50) - 50) * 0.04
+    + (finite(reliability, 50) - 50) * 0.03
+    + (finite(setCare, 50) - 50) * 0.025));
+
 /** Craft and delivery, independent of fame, release footprint and box-office ROI. */
 export const calculateCinemaCraftQuality = (input: CinemaCraftInput): number => {
     const craft = finite(input.scriptQuality, 50) * CINEMA_CRAFT_WEIGHTS.script
@@ -29,10 +35,7 @@ export const calculateCinemaCraftQuality = (input: CinemaCraftInput): number => 
     const setup = finite(input.setupQualityAdjustment, 0, -3, 4);
     const location = (mean(input.locationQualities, 5, 10) - 5) * 0.6;
     const story = finite(input.storyFitQualityAdjustment, 0, -5, 5);
-    const background = Math.max(-3, Math.min(3,
-        (finite(input.backgroundAuthenticity, 50) - 50) * 0.04
-        + (finite(input.backgroundReliability, 50) - 50) * 0.03
-        + (finite(input.backgroundSetCare, 50) - 50) * 0.025));
+    const background = backgroundCraftEffect(input.backgroundAuthenticity, input.backgroundReliability, input.backgroundSetCare);
     return Math.round(Math.max(1, Math.min(100, craft + gear + setup + location + story + background)));
 };
 

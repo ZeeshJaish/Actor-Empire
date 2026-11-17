@@ -1,4 +1,5 @@
-import type { BudgetTier, Commitment, OwnedStreamingOriginalCommission, Player, ProjectDetails, Script } from '../types';
+import type { BackgroundCastingPlan, BudgetTier, Commitment, OwnedStreamingOriginalCommission, Player, ProjectDetails, Script } from '../types';
+import { backgroundCraftEffect } from './boxOffice/boxOfficeDelivery';
 import { createDeterministicId, createDeterministicRng } from './deterministicRandom';
 import { PHASE_ONE_ENERGY_COSTS } from './energyCosts';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -12,6 +13,7 @@ import { createProductionCalendar } from './productionCalendar';
 import { spendPlayerEnergy } from './premiumLogic';
 import { getSeriesBaseTitle } from './seriesIdentity';
 import { getTitleRating } from './titleRating';
+import { buildBackgroundCastingPlan, carryBackgroundCastingPlan, type BackgroundCastingContext } from './livingEnsemble';
 
 /**
  * #292: what comes after a title opens, on its own page. Another season costs more than the last, by how far along the show is and how big a hit it is: a
@@ -59,6 +61,7 @@ const flatRow = (row: any): any => {
         projectQuality: row.projectQuality ?? details.hiddenStats?.qualityScore,
         budget: row.budget ?? details.estimatedBudget,
         episodeBudgetShares: row.episodeBudgetShares ?? details.episodeBudgetShares,
+        backgroundCastingPlan: row.backgroundCastingPlan || details.backgroundCastingPlan,
     };
 };
 
@@ -112,7 +115,20 @@ export interface OriginalNextSeasonQuote {
     energy: number;
     canAfford: boolean;
     hasEnergy: boolean;
+    /** 2026-11-17: the next season's background cast. It starts as the last season's; a change moves the price and,
+     *  by Greenlight's own rule, the craft (at most ±3 points). */
+    extras: {
+        plan: BackgroundCastingPlan;
+        lastSeason: BackgroundCastingPlan;
+        /** the last season had a plan of its own (otherwise the usual plan stands in) */
+        lastSeasonKnown: boolean;
+        costChange: number;
+        qualityChange: number;
+    };
 }
+
+/** The player's choice of background cast for a next season (one of the Greenlight packages, or the last season's). */
+export type OriginalExtrasChoice = Pick<BackgroundCastingPlan, 'scale' | 'source' | 'payStandard' | 'control'>;
 
 export interface OriginalFutureView {
     /** weeks until the first numbers are in: nothing can be decided before */
@@ -125,7 +141,13 @@ export interface OriginalFutureView {
     licence: { weeksLeft: number; extendPrice: number; gone: boolean } | null;
 }
 
-const quoteNext = (player: Player, commission: OwnedStreamingOriginalCommission, episodes: number): OriginalNextSeasonQuote | null => {
+const extrasContext = (commission: OwnedStreamingOriginalCommission, row: any, episodes: number, making: number): BackgroundCastingContext => ({
+    projectId: commission.canonicalProjectId, title: commission.title, genre: row.genre || commission.genre, projectType: commission.projectType,
+    episodes: commission.projectType === 'SERIES' ? episodes : 1, budget: making,
+});
+const planEffect = (plan: BackgroundCastingPlan) => backgroundCraftEffect(plan.authenticity, plan.reliability, plan.setCare);
+
+const quoteNext = (player: Player, commission: OwnedStreamingOriginalCommission, episodes: number, extrasChoice?: OriginalExtrasChoice): OriginalNextSeasonQuote | null => {
     const projectId = commission.canonicalProjectId;
     const row = projectId ? rowOf(player, projectId) : null;
     if (!row || !projectId) return null;
@@ -136,7 +158,13 @@ const quoteNext = (player: Player, commission: OwnedStreamingOriginalCommission,
     const rise = getSeasonPriceRise(nextSeason, hit);
     const lastEpisodes = Math.max(1, commission.episodes || 1);
     const lastMaking = getOriginalMaking(player, commission);
-    const making = roundMoney(lastMaking * (1 + rise / 100) * (isSeries ? episodes / lastEpisodes : 1));
+    const baseMaking = roundMoney(lastMaking * (1 + rise / 100) * (isSeries ? episodes / lastEpisodes : 1));
+    /* the last season's background cast, counted for this one; a different choice changes the bill by the difference */
+    const context = extrasContext(commission, row, episodes, baseMaking);
+    const lastSeason = carryBackgroundCastingPlan(row.backgroundCastingPlan, context);
+    const plan = extrasChoice ? buildBackgroundCastingPlan(context, extrasChoice) : lastSeason;
+    const costChange = plan.estimatedCost - lastSeason.estimatedCost;
+    const making = Math.max(0, baseMaking + costChange);
     const card = outside ? getOriginalsStudio(player, commission.producerStudioId) : null;
     const fee = outside ? (card ? getStudioFee(card, `${commission.id}:${nextSeason}`) : { percent: commission.feePercent || 20, why: 'They keep last season\'s terms.' }) : { percent: 0, why: '' };
     const deal = commission.deal === 'LICENCE' ? 'LICENCE' as const : 'BUY' as const;
@@ -160,11 +188,18 @@ const quoteNext = (player: Player, commission: OwnedStreamingOriginalCommission,
         energy,
         canAfford: Number(player.ownedStreamingPlatform.treasuryCash || 0) >= total,
         hasEnergy: Number(player.energy?.current || 0) >= energy,
+        extras: {
+            plan,
+            lastSeason,
+            lastSeasonKnown: Boolean(row.backgroundCastingPlan),
+            costChange,
+            qualityChange: Math.round((planEffect(plan) - planEffect(lastSeason)) * 10) / 10,
+        },
     };
 };
 
 /** Reads the week's history: for a page's opening, not a tap */
-export const getOriginalFutureView = (player: Player, commissionId: string, episodes?: number): OriginalFutureView | null => {
+export const getOriginalFutureView = (player: Player, commissionId: string, episodes?: number, extrasChoice?: OriginalExtrasChoice): OriginalFutureView | null => {
     const commission = commissionOf(player, commissionId);
     if (!commission?.canonicalProjectId) return null;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
@@ -176,7 +211,7 @@ export const getOriginalFutureView = (player: Player, commissionId: string, epis
     const { hit } = hitOf(player, commission.canonicalProjectId);
     return {
         waitWeeks: premiere ? Math.max(0, premiere + ORIGINAL_EVIDENCE_WEEKS - absoluteWeek) : 0,
-        next: ended || commission.nextSeasonCommissionId ? null : quoteNext(player, commission, episodes || commission.episodes),
+        next: ended || commission.nextSeasonCommissionId ? null : quoteNext(player, commission, episodes || commission.episodes, extrasChoice),
         nextCommissionId: commission.nextSeasonCommissionId || null,
         ended,
         canSpinOff: commission.projectType === 'SERIES' && commission.deal !== 'LICENCE' && commission.lifecycleDecision?.type !== 'FRANCHISE',
@@ -205,8 +240,13 @@ const buildNextProject = (input: {
     installment: number;
     keepCast: boolean;
     hype: number;
+    /** the season's background cast (the last one's, or the player's change) */
+    extras?: BackgroundCastingPlan;
+    /** craft points the change of background cast adds or takes (Greenlight's rule) */
+    extrasQualityChange?: number;
 }): Commitment => {
     const { player, commission, row, id, title, seed, making, episodes, subtype, installment, keepCast, hype } = input;
+    const extras = input.extras || carryBackgroundCastingPlan(row.backgroundCastingPlan, extrasContext(commission, row, episodes, making));
     const outside = isOutsideOriginal(row);
     const card = outside ? getOriginalsStudio(player, commission.producerStudioId) : null;
     const rng = createDeterministicRng(`original-next:${seed}`);
@@ -215,7 +255,7 @@ const buildNextProject = (input: {
     const productionWeeks = card ? getStudioShootWeeks(card, planned) : planned;
     const preQuality = Number(row.projectQuality || row.quality || 60);
     /* no one can promise the next one is as good: the money helps a little, the luck more */
-    const qualityScore = clamp(preQuality + (rng() - 0.55) * 9 + (subtype === 'SPINOFF' ? -4 : 0), 1, 100);
+    const qualityScore = clamp(preQuality + (rng() - 0.55) * 9 + (subtype === 'SPINOFF' ? -4 : 0) + (input.extrasQualityChange || 0), 1, 100);
     const rating = Number(row.imdbRating || row.rating || 6);
     const cast = (row.castList || []).filter((member: any) => keepCast || member.roleType === 'LEAD');
     const shares = commission.projectType === 'SERIES'
@@ -242,6 +282,7 @@ const buildNextProject = (input: {
         installmentNumber: installment,
         isOriginal: true,
         ...(shares ? { episodeBudgetShares: shares } : {}),
+        backgroundCastingPlan: extras,
         hiddenStats: {
             qualityScore: Math.round(qualityScore),
             rawHype: clamp(40 + (rating - 5.5) * 16, 15, 95),
@@ -250,6 +291,10 @@ const buildNextProject = (input: {
             directorQuality: Math.round(qualityScore),
             backendPct: 0,
             lockedFinances: true,
+            backgroundAuthenticity: extras.authenticity,
+            backgroundReliability: extras.reliability,
+            backgroundSetCare: extras.setCare,
+            backgroundDiscoveryPotential: extras.discoveryPotential,
             ...(hype ? { previousSeasonHype: hype } : {}),
         },
     } as unknown as ProjectDetails;
@@ -273,12 +318,13 @@ const buildNextProject = (input: {
 
 const orderNext = (player: Player, commission: OwnedStreamingOriginalCommission, input: {
     title: string; seed: string; making: number; fee: number; feePercent: number; total: number; deal: 'BUY' | 'LICENCE'; episodes: number; subtype: 'SEQUEL' | 'SPINOFF'; installment: number; keepCast: boolean; hype: number; energy: number; label: string;
+    extras?: BackgroundCastingPlan; extrasQualityChange?: number;
 }): { player: Player; moment: OriginalCommissionMoment; commissionId: string } | null => {
     const row = rowOf(player, commission.canonicalProjectId!);
     if (!row) return null;
     const outside = isOutsideOriginal(row);
     const commissionId = createDeterministicId('original-commission', commission.id, input.seed);
-    const job = buildNextProject({ player, commission, row, id: createDeterministicId('original-season', commission.id, input.seed), title: input.title, seed: input.seed, making: input.making, episodes: input.episodes, subtype: input.subtype, installment: input.installment, keepCast: input.keepCast, hype: input.hype });
+    const job = buildNextProject({ player, commission, row, id: createDeterministicId('original-season', commission.id, input.seed), title: input.title, seed: input.seed, making: input.making, episodes: input.episodes, subtype: input.subtype, installment: input.installment, keepCast: input.keepCast, hype: input.hype, extras: input.extras, extrasQualityChange: input.extrasQualityChange });
     const bill: OriginalBill = { above: [], below: [{ label: 'Making it', amount: input.making }], making: input.making, feePercent: input.feePercent, fee: input.fee, total: input.total, deal: input.deal, perEpisode: input.making / Math.max(1, input.episodes) };
     const card = outside ? getOriginalsStudio(player, commission.producerStudioId) : null;
     const mode = {
@@ -310,8 +356,8 @@ const orderNext = (player: Player, commission: OwnedStreamingOriginalCommission,
     return { player: next, moment: { ...finalized.moment, post: { ...finalized.moment.post, text: said } }, commissionId };
 };
 
-export const renewOriginal = (player: Player, commissionId: string, episodes?: number): { player: Player; changed: boolean; message: string; moment?: OriginalCommissionMoment; title?: string; nextCommissionId?: string } => {
-    const view = getOriginalFutureView(player, commissionId, episodes);
+export const renewOriginal = (player: Player, commissionId: string, episodes?: number, extrasChoice?: OriginalExtrasChoice): { player: Player; changed: boolean; message: string; moment?: OriginalCommissionMoment; title?: string; nextCommissionId?: string } => {
+    const view = getOriginalFutureView(player, commissionId, episodes, extrasChoice);
     const commission = commissionOf(player, commissionId);
     if (!view || !commission) return { player, changed: false, message: 'That title is not on your record.' };
     if (view.ended) return { player, changed: false, message: 'You ended this one.' };
@@ -327,6 +373,7 @@ export const renewOriginal = (player: Player, commissionId: string, episodes?: n
     const ordered = orderNext(player, commission, {
         title, seed: `${commission.scriptId}:s${quote.nextSeason}`, making: quote.making, fee: quote.fee, feePercent: quote.feePercent, total: quote.total, deal: quote.deal,
         episodes: episodesNow, subtype: 'SEQUEL', installment: quote.nextSeason, keepCast: true, hype: quote.hype, energy: quote.energy, label: 'Renewed',
+        extras: quote.extras.plan, extrasQualityChange: quote.extras.qualityChange,
     });
     if (!ordered) return { player, changed: false, message: 'That could not be ordered.' };
     const platform = ordered.player.ownedStreamingPlatform;

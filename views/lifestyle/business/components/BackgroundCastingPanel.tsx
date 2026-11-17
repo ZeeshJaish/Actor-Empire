@@ -16,6 +16,7 @@ import {
     type BackgroundPayStandard,
 } from '../../../../types';
 import {
+    BACKGROUND_CASTING_PACKAGES,
     buildBackgroundCastingPlan,
     type BackgroundCastingContext,
 } from '../../../../services/livingEnsemble';
@@ -39,36 +40,8 @@ interface CastingPackage {
     };
 }
 
-const PACKAGES: CastingPackage[] = [
-    {
-        id: 'CONTROLLED',
-        name: 'Essential Extras',
-        label: 'Lean',
-        description: 'A small agency unit for focused scenes and controlled schedules.',
-        choices: { scale: 'LEAN', source: 'AGENCY', payStandard: 'COMPLIANT', control: 'DEPARTMENT' },
-    },
-    {
-        id: 'STORY',
-        name: 'Story-Matched Crowd',
-        label: 'Recommended',
-        description: 'Local faces, fair pay, and a crowd size matched to your script.',
-        choices: { scale: 'STORY_FIT', source: 'LOCAL', payStandard: 'FAIR_PAY', control: 'REVIEW' },
-    },
-    {
-        id: 'DISCOVERY',
-        name: 'Open Casting Call',
-        label: 'More discovery',
-        description: 'A wider search that can uncover future talent, with more schedule risk.',
-        choices: { scale: 'FULL_WORLD', source: 'OPEN_CALL', payStandard: 'FAIR_PAY', control: 'CUSTOM' },
-    },
-    {
-        id: 'SPECTACLE',
-        name: 'Large-Scale Ensemble',
-        label: 'Premium',
-        description: 'Specialist performers for action, crowds, period scenes, and spectacle.',
-        choices: { scale: 'EPIC', source: 'SPECIALIST', payStandard: 'PREMIUM', control: 'REVIEW' },
-    },
-];
+/* 2026-11-17: the four packages live in services/livingEnsemble.ts, so a renewed season offers the same ones */
+const PACKAGES: CastingPackage[] = BACKGROUND_CASTING_PACKAGES;
 
 const SCALE_OPTIONS: Array<{ id: BackgroundEnsembleScale; label: string }> = [
     { id: 'LEAN', label: 'Lean' },

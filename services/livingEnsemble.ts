@@ -188,6 +188,90 @@ export const normalizeBackgroundCastingPlan = (
     control: ['DEPARTMENT', 'REVIEW', 'CUSTOM'].includes(String(value?.control)) ? value?.control : undefined,
 });
 
+/** The four ready-made background casts: Greenlight's Background Cast panel and a renewed season offer the same ones. */
+export interface BackgroundCastingPackage {
+    id: 'CONTROLLED' | 'STORY' | 'DISCOVERY' | 'SPECTACLE';
+    name: string;
+    label: string;
+    description: string;
+    choices: Pick<BackgroundCastingPlan, 'scale' | 'source' | 'payStandard' | 'control'>;
+}
+export const BACKGROUND_CASTING_PACKAGES: BackgroundCastingPackage[] = [
+    {
+        id: 'CONTROLLED',
+        name: 'Essential Extras',
+        label: 'Lean',
+        description: 'A small agency unit for focused scenes and controlled schedules.',
+        choices: { scale: 'LEAN', source: 'AGENCY', payStandard: 'COMPLIANT', control: 'DEPARTMENT' },
+    },
+    {
+        id: 'STORY',
+        name: 'Story-Matched Crowd',
+        label: 'Recommended',
+        description: 'Local faces, fair pay, and a crowd size matched to your script.',
+        choices: { scale: 'STORY_FIT', source: 'LOCAL', payStandard: 'FAIR_PAY', control: 'REVIEW' },
+    },
+    {
+        id: 'DISCOVERY',
+        name: 'Open Casting Call',
+        label: 'More discovery',
+        description: 'A wider search that can uncover future talent, with more schedule risk.',
+        choices: { scale: 'FULL_WORLD', source: 'OPEN_CALL', payStandard: 'FAIR_PAY', control: 'CUSTOM' },
+    },
+    {
+        id: 'SPECTACLE',
+        name: 'Large-Scale Ensemble',
+        label: 'Premium',
+        description: 'Specialist performers for action, crowds, period scenes, and spectacle.',
+        choices: { scale: 'EPIC', source: 'SPECIALIST', payStandard: 'PREMIUM', control: 'REVIEW' },
+    },
+];
+export const findBackgroundCastingPackage = (plan: Pick<BackgroundCastingPlan, 'scale' | 'source' | 'payStandard' | 'control'>): BackgroundCastingPackage | undefined =>
+    BACKGROUND_CASTING_PACKAGES.find(option => option.choices.scale === plan.scale && option.choices.source === plan.source
+        && option.choices.payStandard === plan.payStandard && option.choices.control === plan.control);
+
+/* 2026-11-17 (player report: a renewed season "doesn't pick the best background extras, it picks the pookie ones").
+   A show's next season was given the plain plan (Local, fair pay) whatever its last season had. Now a next season starts
+   from the last season's background cast, counted again for the new season (episodes, budget); the player can still
+   change it. Without a last plan, the usual one. */
+export const carryBackgroundCastingPlan = (
+    previous: Partial<BackgroundCastingPlan> | null | undefined,
+    context: BackgroundCastingContext,
+): BackgroundCastingPlan => (previous && typeof previous === 'object'
+    ? normalizeBackgroundCastingPlan(previous, context)
+    : buildBackgroundCastingPlan(context));
+
+/** The background cast of a show's latest season before `installmentNumber` (the same franchise; a first season's own
+ *  id is its franchise), from the career's releases, finished projects or commitments. */
+export const findPreviousSeasonBackgroundPlan = (
+    player: Pick<Player, 'activeReleases' | 'pastProjects' | 'commitments'>,
+    show: { franchiseId?: string | null; installmentNumber?: number | null },
+): BackgroundCastingPlan | null => {
+    const franchise = String(show.franchiseId || '');
+    if (!franchise) return null;
+    const before = Number(show.installmentNumber) > 0 ? Number(show.installmentNumber) : Number.POSITIVE_INFINITY;
+    let latestSeason = 0;
+    let latestPlan: BackgroundCastingPlan | null = null;
+    const consider = (id: unknown, franchiseId: unknown, installment: unknown, plan: unknown) => {
+        if (String(franchiseId || id || '') !== franchise || !plan || typeof plan !== 'object') return;
+        const season = Number(installment) > 0 ? Number(installment) : 1;
+        if (season >= before || season <= latestSeason) return;
+        latestSeason = season;
+        latestPlan = plan as BackgroundCastingPlan;
+    };
+    for (const release of player.activeReleases || []) {
+        consider(release.id, release.projectDetails?.franchiseId, release.projectDetails?.installmentNumber, release.projectDetails?.backgroundCastingPlan);
+    }
+    for (const project of player.pastProjects || []) {
+        const row = project as unknown as { id: string; franchiseId?: string; installmentNumber?: number; backgroundCastingPlan?: unknown };
+        consider(row.id, row.franchiseId, row.installmentNumber, row.backgroundCastingPlan);
+    }
+    for (const commitment of player.commitments || []) {
+        consider(commitment.id, commitment.projectDetails?.franchiseId, commitment.projectDetails?.installmentNumber, commitment.projectDetails?.backgroundCastingPlan);
+    }
+    return latestPlan;
+};
+
 export const getBackgroundCastingPlanLabel = (plan: BackgroundCastingPlan): string => {
     const scale = {
         LEAN: 'Lean',

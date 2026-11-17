@@ -143,7 +143,7 @@ import {
     toUniverseCharacterId,
 } from './greenlightUtils';
 import { BackgroundCastingPanel } from './components/BackgroundCastingPanel';
-import { buildBackgroundCastingPlan, normalizeBackgroundCastingPlan } from '../../../services/livingEnsemble';
+import { findPreviousSeasonBackgroundPlan, normalizeBackgroundCastingPlan } from '../../../services/livingEnsemble';
 import { createProductionCalendar } from '../../../services/productionCalendar';
 import {
     reserveProjectTalentBookings,
@@ -551,7 +551,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
         const savedConcept = selectedScript.id === initialConcept?.scriptId
             ? initialConcept
             : conceptByScriptId.get(selectedScript.id);
-        setBackgroundCastingPlan(normalizeBackgroundCastingPlan(savedConcept?.backgroundCastingPlan, backgroundCastingContext));
+        /* 2026-11-17: a show's next season starts from the background cast its last season had (the player can change it) */
+        const lastSeasonPlan = findPreviousSeasonBackgroundPlan(player, { franchiseId: selectedScript.franchiseId, installmentNumber: selectedScript.installmentNumber });
+        setBackgroundCastingPlan(normalizeBackgroundCastingPlan(savedConcept?.backgroundCastingPlan || lastSeasonPlan, backgroundCastingContext));
     }, [selectedScript?.id, backgroundCastingContext, conceptByScriptId, initialConcept]);
 
     useEffect(() => {
@@ -999,7 +1001,10 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                     { id: 'supp_1', role: 'Supporting Actor', roleType: 'SUPPORTING', actorId: null, identitySource: 'AUTO' }
                 ]);
                 setTalentBackendDraft({});
-                setBackgroundCastingPlan(buildBackgroundCastingPlan(backgroundCastingContext));
+                setBackgroundCastingPlan(normalizeBackgroundCastingPlan(
+                    findPreviousSeasonBackgroundPlan(player, { franchiseId: selectedScript?.franchiseId, installmentNumber: selectedScript?.installmentNumber }),
+                    backgroundCastingContext,
+                ));
                 setSelectedLocations([]);
                 setEquipmentChoices({
                     cameras: 'TIER_3',

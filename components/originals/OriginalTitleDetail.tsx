@@ -6,7 +6,8 @@ import type { Player } from '../../types';
 import { buildProjectPosterIndex, setTitlePoster } from '../../services/projectPosterIndex';
 import { createCustomPosterBlobFromFile, saveCustomPosterMedia } from '../../services/customPosterMedia';
 import { getOriginalTitleDetail, ORIGINAL_JOURNEY_STEPS, ORIGINAL_NOTE_QUALITY, takeOriginalExtra, takeOriginalNote, type OriginalTitleDetail as Detail } from '../../services/originalsTitleDetail';
-import { endOriginal, extendOriginalLicence, getOriginalFutureView, renewOriginal, spinOffOriginal } from '../../services/originalsRenewal';
+import { endOriginal, extendOriginalLicence, getOriginalFutureView, renewOriginal, spinOffOriginal, type OriginalExtrasChoice } from '../../services/originalsRenewal';
+import { BACKGROUND_CASTING_PACKAGES, findBackgroundCastingPackage, getBackgroundCastingPlanLabel } from '../../services/livingEnsemble';
 import { getOriginalOwnMaker, getOriginalSpinOffScript, prepareOriginalSpinOffScript } from '../../services/originalSpinOffScript';
 import type { OriginalCommissionMoment } from '../../services/originalsCommission';
 import { CommissionMoment } from './CommissionDealAndGo';
@@ -95,12 +96,14 @@ export const OriginalTitleDetail: React.FC<{
     }, [showNumbers, Boolean(numbers)]);
     const [renewing, setRenewing] = useState(false);
     const [episodes, setEpisodes] = useState<number | null>(null);
+    /* 2026-11-17: the next season's background extras. null keeps the last season's; a package changes them */
+    const [extrasPick, setExtrasPick] = useState<OriginalExtrasChoice | null>(null);
     const [confirmEnd, setConfirmEnd] = useState(false);
     const [moment, setMoment] = useState<{ title: string; data: OriginalCommissionMoment } | null>(null);
     const commissions = player.ownedStreamingPlatform?.originalCommissions;
     /* reads the studio's record and the week's chart once for each week or change, never on a tap */
     const detail = useMemo(() => getOriginalTitleDetail(player, commissionId), [commissionId, commissions, player.age, player.currentWeek, player.commitments]);
-    const future = useMemo(() => (detail?.stage === 'LIVE' ? getOriginalFutureView(player, commissionId, episodes ?? undefined) : null), [detail?.stage, commissionId, episodes, commissions, player.age, player.currentWeek, player.energy?.current]);
+    const future = useMemo(() => (detail?.stage === 'LIVE' ? getOriginalFutureView(player, commissionId, episodes ?? undefined, extrasPick ?? undefined) : null), [detail?.stage, commissionId, episodes, extrasPick, commissions, player.age, player.currentWeek, player.energy?.current]);
     /* B20: the title's own poster, and a way to set one (an Original made by another studio had none) */
     const posters = useMemo(() => buildProjectPosterIndex(player), [player]);
     const posterInput = useRef<HTMLInputElement | null>(null);
@@ -126,7 +129,7 @@ export const OriginalTitleDetail: React.FC<{
     const next = future?.next;
     const stepEpisodes = (change: number) => setEpisodes(Math.max(4, Math.min(24, (episodes ?? detail.commission.episodes) + change)));
     const renew = () => {
-        const result = renewOriginal(player, commissionId, episodes ?? undefined);
+        const result = renewOriginal(player, commissionId, episodes ?? undefined, extrasPick ?? undefined);
         setNotice(result.message);
         if (!result.changed) return;
         onUpdatePlayer(result.player);
@@ -437,8 +440,10 @@ export const OriginalTitleDetail: React.FC<{
                                 </span>
                             </div>
                         )}
+                        <RenewExtras extras={next.extras} onPick={setExtrasPick} />
                         <div className="mt-3 space-y-1 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[13px] font-semibold text-zinc-300">
                             <div className="flex justify-between gap-3"><span>Making it</span><span className="font-mono font-black text-white">{money(next.making)}</span></div>
+                            {next.extras.costChange !== 0 && <div className="flex justify-between gap-3 text-[12px]" data-renew-extras-cost><span>of it, the extras' change</span><span className={`font-mono font-black ${next.extras.costChange > 0 ? 'text-amber-200' : 'text-emerald-300'}`}>{next.extras.costChange > 0 ? '+' : '−'}{money(Math.abs(next.extras.costChange))}</span></div>}
                             {next.fee > 0 && <div className="flex justify-between gap-3"><span>Their fee, {next.feePercent}%</span><span className="font-mono font-black text-white">{money(next.fee)}</span></div>}
                             {next.deal === 'LICENCE' && <div className="flex justify-between gap-3"><span>On licence: {Math.round(LICENCE_SHARE_OF_MAKING * 100)}% of it</span><span className="font-mono font-black text-white">{money(next.total)}</span></div>}
                             {next.hype !== 0 && <div className="flex justify-between gap-3"><span>From the last finale</span><span className={`font-mono font-black ${next.hype > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{next.hype > 0 ? '+' : ''}{Math.round(next.hype * 100)}% first 4 weeks</span></div>}
@@ -458,3 +463,47 @@ export const OriginalTitleDetail: React.FC<{
 };
 
 export default OriginalTitleDetail;
+
+/* 2026-11-17 (player report: a renewed season "doesn't pick the best background extras, it picks the pookie ones").
+   The next season starts with the last season's background cast; the Greenlight packages change it for this season only.
+   A package other than the last one moves the bill by the difference and the craft by Greenlight's rule (at most ±3). */
+const EXTRAS_CHIP: Record<string, string> = { CONTROLLED: 'Lean', STORY: 'Story crowd', DISCOVERY: 'Open call', SPECTACLE: 'Premium' };
+const RenewExtras: React.FC<{
+    extras: { plan: import('../../types').BackgroundCastingPlan; lastSeason: import('../../types').BackgroundCastingPlan; lastSeasonKnown: boolean; costChange: number; qualityChange: number };
+    onPick: (choice: OriginalExtrasChoice | null) => void;
+}> = ({ extras, onPick }) => {
+    const same = (a: OriginalExtrasChoice, b: OriginalExtrasChoice) => a.scale === b.scale && a.source === b.source && a.payStandard === b.payStandard && a.control === b.control;
+    const lastPackage = findBackgroundCastingPackage(extras.lastSeason);
+    const picked = findBackgroundCastingPackage(extras.plan);
+    const lastName = lastPackage ? EXTRAS_CHIP[lastPackage.id] : getBackgroundCastingPlanLabel(extras.lastSeason);
+    const quality = extras.qualityChange;
+    return (
+        <div data-renew-extras className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+            {/* on a narrow phone the last season's name drops to its own line rather than being cut */}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                <span className="whitespace-nowrap text-sm font-black text-white">Background extras</span>
+                <span className="text-[11px] font-semibold text-zinc-400">{extras.lastSeasonKnown ? `Last season: ${lastName}` : `Last season: ${lastName} (usual)`}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+                {!lastPackage && (
+                    <button type="button" aria-pressed={same(extras.plan, extras.lastSeason)} data-renew-extras-option="LAST" onClick={() => onPick(null)}
+                        className={`min-h-9 rounded-lg border px-2.5 text-[11px] font-black ${same(extras.plan, extras.lastSeason) ? 'border-rose-300 bg-rose-500/20 text-white' : 'border-white/10 bg-black/30 text-zinc-300'}`}>As last season</button>
+                )}
+                {BACKGROUND_CASTING_PACKAGES.map(option => {
+                    const selected = same(extras.plan, option.choices);
+                    return (
+                        <button key={option.id} type="button" aria-pressed={selected} data-renew-extras-option={option.id}
+                            onClick={() => onPick(same(option.choices, extras.lastSeason) ? null : option.choices)}
+                            className={`min-h-9 rounded-lg border px-2.5 text-[11px] font-black ${selected ? 'border-rose-300 bg-rose-500/20 text-white' : 'border-white/10 bg-black/30 text-zinc-300'}`}>
+                            {EXTRAS_CHIP[option.id]}
+                        </button>
+                    );
+                })}
+            </div>
+            <p className="mt-2 text-[11px] font-semibold leading-snug text-zinc-400" data-renew-extras-note>
+                {picked ? `${picked.name}: ${picked.description}` : `${getBackgroundCastingPlanLabel(extras.plan)}, as last season.`}
+                {quality > 0 ? ` A little more real on screen (+${quality} quality).` : quality < 0 ? ` A little less real on screen (${quality} quality).` : ''}
+            </p>
+        </div>
+    );
+};
