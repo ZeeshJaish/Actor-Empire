@@ -25,6 +25,7 @@ import { CINEMA_ROLE_WEIGHTS } from './boxOffice/boxOfficeProfiles';
 import { creditSignedActorBackend } from './talentCareer';
 import { migrateCinemaState, CinemaMigrationError } from './boxOffice/boxOfficeMigration';
 import { processCinemaMarketWeek, processUnexposedOwnedCinemaMarketWeek, findCinemaBusiness } from './boxOffice/boxOfficeWeek';
+import { alignCinemaClockToCareer } from './boxOffice/boxOfficeClock';
 import { getProductionScale } from './studioProductionEconomy';
 import { completeOfferedCinemaCast, normalizeCinemaTitle } from './boxOffice/boxOfficeInputs';
 import { recordStudioSaleEarnings } from './studioSaleHistory';
@@ -1558,6 +1559,27 @@ const processGameWeekInScope = async (
     const cinemaMigration=migrateCinemaState(nextPlayer,targetAbsoluteWeek-1);
     if(cinemaMigration.status==='REJECTED')throw new CinemaMigrationError(cinemaMigration.diagnostics.map(d=>d.code));
     nextPlayer=cinemaMigration.player;
+    /* B32 (2026-11-17): a cinema clock that had drifted from the career's clock stopped every week for ever
+       ("Cinema stale or out-of-order result"). It is moved back onto the career's clock here, and the gap is reported
+       so the cause can be found in the field. A normal week has no gap and changes nothing. */
+    const cinemaBeforeAlign=nextPlayer.world.cinemaMarket;
+    let cinemaClockGap=0;
+    if(cinemaBeforeAlign){
+        const aligned=alignCinemaClockToCareer(cinemaBeforeAlign,targetAbsoluteWeek-1);
+        if(aligned.gap){
+            cinemaClockGap=aligned.gap;
+            nextPlayer.world.cinemaMarket=aligned.state;
+            recordNonFatal(new Error(`Cinema clock re-anchored by ${aligned.gap} weeks`),'cinema_clock_realigned',{
+                gap:aligned.gap,
+                cinema_week:cinemaBeforeAlign.lastProcessedAbsoluteWeek,
+                career_week:targetAbsoluteWeek-1,
+                cinema_epoch:cinemaBeforeAlign.clockEpoch,
+                cinema_activation_week:cinemaBeforeAlign.activationWeek,
+                cinema_last_receipt_week:cinemaBeforeAlign.weeks[cinemaBeforeAlign.weeks.length-1]?.absoluteWeek ?? -1,
+                cinema_open_titles:Object.values(cinemaBeforeAlign.titles).filter(t=>!t.closed).length,
+            });
+        }
+    }
     const simulationSeed = createWeekSimulationSeed(player, targetAbsoluteWeek);
     const emitLoopStage = (stage: string, context: Record<string, unknown> = {}) => {
         const stageContext = {
@@ -1581,6 +1603,7 @@ const processGameWeekInScope = async (
         addBreadcrumb(`game_loop:${stage}`, stageContext);
     };
     emitLoopStage('state_cloned', { simulation_seed: simulationSeed });
+    if (cinemaClockGap) emitLoopStage('cinema_clock_realigned', { gap: cinemaClockGap });
     const language = getPlayerLanguage(nextPlayer);
     const actorArcBeforeWeek = getActorCareerArc(nextPlayer);
     const getCommitmentDisplayName = (commitment: Commitment, currentLanguage: GameLanguage = language) => {
