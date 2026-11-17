@@ -1977,6 +1977,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
                     onSelectPosition={id => setCampaignPositioning(id as CampaignPositioning)}
                     onSelectTimeline={id => setCampaignTimeline(id as CampaignTimeline)}
                     onChangeChannel={(id, delta) => updateChannelAllocation(id as MarketingChannelId, delta)}
+                    onSetChannel={(id, amount) => setChannelAllocationAmount(id as MarketingChannelId, amount)}
                     onContinue={nextStep}
                     onBack={prevStep}
                 />

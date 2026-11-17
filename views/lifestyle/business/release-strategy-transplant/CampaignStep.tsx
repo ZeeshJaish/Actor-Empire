@@ -18,6 +18,20 @@ const campaignMoney = (value: number) => {
   return amount < 1_000_000 ? `$${Math.round(amount).toLocaleString()}` : formatMoney(amount);
 };
 
+/* 2026-11-17, player request: "switch back to the old manual marketing budget setting". The −/+ steps are a tenth of
+   the pool, so on a $1.5T pool the smallest spend was $152B. A channel's amount can be typed again, as in the old
+   field: a plain number is millions (500 = $500M), and K, M, B or T may be added (2B). The controller keeps a typed
+   amount within what is still available. */
+const MONEY_UNITS: Record<string, number> = { K: 1e3, M: 1e6, B: 1e9, T: 1e12 };
+export const parseCampaignAmount = (text: string): number | null => {
+  const match = text.replace(/[\s,$]/g, '').match(/^(\d+(?:\.\d+)?|\.\d+)([kmbt])?$/i);
+  if (!match) return null;
+  const amount = Number(match[1]) * MONEY_UNITS[(match[2] || 'M').toUpperCase()];
+  return Number.isFinite(amount) ? Math.floor(amount) : null;
+};
+const draftMillions = (amount: number) => amount > 0 ? String(Number((amount / 1e6).toFixed(2))) : '';
+type AmountEdit = { id: string; draft: string; initial: string };
+
 export const CampaignStep: React.FC<{
   cinema?: boolean;
   film: ReleaseFilmArt;
@@ -34,12 +48,26 @@ export const CampaignStep: React.FC<{
   onSelectPosition: (id: string) => void;
   onSelectTimeline: (id: string) => void;
   onChangeChannel: (id: string, delta: number) => void;
+  /** A typed amount for one channel, in dollars. */
+  onSetChannel?: (id: string, amount: number) => void;
   onContinue: () => void;
   onBack: () => void;
-}> = ({ cinema, film, positions, selectedPositionId, timelines, selectedTimelineId, forecast, soundtrack, channels, budget, spent, allocationStep, onSelectPosition, onSelectTimeline, onChangeChannel, onContinue, onBack }) => {
+}> = ({ cinema, film, positions, selectedPositionId, timelines, selectedTimelineId, forecast, soundtrack, channels, budget, spent, allocationStep, onSelectPosition, onSelectTimeline, onChangeChannel, onSetChannel, onContinue, onBack }) => {
   const position = positions.find(item => item.id === selectedPositionId) || positions[0];
   const timeline = timelines.find(item => item.id === selectedTimelineId) || timelines[0];
   const remaining = Math.max(0, budget - spent);
+  const [edit, setEditState] = React.useState<AmountEdit | null>(null);
+  const editRef = React.useRef<AmountEdit | null>(null);
+  const setEdit = (next: AmountEdit | null) => { editRef.current = next; setEditState(next); };
+  const commitEdit = () => {
+    const current = editRef.current;
+    if (!current) return;
+    setEdit(null);
+    const text = current.draft.trim();
+    if (text === current.initial) return;
+    const amount = text === '' ? 0 : parseCampaignAmount(text);
+    if (amount !== null) onSetChannel?.(current.id, amount);
+  };
   return <div className={css.cmp} style={{ '--ch': String(position?.hue || 28) } as React.CSSProperties}>
     <div className={css.cmpwash} />
     <section className={css.oneup}>
@@ -91,12 +119,23 @@ export const CampaignStep: React.FC<{
     <section className={css.sec}>
       <div className={css.sechead}><span className={css.seclabel}>CHANNEL MIX</span><em className={css.step}>05 / 05</em></div>
       <div className={css.pool}><div><em>SPENT</em><b>{campaignMoney(spent)}</b></div><div className={css.poolfree}><em>AVAILABLE</em><b data-testid="campaign-remaining">{campaignMoney(remaining)}</b></div><span className={css.pooltrack}><u style={{ width: `${budget > 0 ? Math.min(100, spent / budget * 100) : 0}%` }} /></span></div>
-      <div className={css.available}>{campaignMoney(budget)} AVAILABLE</div>
+      <div className={css.available}>{onSetChannel && <span>TAP AN AMOUNT TO TYPE IT</span>}{campaignMoney(budget)} AVAILABLE</div>
       <div className={css.chans}>{channels.map(channel => {
         const share = budget > 0 ? channel.amount / budget * 100 : 0;
+        const editing = edit?.id === channel.id ? edit : null;
         return <article key={channel.id} className={join(css.chan, channel.amount > 0 && css.on)}>
           <span className={css.chanicon}><Glyph id={channel.icon} /></span><div className={css.chantext}><b>{channel.label}</b><em>{channel.description}</em></div>
-          <div className={css.chanset}><button type="button" className={css.stepbtn} disabled={channel.amount <= 0} onClick={() => onChangeChannel(channel.id, -allocationStep)} aria-label={`Decrease ${channel.label}`}>−</button><span className={css.readout}><b data-testid={`channel-${channel.id}-value`}>{campaignMoney(channel.amount)}</b></span><button type="button" className={css.stepbtn} disabled={remaining < allocationStep} onClick={() => onChangeChannel(channel.id, allocationStep)} aria-label={`Increase ${channel.label}`}>+</button></div>
+          <div className={css.chanset}><button type="button" className={css.stepbtn} disabled={channel.amount <= 0} onClick={() => onChangeChannel(channel.id, -allocationStep)} aria-label={`Decrease ${channel.label}`}>−</button>
+            {editing
+              ? <label className={join(css.readout, css.readedit)}><i>$</i><input type="text" inputMode="decimal" enterKeyHint="done" autoFocus placeholder="0"
+                  data-testid={`channel-${channel.id}-input`} aria-label={`Amount for ${channel.label}, in millions`} value={editing.draft}
+                  onFocus={event => event.currentTarget.select()}
+                  onChange={event => setEdit({ ...editing, draft: event.target.value })}
+                  onBlur={commitEdit}
+                  onKeyDown={event => { if (event.key === 'Enter') commitEdit(); else if (event.key === 'Escape') setEdit(null); }} /><i>M</i></label>
+              : <button type="button" className={css.readout} disabled={!onSetChannel} aria-label={`Type an amount for ${channel.label}`}
+                  onClick={() => { const draft = draftMillions(channel.amount); setEdit({ id: channel.id, draft, initial: draft }); }}><b data-testid={`channel-${channel.id}-value`}>{campaignMoney(channel.amount)}</b></button>}
+            <button type="button" className={css.stepbtn} disabled={remaining < allocationStep} onClick={() => onChangeChannel(channel.id, allocationStep)} aria-label={`Increase ${channel.label}`}>+</button></div>
           <div className={css.chanfoot}><em>{share.toFixed(0)}% OF POOL</em><span className={css.pips}>{[1,2,3,4,5].map(pip => <i key={pip} className={pib(pip, share) ? css.lit : ''} />)}</span></div><i className={css.chanfill} style={{ width: `${share}%` }} />
         </article>;
       })}</div>

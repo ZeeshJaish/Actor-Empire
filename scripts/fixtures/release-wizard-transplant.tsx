@@ -26,6 +26,9 @@ function ControllerFixture() {
     const base: Player = { ...structuredClone(INITIAL_PLAYER), id: 'release-wizard-controller-player', age: 30, currentWeek: 18, energy: { ...INITIAL_PLAYER.energy, current: 100 }, money: 900_000_000, businesses: [studio], commitments: [], activeReleases: [], pastProjects: [] };
     let result = base;
     createHomeStudioProductionQaActions({ player: base, onUpdatePlayer: player => { result = player; }, closeMenu: () => undefined, ensureCheatStudio: () => ({ updatedPlayer: base, studio }), onOpenProductionHouseCheat: () => undefined }).triggerStudioScenario('AWAITING_RELEASE');
+    /* ?pool=N: a reserved campaign pool of N dollars (a $1.5T pool made the smallest step $152B, 17 Nov report) */
+    const pool = Number(new URLSearchParams(location.search).get('pool') || 0);
+    if (pool > 0 && result.commitments[0]?.projectDetails) result.commitments[0].projectDetails.reservedMarketingBudget = pool;
     const draftStep = Number(new URLSearchParams(location.search).get('draftStep') || 0);
     if (draftStep >= 2 && result.commitments[0]?.projectDetails) {
       result.commitments[0].projectDetails.releasePlanningDraft = {
