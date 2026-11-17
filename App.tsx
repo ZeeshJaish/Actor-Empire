@@ -1442,7 +1442,9 @@ export const App: React.FC = () => {
     setShowWhatsNewModal(false);
   };
 
-  const handleShowWhatsNewCheat = () => {
+  /* Dev menu only. Zeesh (18 Nov 2026): no cheat or dev menu in a public release, so every dev-menu hook in this file is
+     `import.meta.env.DEV ? … : undefined` and a production build leaves its code out (scripts/audit-release-no-dev-tools.mjs). */
+  const handleShowWhatsNewCheat = import.meta.env.DEV ? () => {
     try {
       localStorage.removeItem(WHATS_NEW_STORAGE_KEY);
     } catch (error) {
@@ -1450,7 +1452,7 @@ export const App: React.FC = () => {
     }
     setShowPreviousWhatsNewNotes(false);
     setShowWhatsNewModal(true);
-  };
+  } : undefined;
 
   const handleConfirmBabyName = () => {
       if (!pendingBabyNaming) return;
@@ -2486,7 +2488,8 @@ export const App: React.FC = () => {
       return onScreen;
   };
 
-  const handleQueueBabyNamingCheat = () => {
+  /* Dev menu only: left out of a production build */
+  const handleQueueBabyNamingCheat = import.meta.env.DEV ? () => {
       const nextPlayer = {
           ...player,
           flags: {
@@ -2497,7 +2500,7 @@ export const App: React.FC = () => {
       };
       handleUpdatePlayer(nextPlayer);
       setToastMessage({ title: tr('app.qa.babyQueuedTitle'), subtext: tr('app.qa.babyQueuedSubtext') });
-  };
+  } : undefined;
 
   const handleSchedulePregnancy = (request: PendingBabyNaming) => {
       handleGenericUpdate(prev => {
@@ -2532,7 +2535,8 @@ export const App: React.FC = () => {
       setToastMessage({ title: pregnancyFeedback.title, subtext: pregnancyFeedback.toast });
   };
 
-  const handleStreamingLaunchQa = async (
+  /* Dev menu only: a production build leaves it out, with its two test-company chunks */
+  const handleStreamingLaunchQa = import.meta.env.DEV ? async (
     action: 'READY' | 'COMPLETE_BUILD' | 'FULL_PLATFORM', report: (message: string) => void,
   ): Promise<{ok:boolean;message:string}> => {
     if(weekProcessingLockRef.current||isProcessing) return {ok:false,message:'Wait for current processing to finish.'};
@@ -2583,7 +2587,7 @@ export const App: React.FC = () => {
       lastWeekProcessSettledAtRef.current=Date.now();
       setIsProcessing(false);
     }
-  };
+  } : undefined;
 
   // Screens far from the player read whether the pack is owned.
   useEffect(() => { setStreamingPlusOwnedNow(hasStreamingPlus(player)); }, [player]);
@@ -2841,7 +2845,8 @@ export const App: React.FC = () => {
             setPendingMedicalPrompt(medicalPromptToShow);
         }
 
-        if (shouldTriggerBabyQa) {
+        /* the dev menu's baby-naming test: never in a production build */
+        if (import.meta.env.DEV && shouldTriggerBabyQa) {
             setPendingBabyNaming({
                 partnerId: 'cheat_partner',
                 partnerName: 'Jordan Vale',
@@ -3550,9 +3555,10 @@ export const App: React.FC = () => {
       handleStartGame(name, data.age, introGender, avatar, handle, slot);
   };
 
-  const handleOpenDeathSummaryPreview = () => {
+  /* Dev menu only: left out of a production build */
+  const handleOpenDeathSummaryPreview = import.meta.env.DEV ? () => {
       setDeathScreenPreviewPlayer(clone(player));
-  };
+  } : undefined;
 
   const handleUpdateTutorialState = (state: NewPlayerTutorialState) => {
       handleGenericUpdate(prev => writeNewPlayerTutorialState(prev, state));
@@ -4412,7 +4418,7 @@ export const App: React.FC = () => {
         {gameStatus === 'PLAYING' && (
             <>
                 <div className={`ae-game-content ${isFullBleedMobileSurface ? 'ae-game-content--immersive flex-1 overflow-hidden p-0' : isUiOverhaulSurface ? `min-h-0 flex-1 overflow-hidden${activePage === Page.HOME ? ' ae-game-content--dock-gap' : ''}` : `flex-1 px-5 pt-5 overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
-                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={() => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); }} onOpenPlatformCommissionCheat={() => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); }} onOpenStudioAcquisitionCheat={(studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); }} onOpenBoxOfficeCheat={() => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); }} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} onStreamingLaunchQa={handleStreamingLaunchQa} />)}
+                    {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={import.meta.env.DEV ? () => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); } : undefined} onOpenPlatformCommissionCheat={import.meta.env.DEV ? () => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); } : undefined} onOpenStudioAcquisitionCheat={import.meta.env.DEV ? (studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); } : undefined} onOpenBoxOfficeCheat={import.meta.env.DEV ? () => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); } : undefined} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} onStreamingLaunchQa={handleStreamingLaunchQa} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, careerBalanceVersion: 1, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
                     {activePage === Page.SOCIAL && (<SocialPage player={player} onInteract={handleSocialInteract} onContinueAsChild={handleContinueAsChild} />)}

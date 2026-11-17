@@ -139,8 +139,9 @@ const safeExportHomePortrait = (selection: ProfileBuilderSelection, exportScale 
    one is a canvas drawing plus a PNG encode, about 0.4 s on a mid-range phone for the whole set. */
 const homeAvatarPresetCache = new Map<ProfileBuilderGender, HomeAvatarPreset[]>();
 
-/* #263: the dev menu's replay of the opening night. Loaded when asked for, and nowhere else. */
-const NightReplay = React.lazy(() => import('../components/streaming-transplant/opening-night/NightReplay'));
+/* #263: the dev menu's replay of the opening night. Loaded when asked for, and nowhere else. Dev server only (Zeesh,
+   18 Nov 2026: no cheat or dev menu in a public release): a production build has no NightReplay chunk at all. */
+const NightReplay = import.meta.env.DEV ? React.lazy(() => import('../components/streaming-transplant/opening-night/NightReplay')) : null;
 
 const cheatWeekFromAbsolute = (absoluteWeek: number): { year: number; week: number } => ({
   year: Math.max(18, Math.floor(Math.max(1, absoluteWeek) / 52)),
@@ -3249,7 +3250,7 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
           </div>
       )}
 
-      {nightReplay && (
+      {import.meta.env.DEV && NightReplay && nightReplay && (
           <React.Suspense fallback={<div className="fixed inset-0 z-[2000] bg-black" />}>
               <NightReplay key={nightReplay.run} player={player} tier={nightReplay.tier} onClose={()=>setNightReplay(null)} onAgain={()=>setNightReplay(value=>value&&{...value,run:value.run+1})} />
           </React.Suspense>

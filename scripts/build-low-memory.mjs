@@ -26,5 +26,13 @@ const check=()=>{
 };
 const timer=setInterval(check,1000);process.once('SIGINT',()=>stop('Interrupted'));process.once('SIGTERM',()=>stop('Terminated'));
 child.once('error',error=>{clearInterval(timer);console.error(error);process.exitCode=1});
-child.once('close',(code,signal)=>{clearInterval(timer);const result={exitCode:code,signal,heapMB:2048,peakOwnedTreeRssMiB:Math.round(peakKiB/102.4)/10,stopReason:stopped||null,systemGuard:process.platform};
- console.log('Bounded build:',JSON.stringify(result));if(process.env.LOW_MEMORY_BUILD_REPORT)writeFileSync(process.env.LOW_MEMORY_BUILD_REPORT,JSON.stringify(result,null,2));process.exitCode=code===0&&!stopped?0:1});
+// Zeesh (18 Nov 2026): no cheat or dev menu in a public release. Every finished production build is checked by
+// scripts/audit-release-no-dev-tools.mjs; a build that carries dev tools fails. AE_ALLOW_DEV_TOOLS=1 skips the check
+// for a local QA build that must never be released.
+const outDirArg=process.argv.slice(2).find((arg,i,all)=>all[i-1]==='--outDir')||(process.argv.slice(2).find(arg=>arg.startsWith('--outDir='))||'').slice(9)||'dist';
+const releaseGuard=()=>{
+ if(process.env.AE_ALLOW_DEV_TOOLS==='1'){console.warn('Release guard SKIPPED (AE_ALLOW_DEV_TOOLS=1): this build must not be released.');return 'skipped'}
+ try{execFileSync(process.execPath,[fileURLToPath(new URL('./audit-release-no-dev-tools.mjs',import.meta.url)),outDirArg],{stdio:'inherit'});return 'passed'}catch{return 'failed'}
+};
+child.once('close',(code,signal)=>{clearInterval(timer);const built=code===0&&!stopped;const guard=built?releaseGuard():'not-run';const result={exitCode:code,signal,heapMB:2048,peakOwnedTreeRssMiB:Math.round(peakKiB/102.4)/10,stopReason:stopped||null,systemGuard:process.platform,releaseGuard:guard};
+ console.log('Bounded build:',JSON.stringify(result));if(process.env.LOW_MEMORY_BUILD_REPORT)writeFileSync(process.env.LOW_MEMORY_BUILD_REPORT,JSON.stringify(result,null,2));process.exitCode=built&&guard!=='failed'?0:1});

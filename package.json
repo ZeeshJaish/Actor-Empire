@@ -433,6 +433,7 @@
     "audit:reported-bug-regressions": "esbuild scripts/audit-reported-bug-regressions.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-reported-bug-regressions.mjs && node /tmp/audit-reported-bug-regressions.mjs",
     "audit:x-industry-feed": "esbuild scripts/audit-x-industry-feed.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-x-industry-feed.mjs && node /tmp/audit-x-industry-feed.mjs",
     "audit:changelog-version": "esbuild scripts/audit-changelog-version.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-changelog-version.mjs && node /tmp/audit-changelog-version.mjs",
+    "audit:release-no-dev-tools": "node scripts/audit-release-no-dev-tools.mjs",
     "audit:custom-poster-storage": "node scripts/audit-custom-poster-storage.mjs",
     "audit:actor-career-arcs": "esbuild scripts/audit-actor-career-arcs.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-actor-career-arcs.mjs && node /tmp/audit-actor-career-arcs.mjs",
     "audit:role-performance-feedback": "esbuild scripts/audit-role-performance-feedback.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-role-performance-feedback.mjs && node /tmp/audit-role-performance-feedback.mjs",
