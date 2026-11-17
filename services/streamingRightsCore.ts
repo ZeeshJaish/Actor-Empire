@@ -1,3 +1,4 @@
+import { memoizeWeekNormalizer } from './weekMemo';
 import { buildStreamingPlatformRunsForProject } from './streamingReleaseRuns';
 import {getProjectFundingEconomics} from './projectFundingEconomics';
 import {getStreamingBuyerBackendCapability, streamingBackendPercentForBuyer, validateNewStreamingBackendTerms} from './streamingBackendPolicy';
@@ -265,7 +266,7 @@ const normalizeStreamingRightsContract = (value: unknown): StreamingRightsContra
     };
 };
 
-export const normalizeStreamingRightsContractRegistry = (
+const normalizeStreamingRightsContractRegistryFresh = (
     value: unknown,
 ): StreamingRightsContractRegistry => {
     if (value && typeof value === 'object' && canonicalStreamingRightsRegistries.has(value)) {
@@ -286,6 +287,9 @@ export const normalizeStreamingRightsContractRegistry = (
     streamingRightsIdempotencyIndexes.set(registry, idempotencyIndex);
     return registry;
 };
+
+/* Step 1 (2026-11-17): repeated calls inside one week or one save preparation reuse the first result (services/weekMemo.ts). */
+export const normalizeStreamingRightsContractRegistry = memoizeWeekNormalizer('normalizeStreamingRightsContractRegistry', normalizeStreamingRightsContractRegistryFresh);
 
 export const isCanonicalStreamingRightsContractRegistry = (
     value: unknown,

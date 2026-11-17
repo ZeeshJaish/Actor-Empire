@@ -1,3 +1,4 @@
+import { memoizeWeekNormalizer } from '../weekMemo';
 import {
     INDUSTRY_INTELLIGENCE_SCHEMA_VERSION,
     type IndustryCompanyKind,
@@ -162,7 +163,7 @@ const normalizeBlueprint = (raw: unknown): IndustryUniverseBlueprint | null => {
     };
 };
 
-export const normalizeIndustryContentState = (raw: unknown): IndustryContentIntelligenceState => {
+const normalizeIndustryContentStateFresh = (raw: unknown): IndustryContentIntelligenceState => {
     const source = record(raw);
     return {
         selectedFingerprints: compactIndustryContentFingerprints(
@@ -175,6 +176,9 @@ export const normalizeIndustryContentState = (raw: unknown): IndustryContentInte
         materializationKeys: uniqueStrings(source.materializationKeys, INDUSTRY_CONTENT_MATERIALIZATION_KEY_LIMIT),
     };
 };
+
+/* Step 1 (2026-11-17): repeated calls inside one week or one save preparation reuse the first result (services/weekMemo.ts). */
+export const normalizeIndustryContentState = memoizeWeekNormalizer('normalizeIndustryContentState', normalizeIndustryContentStateFresh);
 
 const createInitialLaneSchedule = (
     companyId: string,

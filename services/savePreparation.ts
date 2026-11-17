@@ -8,6 +8,7 @@ import {
 } from './saveIntegrity';
 import { migratePlayerSave } from './saveMigration';
 import { getAbsoluteWeek } from './legacyLogic';
+import { withWeekMemo } from './weekMemo';
 import {
     createWorldEconomyHealthSummary,
     repairDerivedWorldEconomyState,
@@ -66,10 +67,18 @@ export interface PreparedVerifiedPlayer {
     needsRecoveryCheckpoint: boolean;
 }
 
+/* Step 1 of the week-speed plan (2026-11-17): one save preparation runs inside a same-result memo scope
+   (services/weekMemo.ts), so the objects it normalizes more than once are built once. */
 export const prepareVerifiedPlayerForPersistence = (
     sourcePlayer: Player,
     reason: SaveIntegrityReason,
     options: { legacyOrExternal?: boolean; currentIsUnverified?: boolean; sourceByteEstimate?: number } = {},
+): PreparedVerifiedPlayer => withWeekMemo(() => prepareVerifiedPlayerForPersistenceInScope(sourcePlayer, reason, options));
+
+const prepareVerifiedPlayerForPersistenceInScope = (
+    sourcePlayer: Player,
+    reason: SaveIntegrityReason,
+    options: { legacyOrExternal?: boolean; currentIsUnverified?: boolean; sourceByteEstimate?: number },
 ): PreparedVerifiedPlayer => {
     let canonical = options.legacyOrExternal ? migratePlayerSave(sourcePlayer) : sourcePlayer;
     const absoluteWeek = getAbsoluteWeek(canonical.age, canonical.currentWeek);

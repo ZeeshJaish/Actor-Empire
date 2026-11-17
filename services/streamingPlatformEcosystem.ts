@@ -1,3 +1,4 @@
+import { memoizeWeekNormalizer } from './weekMemo';
 import type {
     Genre,
     PlatformId,
@@ -279,7 +280,7 @@ const normalizeEvents = (value: unknown, validOperatorIds: Set<string>): Streami
         .slice(-120)
 );
 
-export const normalizeStreamingPlatformEcosystem = (
+const normalizeStreamingPlatformEcosystemFresh = (
     value: unknown,
     absoluteWeek: number,
 ): StreamingPlatformEcosystemState => {
@@ -324,6 +325,9 @@ export const normalizeStreamingPlatformEcosystem = (
         eventHistory: normalizeEvents(source.eventHistory, validOperatorIds),
     };
 };
+
+/* Step 1 (2026-11-17): repeated calls inside one week or one save preparation reuse the first result (services/weekMemo.ts). */
+export const normalizeStreamingPlatformEcosystem = memoizeWeekNormalizer('normalizeStreamingPlatformEcosystem', normalizeStreamingPlatformEcosystemFresh);
 
 export const getStreamingEcosystemOperator = (
     state: StreamingPlatformEcosystemState,

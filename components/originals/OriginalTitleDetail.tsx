@@ -352,7 +352,7 @@ export const OriginalTitleDetail: React.FC<{
                             ) : future.nextCommissionId ? (
                                 <button type="button" data-title-next onClick={() => onOpenTitle?.(future.nextCommissionId!)} className="min-h-[52px] w-full rounded-2xl border border-rose-400/40 bg-rose-500/15 text-[12px] font-black uppercase tracking-[0.06em] text-rose-200">The next one is ordered ›</button>
                             ) : future.waitWeeks > 0 ? (
-                                <div data-title-wait className="min-h-[52px] rounded-2xl border border-white/10 bg-zinc-900 px-3 py-4 text-center text-[12px] font-black uppercase tracking-[0.06em] text-zinc-400">Numbers first · {weeksWords(future.waitWeeks)} to go</div>
+                                <div data-title-wait className="min-h-[52px] rounded-2xl border border-white/10 bg-zinc-900 px-3 py-4 text-center text-[12px] font-black uppercase tracking-[0.06em] text-zinc-400">Renewal opens in {weeksWords(future.waitWeeks)}</div>
                             ) : next && (
                                 <button type="button" data-title-renew onClick={() => setRenewing(true)} className="min-h-[52px] w-full rounded-2xl bg-rose-500 text-[13px] font-black uppercase tracking-[0.06em] text-white">
                                     {detail.isSeries ? `Renew season ${next.nextSeason}` : 'Order a sequel'} · about {money(next.total)}

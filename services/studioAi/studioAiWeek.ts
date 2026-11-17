@@ -26,6 +26,9 @@ export interface StudioAiWeekResult {
 
 const errorText = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 200);
 
+/** The statuses on which the slate and handoff steps return the studio unchanged (see runStudioWeek). */
+const TERMINAL_STUDIO_STATUSES = new Set(['DORMANT', 'SOLD_MERGED', 'CLOSED']);
+
 const publicSignal = (name: string, status: StudioAiCompanyStatus) => {
     if (status === 'DISTRESSED') return {
         headline: `${name}'s valuation slides as financing pressure mounts`,
@@ -98,13 +101,22 @@ export const processStudioAiWeek = (
                 // Intelligence must never interrupt the authoritative studio week.
             }
         }
-        const slateExecution = executeStudioAiSlateWeek({ player, world: nextWorld, studio: controlled, absoluteWeek });
-        const handoff = handoffStudioAiGreenlights({
-            player,
-            world: nextWorld,
-            studio: slateExecution.studio,
-            absoluteWeek,
-        });
+        /* Step 1 of the week-speed plan (2026-11-17): for a dormant, merged or closed studio both steps below only
+           normalize the studio and hand it back unchanged (studioAiSlateExecution.ts and studioAiProductionHandoff.ts
+           return early on a terminal status), and normalizing keeps a valid terminal status as it is. So they are
+           skipped for those studios, with the same result. */
+        const terminalStudio = TERMINAL_STUDIO_STATUSES.has(String(controlled.ai?.status || ''));
+        const slateExecution = terminalStudio
+            ? { studio: controlled, admittedCount: 0, reviewedCount: 0, rejectedCount: 0 }
+            : executeStudioAiSlateWeek({ player, world: nextWorld, studio: controlled, absoluteWeek });
+        const handoff = terminalStudio
+            ? { world: nextWorld, studio: slateExecution.studio, createdCount: 0 }
+            : handoffStudioAiGreenlights({
+                player,
+                world: nextWorld,
+                studio: slateExecution.studio,
+                absoluteWeek,
+            });
         nextWorld.industryProductions = handoff.world.industryProductions;
         controlled = handoff.studio;
         let processed = processStudioAiFinanceWeek(controlled, absoluteWeek);

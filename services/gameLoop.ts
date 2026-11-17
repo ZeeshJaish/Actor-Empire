@@ -233,6 +233,7 @@ import { createWeekSimulationSeed } from './weekProcessingDeterminism';
 import { rollUpStreamingBreakdowns, rollUpTheatricalBreakdowns } from './boxOffice/pastProjectBreakdownRollup';
 import { settleSocialAudiences } from './socialAudienceLimits';
 import { isDeveloperMessage } from './developerNotes';
+import { pauseWeekMemo, withWeekMemoAsync } from './weekMemo';
 
 // --- CONSTANTS ---
 const ANNUAL_TAX_FREE_ALLOWANCE = 25000;
@@ -673,7 +674,9 @@ const weekYieldWaiting: Array<() => void> = [];
    here, which also lets a newer request stop a week it no longer needs. Unset on the main thread. */
 let weekProcessingYieldOverride: (() => Promise<void>) | null = null;
 export const setWeekProcessingYield = (override: (() => Promise<void>) | null): void => { weekProcessingYieldOverride = override; };
-const yieldWeekProcessingFrame = (): Promise<void> => {
+/* Step 1 (2026-11-17): screen code that runs during the pause must not see the week's memo scope. */
+const yieldWeekProcessingFrame = (): Promise<void> => pauseWeekMemo(yieldWeekProcessingFrameNow);
+const yieldWeekProcessingFrameNow = (): Promise<void> => {
     if (weekProcessingYieldOverride) return weekProcessingYieldOverride();
     const host = globalThis as {
         scheduler?: { yield?: () => Promise<void> };
@@ -1525,10 +1528,17 @@ export type ProcessGameWeekDiagnostics = {
     repairWorldEconomy?: (candidate: Player, absoluteWeek: number) => Player;
 };
 
+/* Step 1 of the week-speed plan (2026-11-17): the week runs inside a same-result memo scope, so an object the week
+   normalizes again is not rebuilt (services/weekMemo.ts). The scope is paused at every frame yield. */
 // Returns updated player AND a flag if an ad should be triggered
-export const processGameWeek = async (
+export const processGameWeek = (
     player: Player,
     diagnostics: ProcessGameWeekDiagnostics = {}
+): Promise<{ player: Player, triggerAd: boolean }> => withWeekMemoAsync(() => processGameWeekInScope(player, diagnostics));
+
+const processGameWeekInScope = async (
+    player: Player,
+    diagnostics: ProcessGameWeekDiagnostics
 ): Promise<{ player: Player, triggerAd: boolean }> => {
     setCrashContext(player, {
         flow: 'game_loop',
@@ -6892,11 +6902,11 @@ export const processGameWeek = async (
     await yieldWeekProcessingFrame();
     emitLoopStage('weekly_events_start');
     emitLoopStage('weekly_event_text_start');
-    const eventText = await withTimeout(
+    const eventText = await pauseWeekMemo(() => withTimeout(
         generateWeeklyEvent(nextPlayer.age, "Actor", nextPlayer.stats.fame),
         1500,
         "You kept your head down and stayed busy."
-    );
+    ));
     logsToAdd.push({ msg: eventText, type: 'neutral' });
     emitLoopStage('weekly_event_text_done');
 

@@ -1,3 +1,4 @@
+import { memoizeWeekNormalizer } from './weekMemo';
 import type { OwnedStreamingAudienceReport, OwnedStreamingOriginalPitchState } from '../types';
 import type { StreamingExecutiveExitReason } from '../types';
 import { normalizeAuctionFutureFunding } from './streamingAuctionTerms';
@@ -4412,7 +4413,7 @@ const normalizeOpeningProgrammeCommission = (
     };
 };
 
-export const normalizeOwnedStreamingPlatformState = (
+const normalizeOwnedStreamingPlatformStateFresh = (
     value: unknown,
     playerId = 'player',
     protectedRivalMoveIds: ReadonlySet<string> = new Set(),
@@ -4707,6 +4708,9 @@ export const normalizeOwnedStreamingPlatformState = (
         milestoneKeys: uniqueStrings(source.milestoneKeys, OWNED_STREAMING_MILESTONE_LIMIT),
     };
 };
+
+/* Step 1 (2026-11-17): repeated calls inside one week or one save preparation reuse the first result (services/weekMemo.ts). */
+export const normalizeOwnedStreamingPlatformState = memoizeWeekNormalizer('normalizeOwnedStreamingPlatformState', normalizeOwnedStreamingPlatformStateFresh);
 
 export const compactOwnedStreamingPlatformForPersistence = (
     value: unknown,

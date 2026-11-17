@@ -1,3 +1,4 @@
+import { memoizeWeekNormalizer } from '../weekMemo';
 import {normalizeStreamingContractRoyaltyStatements} from '../streamingContractSettlement';
 import {
     INITIAL_PLAYER,
@@ -2538,7 +2539,7 @@ export const readNormalizedPlatformAiIntelligence = (
     return buildNormalizedPlatformAiIntelligence(platform, existing, playerId, absoluteWeek);
 };
 
-export const normalizePlatformAiState = (
+const normalizePlatformAiStateFresh = (
     platform: PlatformState,
     playerId: string,
     absoluteWeek: number,
@@ -2812,6 +2813,9 @@ export const normalizePlatformAiState = (
     };
     return { ...platform, ai };
 };
+
+/* Step 1 (2026-11-17): repeated calls inside one week or one save preparation reuse the first result (services/weekMemo.ts). */
+export const normalizePlatformAiState = memoizeWeekNormalizer('normalizePlatformAiState', normalizePlatformAiStateFresh);
 
 export const normalizeWorldPlatformAi = (
     player: Player,
