@@ -44,6 +44,17 @@ export function pct(value: number, decimals = 1): string {
   return `${trimZeros(value.toFixed(decimals))}%`;
 }
 
+/** U7 (2026-11-16): a share of people served (0–100), as a whole percent that never reads 100% unless every one
+    of them is served, and never 0% when some are. Rounded, 99.6% read "100% served" while an island market sat at
+    0% ("100% served, but islands at 0%"). */
+export function servedPercent(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0%';
+  /* a count-up can land a float's width under its target: that is still everyone */
+  if (value >= 100 - 1e-6) return '100%';
+  if (value < 1) return '<1%';
+  return `${Math.min(99, Math.round(value))}%`;
+}
+
 export function signedPct(value: number, decimals = 1): string {
   const body = pct(Math.abs(value), decimals);
   /* A change of −0.4% rounds to "−0%", which reads as a loss that did not

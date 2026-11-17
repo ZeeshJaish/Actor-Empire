@@ -31,10 +31,17 @@
 .frameActions .see{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#f3f5f9}
 .frameActions .reset{background:transparent;border:1px solid rgba(255,255,255,.12);color:#aab2c0}
 .noImage{margin:10px 2px 0;font-size:9.5px;line-height:1.45;color:#7c8597}
+/* 2026-11-17: a format with no image, with its See it live */
+.noImageRow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.noImageRow .noImage{margin:0 2px;flex:1;min-width:0}
+.noImageRow .see{flex:0 0 auto;display:inline-flex;align-items:center;min-height:34px;padding:0 12px;border-radius:11px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#f3f5f9;font:900 9px/1 'Archivo','Inter',sans-serif;letter-spacing:.08em;text-transform:uppercase}
+.noImageRow .see:active{transform:scale(.95)}
 
 /* a creative, small, in its frame's shape */
 .thumb{position:relative;display:block;width:100%;border-radius:9px;overflow:hidden;background:#07090d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),0 12px 24px -16px #000}
-.thumb canvas{display:block;width:100%;height:100%;object-fit:contain}
+/* 2026-11-17 (Zeesh's iPhone: the Poster 2:3 card ran off the screen): the canvas is placed over the thumb, so its own
+   pixel size never widens the card's first column (WebKit sized it from the canvas); the thumb's ratio sizes it */
+.thumb canvas{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain}
 .thumbTall{width:auto;height:168px}
 .thumbWait{position:absolute;inset:0;background:linear-gradient(100deg,rgba(255,255,255,.02) 30%,rgba(255,255,255,.07) 50%,rgba(255,255,255,.02) 70%) 0 0/200% 100%;
   animation:cr-wait 1.2s linear infinite}
@@ -79,6 +86,27 @@
   animation:cr-fade .2s ease both}
 .liveView{position:relative;flex:1;min-height:0}
 .liveView > div:first-child{position:absolute;inset:0}
+/* 2026-11-17: an online format's mock-up, full width, in the middle of the view */
+.liveOnline{display:grid;place-items:center;background:radial-gradient(120% 80% at 50% 40%,#101626,#020305)}
+.liveOnlineBox{position:relative;width:100%;aspect-ratio:16 / 10}
+/* the mock-up has no size of its own (on a How card the card gives it one); doubled, as its own sheet may load later */
+.liveOnlineBox.liveOnlineBox > *{position:absolute;inset:0}
+/* 2026-11-17: a light show at a landmark with no scene yet: a drawn tower, the creative lit on its facade */
+.liveTower{overflow:hidden;background:radial-gradient(110% 65% at 50% 100%,hsla(var(--hue),60%,24%,.95),#04060c 72%)}
+.towerBody{position:absolute;left:50%;bottom:15%;height:58%;aspect-ratio:1 / 6;transform:translateX(-50%);filter:drop-shadow(0 0 24px hsla(var(--hue),95%,60%,.65))}
+.towerSpire{position:absolute;left:50%;bottom:100%;width:5px;height:16%;margin-left:-2.5px;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#fff,hsl(var(--hue),95%,70%));
+  animation:cr-tower-twinkle 2.6s ease-in-out infinite}
+.towerFacade{position:absolute;inset:0;overflow:hidden;border-radius:4px 4px 0 0;background:linear-gradient(180deg,hsl(var(--hue),95%,68%),hsl(calc(var(--hue) + 40),90%,48%));
+  animation:cr-tower-on 1.4s ease .35s both}
+.towerFacade canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.towerFacade::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(0,0,0,.2) 0 1px,transparent 1px 4px)}
+.towerSweep{position:absolute;left:0;right:0;top:0;height:30%;background:linear-gradient(180deg,transparent,rgba(255,255,255,.38),transparent);transform:translateY(-100%);
+  animation:cr-tower-sweep 3.4s linear 1.8s infinite}
+.towerCity{position:absolute;left:0;right:0;bottom:0;height:22%;background:#05070c;
+  clip-path:polygon(0 40%,8% 40%,8% 20%,16% 20%,16% 50%,24% 50%,24% 10%,30% 10%,30% 45%,40% 45%,40% 30%,60% 30%,60% 55%,68% 55%,68% 15%,76% 15%,76% 42%,86% 42%,86% 25%,94% 25%,94% 50%,100% 50%,100% 100%,0 100%)}
+@keyframes cr-tower-on{from{opacity:0;filter:brightness(.3)}to{opacity:1;filter:none}}
+@keyframes cr-tower-twinkle{50%{opacity:.4}}
+@keyframes cr-tower-sweep{to{transform:translateY(340%)}}
 .liveHud{position:absolute;left:14px;right:60px;top:max(14px,calc(10px + env(safe-area-inset-top)));display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font:800 9px/1.35 'Archivo','Inter',sans-serif;letter-spacing:.12em;
   color:#fff;text-transform:uppercase;text-shadow:0 1px 8px rgba(0,0,0,.6);animation:cr-fade .5s ease .6s both}
 .liveTag{display:inline-flex;align-items:center;gap:5px;padding:5px 7px;border-radius:6px;background:rgba(239,68,68,.9)}
@@ -86,6 +114,21 @@
 @keyframes cr-blink{50%{opacity:.2}}
 .liveView.liveView .liveClose{position:absolute;right:14px;top:max(12px,calc(10px + env(safe-area-inset-top)));width:34px;height:34px;border-radius:11px;background:rgba(0,0,0,.45);
   border:1px solid rgba(255,255,255,.2);font:700 13px/1 'Inter',sans-serif;color:#fff;backdrop-filter:blur(8px)}
+/* 2026-11-17 (Zeesh): each live picture is prepared behind this card, then its moment plays */
+.livePrep{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;padding:0 24px;text-align:center;
+  background:radial-gradient(120% 80% at 50% 40%,#0d1220,#020305);color:#e9edf4;animation:cr-fade .2s ease both}
+.livePrep b{font:900 11px/1.25 'Archivo','Inter',sans-serif;letter-spacing:.14em;text-transform:uppercase}
+.livePrep span{font-size:10px;font-weight:700;color:#8b93a5}
+.livePrepSpin{width:30px;height:30px;border-radius:50%;border:2.5px solid rgba(255,255,255,.14);border-top-color:#f3f5f9;animation:cr-spin .8s linear infinite}
+@keyframes cr-spin{to{transform:rotate(360deg)}}
+.liveBar.liveBar button:disabled{opacity:.4}
+/* 2026-11-17: a frame's formats, each seen live */
+.liveSwitch{display:flex;gap:6px;overflow-x:auto;padding:10px 14px 0;background:#06070b;border-top:1px solid rgba(255,255,255,.07);scrollbar-width:none}
+.liveSwitch::-webkit-scrollbar{display:none}
+.liveSwitch.liveSwitch button{flex:0 0 auto;min-height:34px;padding:0 13px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  font:800 9.5px/1 'Archivo','Inter',sans-serif;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;color:#aab2c0}
+.liveSwitch.liveSwitch .liveSwitchOn{background:#f3f5f9;border-color:#f3f5f9;color:#06070b}
+.liveSwitch + .liveBar{border-top:0}
 .liveBar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#06070b;border-top:1px solid rgba(255,255,255,.07)}
 .liveBar span{min-width:0;font-size:10px;font-weight:700;line-height:1.3;color:#aab2c0;overflow-wrap:anywhere}
 .liveBar.liveBar button{flex:0 0 auto;min-height:42px;padding:0 16px;border-radius:13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);

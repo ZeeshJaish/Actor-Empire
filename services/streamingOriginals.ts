@@ -25,9 +25,11 @@ import {
     normalizeOwnedStreamingPlatformState,
 } from './ownedStreamingPlatform';
 import {
+    createStreamingCatalogTitleReadIndex,
     getStreamingCatalogLicenseStatus,
     resolveStreamingCatalogTitle,
     streamingLicenceWaitsForSlate,
+    type StreamingCatalogTitleReadIndex,
 } from './streamingCatalog';
 import { resolveOwnedStreamingReach } from './streamingProgression';
 
@@ -592,8 +594,18 @@ export const getOwnedStreamingProgramEntries = (player: Player, preparedContext?
     return readStreamingCatalogueDerivedView(context, getOwnedStreamingProgramEntries, () => buildOwnedStreamingProgramEntries(player, context));
 };
 
-export const getStreamingSlateCandidates = (player: Player): StreamingSlateCandidate[] => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+/* B17 (2026-11-15): each title used to be looked up on its own (resolveStreamingCatalogTitle
+   without a read index), which rebuilt every saved release in the career and re-normalized the
+   platform per title: 1.3 s for a 562-title catalogue on a Mac, and the Slate and Schedule all
+   read this list many times. The prepared read index gives the same title with the same
+   precedence (as the week's route evaluator has used since 1.0.27), built once per call. */
+export const getStreamingSlateCandidates = (
+    player: Player,
+    preparedPlatform?: ReturnType<typeof normalizeOwnedStreamingPlatformState>,
+    preparedIndex?: StreamingCatalogTitleReadIndex,
+): StreamingSlateCandidate[] => {
+    const platform = preparedPlatform || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const titleIndex = preparedIndex || createStreamingCatalogTitleReadIndex(player, platform);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const activeLicensedProjectIds = new Set(
         platform.catalogLicenses
@@ -605,7 +617,7 @@ export const getStreamingSlateCandidates = (player: Player): StreamingSlateCandi
             .map(license => license.sourceProjectId),
     );
     const catalog = platform.catalogProjectIds.flatMap(projectId => {
-        const title = resolveStreamingCatalogTitle(player, projectId);
+        const title = resolveStreamingCatalogTitle(player, projectId, platform, titleIndex);
         if (!title) return [];
         if (
             title.source === 'EXTERNAL_MARKET'
@@ -626,9 +638,13 @@ export const getStreamingSlateCandidates = (player: Player): StreamingSlateCandi
         projectType: commission.projectType,
         genre: commission.genre,
     }] : []);
-    return [...originals, ...catalog].filter((candidate, index, all) => (
-        all.findIndex(item => item.projectId === candidate.projectId) === index
-    ));
+    /* the first row for each title wins, as before (a Set instead of a search per row) */
+    const seen = new Set<string>();
+    return [...originals, ...catalog].filter(candidate => {
+        if (seen.has(candidate.projectId)) return false;
+        seen.add(candidate.projectId);
+        return true;
+    });
 };
 
 const canonicalizeStreamingSlate = (

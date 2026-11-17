@@ -14,7 +14,7 @@
    market cleared).
    ========================================================================== */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CLEARANCE_STAGES, type ClearanceOutcome, type ClearanceStage, type ClearanceState } from '../../finance/launch';
 import type { StepProps } from './LaunchWizard';
 import { money } from '../../finance/format';
@@ -62,6 +62,13 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
   const [openId, setOpenId] = useState<string | undefined>(firstCountry?.id);
   const [region, setRegion] = useState(firstCountry?.region || data.regions[0]);
   const [note, setNote] = useState<Note | null>(null);
+  /* U6: the two-tap "Drop all not cleared" (hooks stay above the early return below) */
+  const [dropAllArmed, setDropAllArmed] = useState(false);
+  useEffect(() => {
+    if (!dropAllArmed) return undefined;
+    const timer = window.setTimeout(() => setDropAllArmed(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [dropAllArmed]);
   const [dropping, setDropping] = useState<string | null>(null);
   const say = (result: { ok: boolean; message?: string } | void, countryId?: string) => {
     if (result && result.message) setNote({ ok: result.ok, message: result.message, countryId });
@@ -83,6 +90,14 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
   const cooling = chosen.filter((c) => (stateOf(c.id).refileInWeeks || 0) > 0);
   const soonest = cooling.length ? Math.min(...cooling.map((c) => stateOf(c.id).refileInWeeks || 0)) : 0;
   const actionable = needsYou - cooling.length;
+  /* U6: every chosen market that is not cleared, dropped together (two taps, three seconds apart at most) */
+  const notCleared = chosen.filter((c) => !['APPROVED', 'CONDITIONS'].includes(stateOf(c.id).outcome));
+  const dropNotCleared = () => {
+    if (!dropAllArmed) { setDropAllArmed(true); return; }
+    setDropAllArmed(false);
+    const dropped = notCleared.filter((c) => { const result = handlers.onWithdrawMarket?.(c.id); return Boolean(result && result.ok); }).map((c) => c.id);
+    if (dropped.length) patch({ selectedCountryIds: draft.selectedCountryIds.filter((id) => !dropped.includes(id)) });
+  };
   const energy = data.energy.current;
   /* one tap for every request that is owed, cheapest first, as far as the free treasury and energy go */
   const owed = chosen.filter((c) => stateOf(c.id).requirement)
@@ -429,7 +444,20 @@ export function StepClearance({ data, draft, chosen, free, handlers, initialCoun
             : `File all ${unfiled.length} · ${money(due)} · ${filingEnergy}E`}
         </button>
       )}
-      {unfiled.length === 0 && <p className="lw-rule">Every market is filed. Reviews run on their own from here.</p>}
+      {/* U6 (2026-11-15): "Reviews run on their own" showed while markets were waiting for the player (197 markets
+         "all approved but stuck"). It now says what is left, and the markets that are not cleared can go in one go. */}
+      {unfiled.length === 0 && (needsYou > 0
+        ? <p className="lw-rule" data-clearance-left>{actionable > 0
+            ? `${actionable} market${actionable === 1 ? '' : 's'} need${actionable === 1 ? 's' : ''} you: open ${actionable === 1 ? 'it' : 'each one'} to answer.`
+            : `${cooling.length} declined market${cooling.length === 1 ? '' : 's'} can be filed again in ${soonest} week${soonest === 1 ? '' : 's'}, or dropped.`}</p>
+        : waiting > 0
+          ? <p className="lw-rule" data-clearance-left>Every market is filed. {waiting} still in review; they run on their own.</p>
+          : <p className="lw-rule" data-clearance-left>Every market is cleared.</p>)}
+      {notCleared.length > 0 && cleared > 0 && (
+        <button type="button" data-drop-not-cleared className={dropAllArmed ? 'sf-btn sf-btn--primary' : 'sf-btn sf-btn--ghost'} onClick={dropNotCleared}>
+          {dropAllArmed ? `Tap again to drop ${notCleared.length} market${notCleared.length === 1 ? '' : 's'}` : `Drop all not cleared (${notCleared.length})`}
+        </button>
+      )}
     </>
   );
 }

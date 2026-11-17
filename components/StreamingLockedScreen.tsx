@@ -52,6 +52,8 @@ interface Props {
   entitlementStatus?: StreamingEntitlementStatus;
   onRetryAccess?: () => void;
   onOpenProductionHouse?: () => void;
+  /** B14b */
+  onOpenStudioContinuation?: (studioId: string, scriptId: string) => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   initialDestination?: 'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE';
@@ -188,6 +190,7 @@ export default function StreamingLockedScreen({
   onRetryAccess,
   onOpenOriginalProduction,
   onOpenProductionHouse,
+  onOpenStudioContinuation,
   onOpenBank,
   initialDestination = 'HOME',
   initialContentMarketOfferId,
@@ -293,6 +296,7 @@ export default function StreamingLockedScreen({
         onBack={onBack}
         onReturnToGame={onReturnToGame}
         onOpenProductionHouse={onOpenProductionHouse}
+        onOpenStudioContinuation={onOpenStudioContinuation}
         onOpenOriginalProduction={onOpenOriginalProduction}
         onOpenBank={onOpenBank}
         initialDestination={headquartersDestination}

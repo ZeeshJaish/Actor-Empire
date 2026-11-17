@@ -82,7 +82,9 @@ export const quoteOf = (q: QuoteInputs): Quote => {
    ============================================================ */
 export const StockBug: React.FC<{
   ticker: string; quote: Quote; onOpen?: () => void;
-}> = ({ ticker, quote, onOpen }) => {
+  /** B26: a chip in the page (the HQ home) instead of a bar fixed over every screen */
+  inline?: boolean;
+}> = ({ ticker, quote, onOpen, inline = false }) => {
   const [flash, setFlash] = useState<'' | 'u' | 'd'>('');
   const prev = useRef(quote.price);
 
@@ -96,7 +98,8 @@ export const StockBug: React.FC<{
 
   const up = quote.pct >= 0;
   return (
-    <button className={cx(css.stbug, up ? css.u : css.d, flash ? css['f' + flash] : '')} data-epx-root onClick={onOpen}>
+    <button className={cx(css.stbug, inline ? css.inline : '', up ? css.u : css.d, flash ? css['f' + flash] : '')} data-epx-root data-stock-chip={inline ? '' : undefined} onClick={onOpen}
+      aria-label={`${ticker} $${quote.price.toFixed(2)}, ${quote.pct >= 0 ? 'up' : 'down'} ${Math.abs(quote.pct).toFixed(1)}%. Why it moved`}>
       <span>{ticker}</span>
       <b>${quote.price.toFixed(2)}</b>
       <em>{up ? '▲' : '▼'}{Math.abs(quote.pct).toFixed(1)}%</em>

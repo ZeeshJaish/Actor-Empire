@@ -32,6 +32,8 @@ import { migrateLegacyCharacterIdentity } from './characterIdentityMigration';
 import { mergeParentStudioTalentRosters } from './talentRoster';
 import { normalizeBackgroundCastingPlan, normalizeLivingEnsembleState } from './livingEnsemble';
 import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
+import { restoreDroppedOriginalCommissions } from './originalsCommissionRepair';
+import { holdPrelaunchPurchasesForSlate } from './streamingCatalog';
 import { normalizeIndustryProductions } from './industryProductions';
 import {
     getCanonicalScheduledRivals,
@@ -1118,7 +1120,9 @@ const withCinemaMigration = (player: Player): Player => {
 };
 export const migratePlayerSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean } = {}): Player => (
     /* 2026-11-11: repairRunawayRivalEconomy bounds the old 1.0.25 rival economy that blocked weeks in 1.0.26 */
-    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : settleLegacySocialCounts(advanceOriginalPitches(healCopiedEpisodeRatings(repairRunawayRivalEconomy(migrateSave(input, options)).player))))
+    /* 2026-11-15 (B13): restoreDroppedOriginalCommissions gives back originals the old 40-item cap dropped */
+    /* 2026-11-15 (B16): holdPrelaunchPurchasesForSlate keeps titles bought before launch on the shelves for the Slate */
+    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : holdPrelaunchPurchasesForSlate(restoreDroppedOriginalCommissions(settleLegacySocialCounts(advanceOriginalPitches(healCopiedEpisodeRatings(repairRunawayRivalEconomy(migrateSave(input, options)).player))))))
 );
 
 const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean }): Player => {

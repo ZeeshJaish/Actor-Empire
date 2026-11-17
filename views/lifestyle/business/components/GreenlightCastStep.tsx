@@ -4,6 +4,7 @@ import {
     ChevronDown,
     Crown,
     Info,
+    Pencil,
     Plus,
     ShieldAlert,
     Users,
@@ -276,17 +277,24 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                 </div>
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                                            <select
-                                                value={role.roleType || 'SUPPORTING'}
-                                                onChange={event => onRoleTypeChange(role.id, event.target.value as GreenlightCastRole['roleType'])}
-                                                className="bg-black/50 border border-zinc-800 rounded-lg px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 focus:outline-none focus:border-emerald-500 hover:border-zinc-700 transition-colors cursor-pointer"
-                                                onClick={event => event.stopPropagation()}
-                                            >
-                                                <option value="LEAD">Lead Role</option>
-                                                <option value="SUPPORTING">Supporting</option>
-                                                <option value="CAMEO">Cameo</option>
-                                                <option value="EXTRA">Extra</option>
-                                            </select>
+                                            {/* 2026-11-16 (player report, EJ: "it only says supporting at the top"): the billing is a
+                                                choice, so it looks like one (a chevron, the same on every phone), and a lead stands out */}
+                                            <span className="relative inline-flex">
+                                                <select
+                                                    value={role.roleType || 'SUPPORTING'}
+                                                    onChange={event => onRoleTypeChange(role.id, event.target.value as GreenlightCastRole['roleType'])}
+                                                    data-role-billing={role.roleType || 'SUPPORTING'}
+                                                    aria-label="Billing"
+                                                    className={`appearance-none rounded-lg border py-1 pl-2.5 pr-6 text-[9px] font-black uppercase tracking-widest transition-colors cursor-pointer focus:outline-none focus:border-emerald-500 ${role.roleType === 'LEAD' ? 'border-amber-400/40 bg-amber-400/10 text-amber-200' : 'border-zinc-700 bg-black/50 text-zinc-300 hover:border-zinc-600'}`}
+                                                    onClick={event => event.stopPropagation()}
+                                                >
+                                                    <option value="LEAD">Lead Role</option>
+                                                    <option value="SUPPORTING">Supporting</option>
+                                                    <option value="CAMEO">Cameo</option>
+                                                    <option value="EXTRA">Extra</option>
+                                                </select>
+                                                <ChevronDown size={11} aria-hidden="true" className={`pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 ${role.roleType === 'LEAD' ? 'text-amber-200' : 'text-zinc-400'}`} />
+                                            </span>
                                             {returningData && <span className="px-2 py-1 rounded-lg bg-purple-500/10 text-purple-300 text-[9px] font-black uppercase tracking-widest">Returning</span>}
                                             {isKnownRole && <span className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-300 text-[9px] font-black uppercase tracking-widest">Known Character</span>}
                                         </div>
@@ -298,7 +306,17 @@ export const GreenlightCastStep: React.FC<GreenlightCastStepProps> = ({
                                             <div className="text-base sm:text-xl font-black text-zinc-500 italic">Pending Audition</div>
                                         )}
                                         {isMissingMovieActorProfile(role.actorId, player.flags.extraNPCs || []) && <p className="mt-2 text-xs leading-relaxed text-amber-200">Profile unavailable. Restore a verified backup or choose another actor to continue with this role.</p>}
-                                    <p className="mt-0.5 truncate text-[11px] italic text-zinc-300">{role.characterName ? `as ${role.characterName}` : 'Character not named yet'}</p>
+                                    {/* 2026-11-16 (player report, EJ: "you cannot change the name of your characters"): the
+                                        name field sat inside the Character fold; the name line opens it */}
+                                    <button
+                                        type="button"
+                                        data-role-name
+                                        onClick={() => setOpenRoleId(role.id)}
+                                        className="mt-0.5 flex max-w-full items-center gap-1 text-left text-[11px] italic text-zinc-300 hover:text-white"
+                                    >
+                                        <span className="truncate">{role.characterName ? `as ${role.characterName}` : 'Name this character'}</span>
+                                        <Pencil size={10} aria-hidden="true" className="shrink-0 text-zinc-500" />
+                                    </button>
                                 </div>
                             </div>
 

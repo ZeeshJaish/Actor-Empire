@@ -226,7 +226,8 @@ export function NetworkMapBox({
       {totals.racks + (totals.compute ?? 0) > 0 && (
         <p className={`bw-place-risk is-${REDUNDANCY_COPY[totals.redundancy].tone}`} role="status">
           <b>{REDUNDANCY_COPY[totals.redundancy].label}</b>
-          {totals.redundancy !== 'REDUNDANT' && <em>{REDUNDANCY_COPY[totals.redundancy].line}</em>}
+          {/* U8 (2026-11-16): "Redundant" is explained too; players read it as "covers everything" */}
+          <em>{REDUNDANCY_COPY[totals.redundancy].line}</em>
           {/* What it costs, beside the picture it is about (#120). The two
               figures on the map are a matched pair — the night, and how much
               of it you serve — so the money goes on the line under them

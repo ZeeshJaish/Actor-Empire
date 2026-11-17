@@ -1,4 +1,5 @@
-import { getGearLineQuality, getGearQuality } from '../../../../services/greenlightSetupEffects';
+import { getGearLineQuality, getGearQuality, getOwnedGearQualityLevel } from '../../../../services/greenlightSetupEffects';
+import { getOwnedEquipmentProjectCost } from '../../../../services/studioProductionEconomy';
 import React from 'react';
 import { type StudioEquipment } from '../../../../types';
 import { getEquipmentStageName } from '../FacilitiesView';
@@ -90,10 +91,11 @@ export const GreenlightEquipmentStep: React.FC<GreenlightEquipmentStepProps> = (
             <p className="text-zinc-400 text-sm">Rent gear or use your studio&apos;s owned equipment to boost quality.</p>
             <div data-gear-total className="mt-3 flex items-center justify-between rounded-lg bg-black/30 px-3 py-2">
                 <span className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400">All four lines add</span>
+                {/* B28: owned gear counts on the rental scale (level 10 = Cutting-Edge), shown to two decimals */}
                 <span className="font-mono text-sm font-black text-emerald-300">+{(Math.round(getGearQuality(GEAR_CATEGORIES.reduce((sum, gear) => {
                     const choice = choices[gear.id];
-                    return sum + (choice === 'OWNED' ? studioEquipment?.[gear.id as keyof StudioEquipment] || 0 : GREENLIGHT_GEAR_TIERS[choice]?.quality || 0);
-                }, 0) / 4) * 10) / 10).toFixed(1)} quality</span>
+                    return sum + (choice === 'OWNED' ? getOwnedGearQualityLevel(studioEquipment?.[gear.id as keyof StudioEquipment] || 0) : GREENLIGHT_GEAR_TIERS[choice]?.quality || 0);
+                }, 0) / 4) * 100) / 100).toFixed(2)} quality</span>
             </div>
         </div>
 
@@ -125,11 +127,12 @@ export const GreenlightEquipmentStep: React.FC<GreenlightEquipmentStepProps> = (
                                         Level {ownedLevel} ({getEquipmentStageName(gear.id, ownedLevel)})
                                     </div>
                                     <div className="text-[10px] text-emerald-400 font-bold mt-0.5">
-                                        Quality +{getGearLineQuality(ownedLevel)}
+                                        Quality +{getGearLineQuality(getOwnedGearQualityLevel(ownedLevel)).toFixed(2)}
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="font-mono font-bold text-emerald-400">$0</div>
+                                {/* B28: it read $0 while the budget charged up to $1.8M; now the real running cost, about 40% of renting the same quality */}
+                                <div className="text-right" data-owned-gear-cost>
+                                    <div className="font-mono font-bold text-emerald-400">{formatMoney(getOwnedEquipmentProjectCost(ownedLevel))}</div>
                                     <div className="text-[9px] uppercase">Cost</div>
                                 </div>
                             </button>
@@ -169,7 +172,7 @@ export const GreenlightEquipmentStep: React.FC<GreenlightEquipmentStepProps> = (
                                             <div className="font-bold text-sm">{specificData.name}</div>
                                             <div className="text-[10px] opacity-80">{specificData.desc}</div>
                                             <div className={`text-[10px] ${colorClass} font-bold mt-0.5`}>
-                                                Quality +{getGearLineQuality(tierData.quality)}
+                                                Quality +{getGearLineQuality(tierData.quality).toFixed(2)}
                                             </div>
                                         </div>
                                         <div className="text-right">

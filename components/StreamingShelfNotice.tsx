@@ -50,12 +50,13 @@ export const StreamingAfterCinemaChoice: React.FC<{
                     </button>
                     <div className={weeks > 0 ? css.roadOn : css.road}>
                         <button type="button" className={css.roadHead} aria-pressed={weeks > 0} onClick={() => setWeeks(current => current || 1)}>
-                            <i aria-hidden="true" /><span><b>Live by itself</b><em>After cinemas close</em></span>
+                            {/* B7/U10: counted from the end of its cinema run, which now ends by week 16 (30 for a long-running hit) */}
+                            <i aria-hidden="true" /><span><b>Live by itself</b><em>After cinemas close · by week 16 of its run, 30 at most</em></span>
                         </button>
                         <div className={css.chips}>
                             {YOUR_SERVICE_AFTER_CINEMA_WEEKS.map(choice => (
                                 <button type="button" key={choice} className={choice === weeks ? css.chipOn : css.chip} aria-pressed={choice === weeks} onClick={() => setWeeks(choice)}>
-                                    {choice === 1 ? 'Next week' : `${choice} weeks`}
+                                    {choice === 1 ? 'The week after' : `${choice} weeks after`}
                                 </button>
                             ))}
                         </div>

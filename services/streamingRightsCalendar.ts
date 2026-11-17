@@ -650,12 +650,21 @@ export const evaluateOwnedStreamingRenewalReturn=(player:Player,contract:Streami
     return {observedWeeks:contributions.length,expectedContribution,requiredRecovery:economics.minimumGuarantee*1.15,
         coversInvestment:contributions.length>=4&&expectedContribution>=economics.minimumGuarantee*1.15};
 };
+/** 2026-11-15 (B18): is the player a party to this deal (their studio sells, or their service buys)? */
+const isPlayerRightsParty = (contract: StreamingRightsContract | undefined): boolean => Boolean(contract) && (
+    contract!.seller.type === 'PLAYER_STUDIO' || contract!.seller.type === 'PLAYER_PLATFORM' || contract!.buyer.type === 'PLAYER_PLATFORM'
+);
+
 export const classifyStreamingRightsRenewalControl = (
     player: Player,
     contract: StreamingRightsContract,
     offer: StreamingRightsRenewalOfferEvaluation,
     management = normalizeStreamingRightsManagementState(player.streamingRightsManagement),
 ): StreamingRightsRenewalControlDecision => {
+    /* 2026-11-15 (B18): the player's rights policy is for the player's own deals. It was applied to every contract in
+       the world, so studios and platforms dealing with each other asked the player to decide ("N rights decisions due"
+       every week, even with no studio and no service). A contract the player is not part of never waits for them. */
+    if (!isPlayerRightsParty(contract)) return { requiresApproval: false, protectionReasons: [], delegatedReason: 'The two companies renewed this between themselves.' };
     const reasons: string[] = [];
     if(contract.buyer.type==='PLAYER_PLATFORM' && offer.proposedEconomics
         && !evaluateOwnedStreamingRenewalReturn(player,contract,offer.proposedEconomics).coversInvestment) reasons.push('RETURN_NOT_SUPPORTED');
@@ -1057,14 +1066,20 @@ export const processStreamingRightsCalendarWeek = (
         && candidate.outcome === 'PENDING'
         && candidate.decisionDeadlineAbsoluteWeek >= week
         && candidate.decisionDeadlineAbsoluteWeek - week <= 1
+        /* B18: only the player's own deals (old saves may still hold world deals marked for approval) */
+        && isPlayerRightsParty(contracts[candidate.sourceContractId])
     ));
+    /* 2026-11-15 (B18): a case stays urgent for two weeks and the mail was keyed by week, so the same decisions were
+       mailed week after week. Each case is mailed once; a week with no new urgent case sends nothing. */
+    const caseNoticeKey = (caseId: string) => `rights-urgent-case:${caseId}`;
+    const newlyUrgentCases = urgentCases.filter(candidate => !resolvedCalendar.urgentNoticeKeys.includes(caseNoticeKey(candidate.id)));
     const urgentKey = `rights-urgent:${week}`;
     const urgentAlreadyRecorded = resolvedCalendar.urgentNoticeKeys.includes(urgentKey);
     const urgentAlreadyDelivered = (nextPlayer.inbox || []).some(message => message.id === urgentKey);
-    const shouldRecordUrgent = urgentCases.length > 0 && !urgentAlreadyRecorded;
+    const shouldRecordUrgent = newlyUrgentCases.length > 0 && !urgentAlreadyRecorded;
     const shouldDeliverUrgent = shouldRecordUrgent && !urgentAlreadyDelivered;
     const nextUrgentNoticeKeys = shouldRecordUrgent
-        ? [...resolvedCalendar.urgentNoticeKeys, urgentKey].slice(-100)
+        ? [...resolvedCalendar.urgentNoticeKeys, urgentKey, ...newlyUrgentCases.map(candidate => caseNoticeKey(candidate.id))].slice(-400)
         : resolvedCalendar.urgentNoticeKeys;
     if (shouldDeliverUrgent) {
         /* 2026-11-11: each title once (a title with several windows was listed several times) */

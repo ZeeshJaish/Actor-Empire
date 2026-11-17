@@ -856,9 +856,9 @@ export const settleStreamingRightsSublicense = (
             ownedStreamingPlatform: {
                 ...nextPlayer.ownedStreamingPlatform,
                 treasuryCash: nextPlayer.ownedStreamingPlatform.treasuryCash - price,
-                /* bought once the service is live: it waits on the shelves for the Slate */
-                catalogLicenses: [...nextPlayer.ownedStreamingPlatform.catalogLicenses,
-                    nextPlayer.ownedStreamingPlatform.launchCommit ? { ...successor, holdForSlate: true } : successor],
+                /* it waits on the shelves for the Slate. B16 (2026-11-15): before launch too; a title bought
+                   before launch used to join the programme by itself and leave the Slate's options */
+                catalogLicenses: [...nextPlayer.ownedStreamingPlatform.catalogLicenses, { ...successor, holdForSlate: true }],
                 catalogProjectIds: Array.from(new Set([
                     ...nextPlayer.ownedStreamingPlatform.catalogProjectIds,
                     successor.sourceProjectId,

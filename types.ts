@@ -2470,6 +2470,8 @@ export interface SeasonEpisodeRatings {
     episodes: EpisodeRating[];
     averageRating: number;
     verdict: 'AWESOME' | 'GREAT' | 'GOOD' | 'REGULAR' | 'BAD' | 'GARBAGE';
+    /** B19: a weekly season still coming out (only the aired episodes are in `episodes`) */
+    airing?: { aired: number; total: number };
 }
 
 export interface PosterElement {
@@ -6891,6 +6893,8 @@ export interface OwnedStreamingOriginalCommission {
     scriptId: string;
     canonicalProjectId: string | null;
     title: string;
+    /** B20: the poster the player set on the Original's page (a saved picture, kept by id) */
+    customPoster?: CustomPoster;
     gapId: StreamingOriginalGapId;
     projectType: ProjectType;
     genre: Genre;

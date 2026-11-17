@@ -888,7 +888,8 @@ export function redundancy(facilities: Facility[]): Redundancy {
 }
 
 export const REDUNDANCY_COPY: Record<Redundancy, { label: string; tone: 'good' | 'warn' | 'bad'; line: string }> = {
-  REDUNDANT: { label: 'Redundant', tone: 'good', line: 'Lose a city and the service stays up.' },
+  /* U8 (2026-11-16): said what it means, since it is about a city failing, not about how much is covered */
+  REDUNDANT: { label: 'Redundant', tone: 'good', line: 'Rooms in 3+ cities: lose one and the service stays up.' },
   EXPOSED: { label: 'Exposed', tone: 'warn', line: 'Lose the wrong city and a region goes dark.' },
   SINGLE: { label: 'Single point of failure', tone: 'bad', line: 'One room, one power feed, one bad night.' },
 };

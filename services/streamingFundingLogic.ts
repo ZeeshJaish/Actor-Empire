@@ -331,7 +331,10 @@ export const applyLockedSeasonFunding = ({
 
 // Existing funds without an explicit deadline retain their original allowance.
 export const STREAMING_FUNDING_DEADLINE_WEEKS = 104;
-export const PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS = 26;
+/* 2026-11-15 (B15): was 26 weeks from the sale. Season 2 can only start after the platform's premiere (its own
+   pick), 6–8 weeks of streaming and a new script (27–37 weeks), so a 26-week clock ran out before the player could
+   act, and the deal cancelled itself with a claim and lost trust. Two years from the sale, as the copy already says. */
+export const PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS = 104;
 export const STREAMING_FUNDING_FIRST_WARNING_WEEKS = 26;
 export const STREAMING_FUNDING_FINAL_WARNING_WEEKS = 8;
 
@@ -407,9 +410,14 @@ export const processStreamingFundingContracts = ({
         const createdYear = Math.max(0, Math.floor(Number(funding.createdYear) || currentYear));
         const extensionWeeks = Math.max(0, Math.floor(Number(funding.deadlineExtensionWeeks) || 0));
         const requestedDeadline = Number(funding.deadlineWeeks);
-        const baseDeadlineWeeks = Number.isFinite(requestedDeadline) && requestedDeadline >= 1
+        const storedDeadlineWeeks = Number.isFinite(requestedDeadline) && requestedDeadline >= 1
             ? Math.floor(requestedDeadline)
             : STREAMING_FUNDING_DEADLINE_WEEKS;
+        /* B15: a season fund from a sold first season (it names that season) gets the full player allowance,
+           so funds saved with the old 26 weeks are not cancelled before season 2 can even start */
+        const baseDeadlineWeeks = funding.sourceProjectId
+            ? Math.max(storedDeadlineWeeks, PLAYER_STREAMING_FUNDING_DEADLINE_WEEKS)
+            : storedDeadlineWeeks;
         const deadlineWeeks = baseDeadlineWeeks + extensionWeeks;
         const ageWeeks = Math.max(0, currentAbsoluteWeek - getAbsoluteContractWeek(createdYear, createdWeek));
         const weeksRemaining = deadlineWeeks - ageWeeks;

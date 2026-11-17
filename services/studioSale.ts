@@ -852,12 +852,52 @@ const makeSaleSnapshot = (player: Player, studio: Business): NonNullable<StudioS
     }),
 });
 
+/* B23 (2026-11-15): the terms went out of date every week, because the snapshot also held the catalogue's value, the
+   studio's quality, its earnings and stock at the live price, which all move weekly. "Choose Buyer" then did nothing.
+   Only cash, debt, ownership and the assets themselves count now, money with a tolerance. */
+const SALE_MONEY_TOLERANCE_SHARE = 0.02;
+const SALE_MONEY_TOLERANCE_FLOOR = 250_000;
+const SALE_OWNERSHIP_TOLERANCE = 0.005;
+const moneyClose = (left: number, right: number): boolean => (
+    Math.abs(left - right) <= Math.max(SALE_MONEY_TOLERANCE_FLOOR, Math.max(Math.abs(left), Math.abs(right)) * SALE_MONEY_TOLERANCE_SHARE)
+);
+const idsOf = (value: unknown): string => JSON.stringify((Array.isArray(value) ? value : [])
+    .map(item => (item && typeof item === 'object' ? String((item as { id?: unknown }).id ?? JSON.stringify(item)) : String(item))).sort());
+/* the assets in a sale fingerprint, without the figures that move every week */
+const saleAssets = (fingerprint: string): string => {
+    let parsed: Record<string, unknown> = {};
+    try { parsed = JSON.parse(fingerprint) as Record<string, unknown>; } catch { return fingerprint; }
+    const holdings = (value: unknown) => JSON.stringify((Array.isArray(value) ? value : []).map(item => {
+        const row = (item || {}) as Record<string, unknown>;
+        return `${String(row.id ?? row.studioId ?? row.companyId ?? row.stockId ?? '')}:${String(row.shares ?? row.ownershipPercent ?? row.percent ?? '')}`;
+    }).sort());
+    return JSON.stringify({
+        config: parsed.config, departments: parsed.departments, equipment: parsed.equipment,
+        scripts: idsOf(parsed.scripts), concepts: idsOf(parsed.concepts), ownedRights: idsOf(parsed.ownedRights),
+        purchasedIPTitles: idsOf(parsed.purchasedIPTitles), locations: parsed.locations,
+        corporatePrivateHoldings: holdings(parsed.corporatePrivateHoldings), corporateStockAssets: holdings(parsed.corporateStockAssets),
+    });
+};
+export const isStudioSaleSnapshotCurrent = (
+    stored: NonNullable<StudioSaleDeck['saleSnapshot']>,
+    fresh: NonNullable<StudioSaleDeck['saleSnapshot']>,
+): boolean => {
+    if (stored.studios.length !== fresh.studios.length) return false;
+    return stored.studios.every((part, index) => {
+        const now = fresh.studios[index];
+        return Boolean(now) && now.id === part.id
+            && moneyClose(part.cash, now.cash) && moneyClose(part.debt, now.debt)
+            && Math.abs(part.ownershipPercent - now.ownershipPercent) <= SALE_OWNERSHIP_TOLERANCE
+            && saleAssets(part.materialFingerprint) === saleAssets(now.materialFingerprint);
+    });
+};
+
 export const getStudioSaleRevalidationIssue = (player: Player, studio: Business, deck = studio.studioState?.saleDeck): string | null => {
     if (!deck || ['CLOSED', 'WITHDRAWN'].includes(deck.status)) return null;
     if (!deck.saleSnapshot || deck.saleSnapshot.version !== 1) {
         return 'This saved sale room needs buyer revalidation. Refresh buyer terms before accepting or signing.';
     }
-    if (JSON.stringify(deck.saleSnapshot) !== JSON.stringify(makeSaleSnapshot(player, studio))) {
+    if (!isStudioSaleSnapshotCurrent(deck.saleSnapshot, makeSaleSnapshot(player, studio))) {
         return 'Studio cash, debt, ownership or assets changed. Refresh buyer terms to reprice the package before accepting or signing.';
     }
     return null;

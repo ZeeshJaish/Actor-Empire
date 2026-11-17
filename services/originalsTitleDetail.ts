@@ -269,7 +269,10 @@ export const getOriginalTitleDetail = (player: Player, commissionId: string): Or
         wins: stage === 'LIVE' ? (player.world?.awardHistory || []).flatMap(entry => entry.winners
             .filter(winner => winner.projectId === id)
             .map(winner => ({ category: winner.category, show: entry.type === 'EMMY' ? 'Emmys' : entry.type === 'GOLDEN_GLOBE' ? 'Golden Globes' : entry.type === 'OSCAR' ? 'Oscars' : String(entry.type).replace(/_/g, ' '), year: entry.year }))) : [],
-        reviews: stage === 'LIVE' ? (Array.isArray(details.reviews) ? details.reviews : []).slice(0, 2).map((review: any) => ({ id: String(review.id), text: String(review.text), publication: String(review.publication || '') })) : [],
+        /* 2026-11-16: a release picks its reviews at random, so its first two could be the same line twice */
+        reviews: stage === 'LIVE' ? (Array.isArray(details.reviews) ? details.reviews : [])
+            .filter((review: any, index: number, all: any[]) => all.findIndex((other: any) => String(other?.text) === String(review?.text)) === index)
+            .slice(0, 2).map((review: any) => ({ id: String(review.id), text: String(review.text), publication: String(review.publication || '') })) : [],
     };
 };
 

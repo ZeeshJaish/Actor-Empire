@@ -30,7 +30,9 @@ export const CampaignScenePreview: React.FC<{ subject: CreativeSubject; onClose:
   useEffect(() => {
     let alive = true;
     Promise.all(ORDER.map(id => makeDefaultCreative(subject, CAMPAIGN_SCENES[id].aspect).then(canvas => [id, canvas] as const)))
-      .then(entries => { if (alive) setMade(Object.fromEntries(entries)); });
+      .then(entries => { if (alive) setMade(Object.fromEntries(entries)); })
+      /* 2026-11-16: no canvas memory: the preview shows its places without the made-for-you pictures */
+      .catch(() => undefined);
     return () => { alive = false; };
   }, [subject.title, subject.service, subject.hue, subject.brandHue]);
   useEffect(() => () => urls.current.forEach(url => URL.revokeObjectURL(url)), []);

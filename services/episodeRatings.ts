@@ -181,6 +181,28 @@ export const buildEpisodeRatingsStory = ({
     };
 };
 
+/* B19 (2026-11-15): a season released an episode a week is rated as it airs. Its ratings are still made at
+   the premiere (the renewal talk reads the whole season), but the screens show only the episodes that are
+   out: episode 1 in the premiere week, episode 2 a week later, and so on. A player saw every episode of a
+   weekly Original already rated on IMDb on premiere night. */
+const releasePatternOf = (row: any) => row?.projectDetails?.hiddenStats?.ownedStreamingReleasePattern ?? row?.hiddenStats?.ownedStreamingReleasePattern;
+
+/** How many episodes of a weekly season are out by `now` (null: not a weekly season, or no clock to read) */
+export const getAiredEpisodeCount = (row: any, now: number | undefined): number | null => {
+    if (now === undefined || !Number.isFinite(now) || releasePatternOf(row) !== 'WEEKLY') return null;
+    const releasedAt = Number(row?.releasedAtAbsoluteWeek ?? row?.projectDetails?.releasedAtAbsoluteWeek);
+    if (!Number.isFinite(releasedAt)) return null;
+    return Math.max(0, Math.floor(now - releasedAt) + 1);
+};
+
+/** The season as far as it has aired: its episodes so far, their average and verdict, and how far it has got */
+export const limitToAiredEpisodes = (season: SeasonEpisodeRatings, aired: number | null): SeasonEpisodeRatings => {
+    if (aired === null || aired >= season.episodes.length) return season;
+    const episodes = season.episodes.slice(0, aired);
+    const averageRating = episodes.length ? roundRating(episodes.reduce((sum, item) => sum + item.rating, 0) / episodes.length) : 0;
+    return { ...season, episodes, averageRating, verdict: getEpisodeRatingVerdict(averageRating), airing: { aired: episodes.length, total: season.episodes.length } };
+};
+
 export const generateEpisodeRatings = (release: EpisodeRatingSource): SeasonEpisodeRatings[] => {
     const details = (release.projectDetails || release) as Partial<ProjectDetails> & EpisodeRatingSource;
     const mediaType = release.type || release.projectType || details.type;

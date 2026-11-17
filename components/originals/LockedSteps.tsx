@@ -6,6 +6,7 @@ import { PinnedBar } from './CommissionDealAndGo';
 /**
  * #285: on a pitch, each Greenlight step is an overview of what the studio chose: the choice, its face, its price.
  * They read like the real screens, and there is nothing to press but Next and Skip to Deal.
+ * B21 (2026-11-15): except the characters' names on the Cast step, which the player writes, as in the studio.
  */
 
 const money = (value: number) => (value >= 1_000_000_000
@@ -23,10 +24,12 @@ export const LockedShell: React.FC<{
     onNext: () => void;
     onSkip: () => void;
     children: React.ReactNode;
-}> = ({ studioName, nextLabel, onBack, onNext, onSkip, children }) => (
+    /** B21: what the player can still do on this step, said in the banner */
+    note?: string;
+}> = ({ studioName, nextLabel, onBack, onNext, onSkip, children, note }) => (
     <div data-locked-step className="space-y-2.5 px-4 pb-44 pt-4">
         <div data-locked-banner className="flex items-center gap-2 rounded-xl border border-violet-300/25 bg-violet-500/10 px-3 py-2 text-[11px] font-bold text-violet-100">
-            <Lock size={12} className="shrink-0" /> {studioName} chose this. You can see it, not change it.
+            <Lock size={12} className="shrink-0" /> {note || `${studioName} chose this. You can see it, not change it.`}
         </div>
         {children}
         <PinnedBar onBack={onBack} nextLabel={nextLabel} onNext={onNext} skip={onSkip} />
@@ -85,7 +88,10 @@ export const LockedCast: React.FC<{
     dna: Array<{ label: string; value: string }>;
     balance?: number;
     roles: LockedRole[];
-}> = ({ dna, balance, roles }) => (
+    /** B21 (2026-11-15): the studio chose the cast, the player names the characters (the studio Greenlight's own field) */
+    onRename?: (roleId: string, value: string) => void;
+    onRenameDone?: (roleId: string, index: number) => void;
+}> = ({ dna, balance, roles, onRename, onRenameDone }) => (
     <>
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-emerald-300">Script DNA</div>
@@ -107,18 +113,33 @@ export const LockedCast: React.FC<{
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500">Roles</div>
             <div className="space-y-2">
-                {roles.map(role => (
+                {roles.map((role, index) => (
                     <div key={role.id} data-locked-role className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-2.5">
                         <Face name={role.name} gender={role.gender} />
                         <span className="min-w-0">
                             <span className="block text-sm font-black leading-tight">{role.name}</span>
-                            {role.character && <span className="block text-[11px] font-semibold leading-tight text-zinc-300">as {role.character}</span>}
+                            {!onRename && role.character && <span className="block text-[11px] font-semibold leading-tight text-zinc-300">as {role.character}</span>}
                             <span className="block text-[9px] font-black uppercase tracking-[0.06em] text-zinc-500">{role.functionLabel}</span>
                         </span>
                         <span className="text-right">
                             <span className="block font-mono text-xs font-black text-amber-300">{money(role.fee)}</span>
                             <span className="block text-[9px] font-black text-emerald-300">Fit {role.fit}</span>
                         </span>
+                        {onRename && (
+                            <label className="col-span-3 flex min-h-[40px] items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-2.5 focus-within:border-emerald-400/60">
+                                <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.1em] text-zinc-500">as</span>
+                                <input
+                                    data-locked-character
+                                    value={role.character || ''}
+                                    onChange={event => onRename(role.id, event.target.value)}
+                                    onBlur={() => onRenameDone?.(role.id, index)}
+                                    placeholder="Name the character"
+                                    maxLength={40}
+                                    aria-label={`Character played by ${role.name}`}
+                                    className="min-w-0 flex-1 bg-transparent text-[13px] font-bold text-white placeholder:text-zinc-600 focus:outline-none"
+                                />
+                            </label>
+                        )}
                     </div>
                 ))}
             </div>

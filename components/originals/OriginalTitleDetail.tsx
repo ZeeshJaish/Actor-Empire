@@ -1,10 +1,13 @@
 import { LICENCE_SHARE_OF_MAKING } from '../../services/originalsDeal';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Clapperboard, Film, Sparkles, Star, Tv, X, Zap, CalendarDays, Scissors } from 'lucide-react';
+import { Check, Clapperboard, Film, Sparkles, Star, Tv, X, Zap, CalendarDays, Scissors, ImagePlus } from 'lucide-react';
 import type { Player } from '../../types';
+import { buildProjectPosterIndex, setTitlePoster } from '../../services/projectPosterIndex';
+import { createCustomPosterBlobFromFile, saveCustomPosterMedia } from '../../services/customPosterMedia';
 import { getOriginalTitleDetail, ORIGINAL_JOURNEY_STEPS, ORIGINAL_NOTE_QUALITY, takeOriginalExtra, takeOriginalNote, type OriginalTitleDetail as Detail } from '../../services/originalsTitleDetail';
 import { endOriginal, extendOriginalLicence, getOriginalFutureView, renewOriginal, spinOffOriginal } from '../../services/originalsRenewal';
+import { getOriginalOwnMaker, getOriginalSpinOffScript, prepareOriginalSpinOffScript } from '../../services/originalSpinOffScript';
 import type { OriginalCommissionMoment } from '../../services/originalsCommission';
 import { CommissionMoment } from './CommissionDealAndGo';
 import { OriginalPoster } from './OriginalsDesk';
@@ -76,12 +79,14 @@ export const OriginalTitleDetail: React.FC<{
     onUpdatePlayer: (player: Player) => void;
     onClose: () => void;
     onAction: (action: OriginalTitleAction, detail: Detail) => void;
+    /** 2026-11-16: open the Commission wizard on one of the player's own scripts (a spin-off's, to cast it) */
+    onCommissionScript?: (scriptId: string) => void;
     /** #292: open another season's page */
     onOpenTitle?: (commissionId: string) => void;
     initialNotice?: string;
     /** #317: all the numbers, read when they are asked for and shown here on this page */
     numbers?: { brand: Brand; title: DossierTitle } | null;
-}> = ({ player, commissionId, onUpdatePlayer, onClose, onAction, onOpenTitle, initialNotice, numbers }) => {
+}> = ({ player, commissionId, onUpdatePlayer, onClose, onAction, onOpenTitle, initialNotice, numbers, onCommissionScript }) => {
     const [notice, setNotice] = useState(initialNotice || '');
     const [showNumbers, setShowNumbers] = useState(false);
     const numbersRef = useRef<HTMLDivElement | null>(null);
@@ -96,7 +101,28 @@ export const OriginalTitleDetail: React.FC<{
     /* reads the studio's record and the week's chart once for each week or change, never on a tap */
     const detail = useMemo(() => getOriginalTitleDetail(player, commissionId), [commissionId, commissions, player.age, player.currentWeek, player.commitments]);
     const future = useMemo(() => (detail?.stage === 'LIVE' ? getOriginalFutureView(player, commissionId, episodes ?? undefined) : null), [detail?.stage, commissionId, episodes, commissions, player.age, player.currentWeek, player.energy?.current]);
+    /* B20: the title's own poster, and a way to set one (an Original made by another studio had none) */
+    const posters = useMemo(() => buildProjectPosterIndex(player), [player]);
+    const posterInput = useRef<HTMLInputElement | null>(null);
+    const [posterBusy, setPosterBusy] = useState(false);
     if (!detail) return null;
+    const poster = posters.get(detail.commission.canonicalProjectId || '') || posters.get(detail.commission.id);
+    const choosePoster = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        setPosterBusy(true);
+        try {
+            const picture = await createCustomPosterBlobFromFile(file);
+            const media = await saveCustomPosterMedia(detail.commission.canonicalProjectId || detail.commission.id, picture.blob, { width: picture.width, height: picture.height });
+            onUpdatePlayer(setTitlePoster(player, { projectId: detail.commission.canonicalProjectId, commissionId: detail.commission.id }, { type: 'IMAGE', posterMediaId: media.id }));
+            setNotice('Poster saved. It shows here, on the Slate and on your service.');
+        } catch (error) {
+            setNotice(error instanceof Error ? error.message : 'That picture could not be used as a poster.');
+        } finally {
+            setPosterBusy(false);
+        }
+    };
     const next = future?.next;
     const stepEpisodes = (change: number) => setEpisodes(Math.max(4, Math.min(24, (episodes ?? detail.commission.episodes) + change)));
     const renew = () => {
@@ -107,7 +133,20 @@ export const OriginalTitleDetail: React.FC<{
         setRenewing(false);
         if (result.moment) setMoment({ title: result.title || detail.title, data: result.moment });
     };
+    /* 2026-11-16 (player report, EJ; Zeesh: cast it as the production house Greenlight does): a spin-off of an Original your
+       own studio made is a script in that studio, cast and commissioned in the wizard. One an outside studio made is
+       still ordered in one tap (they cast it). */
+    const ownMaker = getOriginalOwnMaker(player, commissionId);
+    const spinOffScript = ownMaker ? getOriginalSpinOffScript(player, commissionId) : null;
     const spinOff = () => {
+        if (ownMaker && onCommissionScript) {
+            if (spinOffScript?.ready) { onCommissionScript(spinOffScript.scriptId); return; }
+            const prepared = prepareOriginalSpinOffScript(player, commissionId);
+            setNotice(prepared.message);
+            if (prepared.changed) onUpdatePlayer(prepared.player);
+            if (prepared.scriptId) onCommissionScript(prepared.scriptId);
+            return;
+        }
         const result = spinOffOriginal(player, commissionId);
         setNotice(result.message);
         if (!result.changed) return;
@@ -158,8 +197,9 @@ export const OriginalTitleDetail: React.FC<{
     return createPortal(
         <div data-original-title={detail.stage} className="fixed inset-0 z-[85] flex flex-col overflow-hidden bg-[#0a0406] font-sans text-white">
             <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                <OriginalPoster title={detail.title} className="h-[196px]">
+                <OriginalPoster title={detail.title} className="h-[196px]" poster={poster}>
                     <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/30 to-[#0a0406]" />
+                    <input ref={posterInput} type="file" accept="image/*" className="hidden" onChange={choosePoster} />
                     <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 pt-[calc(env(safe-area-inset-top)+12px)]">
                         <div className="flex min-w-0 flex-wrap gap-1.5" data-title-chips>
                             <span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] ${detail.stage === 'LIVE' ? 'bg-amber-300 text-black' : 'bg-rose-500 text-white'}`}>{detail.stageChip}</span>
@@ -167,7 +207,15 @@ export const OriginalTitleDetail: React.FC<{
                             {detail.rating !== null && <span className="rounded-full bg-amber-300 px-2.5 py-1 text-[9px] font-black text-black">★ {detail.rating.toFixed(1)}</span>}
                             <span className="max-w-[170px] truncate rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-white" style={{ background: detail.color }}>{detail.byLabel}</span>
                         </div>
-                        <button type="button" onClick={onClose} aria-label="Close" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/60"><X size={17} /></button>
+                        <div className="flex shrink-0 items-center gap-2">
+                            {/* B20: the studio's Edit Poster, here too: a commissioned Original had nowhere to set one */}
+                            <button type="button" data-edit-poster onClick={() => posterInput.current?.click()} disabled={posterBusy}
+                                aria-label={poster ? 'Change poster' : 'Add a poster'} title={poster ? 'Change poster' : 'Add a poster'}
+                                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/60 text-white disabled:animate-pulse disabled:opacity-60">
+                                <ImagePlus size={17} />
+                            </button>
+                            <button type="button" onClick={onClose} aria-label="Close" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-black/60"><X size={17} /></button>
+                        </div>
                     </div>
                     <div className="absolute inset-x-0 bottom-0 px-4 pb-2">
                         <h1 className="font-serif text-[32px] font-bold italic leading-[1.02] text-white [overflow-wrap:anywhere]">{detail.title}</h1>
@@ -353,13 +401,18 @@ export const OriginalTitleDetail: React.FC<{
                                 <button type="button" data-title-next onClick={() => onOpenTitle?.(future.nextCommissionId!)} className="min-h-[52px] w-full rounded-2xl border border-rose-400/40 bg-rose-500/15 text-[12px] font-black uppercase tracking-[0.06em] text-rose-200">The next one is ordered ›</button>
                             ) : future.waitWeeks > 0 ? (
                                 <div data-title-wait className="min-h-[52px] rounded-2xl border border-white/10 bg-zinc-900 px-3 py-4 text-center text-[12px] font-black uppercase tracking-[0.06em] text-zinc-400">Renewal opens in {weeksWords(future.waitWeeks)}</div>
-                            ) : next && (
+                            ) : next ? (
                                 <button type="button" data-title-renew onClick={() => setRenewing(true)} className="min-h-[52px] w-full rounded-2xl bg-rose-500 text-[13px] font-black uppercase tracking-[0.06em] text-white">
                                     {detail.isSeries ? `Renew season ${next.nextSeason}` : 'Order a sequel'} · about {money(next.total)}
                                 </button>
+                            ) : (
+                                /* 2026-11-15 (B14): never a silent gap where Renew should be */
+                                <div data-title-renew-unavailable className="min-h-[52px] rounded-2xl border border-white/10 bg-zinc-900 px-3 py-4 text-center text-[12px] font-black uppercase tracking-[0.06em] text-zinc-400">
+                                    {detail.isSeries ? 'Renew isn’t available for this season' : 'A sequel isn’t available for this title'}
+                                </div>
                             )}
-                            <div className={`grid gap-2.5 ${future.canSpinOff && !future.nextCommissionId ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                                {future.canSpinOff && !future.nextCommissionId && <button type="button" data-title-spinoff onClick={spinOff} disabled={future.waitWeeks > 0 || future.ended} className="min-h-11 rounded-xl border border-white/10 bg-zinc-900 text-[11px] font-black uppercase tracking-[0.04em] text-white disabled:opacity-40">Spin-off</button>}
+                            <div className={`grid gap-2.5 ${(future.canSpinOff && !future.nextCommissionId) || spinOffScript?.ready ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                {((future.canSpinOff && !future.nextCommissionId) || spinOffScript?.ready) && <button type="button" data-title-spinoff onClick={spinOff} disabled={!spinOffScript?.ready && (future.waitWeeks > 0 || future.ended)} className="min-h-11 rounded-xl border border-white/10 bg-zinc-900 text-[11px] font-black uppercase tracking-[0.04em] text-white disabled:opacity-40">Spin-off</button>}
                                 <button type="button" data-title-campaign onClick={() => onAction('campaign', detail)} className="min-h-11 rounded-xl border border-white/10 bg-zinc-900 text-[11px] font-black uppercase tracking-[0.04em] text-white">Campaign</button>
                                 <button type="button" data-title-end onClick={end} disabled={future.ended} className={`min-h-11 rounded-xl border text-[11px] font-black uppercase tracking-[0.04em] disabled:opacity-40 ${confirmEnd ? 'border-rose-400 bg-rose-500 text-white' : 'border-white/10 bg-zinc-900 text-white'}`}>{confirmEnd ? 'Sure? End it' : 'End it'}</button>
                             </div>

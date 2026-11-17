@@ -140,6 +140,8 @@ import { applyStreamingBrandLook, getStreamingBrandStudioView, rebrandStreamingI
 import { streamingLaunchUnlockLock } from '../services/streamingLaunchUnlocks';
 import { resolveStreamingTechTree } from '../services/streamingTechTreeCatalogue';
 import { getStreamingWeeklyChartView } from '../services/streamingWeeklyChart';
+import { getLatestStreamingTitleWeekRows } from '../services/streamingTitleWeekPerformance';
+import { getOwnStudioNextSeason } from '../services/ownStudioNextSeason';
 import {
   derive as deriveStreamingBuild,
   presetPlacements as streamingPresetPlacements,
@@ -302,6 +304,8 @@ interface Props {
   onBack: () => void;
   onReturnToGame?: () => void;
   onOpenProductionHouse?: () => void;
+  /** B14b: open the player's studio Vault on a script (a studio series' next season) */
+  onOpenStudioContinuation?: (studioId: string, scriptId: string) => void;
   onOpenOriginalProduction?: (target: { studioId: string; scriptId: string; commissionId: string }) => void;
   onOpenBank?: () => void;
   /** #75: STATUS opens the Platform room on its STATUS tab (the incident popup's "Open STATUS") */
@@ -470,7 +474,7 @@ export default function StreamingPlatformHQ(props: React.ComponentProps<typeof S
   );
 }
 
-function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenProductionHouse, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
+function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdate, onBack, onReturnToGame, onOpenOriginalProduction, onOpenProductionHouse, onOpenStudioContinuation, onOpenBank, initialDestination = 'HOME', initialContentMarketOfferId, onContentMarketOfferConsumed }: Props) {
   const projectionSourceRef = useRef<ReturnType<typeof advanceStreamingPresentationCursor> | undefined>(undefined);
   projectionSourceRef.current = advanceStreamingPresentationCursor(projectionSourceRef.current, player);
   const readPlayer: Player = projectionSourceRef.current.source;
@@ -556,6 +560,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   const [originalDetailId, setOriginalDetailId] = useState<string | null>(null);
   const [originalDetailNotice, setOriginalDetailNotice] = useState('');
   const [commissionPitchId, setCommissionPitchId] = useState<string | null>(null);
+  /* 2026-11-16: a spin-off's script opened in the Commission wizard from its show's page */
+  const [commissionScriptId, setCommissionScriptId] = useState<string | null>(null);
   const [showRightsExchange, setShowRightsExchange] = useState(false);
   const [rightsExchangeInitialTab, setRightsExchangeInitialTab] = useState<RightsExchangeTab>('MARKET');
   const [showAcquisitionCommand, setShowAcquisitionCommand] = useState(false);
@@ -728,7 +734,8 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     const absoluteWeek = getAbsoluteWeek(readPlayer.age, readPlayer.currentWeek);
     const headline = getStreamingPlatformHeadline(readPlayer);
     const latestPerformance = latestWeeklySnapshot?.operations?.titlePerformance ?? [];
-    const performanceByProject = new Map(latestPerformance.map(item => [item.projectId, item]));
+    /* B16: every title's latest week (the weekly record keeps 24; the viewing engine's rows fill in the rest) */
+    const performanceByProject = new Map([...getLatestStreamingTitleWeekRows(readPlayer, readPlatform)].map(([projectId, read]) => [projectId, read.row]));
     const mostWatched = [...latestPerformance].sort((a, b) => b.viewingAccounts - a.viewingAccounts)[0];
     const activeRegions = readPlatform.competitiveWorld.regionalLaunches.filter(region => region.status === 'ACTIVE').length;
     const isPreLaunch = readPlatform.lifecycle === 'FOUNDING' && !readPlatform.launchCommit;
@@ -1307,10 +1314,14 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
   }, [builtFacilities, readPlatform.infrastructureSetup]);
   const cinematicDossier = useStreamingView<StreamingDossierTitle | null>(() => {
     if (!titleDossierInitialProjectId) return null;
-    const performance = [...(readPlatform.weeklyHistory || [])]
+    /* B16: the latest week first (the weekly record keeps 24 titles, the viewing engine's rows fill in the
+       rest), else the last week the record kept this title */
+    const latestRead = getLatestStreamingTitleWeekRows(readPlayer, readPlatform).get(titleDossierInitialProjectId);
+    const performance = latestRead?.row ?? [...(readPlatform.weeklyHistory || [])]
       .reverse()
       .flatMap(snapshotValue => snapshotValue.operations?.titlePerformance || [])
       .find(item => item.projectId === titleDossierInitialProjectId);
+    const detailed = latestRead ? latestRead.detailed : Boolean(performance);
     const catalogue = cinematicContentState().titles.find(item => item.id === titleDossierInitialProjectId);
     if (!performance && !catalogue) return null;
     const title = performance?.title || catalogue?.title || 'Streaming title';
@@ -1346,14 +1357,22 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
       rightsInvestment: readPlatform.catalogLicenses
         .filter(license => license.sourceProjectId === titleDossierInitialProjectId)
         .reduce((total, license) => total + license.minimumGuarantee, 0),
-      financialsAvailable: Boolean(performance),
+      /* B16: the cost split is in the weekly record only; the engine's row still knows the title's revenue */
+      financialsAvailable: detailed,
+      revenueKnown: Boolean(performance),
+      /* B14b: a series from the player's own studio: its next season in the studio's Vault */
+      ...(() => {
+        const next = getOwnStudioNextSeason(readPlayer, titleDossierInitialProjectId);
+        return next ? { nextSeason: { number: next.seasonNumber, ready: Boolean(next.scriptId && onOpenStudioContinuation), note: next.note } } : {};
+      })(),
       sources: sourceMix ? [
         { label: 'Homepage', pct: sourceMix.homepagePercent },
         { label: 'Recommendations', pct: sourceMix.recommendationsPercent },
         { label: 'Search', pct: sourceMix.searchPercent },
         { label: 'Direct', pct: sourceMix.directPercent },
       ] : [{ label: 'Platform discovery', pct: 100 }],
-      journey: { steps: ['Acquired', 'Prepared', 'Scheduled', 'Live', 'Peak', 'Long tail'], at: performance ? Math.min(5, 3 + Math.floor(performance.weeksAvailable / 3)) : 2 },
+      /* B16: a title the Library calls LIVE is at least Live here, even before its first measured week */
+      journey: { steps: ['Acquired', 'Prepared', 'Scheduled', 'Live', 'Peak', 'Long tail'], at: performance ? Math.min(5, 3 + Math.floor(performance.weeksAvailable / 3)) : catalogue?.status === 'LIVE' ? 3 : 2 },
       dna: [
         { label: 'Reach', value: Math.min(100, Math.round((performance?.viewingAccounts || 0) / Math.max(1, readPlatform.metrics.subscribers) * 100)) },
         { label: 'Completion', value: completion },
@@ -2306,6 +2325,9 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
     <StreamingPlatformCommandDeck
       brand={commandDeckBrand()}
       state={commandDeckState()}
+      stockChip={platform.publicCompany.listing && stockQuote() ? (
+        <StreamingStockBug inline ticker={platform.publicCompany.listing.ticker} quote={stockQuote()!} onOpen={() => setShowCinematicStock(true)} />
+      ) : undefined}
       onBack={onBack}
       onCommission={() => platform.starterCatalog ? setShowOriginalsDesk(true) : setShowContentMarket(true)}
       onOpenDivision={openCommandDivision}
@@ -2445,7 +2467,19 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           persistCanonical(result.player);
           if (!result.scheduled.length) return { ok: true, message: 'Your planned premieres are off the slate; nothing fits a week right now.' };
           const weekOf = (item: { absoluteWeek: number }) => (platform.launchCommit ? `W${(item.absoluteWeek % 52) + 1}` : item.absoluteWeek === 1 ? 'opening night' : `W${item.absoluteWeek}`);
-          return { ok: true, message: `${fresh ? 'Planned anew. ' : ''}Scheduled ${result.scheduled.length}: ${result.scheduled.map(item => `${item.title} (${weekOf(item)})`).join(', ')}.` };
+          /* B17: the plan card already listed every title and week, so the note is the count and the span
+             (it used to list all of them: 50 titles made a wall of text under the button) */
+          const count = result.scheduled.length;
+          const first = result.scheduled[0];
+          const last = result.scheduled[count - 1];
+          const yearOf = (item: { absoluteWeek: number }) => Math.floor(item.absoluteWeek / 52) + 1;
+          /* a span that crosses into the next year names both years (W33 to W32 would read backwards) */
+          const span = !platform.launchCommit || yearOf(first) === yearOf(last)
+            ? `${weekOf(first)} to ${weekOf(last)}`
+            : `${weekOf(first)} (year ${yearOf(first)}) to ${weekOf(last)} (year ${yearOf(last)})`;
+          return { ok: true, message: `${fresh ? 'Planned anew. ' : ''}${count === 1
+            ? `Scheduled ${first.title} (${weekOf(first)}).`
+            : `Scheduled ${count} premieres, ${span}.`}` };
         }}
         onClearSlatePlans={() => {
           const result = clearStreamingSlatePlans(player);
@@ -3057,6 +3091,10 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
             leave();
             setRightsExchangeInitialTab('CALENDAR');
             setShowRightsExchange(true);
+          } else if (action === 'order-season') {
+            /* B14b: the next season is made in the player's own studio, from its Vault */
+            const next = getOwnStudioNextSeason(player, projectId);
+            if (next?.studioId && next.scriptId && onOpenStudioContinuation) { leave(); onOpenStudioContinuation(next.studioId, next.scriptId); }
           }
         }}
       />
@@ -3140,13 +3178,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
         />
       ) : null}
 
-      {platform.publicCompany.listing && stockQuote() ? (
-        <StreamingStockBug
-          ticker={platform.publicCompany.listing.ticker}
-          quote={stockQuote()}
-          onOpen={() => setShowCinematicStock(true)}
-        />
-      ) : null}
+      {/* B26: the share price lives on the HQ home (stockChip on the command deck), not fixed over every screen */}
       {showCinematicStock && platform.publicCompany.listing && stockQuote() ? (
         <StreamingStockPanel
           ticker={platform.publicCompany.listing.ticker}
@@ -3302,7 +3334,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           player={player}
           onUpdatePlayer={persist}
           onClose={() => setShowOriginalsDesk(false)}
-          onCommission={pitchId => { setShowOriginalsDesk(false); setCommissionPitchId(pitchId || null); setShowCommissionWizard(true); }}
+          onCommission={pitchId => { setShowOriginalsDesk(false); setCommissionPitchId(pitchId || null); setCommissionScriptId(null); setShowCommissionWizard(true); }}
           onOpenReport={() => setShowAudienceReport(true)}
           onOpenTitle={commissionId => setOriginalDetailId(commissionId)}
         />
@@ -3316,6 +3348,7 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           onUpdatePlayer={persist}
           onClose={() => { setOriginalDetailId(null); setOriginalDetailNotice(''); setTitleDossierInitialProjectId(null); }}
           onOpenTitle={commissionId => { setOriginalDetailNotice(''); setTitleDossierInitialProjectId(null); setOriginalDetailId(commissionId); }}
+          onCommissionScript={scriptId => { setOriginalDetailId(null); setOriginalDetailNotice(''); setShowOriginalsDesk(false); setCommissionPitchId(null); setCommissionScriptId(scriptId); setShowCommissionWizard(true); }}
           numbers={!showTitleDossier && cinematicDossier() ? { brand: commandDeckBrand(), title: cinematicDossier()! } : null}
           onAction={(action, detail) => {
             const projectId = detail.commission.canonicalProjectId;
@@ -3355,8 +3388,9 @@ function StreamingPlatformHQInner({ player, onUpdatePlayer, onTrustedMarketUpdat
           player={player}
           onUpdatePlayer={persist}
           initialPitchId={commissionPitchId}
-          onClose={() => { setShowCommissionWizard(false); setShowOriginalsDesk(true); }}
-          onCommissioned={() => { setShowCommissionWizard(false); setShowOriginalsDesk(true); }}
+          initialScriptId={commissionScriptId}
+          onClose={() => { setShowCommissionWizard(false); setCommissionScriptId(null); setShowOriginalsDesk(true); }}
+          onCommissioned={() => { setShowCommissionWizard(false); setCommissionScriptId(null); setShowOriginalsDesk(true); }}
           onOpenProductionHouse={onOpenProductionHouse ? () => { setShowCommissionWizard(false); onOpenProductionHouse(); } : undefined}
         />
       ) : null}

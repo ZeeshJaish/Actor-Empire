@@ -14,6 +14,7 @@ import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallback
 import { calculateProjectMusicImpact, getMusicCreditRoleLabel, getMusicStrategyLabel, getProjectMusicPlan } from '../../services/musicIndustry';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { inferSeasonNumber } from '../../services/episodeRatings';
+import { getAbsoluteWeek } from '../../services/legacyLogic';
 import { CustomPosterImage } from '../../components/CustomPosterImage';
 import { resolveProjectType } from '../../services/businessLogic';
 import { getDynastyCareerArchives } from '../../services/dynastyCareer';
@@ -273,7 +274,8 @@ const SeasonEpisodeList: React.FC<{ season: SeasonEpisodeRatings; names: string[
                     <div key={episode.episode} className="flex min-h-[38px] items-center gap-2.5 px-3 py-1.5">
                         <span className="w-6 shrink-0 text-[10px] font-black text-zinc-500">E{episode.episode}</span>
                         <span className="min-w-0 flex-1 truncate text-xs font-bold text-zinc-100">{names[episode.episode - 1]}</span>
-                        {episode.rating === best && <span className="shrink-0 rounded bg-yellow-400 px-1 py-0.5 text-[8px] font-black uppercase text-black">Best</span>}
+                        {/* B19: the season's best is named once the season is out, not after its first episode */}
+                        {episode.rating === best && !season.airing && <span className="shrink-0 rounded bg-yellow-400 px-1 py-0.5 text-[8px] font-black uppercase text-black">Best</span>}
                         <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-black ${getEpisodeRatingCellTone(episode.rating)}`}>{episode.rating.toFixed(1)}</span>
                     </div>
                 ))}
@@ -1228,7 +1230,8 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	    const selectedSeason = selectedSeries?.seasons.find(season => season.row.id === selectedProject.id)?.season;
 	    const selectedHasSeasons = (selectedSeries?.seasons.length || 0) > 1;
 	    const selectedTitle = selectedHasSeasons && selectedSeries ? selectedSeries.name : selectedProject.name;
-	    const selectedProjectEpisodeRatings = getSeriesEpisodeRatings(selectedSeries, project => project.originalObject);
+	    /* B19: a weekly season shows the episodes out so far */
+	    const selectedProjectEpisodeRatings = getSeriesEpisodeRatings(selectedSeries, project => project.originalObject, getAbsoluteWeek(player.age, player.currentWeek));
 	    const selectedSeasonRatings = selectedProjectEpisodeRatings.find(season => season.season === selectedSeason);
 	    const selectedEpisodeTotal = selectedProjectEpisodeRatings.reduce((sum, season) => sum + season.episodes.length, 0);
 	    const selectedSeriesRating = selectedSeries ? getSeriesRating(selectedSeries.seasons.map(season => season.row.rating)) : 0;
@@ -1341,6 +1344,11 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
 	                    selectedProjectEpisodeRatings.length > 0 ? (
 	                        <>
 	                            <EpisodeRatingsHeatmap ratings={selectedProjectEpisodeRatings} tr={tr} activeSeason={selectedSeason} />
+	                            {selectedSeasonRatings?.airing && (
+	                                <div className="px-4 py-2 border-b border-zinc-800 bg-zinc-950 text-[11px] font-semibold text-emerald-300/90">
+	                                    {tr('imdb.project.episodesAiring', { aired: selectedSeasonRatings.airing.aired, total: selectedSeasonRatings.airing.total })}
+	                                </div>
+	                            )}
 	                            {selectedSeasonRatings && (
 	                                <SeasonEpisodeList
 	                                    season={selectedSeasonRatings}

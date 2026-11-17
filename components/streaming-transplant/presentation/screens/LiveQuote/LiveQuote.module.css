@@ -20,10 +20,29 @@
 .stbug em{font-style:normal;font-size:12px;font-weight:900}
 .stbug.u em{color:#31dd88}
 .stbug.d em{color:#ff5560}
+/* B26 (2026-11-15): on the HQ home the quote lives in the page, never as a bar over a room, a sheet's pinned buttons
+   or a memo (it was fixed to the bottom of every screen at z-index 60, with no close).
+   v2 (2026-11-16, Zeesh: the boxed chip row made the header busy): one quiet line under the Treasury, like
+   "+1.15M this week" under the subscribers: ticker, price, move and a chevron. The padding is the tap area; the
+   negative margins keep the text where a plain line would sit. */
+.stbug.inline{position:relative;left:auto;right:auto;bottom:auto;z-index:auto;display:inline-flex;align-items:baseline;
+  gap:5px;margin:-3px -8px -8px 0;padding:8px 8px 8px 10px;border-radius:9px;background:transparent;box-shadow:none;
+  font-family:inherit;font-variant-numeric:tabular-nums;white-space:nowrap;
+  transition:background-color .35s ease,opacity .2s}
+.stbug.inline::after{content:'\203A';margin-left:0;font-size:13px;font-weight:900;letter-spacing:0;line-height:1;
+  color:#7d8698;font-family:inherit;align-self:baseline}
+.stbug.inline span{font-size:9px;letter-spacing:.16em;color:#7d8698;font-family:inherit}
+.stbug.inline b{font-size:11px;font-weight:800;letter-spacing:0;color:#d5dbe6}
+.stbug.inline em{font-size:11px;font-weight:800}
+.stbug.inline:active{transform:none;opacity:.62}
+.stbug.inline:focus-visible{outline:2px solid rgba(255,255,255,.35);outline-offset:1px}
 .stbug.fu{box-shadow:0 8px 26px rgba(0,0,0,.55),inset 0 0 0 1px rgba(49,221,136,.9),
   0 0 26px -4px rgba(49,221,136,.7)}
 .stbug.fd{box-shadow:0 8px 26px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,85,96,.9),
   0 0 26px -4px rgba(255,85,96,.7)}
+/* the quiet line flashes as a soft tint behind it, not a glowing box */
+.stbug.inline.fu{box-shadow:none;background-color:rgba(49,221,136,.16)}
+.stbug.inline.fd{box-shadow:none;background-color:rgba(255,85,96,.16)}
 
 /* ── the panel ───────────────────────────────────────────────────────────── */
 .stwrap{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;

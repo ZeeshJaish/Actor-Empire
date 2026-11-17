@@ -19,15 +19,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, type Key } fr
 import type { CloudProviderId, Facility, ServerTier } from '../../finance/build';
 import {
   CLOUD_PROVIDERS, CLOUD_PROVIDER_IDS, CLOUD_WEEKLY_PER_RACK, OPEN_TIERS, SERVER_TIERS, SERVICE_COPY, cloudProviderServes,
-  cloudWeeklyCost, computeRacks, facilityRacks, listingFor, rackBuildCost, tierCapacity, tiersOf,
+  cloudWeeklyCost, computeRacks, facilityRacks, listingFor, rackBuildCost, tierCapacity, tierReachKm, tiersOf,
 } from '../../finance/build';
+import { fibreMultiplier } from '../../../../services/streamingFibreLadder';
 import {
   canAddServer, cloudCeilingOf, coverWithCloud, emptySetup, facilitiesIn, openingRegions, packLockedProvider, packLockedTier, placeRegion, regionReport,
   regionsOf, regionalCloudMaximum, serverCeilingOf, whatIfsFor, type RegionReport, type RegionSetup, type WhatIf,
 } from '../../finance/placer';
 import { StreamingPlusChip } from '../../../streamingPlus/StreamingPlusParts';
 import { openStreamingPlusSheet } from '../../../../services/streamingPlusEvents';
-import { compactCount, money, pct } from '../../finance/format';
+import { compactCount, money, pct, servedPercent } from '../../finance/format';
 import type { StageProps } from './BuildWizard';
 import { NetworkMapBox } from './NetworkMapBox';
 import { NetworkSuggestionSheet } from './NetworkSuggestionSheet';
@@ -260,8 +261,9 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
   const fullRegionCompute = useMemo(() => regionalCloudMaximum(data, region, providerId, draft), [data, region, providerId, draft]);
   // The one slider ends at physical regional coverage. Keep an older saved
   // purchase inside the range even if its compute exceeds today's target.
+  /* B10 (2026-11-15): the slider no longer stops at the target: room past it for capacity (half again) */
   const sliderMax = fullRegionCompute > 0
-    ? Math.max(fullRegionCompute, setup.cloud.compute)
+    ? Math.max(Math.ceil(fullRegionCompute * 1.5), fullRegionCompute + 4, setup.cloud.compute)
     : 0;
   const ownServed = Math.max(0, served - cloudServed);
   const set = (next: Partial<RegionSetup>) => onWrite({ ...setup, ...next });
@@ -332,7 +334,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
     onWrite(emptySetup());
   };
   const whatIfLine = (option: WhatIf): { head: string; line: string } => {
-    const servedPct = pct(share(option.served, option.peak) * 100, 0);
+    const servedPct = servedPercent(share(option.served, option.peak) * 100);
     switch (option.id) {
       case 'COVER':
         return {
@@ -409,7 +411,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               {setup.cloud.compute > 0 && (
                 <b className="is-cloud"><i aria-hidden="true" />{setup.cloud.compute}<s>cloud</s></b>
               )}
-              <em>{coverageAvailable ? `${pct(share(served, peak) * 100, 0)} served` : 'Coverage unavailable'}</em>
+              <em>{coverageAvailable ? `${servedPercent(share(served, peak) * 100)} served` : 'Coverage unavailable'}</em>
             </>
           )}
         </span>
@@ -444,7 +446,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                 {attention.slice(0, 4).map(country => (
                   <li key={country.id} className={`is-${SERVICE_COPY[country.state].tone}`}>
                     <b>{country.name}</b>
-                    <em>{SERVICE_COPY[country.state].label} · {country.coverageAvailable ? `${pct(country.share * 100, 0)} served` : 'coverage unavailable'}</em>
+                    <em>{SERVICE_COPY[country.state].label} · {country.coverageAvailable ? `${servedPercent(country.share * 100)} served` : 'coverage unavailable'}</em>
                   </li>
                 ))}
                 {attention.length > 4 && <li className="is-more">+{attention.length - 4} more in the country list further down</li>}
@@ -470,12 +472,15 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                 const delta = standing ? count - standing.servers[tier] : 0;
                 /* Streaming+: the Titan stays on show; its + opens the pack's sheet */
                 const tierPlus = packLockedTier(data, tier);
+                /* U8 (2026-11-16): "Servers don't cover everything." Each kind reaches only so far, by design; the card
+                   says how far (about, at this many racks and this fibre), as the map's rings draw it. */
+                const reachKm = Math.round(tierReachKm(tier, Math.max(1, count), fibreMultiplier(data.fibre)) / 10) * 10;
                 return (
                   <li key={tier} className={`${count > 0 ? `bw-net-duty is-on is-${tier.toLowerCase()}` : `bw-net-duty is-${tier.toLowerCase()}`}${tierPlus ? ' is-plus' : ''}`}>
                     <ServerMark tier={tier} />
                     <b>{spec.name}{tierPlus && <> <StreamingPlusChip compact /></>}</b>
                     <s className="bw-rg-tier-reach">{compactCount(tierCapacity(tier, 1))}<small>viewers per rack</small></s>
-                    <span className="bw-rg-tier-coverage">{SERVER_COVERAGE[tier]} coverage</span>
+                    <span className="bw-rg-tier-coverage" data-tier-reach-km={reachKm}>{SERVER_COVERAGE[tier]} · {`~${reachKm.toLocaleString('en-US')}\u00a0km`}</span>
                     <span className="bw-net-duty-set">
                       <button type="button" disabled={locked || count === 0} onClick={() => setTier(tier, count - 1)} aria-label={`One fewer ${spec.name} in ${region.name}`}>−</button>
                       <b key={count} aria-live="polite">{count}</b>
@@ -603,7 +608,7 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
                       <b>{candidate.name}</b>
                       <em>{!cloudProviderServes(candidate, region.id) ? 'Not sold here'
                         : !cover ? 'No additional cloud needed or available'
-                          : `+${cover.addedCompute} compute · +${money(cover.addedWeekly ?? 0)}/wk · ${cover.reached ? 'Strong' : `${pct(share(cover.served, cover.peak) * 100, 0)} at most`}`}</em>
+                          : `+${cover.addedCompute} compute · +${money(cover.addedWeekly ?? 0)}/wk · ${cover.reached ? 'Strong' : `${servedPercent(share(cover.served, cover.peak) * 100)} at most`}`}</em>
                     </li>;
                   })}
                 </ul>
@@ -616,13 +621,13 @@ function RegionRow({ data, draft, report, open, note, onToggle, onWrite, onCloud
               here on demand so a 23-country opening does not bury the levers. */}
           {countries.length > 0 && (
             <details className="bw-rg-countries-detail">
-              <summary>Who you are serving <span>{countries.length} {countries.length === 1 ? 'country' : 'countries'} · {coverageAvailable ? `${pct(share(served, peak) * 100, 0)} served` : 'coverage unavailable'}</span></summary>
+              <summary>Who you are serving <span>{countries.length} {countries.length === 1 ? 'country' : 'countries'} · {coverageAvailable ? `${servedPercent(share(served, peak) * 100)} served` : 'coverage unavailable'}</span></summary>
               <ul className="bw-rg-countries">
                 {[...countries].sort((a, b) => a.share - b.share || b.peak - a.peak).map(country => (
                   <li key={country.id} className={country.share >= 0.9 ? 'is-good' : country.share >= 0.6 ? 'is-warn' : 'is-bad'}>
                     <span className="bw-rg-country-who"><b>{country.name}</b><em>{country.coverageAvailable ? compactCount(country.peak) : '—'} {live ? 'at peak' : 'on the night'}</em></span>
                     <span className="bw-rg-country-bar" aria-hidden="true">{country.coverageAvailable && <i style={{ width: `${Math.round(country.share * 100)}%` }} />}</span>
-                    <strong>{country.coverageAvailable ? pct(country.share * 100, 0) : 'Unavailable'}</strong>
+                    <strong>{country.coverageAvailable ? servedPercent(country.share * 100) : 'Unavailable'}</strong>
                   </li>
                 ))}
               </ul>
@@ -681,7 +686,7 @@ function ServedBar({ regionName, peak, served, ownServed, cloudServed, unservabl
     <div
       className="bw-rg-served"
       role="img"
-      aria-label={`${Math.round(share(served, peak) * 100)} percent of ${regionName} served ${live ? 'at peak' : 'on the night'}`}
+      aria-label={`${servedPercent(share(served, peak) * 100).replace('%', '')} percent of ${regionName} served ${live ? 'at peak' : 'on the night'}`}
     >
       <span className="bw-rg-served-track">
         <i className="is-own" style={{ width: `${Math.round(share(ownServed, peak) * 100)}%` }} />
@@ -689,7 +694,7 @@ function ServedBar({ regionName, peak, served, ownServed, cloudServed, unservabl
         {unservablePeak > 0 && <i className="is-dead" style={{ width: `${Math.round(share(unservablePeak, peak) * 100)}%` }} />}
       </span>
       <span className="bw-rg-served-read">
-        <b>{pct(servedPct, 0)} served</b>
+        <b>{servedPercent(servedPct)} served</b>
         <em>
           {compactCount(Math.round(servedCount))} of {compactCount(peak)}
           {cloudServed > 0 && ownServed > 0 ? ` · ${pct(share(ownServed, peak) * 100, 0)} yours, ${pct(share(cloudServed, peak) * 100, 0)} cloud` : ''}

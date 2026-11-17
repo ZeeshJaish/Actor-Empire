@@ -101,6 +101,8 @@
 .hq .hqheroes{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:16px}
 .hq .hero{min-width:0}
 .hq .hero.big{flex:1}
+/* B26 v2: the Treasury and, once listed, the share price under it */
+.hq .heroSide{display:flex;flex-direction:column;align-items:flex-end;min-width:0;flex:none}
 .hq .hlabel{display:block;font-size:9px;font-weight:900;letter-spacing:.2em;color:#7d8698}
 .hq .hval{display:block;margin-top:3px;font-size:34px;font-weight:900;letter-spacing:-.02em;line-height:1.05;
   background:linear-gradient(150deg,#fff,var(--epx-hq-c));-webkit-background-clip:text;background-clip:text;

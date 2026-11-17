@@ -355,14 +355,9 @@ export const CampaignBuilder: React.FC<{
     const frames = useMemo(() => creativeFramesOf(formats), [formats]);
     const creativeSubject = useMemo(() => (subject ? creativeSubjectOf(subject, brand, id => subjects.find(item => item.kind === 'TITLE' && item.id === id)?.genre) : null),
         [subject, brand, subjects]);
-    /* #156: every format's frame, from How on: How's cards show each format with its creative */
-    const allFrames = useMemo(() => creativeFramesOf(CAMPAIGN_FORMAT_ORDER), []);
-    const made = useMadeForYou(creativeSubject, allFrames, step !== 'WHAT' && step !== 'WHERE');
-    const creativeOf = (formatId: CampaignFormatId) => {
-        /* search ads carry no image of their own: their result shows the square one */
-        const frame = allFrames.find(item => item.formats.includes(formatId)) ?? allFrames.find(item => item.key === '1:1');
-        return frame ? (kept[frame.key]?.canvas ?? made[frame.key] ?? null) : null;
-    };
+    /* 2026-11-17 (Zeesh: How shows each format's own picture, the creative is in the Creative step): the made-for-you
+       creatives are drawn from the Creative step on, and only for the frames the picked formats need (How drew all eight) */
+    const made = useMadeForYou(creativeSubject, frames, step !== 'WHAT' && step !== 'WHERE' && step !== 'HOW');
     const yours = frames.filter(frame => kept[frame.key]).length;
     /* only big moments: one night, no weeks */
     const flowing = formats.filter(id => CAMPAIGN_FORMATS[id].group !== 'BIG_MOMENT');
@@ -543,7 +538,7 @@ export const CampaignBuilder: React.FC<{
                                             ? openStreamingPlusSheet({ source: 'campaign-format', focus: 'campaigns', line: `${format.name} is one of the Streaming+ Pack's 7 big campaign moments.` })
                                             : toggleFormat(id))}>
                                         <span className={css.formatPicture}>
-                                            <FormatPicture formatId={id} countryId={pictured} creative={creativeOf(id)} subjectName={subject?.name ?? brand.name} brandName={brand.name} hue={brand.hue} />
+                                            <FormatPicture formatId={id} countryId={pictured} subjectName={subject?.name ?? brand.name} brandName={brand.name} hue={brand.hue} />
                                             <span className={css.formatBadge}><FormatGlyph id={id} /></span>
                                             {plus && <span className={css.formatPlus}><StreamingPlusChip /></span>}
                                             {on && <i className={css.formatCheck} aria-hidden="true">✓</i>}
@@ -597,6 +592,7 @@ export const CampaignBuilder: React.FC<{
                 ))}
                 {step === 'CREATIVE' && subject && (
                     <CreativeStep frames={frames} formats={formats} made={made} kept={kept} accent={accent} countryIds={countryIds} places={quote?.places}
+                        liveName={subject.name} brandName={brand.name} hue={brand.hue}
                         subjectName={subject.kind === 'SERVICE' ? "your service's own colours" : `${subject.name}${/s$/i.test(subject.name) ? "'" : "'s"} poster`}
                         onKeep={(key, creative) => setKept(current => ({ ...current, [key]: creative ?? undefined }))} />
                 )}

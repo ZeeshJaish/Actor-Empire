@@ -203,15 +203,9 @@ export const LaunchCampaignBuilder: React.FC<LaunchCampaignBuilderProps> = props
   const toggleDoor = (id: LaunchDoorId) => setDoors(current => (current.includes(id) ? current.filter(item => item !== id) : [...current, id]));
   const subject = launchCreativeSubject(objective, flagship, serviceName, brandHue);
   const frames = useMemo(() => creativeFramesOf(formats), [formats.join(',')]);
-  /* #158: every format's frame, from How on: How's cards show each format with its creative (as the Studio's, #156) */
-  const allFrames = useMemo(() => creativeFramesOf(CAMPAIGN_FORMAT_ORDER), []);
-  const made = useMadeForYou(subject, allFrames, step !== 'WHAT' && step !== 'WHERE');
-  const creativeIn = (key: string | undefined) => {
-    const frame = allFrames.find(item => item.key === key);
-    return frame ? (kept[frame.key]?.canvas ?? made[frame.key] ?? null) : null;
-  };
-  /* search ads carry no image of their own: their result shows the square one */
-  const creativeOf = (formatId: CampaignFormatId) => creativeIn((allFrames.find(item => item.formats.includes(formatId)) ?? allFrames.find(item => item.key === '1:1'))?.key);
+  /* 2026-11-17 (Zeesh: How shows each format's own picture, the creative is in the Creative step): the made-for-you
+     creatives are drawn from the Creative step on, and only for the frames the picked formats need (How drew all eight) */
+  const made = useMadeForYou(subject, frames, step !== 'WHAT' && step !== 'WHERE' && step !== 'HOW');
   const yours = frames.filter(frame => kept[frame.key]).length;
   /* a format picked before the opening countries changed may have no site left in them */
   const nowhereOf = (id: CampaignFormatId) => !countryIds.some(countryId => campaignFormatIn(CAMPAIGN_FORMATS[id], countryId));
@@ -373,7 +367,7 @@ export const LaunchCampaignBuilder: React.FC<LaunchCampaignBuilderProps> = props
                             ? openStreamingPlusSheet({ source: 'launch-campaign-format', focus: 'campaigns', line: `${format.name} is one of the Streaming+ Pack's 7 big campaign moments.` })
                             : toggle(id))}>
                           <span className={css.formatPicture}>
-                            <FormatPicture formatId={id} countryId={pictured} creative={creativeOf(id)} subjectName={subject.title} brandName={serviceName} hue={brandHue} />
+                            <FormatPicture formatId={id} countryId={pictured} subjectName={subject.title} brandName={serviceName} hue={brandHue} />
                             <span className={css.formatBadge}><FormatGlyph id={id} /></span>
                             {plus && <span className={css.formatPlus}><StreamingPlusChip /></span>}
                             {on && <i className={css.formatCheck} aria-hidden="true">✓</i>}
@@ -436,7 +430,7 @@ export const LaunchCampaignBuilder: React.FC<LaunchCampaignBuilderProps> = props
                   return (
                     <button key={door.id} type="button" className={cx(css.format, css.pictured, on && css.picked, locked && css.off)} disabled={Boolean(locked) && !on} aria-pressed={on} onClick={() => toggleDoor(door.id)}>
                       <span className={css.formatPicture}>
-                        <DoorPicture doorId={door.id} creative={creativeIn('16:9')} subjectName={subject.title} brandName={serviceName} hue={brandHue} />
+                        <DoorPicture doorId={door.id} subjectName={subject.title} brandName={serviceName} hue={brandHue} />
                         <span className={cx(css.formatBadge, launchCss.doorBadge)} aria-hidden="true">{door.id === 'DEVICE_STORES' ? '⇩' : '☏'}</span>
                         {on && <i className={css.formatCheck} aria-hidden="true">✓</i>}
                       </span>
@@ -450,8 +444,10 @@ export const LaunchCampaignBuilder: React.FC<LaunchCampaignBuilderProps> = props
             </section>
           </>
         )}
-        {step === 'CREATIVE' && (formats.length > 0 ? (
+        {step === 'CREATIVE' && (formats.length > 0 || doors.length > 0 ? (
           <CreativeStep frames={frames} formats={formats} made={made} kept={kept} accent={accent} countryIds={countryIds} places={plan.places}
+            liveName={subject.title} brandName={serviceName} hue={brandHue}
+            doors={doors.map(id => ({ id, name: LAUNCH_DOORS.find(door => door.id === id)?.name ?? id }))}
             subjectName={subject.kind === 'TITLE' ? `${subject.title}${/s$/i.test(subject.title) ? "'" : "'s"} poster` : "your service's own colours"}
             onKeep={(key, creative) => setKept(current => ({ ...current, [key]: creative ?? undefined }))} />
         ) : (

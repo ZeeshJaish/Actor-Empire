@@ -5,7 +5,7 @@ import { createArchivedCinemaReleaseRecord } from '../../services/boxOffice/boxO
 import { getCinemaProjectFinance } from '../../services/boxOffice/boxOfficeSettlement';
 import React, { useState } from 'react';
 import { Player, ActiveRelease, OutsideProductionInvestment, BoxOfficeRegionId, CinemaChainId, PastProject } from '../../types';
-import { PLATFORMS } from '../../services/streamingLogic';
+import { getStreamingPlatformDisplay } from '../../services/streamingPlatformDisplay';
 import { getBoxOfficeRegionLabel, getBoxOfficeRegionShortLabel, getCinemaChainById } from '../../services/cinemaChains';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel } from '../../services/releaseTiming';
@@ -210,7 +210,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
           return { isPending: false, weeksUntilStart: 0, label: '', detail: '', meta: '' };
       }
 
-      const platformName = PLATFORMS[streamingState.platformId]?.name || tr('box.streamingPlatform');
+      const platformName = getStreamingPlatformDisplay(player, streamingState.platformId).name || tr('box.streamingPlatform');
       const weeksUntilStart = getStreamingWeeksUntilStart(
           streamingState,
           player.age,
@@ -735,7 +735,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
       const investorScopeLabel = rel.type === 'SERIES' ? tr('box.seasonOnlyCapTable') : tr('box.projectOnlyCapTable');
       const investorPayoutTotal = Math.max(0, Number(rel.investorPayouts?.lifetimeInvestorPayout || rel.projectDetails?.investorPayouts?.lifetimeInvestorPayout || 0));
       const studioNetAfterInvestors = cinemaFinance.netStudioReceiptsCents / 100;
-      const platform = isStreamingRelease ? PLATFORMS[rel.streaming!.platformId] : null;
+      const platform = isStreamingRelease ? getStreamingPlatformDisplay(player, rel.streaming!.platformId) : null;
       const tone = isStreamingRelease ? 'streaming' : 'theatrical';
       const streamingRolloutStatus = isStreamingRelease ? getStreamingRolloutStatus(rel) : null;
       const streamingContract = isStreamingRelease ? getStreamingContract(rel) : null;
@@ -1610,7 +1610,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                         <div className="text-center text-zinc-600 mt-10 text-sm">{tr('box.noStreaming')}</div>
                     )}
                     {streaming.map(rel => {
-                        const platform = PLATFORMS[rel.streaming!.platformId];
+                        const platform = getStreamingPlatformDisplay(player, rel.streaming!.platformId);
                         const weeklyViews = rel.streaming!.weeklyViews || [];
                         const rolloutStatus = getStreamingRolloutStatus(rel);
                         const maxViews = Math.max(...weeklyViews, 1);
@@ -1630,7 +1630,7 @@ export const BoxOfficeApp: React.FC<BoxOfficeAppProps> = ({ player, onBack }) =>
                                             <div className="font-bold text-lg break-words">{rel.name}</div>
                                         </div>
                                         <div className="ml-auto flex shrink-0 items-center gap-2">
-                                            <div className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${platform.color} bg-white/10`}>{platform.name}</div>
+                                            <div className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${platform.colorClass || ''} bg-white/10`} style={platform.colorClass ? undefined : { color: platform.colorHex }}>{platform.name}</div>
                                             <ChevronRight size={16} className="text-zinc-500" />
                                         </div>
                                     </div>

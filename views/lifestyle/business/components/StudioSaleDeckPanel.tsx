@@ -1,4 +1,5 @@
 import { getStudioOwnershipPercent } from '../../../../services/studioOwnership';
+import { getFullMergerCarveOutTerms } from '../../../../services/studioGroup';
 import React from 'react';
 import {
     ArrowLeft,
@@ -201,6 +202,11 @@ export const StudioSaleEntryCard: React.FC<StudioSaleEntryCardProps> = ({ player
     const readiness = getStudioSaleReadiness(player, liveStudio);
     const liveDeck = isActiveDeck(deck) ? deck : null;
     const windowState = liveDeck ? getStudioSaleWindowState(player, liveDeck) : null;
+    /* U4 (2026-11-15): a fully merged banner can't be sold or liquidated on its own, and the card only showed the first
+       blocker and a valuation it could never fetch. It now names the two ways out: sell the studio it merged into, or
+       carve it out again in Studio Group, at its cost. */
+    const carveOut = liveStudio.studioState?.operatingModel === 'FULL_MERGER' ? getFullMergerCarveOutTerms({ player, studioId: liveStudio.id }) : null;
+    const mergedInto = carveOut ? player.businesses.find(business => business.id === liveStudio.studioState?.mergedIntoStudioId)?.name || 'its group' : null;
 
     return (
         <div className="rounded-[18px] border-2 border-[#2d2414] bg-[#120d07] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -219,12 +225,18 @@ export const StudioSaleEntryCard: React.FC<StudioSaleEntryCardProps> = ({ player
                             : 'Valuation file, deal chips, a three-week bid window and a signing ceremony.'}
                     </p>
                 </div>
+                {carveOut ? null : (
                 <div className="shrink-0 rounded-[15px] border border-amber-300/20 bg-black/30 px-3 py-2 text-right">
                     <div className="text-[10px] font-black uppercase text-zinc-600">Valuation</div>
                     <div className="font-mono text-[14px] font-black text-amber-200">{formatMoney(valuation.indicativeValue)}</div>
                 </div>
+                )}
             </div>
-            {!readiness.canList && !liveDeck ? (
+            {carveOut && !liveDeck ? (
+                <div data-merged-exit className="mt-3 rounded-[13px] border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 text-[11px] font-bold leading-relaxed text-amber-100">
+                    Merged into {mergedInto}: sell {mergedInto}, or carve it out again in Studio Group ({formatMoney(carveOut.totalCost)}: a {formatMoney(carveOut.reversalFee)} fee and {formatMoney(carveOut.restorationCapital)} to restart it).
+                </div>
+            ) : !readiness.canList && !liveDeck ? (
                 <div className="mt-3 rounded-[13px] border border-rose-300/20 bg-rose-300/[0.06] px-3 py-2 text-[11px] font-bold leading-relaxed text-rose-100">
                     {readiness.blockers[0] || 'Sale requirements are not ready.'}
                 </div>
@@ -414,12 +426,23 @@ interface SoldSummary {
 interface CounterDraft { amount: string; royalty: string; }
 
 export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
-    player,
+    player: savedPlayer,
     studio,
     onBack,
     onUpdatePlayer,
     onSold,
 }) => {
+    /* B23 (2026-11-15): out-of-date terms are repriced as the room opens, in memory: the room shows the new terms, and
+       they are saved with the player's next move here (choose a buyer, counter). Not while signing: a refresh would
+       send the signed buyer back to the offers. When they cannot be repriced, the banner says why. */
+    const savedStudio = getLiveStudio(savedPlayer, studio);
+    const savedDeck = isActiveDeck(savedStudio.studioState?.saleDeck) ? savedStudio.studioState?.saleDeck : null;
+    const staleIssue = savedDeck ? getStudioSaleRevalidationIssue(savedPlayer, savedStudio, savedDeck) : null;
+    const repriced = React.useMemo(() => (
+        staleIssue && savedDeck && savedDeck.status !== 'SIGNING' ? refreshStudioSaleDeck(savedPlayer, savedStudio.id) : null
+    ), [savedPlayer, savedStudio.id, staleIssue, savedDeck?.status]);
+    const player = repriced?.success ? repriced.player : savedPlayer;
+    const repriceRefusal = repriced && !repriced.success ? repriced.message : null;
     const liveStudio = getLiveStudio(player, studio);
     const deck = liveStudio.studioState?.saleDeck;
     const activeDeck = isActiveDeck(deck) ? deck : null;
@@ -1063,7 +1086,8 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                                     type="button"
                                     onClick={() => handleAccept(offer.id)}
                                     disabled={!!revalidationIssue}
-                                    className="flex min-h-11 items-center justify-center gap-1.5 rounded-[14px] border-2 border-emerald-300/40 bg-gradient-to-b from-emerald-200 to-emerald-300 px-2 text-[10.5px] font-black uppercase tracking-[0.05em] text-black shadow-[0_4px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b]"
+                                    data-choose-buyer
+                                    className="flex min-h-11 items-center justify-center gap-1.5 rounded-[14px] border-2 border-emerald-300/40 bg-gradient-to-b from-emerald-200 to-emerald-300 px-2 text-[10.5px] font-black uppercase tracking-[0.05em] text-black shadow-[0_4px_0_#064e3b] active:translate-y-0.5 active:shadow-[0_2px_0_#064e3b] disabled:cursor-not-allowed disabled:border-zinc-600/40 disabled:from-zinc-700 disabled:to-zinc-700 disabled:text-zinc-400 disabled:shadow-none disabled:active:translate-y-0"
                                 >
                                     <FileSignature size={14} />
                                     Choose Buyer
@@ -1495,11 +1519,21 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                     </header>
 
                     {revalidationIssue ? (
-                        <div role="status" className="shrink-0 border-b border-amber-300/20 bg-[#1c1608] px-4 py-3 text-[11px] font-bold text-amber-100">
+                        <div role="status" data-sale-stale className="shrink-0 border-b border-amber-300/20 bg-[#1c1608] px-4 py-3 text-[11px] font-bold text-amber-100">
                             <p>{revalidationIssue}</p>
-                            <button type="button" onClick={handleRefresh} className="mt-2 min-h-11 rounded-xl bg-amber-300 px-4 font-black text-black">
-                                Refresh buyer terms
-                            </button>
+                            {/* B23: why the terms cannot be repriced yet, here and not at the bottom of the page */}
+                            {repriceRefusal || (feedback && activeDeck?.status === 'SIGNING') ? (
+                                <p data-sale-stale-reason className="mt-1.5 text-amber-300">{repriceRefusal || feedback}</p>
+                            ) : null}
+                            {repriceRefusal ? null : (
+                                <button type="button" onClick={handleRefresh} className="mt-2 min-h-11 rounded-xl bg-amber-300 px-4 font-black text-black">
+                                    Refresh buyer terms
+                                </button>
+                            )}
+                        </div>
+                    ) : repriced?.success ? (
+                        <div role="status" data-sale-repriced className="shrink-0 border-b border-emerald-300/15 bg-emerald-300/[0.06] px-4 py-2 text-[11px] font-bold text-emerald-100">
+                            Terms repriced for this week&apos;s cash and assets.
                         </div>
                     ) : null}
 

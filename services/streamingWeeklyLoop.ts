@@ -588,6 +588,10 @@ export const processOwnedStreamingPlatformWeek = (
         ownedStreamingPlatform: platform,
     });
     const releasesThisWeek = slateEntries.filter(entry => entry.launchWeek === programWeek);
+    /* B19 (2026-11-15): a weekly series still coming out (an Original's own episode count, else 8) has an episode
+       out this week: the week's line says so instead of "A quiet week" (the line only; the numbers are unchanged) */
+    const weeklyDrop = slateEntries.find(entry => entry.releasePattern === 'WEEKLY' && entry.launchWeek < programWeek
+        && programWeek - entry.launchWeek < (platform.originalCommissions.find(item => item.canonicalProjectId === entry.projectId)?.episodes || 8));
     const recentEntries = slateEntries.filter(entry => (
         entry.launchWeek <= programWeek && programWeek - entry.launchWeek <= (entry.releasePattern === 'WEEKLY' ? 5 : 2)
     ));
@@ -1205,6 +1209,8 @@ export const processOwnedStreamingPlatformWeek = (
             ? 'The audience contracted despite a working service.'
             : releasesThisWeek.length
                 ? `${releasesThisWeek[0].title} moved the week.`
+                : weeklyDrop
+                    ? `${weeklyDrop.title}: episode ${programWeek - weeklyDrop.launchWeek + 1} came out this week.`
                 : netCashContribution >= 0
                     ? 'A quiet week still strengthened the company.'
                     : 'The platform held audience but paid for it.';

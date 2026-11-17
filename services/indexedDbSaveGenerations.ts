@@ -142,11 +142,11 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
         for(const value of raw)result.push(await materializeOrInvalid(value));
         return result;
     };
-    const mutate=async(operation:string,start:(store:IDBObjectStore)=>void)=>{
+    const mutate=async(operation:string,start:(store:IDBObjectStore)=>void,timeoutMs?:number)=>{
         const db=await openDB();try{
             const tx=db.transaction(name,'readwrite');
             // Attach handlers before any user data can throw or abort.
-            const completion=waitForIndexedDbTransaction(tx,{operation});
+            const completion=waitForIndexedDbTransaction(tx,{operation,...(timeoutMs?{timeoutMs}:{})});
             try{start(tx.objectStore(name));}catch{tx.abort();}
             await completion;
         }finally{db.close();}
@@ -255,8 +255,23 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
         verifiedLive.set(keys.current,committed);
         return committed;
     };
+    /* B3 (2026-11-15): writing a week's save (write, read back, check, flip) had a fixed 12-second limit. A slow phone
+       with a big career always needs longer, so the save was cancelled and the week failed every time ("Retry week"
+       for ever; export → import helped for a few weeks because the import writes a smaller save). The limit now
+       follows this phone: three times its last save plus 4 s, at least 12 s and at most 90 s, and a save that runs out
+       of time doubles the next one's limit (12 → 24 → 48 → 90 s), so a retry can finish. Kept on the device. */
+    const writeLimitMs=()=>{
+        let learned=0;
+        try{learned=Number(globalThis.localStorage?.getItem('ae.saveWriteLimitMs'))||0;}catch{learned=0;}
+        return Math.min(90_000,Math.max(12_000,learned));
+    };
+    const learnWriteLimit=(nextMs:number)=>{
+        try{globalThis.localStorage?.setItem('ae.saveWriteLimitMs',String(Math.round(Math.min(90_000,Math.max(12_000,nextMs)))));}catch{/* private mode */}
+    };
     const writeVerifiedGeneration=async({keys,generation:next,retainPrevious,expectedCandidateDigest}:WriteVerifiedGenerationInput)=>{
         const headKey=keys.current+HEAD_SUFFIX;let committed:{digest:string;token:string|null}|null=null;
+        const writeStarted=Date.now();
+        const limit=writeLimitMs();
         await mutate('write and verify atomic save generation',store=>{
             /** Writes the new generation into one slot, reads it back, checks it, then flips the head. */
             const writeSlot=(target:SlotName,head:SaveHead|null,kept:{slot:SlotName;digest:string}|null)=>{
@@ -309,7 +324,11 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
                     });
                 });
             });
+        },limit).catch(error=>{
+            if(String((error as {code?:unknown})?.code)==='TIMEOUT')learnWriteLimit(limit*2);
+            throw error;
         });
+        learnWriteLimit(Math.max(12_000,(Date.now()-writeStarted)*3+4_000));
         if(committed)verifiedLive.set(keys.current,committed);
     };
     return {

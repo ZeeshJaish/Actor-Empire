@@ -67,6 +67,9 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
                 ||a.countries.some(c=>!object(c)||typeof c.countryId!=='string'||!integer(c.awarePeople)||!integer(c.deferredPeople)||(c.deferredPeople as number)>(c.awarePeople as number)))return ['CINEMA_AUDIENCE_SIGNAL_CORRUPT'];
         }
         for(const k of ['satisfactionScoreUnits','satisfactionAdmissions'])if(value[k]!==undefined&&!integer(value[k]))return ['CINEMA_TITLE_AUDIENCE_CORRUPT'];
+        /* B7: the run's own end (opening week, weeks under its floor, why it ended) */
+        for(const k of ['openingWeekGrossCents','lowWeeks'])if(value[k]!==undefined&&!integer(value[k]))return ['CINEMA_TITLE_RUN_CORRUPT'];
+        if(value.runEndReason!==undefined&&!['FLOOR','WINDOW','STREAMING'].includes(String(value.runEndReason)))return ['CINEMA_TITLE_RUN_CORRUPT'];
         if(value.legacyProducerReceiptsCents!==null && !integer(value.legacyProducerReceiptsCents))return ['CINEMA_TITLE_MONEY_CORRUPT'];
         if(value.grossCents!==(value.producerReceiptsCents as number)+(value.exhibitorReceiptsCents as number)+(value.distributionDeductionsCents as number))return ['CINEMA_RECEIPT_CONSERVATION'];
     }

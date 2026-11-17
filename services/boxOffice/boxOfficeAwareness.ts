@@ -57,6 +57,23 @@ const uniqueEvents = (events: readonly CinemaExposureEvent[]): CinemaExposureEve
     return [...result.values()].sort((a, b) => a.absoluteWeek - b.absoluteWeek || a.id.localeCompare(b.id));
 };
 
+/** U2 (2026-11-16): "Attention 33 with a top cast?" The four parts of a package's Attention, in points out of 100,
+    the same terms buildCinemaExposure adds: cast up to 60, script hype up to 20, music up to 10, studio up to 10
+    (a studio's recognition tops out at a quarter of that). Their rounded sum is attentionPotential. Marketing is not
+    in it: campaigns turn attention into awareness once the film is announced and released. */
+export const getCinemaAttentionParts = (input: Pick<CinemaExposureInput, 'cast' | 'storyAttention' | 'musicAttention' | 'studio'>): {
+    cast: number; script: number; music: number; studio: number;
+} => {
+    const cast = uniqueCast(input.cast);
+    const studioRecognition = clamp(input.studio.releasedTitleCount / 8) * clamp(input.studio.prestige / 100) * 0.25;
+    return {
+        cast: 100 * recognitionUnion(cast.map(actor => actorRecognition(actor))) * 0.6,
+        script: 100 * clamp(input.storyAttention / 100) * 0.2,
+        music: 100 * clamp(input.musicAttention / 100) * 0.1,
+        studio: 100 * studioRecognition * 0.1,
+    };
+};
+
 /** Pure population-bounded exposure. No seats, release footprint, wallets or ticket sales enter this calculation. */
 export const buildCinemaExposure = (input: CinemaExposureInput): CinemaExposureResult => {
     count(input.absoluteWeek, 'week');

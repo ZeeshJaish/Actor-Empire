@@ -73,7 +73,10 @@ const canvasOf = (width: number, height: number) => {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  return { canvas, ctx: canvas.getContext('2d')! };
+  /* 2026-11-16: a phone out of canvas memory (iOS) hands back no context: a clear error for the caller's catch */
+  const ctx = canvas.getContext('2d');
+  if (!ctx) { canvas.width = 0; canvas.height = 0; throw new Error('No canvas memory'); }
+  return { canvas, ctx };
 };
 
 /** a service's art: its colour, a soft light, its initial as a faint mark */

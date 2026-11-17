@@ -30,6 +30,23 @@ const TITLE_QUALIFIERS = ['Amber', 'Ancient', 'Burning', 'Crimson', 'Distant', '
     'Cinder', 'Restless', 'Silver', 'Silent', 'Solitary', 'Southern', 'Open', 'Velvet',
     'Wandering', 'Winter'];
 const SCOUT_PREFIXES = ['Echoes of', 'Stories from', 'Letters to', 'Secrets of', 'Paths through', 'Voices from'];
+/* B22 (2026-11-15): a cycle's names came from consecutive codes, so neighbours on the shelf differed in their
+   first word only ("Golden Crimson Summer After Dark", "After Crimson Summer After Dark"), and an opener could
+   repeat a word of its ending ("After … After Dark", "Beyond … Beyond the Sea"). The code is now shuffled inside
+   each block of names, one to one (so every code still has its own name), and a word never repeats: a clashing
+   opener or qualifier takes a stand-in no other name uses. Offers already on a shelf keep their names (a cycle
+   is saved with its offers). */
+const NAME_BLOCK = OPENERS.length * SUBJECTS.length * ENDINGS.length;
+/** coprime with NAME_BLOCK (2100), so multiplying shuffles each block one to one; consecutive codes change all three parts */
+const NAME_MIX = 1013;
+const OPENER_STAND_INS: Readonly<Record<string, string>> = { After: 'Long', Beyond: 'Far' };
+const QUALIFIER_STAND_INS: Readonly<Record<string, string>> = { Winter: 'Frozen' };
+const LITTLE_WORDS = new Set(['a', 'the', 'of', 'at', 'in', 'under', 'to', 'from', 'through']);
+const titleWords = (text: string) => text.toLowerCase().split(/\s+/).filter(word => word && !LITTLE_WORDS.has(word));
+const sharesAWord = (left: string, right: string) => {
+    const words = new Set(titleWords(right));
+    return titleWords(left).some(word => words.has(word));
+};
 const actors = NPC_DATABASE.filter(npc => npc.id.startsWith('celeb_act_'))
     .sort((left, right) => left.id.localeCompare(right.id));
 const directors = NPC_DATABASE.filter(npc => npc.id.startsWith('celeb_dir_'))
@@ -53,24 +70,32 @@ export const buildStreamingOpportunityOffer = (
     const sellerId = seller?.id || 'independent-rights-holder';
     const sellerName = seller?.name || 'Independent rights holder';
     const titleCode = lane === 'SCOUTED' ? index : cycle * 22 + index;
-    const opener = OPENERS[titleCode % OPENERS.length];
-    const subject = SUBJECTS[Math.floor(titleCode / OPENERS.length) % SUBJECTS.length];
-    const ending = ENDINGS[Math.floor(titleCode / (OPENERS.length * SUBJECTS.length)) % ENDINGS.length];
+    /* B22: the code shuffled inside its block, one to one */
+    const mixedCode = ((titleCode % NAME_BLOCK) * NAME_MIX) % NAME_BLOCK;
+    const subject = SUBJECTS[Math.floor(mixedCode / OPENERS.length) % SUBJECTS.length];
+    const ending = ENDINGS[Math.floor(mixedCode / (OPENERS.length * SUBJECTS.length)) % ENDINGS.length];
+    const pickedOpener = OPENERS[mixedCode % OPENERS.length];
+    const opener = sharesAWord(pickedOpener, ending) ? (OPENER_STAND_INS[pickedOpener] || pickedOpener) : pickedOpener;
+    const fitQualifier = (word: string) => (sharesAWord(word, ending) ? (QUALIFIER_STAND_INS[word] || word) : word);
     // A three-week market eventually exhausts the base name space. Keep the
     // saved seed/identity stable, but introduce new title variants before it
     // wraps so a decades-old acquired film cannot be advertised again.
-    const titleVariant = Math.floor(titleCode / (OPENERS.length * SUBJECTS.length * ENDINGS.length));
+    const titleVariant = Math.floor(titleCode / NAME_BLOCK);
     const firstQualifierIndex = (titleVariant - 1) % TITLE_QUALIFIERS.length;
     const secondQualifierIndex = (Math.floor((titleVariant - 1) / TITLE_QUALIFIERS.length) - 1)
         % TITLE_QUALIFIERS.length;
     const distinctSecondIndex = secondQualifierIndex === firstQualifierIndex
         ? (secondQualifierIndex + 1) % TITLE_QUALIFIERS.length : secondQualifierIndex;
     const qualifier = titleVariant > 0
-        ? `${TITLE_QUALIFIERS[firstQualifierIndex]}${titleVariant > TITLE_QUALIFIERS.length
-            ? ` ${TITLE_QUALIFIERS[distinctSecondIndex]}` : ''} ` : '';
-    const title = lane === 'SCOUTED'
-        ? `${SCOUT_PREFIXES[(titleCode + titleVariant) % SCOUT_PREFIXES.length]} ${opener} ${qualifier}${subject} ${ending}`
-        : `${opener} ${qualifier}${subject} ${ending}`;
+        ? `${fitQualifier(TITLE_QUALIFIERS[firstQualifierIndex])}${titleVariant > TITLE_QUALIFIERS.length
+            ? ` ${fitQualifier(TITLE_QUALIFIERS[distinctSecondIndex])}` : ''} ` : '';
+    const body = `${opener} ${qualifier}${subject} ${ending}`;
+    /* a scouted lead's framing words never repeat its name's (no "Letters to … Letter …") */
+    const scoutStart = (titleCode + titleVariant) % SCOUT_PREFIXES.length;
+    const stem = (text: string) => titleWords(text).map(word => word.replace(/s$/, ''));
+    const scoutPrefix = SCOUT_PREFIXES.map((_, step) => SCOUT_PREFIXES[(scoutStart + step) % SCOUT_PREFIXES.length])
+        .find(prefix => !stem(prefix).some(word => stem(body).includes(word))) || SCOUT_PREFIXES[scoutStart];
+    const title = lane === 'SCOUTED' ? `${scoutPrefix} ${body}` : body;
     const premium = index % 9 === 0;
     const qualityForecast = Math.round((premium ? 84 : 48) + rng() * (premium ? 12 : 39));
     const budgetTier = premium ? (index % 18 === 0 ? 'BLOCKBUSTER' : 'HIGH')
@@ -254,8 +279,8 @@ export const purchaseStreamingOpportunityOffer = (
     const eventKey = `market-package:${offer.id}`;
     const nextPlatform = compactOwnedStreamingPlatformForPersistence({ ...platform,
         treasuryCash: platform.treasuryCash - offer.askingPrice,
-        /* bought once the service is live: it waits on the shelves for the Slate */
-        catalogLicenses: [...platform.catalogLicenses, platform.launchCommit ? { ...license, holdForSlate: true } : license],
+        /* it waits on the shelves for the Slate (B16, 2026-11-15: before launch too) */
+        catalogLicenses: [...platform.catalogLicenses, { ...license, holdForSlate: true }],
         catalogProjectIds: [...new Set([...platform.catalogProjectIds, offer.projectId])],
         eventLedger: [...platform.eventLedger, {
             id: createDeterministicId('streaming_event', platform.simulationSeed, eventKey),

@@ -1,4 +1,6 @@
 import type { StreamingFacilityRepairAction } from './streamingInfrastructurePhysical';
+import { STREAMING_SERVED_COVERAGE_SHARE } from './streamingNetworkCoverage';
+import { hasDataResidencyRule } from './streamingServerSites';
 
 export type StreamingRehearsalScenario = 'QUIET' | 'LIKELY' | 'SURGE';
 export type StreamingRehearsalVerdict = 'HELD' | 'BURST' | 'BROKE';
@@ -152,19 +154,30 @@ export const createStreamingLaunchRehearsal = (
     const affectedMarkets = new Map<string, Set<string>>();
     const countryAllocations = new Map<string, Array<{ facilityId: string; demand: number }>>();
 
-    for (const country of input.countries) {
-        const route = Array.from(new Set(country.routeFacilityIds))
-            .map(id => facilityById.get(id))
-            .filter((item): item is StreamingRehearsalFacilityInput => Boolean(item));
+    /* B9 (2026-11-16): viewers who must be served in their own country (data residency) take their country's rooms
+       first; every other market shares what the rooms have left, in proportion to the spare. Every market used to be
+       split over every room of its region by raw capacity, so Germany's viewers landed on Moscow's room, Moscow broke
+       under Russia's viewers plus theirs, and every market routed through it failed while Frankfurt sat half empty. */
+    const routeOf = (country: StreamingRehearsalCountryInput): StreamingRehearsalFacilityInput[] => Array.from(new Set(country.routeFacilityIds))
+        .map(id => facilityById.get(id))
+        .filter((item): item is StreamingRehearsalFacilityInput => Boolean(item));
+    const residencyDemand = new Map<string, number>();
+    const allocate = (
+        country: StreamingRehearsalCountryInput,
+        route: StreamingRehearsalFacilityInput[],
+        weightOf: (item: StreamingRehearsalFacilityInput) => number,
+    ) => {
         const reachableDemand = round(country.demand * clamp(country.reachableShare ?? 1, 0, 1));
-        const routeCapacity = route.reduce((sum, item) => sum + Math.max(1, item.steadyCapacity), 0);
-        const allocations = route.map(item => ({
+        const weights = route.map(item => Math.max(0, weightOf(item)));
+        const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+        const allocations = route.map((item, index) => ({
             facilityId: item.facilityId,
-            demand: round(reachableDemand * Math.max(1, item.steadyCapacity) / Math.max(1, routeCapacity)),
+            demand: totalWeight > 0 ? round(reachableDemand * weights[index] / totalWeight) : 0,
         }));
         const allocationTotal = allocations.reduce((sum, item) => sum + item.demand, 0);
         if (allocations.length && allocationTotal !== reachableDemand) {
-            allocations[0].demand += reachableDemand - allocationTotal;
+            const heaviest = weights.indexOf(Math.max(...weights));
+            allocations[Math.max(0, heaviest)].demand += reachableDemand - allocationTotal;
         }
         countryAllocations.set(country.marketId, allocations);
         allocations.forEach(allocation => {
@@ -173,6 +186,21 @@ export const createStreamingLaunchRehearsal = (
             marketIds.add(country.marketId);
             affectedMarkets.set(allocation.facilityId, marketIds);
         });
+        return allocations;
+    };
+    for (const country of input.countries.filter(item => hasDataResidencyRule(item.marketId))) {
+        allocate(country, routeOf(country), item => Math.max(1, item.steadyCapacity)).forEach(allocation => {
+            residencyDemand.set(allocation.facilityId, (residencyDemand.get(allocation.facilityId) || 0) + allocation.demand);
+        });
+    }
+    for (const country of input.countries.filter(item => !hasDataResidencyRule(item.marketId))) {
+        const route = routeOf(country);
+        const spare = (item: StreamingRehearsalFacilityInput) => Math.max(0, item.steadyCapacity - (residencyDemand.get(item.facilityId) || 0));
+        const burstSpare = (item: StreamingRehearsalFacilityInput) => Math.max(0, item.burstCapacity - (residencyDemand.get(item.facilityId) || 0));
+        const weightOf = route.some(item => spare(item) > 0) ? spare
+            : route.some(item => burstSpare(item) > 0) ? burstSpare
+                : (item: StreamingRehearsalFacilityInput) => Math.max(1, item.steadyCapacity);
+        allocate(country, route, weightOf);
     }
 
     const facilityResults: StreamingRehearsalFacilityResult[] = facilities.map(facility => {
@@ -226,23 +254,36 @@ export const createStreamingLaunchRehearsal = (
             .map(item => ({ allocation: item, result: facilityResultById.get(item.facilityId) }))
             .filter((item): item is { allocation: { facilityId: string; demand: number }; result: StreamingRehearsalFacilityResult } => Boolean(item.result));
         const delivered = routeResults.reduce((sum, item) => sum + item.allocation.demand * (1 - item.result.failedPercent / 100), 0);
-        const unreachablePercent = routeResults.length ? round((1 - clamp(country.reachableShare ?? 1, 0, 1)) * 100) : 100;
+        const reachable = clamp(country.reachableShare ?? 1, 0, 1);
+        const unreachablePercent = routeResults.length ? round((1 - reachable) * 100) : 100;
+        /* B10 (2026-11-15): one coverage bar, the Build's (80% of a market in signal reach). Below it the market
+           fails; above it, the part outside reach can't sign up (the weekly game counts only a country's covered
+           share as customers: worldStreamingCustomers / worldStreamingViewing), so it never tries a stream and is not
+           counted as failed streams. The rehearsal used to break every market under about 99.5%, which no plan could
+           reach in Asia while the Build's check said 80% was enough.
+           2026-11-16: the line used to say that part "watches at lower picture quality"; the game has no such thing. */
+        const belowCoverageBar = reachable < STREAMING_SERVED_COVERAGE_SHARE;
+        const lowerQualityDemand = routeResults.length && !belowCoverageBar ? country.demand * (1 - reachable) : 0;
         const failedPercent = routeResults.length
-            ? country.demand > 0 ? clamp(round((country.demand - delivered) / country.demand * 100), 0, 100) : unreachablePercent
+            ? country.demand > 0 ? clamp(round((country.demand - delivered - lowerQualityDemand) / country.demand * 100), 0, 100) : unreachablePercent
             : 100;
         const worstLoad = routeResults.reduce((max, item) => Math.max(max, item.result.loadPercent), 0);
         const hasBrokenRoute = routeResults.some(item => item.result.verdict === 'BROKE');
         const hasBurstRoute = routeResults.some(item => item.result.verdict === 'BURST');
-        const verdict: StreamingRehearsalVerdict = routeResults.length === 0 || hasBrokenRoute || unreachablePercent > 0
+        const verdict: StreamingRehearsalVerdict = routeResults.length === 0 || hasBrokenRoute || belowCoverageBar
             ? 'BROKE'
             : hasBurstRoute ? 'BURST' : 'HELD';
         const uniqueCities = new Set(country.servingCityLabels).size;
-        const allocatedDemand = Math.max(1, routeResults.reduce((sum, item) => sum + item.allocation.demand, 0));
-        const routeReliabilityPercent = routeResults.length
-            ? routeResults.reduce((sum, item) => (
-                sum + (facilityById.get(item.result.facilityId)?.reliabilityPercent || 0) * item.allocation.demand
-            ), 0) / allocatedDemand
-            : 0;
+        const routeDemand = routeResults.reduce((sum, item) => sum + item.allocation.demand, 0);
+        const routeReliability = (item: (typeof routeResults)[number]) => facilityById.get(item.result.facilityId)?.reliabilityPercent || 0;
+        /* 2026-11-15 (B6): a covered market with no demand (Vatican City) has nothing to weight by. The weighted
+           average read 0% there, which added ~90 points of buffering risk and kept it at "Watch it" whatever was
+           built. With zero demand, its routes count equally. */
+        const routeReliabilityPercent = !routeResults.length
+            ? 0
+            : routeDemand > 0
+                ? routeResults.reduce((sum, item) => sum + routeReliability(item) * item.allocation.demand, 0) / routeDemand
+                : routeResults.reduce((sum, item) => sum + routeReliability(item), 0) / routeResults.length;
         const outageResistance: StreamingRehearsalCountryResult['outageResistance'] = routeResults.length === 0
             ? 'UNSERVED'
             : uniqueCities >= 2 ? 'REDUNDANT'
@@ -268,6 +309,8 @@ export const createStreamingLaunchRehearsal = (
             ? `${failedPercent}% of attempted streams are expected to fail at peak.`
             : bufferingRiskPercent >= 15
                 ? `Playback should start, but ${bufferingRiskPercent}% buffering risk will be visible.`
+                : unreachablePercent > 0
+                    ? `Playback works; ${unreachablePercent}% of this market is outside signal reach and can't sign up until your network reaches it.`
                 : catalogueAvailabilityPercent < 100
                     ? `Playback is healthy, but only ${catalogueAvailabilityPercent}% of the opening catalogue is cleared here.`
                     : outageResistance === 'SINGLE_POINT'
@@ -317,7 +360,8 @@ export const createStreamingLaunchRehearsal = (
         : countries.some(country => country.verdict === 'BURST') ? 'BURST' : 'HELD';
 
     const repairs: StreamingRehearsalRepairAction[] = [];
-    for (const country of countries.filter(item => item.outageResistance === 'UNSERVED' || (item.unreachablePercent || 0) > 0)) {
+    /* B10: a repair for a market below the coverage bar (or unserved); one above it passes and only loses picture quality */
+    for (const country of countries.filter(item => item.outageResistance === 'UNSERVED' || (item.unreachablePercent || 0) > Math.round((1 - STREAMING_SERVED_COVERAGE_SHARE) * 100))) {
         repairs.push({
             id: `coverage:${country.marketId}`, type: 'REVIEW_COVERAGE',
             label: `Review ${country.country} coverage`,

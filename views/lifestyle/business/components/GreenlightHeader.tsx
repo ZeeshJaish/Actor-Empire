@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Check, Clapperboard, Info, Star } from 'lucide-react';
 import { type GreenlightStep } from '../greenlightTypes';
 
@@ -23,6 +23,8 @@ interface GreenlightHeaderProps {
     onStepChange: (step: GreenlightStep) => void;
     selectedScriptId: string | null;
     currentEstimatedBuzz: number;
+    /** U2: the film's Attention in parts (points out of 100); a tap on Attention shows them */
+    attentionParts?: { cast: number; script: number; music: number; studio: number } | null;
     currentEstimatedQuality: number;
     budgetBreakdown: {
         baseCost: number;
@@ -58,6 +60,7 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
     onStepChange,
     selectedScriptId,
     currentEstimatedBuzz,
+    attentionParts,
     currentEstimatedQuality,
     budgetBreakdown,
     musicBudget,
@@ -72,6 +75,14 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
     const stepIndex = commission ? commission.index : STEP_ORDER.indexOf(step);
     const canNavigate = selectedScriptId !== null && step !== 'BUZZ';
     const labels = commission ? commission.labels : STEP_LABELS;
+    /* U2 (2026-11-16): "Attention 33 with a top cast?" A tap on Attention says what it is made of */
+    const [attentionOpen, setAttentionOpen] = useState(false);
+    const attentionRows = attentionParts ? [
+        { label: 'Cast', value: attentionParts.cast, max: 60 },
+        { label: 'Script hype', value: attentionParts.script, max: 20 },
+        { label: 'Music', value: attentionParts.music, max: 10 },
+        { label: 'Studio', value: attentionParts.studio, max: 10 },
+    ] : null;
 
     return (
         <div className="relative shrink-0 z-20 bg-emerald-950/40 backdrop-blur-2xl border-b border-emerald-500/20 shadow-2xl">
@@ -95,8 +106,17 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 mb-4" data-greenlight-metrics>
-                    <div className="bg-black/60 px-2 py-2 min-h-[58px] rounded-2xl border border-amber-500/20 backdrop-blur-xl flex flex-col items-center justify-center text-center shadow-2xl">
-                        <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.18em] text-zinc-500 mb-1">Attention</span>
+                    <div
+                        className={`relative bg-black/60 px-2 py-2 min-h-[58px] rounded-2xl border border-amber-500/20 backdrop-blur-xl flex flex-col items-center justify-center text-center shadow-2xl ${attentionRows ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''}`}
+                        role={attentionRows ? 'button' : undefined}
+                        tabIndex={attentionRows ? 0 : undefined}
+                        aria-expanded={attentionRows ? attentionOpen : undefined}
+                        aria-label={attentionRows ? `Attention ${currentEstimatedBuzz}: what it is made of` : undefined}
+                        onClick={attentionRows ? () => setAttentionOpen(open => !open) : undefined}
+                        onKeyDown={attentionRows ? event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setAttentionOpen(open => !open); } } : undefined}
+                        data-greenlight-attention
+                    >
+                        <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-[0.18em] text-zinc-500 mb-1">Attention{attentionRows ? <Info size={8} className="inline ml-1 -mt-px text-zinc-600" /> : null}</span>
                         <div className="flex items-center gap-1">
                             <div className="relative inline-block w-[14px] h-[14px]">
                                 <Star size={14} className="absolute inset-0 text-zinc-700" />
@@ -106,6 +126,21 @@ export const GreenlightHeader: React.FC<GreenlightHeaderProps> = ({
                             </div>
                             <span className="text-sm sm:text-lg font-mono font-black text-amber-400">{currentEstimatedBuzz}</span>
                         </div>
+                        {attentionRows && attentionOpen && (
+                            <div className="absolute top-full left-0 mt-2 w-60 max-w-[calc(100vw-2rem)] bg-zinc-950 border border-amber-500/25 rounded-xl p-3 shadow-2xl z-50 text-left" data-greenlight-attention-parts onClick={event => event.stopPropagation()}>
+                                <div className="text-[8px] font-black uppercase tracking-[0.18em] text-amber-300/80 mb-2">What makes Attention</div>
+                                <div className="space-y-1.5">
+                                    {attentionRows.map(row => (
+                                        <div key={row.label} className="grid grid-cols-[70px_minmax(0,1fr)_44px] items-center gap-2 text-[9px]">
+                                            <span className="text-zinc-400 uppercase font-bold">{row.label}</span>
+                                            <span className="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><span className="block h-full rounded-full bg-amber-400" style={{ width: `${Math.min(100, Math.max(0, row.value / row.max * 100))}%` }} /></span>
+                                            <span className="text-right font-mono text-white">{Math.round(row.value)}<span className="text-zinc-600">/{row.max}</span></span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="mt-2 pt-2 border-t border-zinc-800 text-[9px] leading-snug text-zinc-400">Marketing isn't part of it: once you announce, campaigns turn attention into awareness.</p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="relative group/budget bg-black/60 px-2 py-2 min-h-[58px] rounded-2xl border border-emerald-500/20 backdrop-blur-xl flex flex-col items-center justify-center text-center shadow-2xl" data-greenlight-budget>

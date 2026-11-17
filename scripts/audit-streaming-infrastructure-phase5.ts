@@ -179,9 +179,26 @@ const invalidPricingDraft = {
         FAMILY: 15.99,
     },
 };
+/* B11 (2026-11-15): before launch the tiers are read from the plans on screen, so a copy out of step with them (as
+   here) no longer refuses the commission; the ladder the plans give keeps the $2 / $3 gaps, in cents */
+const withPlans = validateStreamingInfrastructureDraft(tested.player, invalidPricingDraft);
 assert(
-    validateStreamingInfrastructureDraft(tested.player, invalidPricingDraft).issues.some(issue => issue.code === 'PRICE_ORDER'),
-    'Pricing should preserve understandable value separation between tiers.',
+    !withPlans.issues.some(issue => issue.code === 'PRICE_ORDER' || issue.code === 'PRICE_RANGE'),
+    'Before launch the tiers follow the plans on screen, not a copy saved earlier.',
+);
+const noPlansPlayer = {
+    ...tested.player,
+    ownedStreamingPlatform: {
+        ...tested.player.ownedStreamingPlatform,
+        serviceConfiguration: {
+            ...tested.player.ownedStreamingPlatform.serviceConfiguration,
+            pricing: { ...tested.player.ownedStreamingPlatform.serviceConfiguration.pricing, plans: [] },
+        },
+    },
+};
+assert(
+    validateStreamingInfrastructureDraft(noPlansPlayer, invalidPricingDraft).issues.some(issue => issue.code === 'PRICE_ORDER'),
+    'With no plans to follow, pricing should preserve understandable value separation between tiers.',
 );
 
 const beforeCommitTreasury = tested.player.ownedStreamingPlatform.treasuryCash;
@@ -235,14 +252,22 @@ const repeated = commitStreamingInfrastructureSetup(committed.player);
 assert(!repeated.changed && repeated.reason === 'ALREADY_CONFIGURED', 'Repeated approval of the same committed state must not charge twice.');
 assert(repeated.player.ownedStreamingPlatform.treasuryCash === committed.player.ownedStreamingPlatform.treasuryCash, 'Repeated approval must preserve company cash.');
 
-const priceDraft = createDefaultStreamingInfrastructureDraft(committed.player);
-const testedPriceDraftPlayer = saveStreamingInfrastructureDraft(committed.player, {
-    ...priceDraft,
-    subscriptionPrices: {
-        ...priceDraft.subscriptionPrices,
-        BASIC: 8.49,
+/* B11 (2026-11-15): before launch the tiers come from the plans on screen (the Offer), so a price revision is a plan
+   change: the cheapest paid plan to $8.49 */
+const revisedPricing = committed.player.ownedStreamingPlatform.serviceConfiguration.pricing;
+const cheapestPaid = [...revisedPricing.plans].filter(plan => plan.monthly > 0).sort((left, right) => left.monthly - right.monthly)[0];
+const revisedPlayer: Player = {
+    ...committed.player,
+    ownedStreamingPlatform: {
+        ...committed.player.ownedStreamingPlatform,
+        serviceConfiguration: {
+            ...committed.player.ownedStreamingPlatform.serviceConfiguration,
+            pricing: { ...revisedPricing, plans: revisedPricing.plans.map(plan => (plan === cheapestPaid ? { ...plan, monthly: 8.49 } : plan)) },
+        },
     },
-});
+};
+const priceDraft = createDefaultStreamingInfrastructureDraft(revisedPlayer);
+const testedPriceDraftPlayer = saveStreamingInfrastructureDraft(revisedPlayer, priceDraft);
 const priceRevision = commitStreamingInfrastructureSetup(testedPriceDraftPlayer);
 assert(priceRevision.changed, 'Pre-launch pricing should remain revisable.');
 assert(priceRevision.forecast.transactionCost === 0, 'A pricing-only revision should not create a fake infrastructure capital bill.');

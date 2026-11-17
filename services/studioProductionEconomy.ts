@@ -1,4 +1,5 @@
 import type { BudgetTier, StudioDepartments, StudioEquipment } from '../types';
+import { getOwnedGearQualityLevel } from './greenlightSetupEffects';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const safeLevel = (level: unknown) => clamp(Math.floor(Number(level) || 0), 0, 10);
@@ -44,10 +45,29 @@ export const getInHouseCastProjectCost = (level: number): number => {
  * This allocation represents maintenance, operators, transport, expendables,
  * insurance, and wear for one production.
  */
+/* B28 (2026-11-15): owned gear at quality 8 cost $1.345M a film against $500K to rent the same quality, though the
+   Greenlight promises "discounted studio operating rates". Using owned gear now costs about 40% of renting the same
+   quality (the rental prices, in between tiers read along a straight line). */
+const RENTAL_PRICE_BY_QUALITY: ReadonlyArray<readonly [number, number]> = [[2, 10_000], [5, 100_000], [8, 500_000], [15, 2_500_000], [30, 8_500_000]];
+const OWNED_GEAR_SHARE_OF_RENTAL = 0.4;
+const rentalPriceAtQuality = (quality: number): number => {
+    if (quality <= RENTAL_PRICE_BY_QUALITY[0][0]) return RENTAL_PRICE_BY_QUALITY[0][1] * (quality / RENTAL_PRICE_BY_QUALITY[0][0]);
+    for (let index = 1; index < RENTAL_PRICE_BY_QUALITY.length; index += 1) {
+        const [q1, p1] = RENTAL_PRICE_BY_QUALITY[index];
+        const [q0, p0] = RENTAL_PRICE_BY_QUALITY[index - 1];
+        if (quality <= q1) return p0 + (p1 - p0) * ((quality - q0) / (q1 - q0));
+    }
+    return RENTAL_PRICE_BY_QUALITY[RENTAL_PRICE_BY_QUALITY.length - 1][1];
+};
+/* B28 cap (Zeesh 2026-11-16): the released price per film is a ceiling, so no owned level costs more than it did
+   before the update. Levels 1–8 are 40% of renting (well under it); levels 9–10, which now give High-End and
+   Cutting-Edge quality, stay at $1.58M and $1.84M a line (about 30% and 22% of renting that quality). */
+const releasedOwnedEquipmentProjectCost = (level: number): number => Math.round(65_000 + (level * 92_000) + (level * level * 8_500));
 export const getOwnedEquipmentProjectCost = (level: number): number => {
     const safe = safeLevel(level);
     if (safe <= 0) return 0;
-    return Math.round(65_000 + (safe * 92_000) + (safe * safe * 8_500));
+    const shareOfRenting = Math.round((rentalPriceAtQuality(getOwnedGearQualityLevel(safe)) * OWNED_GEAR_SHARE_OF_RENTAL) / 1_000) * 1_000;
+    return Math.min(shareOfRenting, releasedOwnedEquipmentProjectCost(safe));
 };
 
 export const getInfrastructureLineAnnualOverhead = (level: number, isDepartment: boolean): number => (

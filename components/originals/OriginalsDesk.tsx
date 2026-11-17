@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, ChevronRight, Plus, Radar, Search } from 'lucide-react';
-import type { Player } from '../../types';
+import type { CustomPoster, Player } from '../../types';
+import { CustomPosterImage } from '../CustomPosterImage';
+import { buildProjectPosterIndex } from '../../services/projectPosterIndex';
 import { buyOriginalAudienceReport, getActiveAudienceReport, getOriginalAudienceReportPrice } from '../../services/originalsAudienceReport';
 import { getOriginalsDeskView, type DeskPitch, type DeskTitle } from '../../services/originalsDesk';
 import { getOriginalPitchRefreshInWeeks, getOriginalScoutQuote, scoutOriginalPitches } from '../../services/originalsPitches';
@@ -23,19 +25,21 @@ const posterInitials = (title: string): string => {
     return (words.length ? words : [title]).slice(0, 3).map(word => word[0]).join('');
 };
 
-export const OriginalPoster: React.FC<{ title: string; className?: string; small?: boolean; children?: React.ReactNode }> = ({ title, className = '', small, children }) => {
+export const OriginalPoster: React.FC<{ title: string; className?: string; small?: boolean; children?: React.ReactNode; poster?: CustomPoster | null }> = ({ title, className = '', small, children, poster }) => {
     const longestWord = title.split(/\s+/).reduce((longest, word) => Math.max(longest, word.length), 1);
     const fontSize = small ? 18 : Math.min(22, Math.floor(118 / (longestWord * 0.66)));
+    const typeArt = <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center p-1 text-center font-serif font-black uppercase leading-[.95] tracking-tighter text-white/15 -rotate-6" style={{ fontSize }}>{small ? posterInitials(title) : title}</div>;
     return (
         /* #316: "relative" beat a caller's "absolute" in the stylesheet, so a poster filling a card had no height and the card was black */
         <div className={`${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative '}overflow-hidden ${className}`} style={{ background: `linear-gradient(145deg, ${posterColor(title)}, #000 120%)` }}>
-            <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center p-1 text-center font-serif font-black uppercase leading-[.95] tracking-tighter text-white/15 -rotate-6" style={{ fontSize }}>{small ? posterInitials(title) : title}</div>
+            {/* B20: the player's own poster when there is one, the title's type art otherwise */}
+            {poster ? <CustomPosterImage poster={poster} alt="" className="absolute inset-0 h-full w-full object-cover" fallback={typeArt} /> : typeArt}
             {children}
         </div>
     );
 };
 
-const SlateCard: React.FC<{ title: DeskTitle; onOpen: () => void }> = ({ title, onOpen }) => (
+const SlateCard: React.FC<{ title: DeskTitle; onOpen: () => void; poster?: CustomPoster }> = ({ title, onOpen, poster }) => (
     <button
         type="button"
         data-desk-making={title.commission.id}
@@ -43,7 +47,7 @@ const SlateCard: React.FC<{ title: DeskTitle; onOpen: () => void }> = ({ title, 
         className="relative h-[176px] w-[132px] shrink-0 overflow-hidden rounded-xl border-2 bg-zinc-900 text-left active:scale-[0.98]"
         style={{ borderColor: title.color, boxShadow: `0 0 14px ${title.color}44` }}
     >
-        <OriginalPoster title={title.commission.title} className="absolute inset-0" />
+        <OriginalPoster title={title.commission.title} className="absolute inset-0" poster={poster} />
         <span className="absolute inset-x-0 top-0 z-10 truncate px-1.5 py-1 text-center text-[9px] font-black uppercase leading-none tracking-[0.06em] text-white" style={{ background: title.color }}>{title.byLabel}</span>
         <span className="absolute left-2 top-7 z-10 rounded bg-rose-600 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">{title.phaseLabel}</span>
         <span className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black via-black/80 to-transparent p-2 pt-6">
@@ -115,6 +119,9 @@ export const OriginalsDesk: React.FC<{
     const week = `${player.age}:${player.currentWeek}`;
     const [revision, setRevision] = useState(0);
     const view = useMemo(() => getOriginalsDeskView(player), [week, revision, player.ownedStreamingPlatform?.originalPitches, player.ownedStreamingPlatform?.originalCommissions]);
+    /* B20: the player's own posters (an Original's own, or its release's, script's or studio library's) */
+    const posters = useMemo(() => buildProjectPosterIndex(player), [player]);
+    const posterOf = (commission: { id: string; canonicalProjectId: string | null }) => posters.get(commission.canonicalProjectId || '') || posters.get(commission.id);
     const scout = useMemo(() => getOriginalScoutQuote(player), [player.ownedStreamingPlatform?.originalPitches, player.ownedStreamingPlatform?.treasuryCash]);
     const [notice, setNotice] = useState('');
     const reportPrice = useMemo(() => getOriginalAudienceReportPrice(player), [week]);
@@ -168,7 +175,7 @@ export const OriginalsDesk: React.FC<{
                     </div>
                     {view.making.length ? (
                         <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1 no-scrollbar">
-                            {view.making.map(title => <SlateCard key={title.commission.id} title={title} onOpen={() => onOpenTitle(title.commission.id, title.commission.canonicalProjectId)} />)}
+                            {view.making.map(title => <SlateCard key={title.commission.id} title={title} poster={posterOf(title.commission)} onOpen={() => onOpenTitle(title.commission.id, title.commission.canonicalProjectId)} />)}
                         </div>
                     ) : (
                         <p className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-center text-xs font-semibold text-zinc-500">What you commission shows here while it is being made.</p>
@@ -221,7 +228,7 @@ export const OriginalsDesk: React.FC<{
                         <div className="space-y-1.5">
                             {view.live.map(title => (
                                 <button key={title.commission.id} type="button" data-desk-live={title.commission.id} onClick={() => onOpenTitle(title.commission.id, title.commission.canonicalProjectId)} className="grid min-h-[56px] w-full grid-cols-[40px_minmax(0,1fr)_16px] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-left active:scale-[0.99]">
-                                    <OriginalPoster title={title.commission.title} small className="h-10 w-10 rounded-md" />
+                                    <OriginalPoster title={title.commission.title} small className="h-10 w-10 rounded-md" poster={posterOf(title.commission)} />
                                     <span className="min-w-0">
                                         <span className="block truncate text-sm font-black">{title.commission.title}</span>
                                         <span className="block truncate text-[11px] font-semibold text-zinc-400">{title.outside ? `Made by ${title.commission.producerStudioName}` : 'Made by your studio'}</span>

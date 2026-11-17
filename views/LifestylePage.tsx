@@ -69,6 +69,8 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
   const [purchaseCelebrationAsset, setPurchaseCelebrationAsset] = useState<ShareableAsset | null>(null);
   const [streamingOriginalTarget, setStreamingOriginalTarget] = useState<{ studioId: string; scriptId: string; commissionId: string } | null>(null);
+  /* B14b: the service's "Order season N" opens the studio's Vault on that season, the way the inbox's "Season N: Your Call" does */
+  const [serviceContinuation, setServiceContinuation] = useState<{ studioId: string; scriptId: string } | null>(null);
   const [streamingDestination, setStreamingDestination] = useState<'HOME' | 'FINANCE' | 'STATUS' | 'TEAM' | 'OWNERSHIP' | 'SLATE' | 'RIGHTS'>('HOME');
   /* #252: a title sent to the player's own service from the rights floor */
   const [shelfNotice, setShelfNotice] = useState<StreamingShelfNoticeModel | null>(null);
@@ -304,7 +306,7 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
 
   if (view === 'PRODUCTION_WIZARD') return <ProductionWizard player={player} onCancel={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} onComplete={() => setView('PRODUCTION_GAME')} />;
 
-  if (view === 'PRODUCTION_GAME') return <><ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} initialStudioContinuation={initialStudioContinuation} onStudioContinuationConsumed={onStudioContinuationConsumed} initialPlatformCommission={initialPlatformCommission} onPlatformCommissionConsumed={onPlatformCommissionConsumed} initialStreamingOriginal={streamingOriginalTarget || undefined} onStreamingOriginalConsumed={() => setStreamingOriginalTarget(null)} onStreamingOriginalGreenlightComplete={() => openStreamingPlatform()} onOpenOwnedStreamingDelivery={() => openStreamingPlatform()} onOpenStreamingSlate={() => openStreamingPlatform('SLATE')} onSentToYourService={setShelfNotice} />
+  if (view === 'PRODUCTION_GAME') return <><ProductionHouseGame player={player} onBack={() => setView('MAIN')} onUpdatePlayer={onUpdatePlayer!} initialRightsMarketOpportunityId={initialRightsMarketOpportunityId} onRightsMarketTargetConsumed={onRightsMarketTargetConsumed} initialStudioContinuation={serviceContinuation || initialStudioContinuation} onStudioContinuationConsumed={() => { setServiceContinuation(null); onStudioContinuationConsumed?.(); }} initialPlatformCommission={initialPlatformCommission} onPlatformCommissionConsumed={onPlatformCommissionConsumed} initialStreamingOriginal={streamingOriginalTarget || undefined} onStreamingOriginalConsumed={() => setStreamingOriginalTarget(null)} onStreamingOriginalGreenlightComplete={() => openStreamingPlatform()} onOpenOwnedStreamingDelivery={() => openStreamingPlatform()} onOpenStreamingSlate={() => openStreamingPlatform('SLATE')} onSentToYourService={setShelfNotice} />
       {shelfNotice && <StreamingShelfNotice {...shelfNotice} service={player.ownedStreamingPlatform.identity?.name || 'your service'} color={player.ownedStreamingPlatform.identity?.primaryColor}
           onClose={() => setShelfNotice(null)} onSchedule={() => { setShelfNotice(null); openStreamingPlatform('SLATE'); }} />}
   </>;
@@ -321,6 +323,10 @@ export const LifestylePage: React.FC<LifestylePageProps> = ({ player, onBuyItem,
           initialContentMarketOfferId={initialStreamingContentOfferId}
           onContentMarketOfferConsumed={onStreamingContentOfferConsumed}
           onOpenProductionHouse={handleProductionClick}
+          onOpenStudioContinuation={(studioId, scriptId) => {
+              setServiceContinuation({ studioId, scriptId });
+              setView('PRODUCTION_GAME');
+          }}
           onOpenOriginalProduction={target => {
               setStreamingOriginalTarget(target);
               setView('PRODUCTION_GAME');

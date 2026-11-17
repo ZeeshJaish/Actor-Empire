@@ -134,10 +134,17 @@ export const applyCareerRehearsal = (input: Player, projectId: string): { player
     return { player: next, changed: true, message: `${c.name}: ${Math.round(Math.min(100, current + gain))}% ${pre || audition ? 'preparation' : 'scene preparation'}${distributed && canLearn ? ' · role skills improved' : ''}${getCareerProjectLoad(p) > 1 ? ' · attention shared across current roles' : ''}.` };
 };
 
+/** U3 (2026-11-16): how far a publicist can lift fame, which recent credits, work and audience support (15–98).
+    Above it the publicist adds nothing and fame fades by getCareerFameDecay each week; the Team app now says so. */
+export const getCareerFameCeiling = (p: Player): number => {
+    const evidence = getCareerEvidence(p, true);
+    return clamp(15 + Math.min(30, evidence.credits * 3) + evidence.workSignal * 35 + evidence.audience * 18, 15, 98);
+};
+
 export const getCareerPublicityGain = (p: Player): number => {
     const tierGain = { ROOKIE: .5, STANDARD: 1, ELITE: 1.5, LEGEND: 1.5 }[p.team.publicist?.tier || ''] || 0;
     const evidence = getCareerEvidence(p, true);
-    const ceiling = clamp(15 + Math.min(30, evidence.credits * 3) + evidence.workSignal * 35 + evidence.audience * 18, 15, 98);
+    const ceiling = getCareerFameCeiling(p);
     return tierGain * clamp((ceiling - p.stats.fame) / 20, 0, 1) * (.35 + .65 * Math.max(evidence.workSignal, evidence.audience));
 };
 

@@ -46,6 +46,10 @@ export interface DossierTitle {
   cost: number;
   rightsInvestment?: number;
   financialsAvailable?: boolean;
+  /** B16: the latest week's revenue is known even when its cost split is not (outside the 24 the weekly record keeps) */
+  revenueKnown?: boolean;
+  /** B14b: a series from the player's own studio: its next season, ready in the studio's Vault or not yet */
+  nextSeason?: { number: number; ready: boolean; note: string };
   /** where the views came from, as percentages */
   sources: { label: string; pct: number }[];
 
@@ -161,10 +165,11 @@ const DossierBody: React.FC<{
             {!inPlace && <Cell label="CHURN PREVENTED" value={count(t.churnPrevented)} tone="brand" note="stayed because of it" />}
             {t.kind === 'LICENSED' && <Cell label="RIGHTS GUARANTEE PAID" value={money(t.rightsInvestment || 0)}
               note="Paid upfront; accounted over the licence term" />}
-            <Cell label="REVENUE / LATEST WEEK" value={t.financialsAvailable === false ? '—' : money(t.revenue)} tone="good" />
-            <Cell label="COST / LATEST WEEK" value={t.financialsAvailable === false ? '—' : money(t.cost)} tone="bad" />
+            <Cell label="REVENUE / LATEST WEEK" value={t.financialsAvailable === false && !t.revenueKnown ? '—' : money(t.revenue)} tone="good" />
+            <Cell label="COST / LATEST WEEK" value={t.financialsAvailable === false ? '—' : money(t.cost)} tone="bad"
+              note={t.financialsAvailable === false && t.revenueKnown ? 'Shown for your 24 most-watched titles' : undefined} />
             <Cell label="CONTRIBUTION / LATEST WEEK" value={t.financialsAvailable === false ? '—' : `${marginPct > 0 ? '+' : ''}${marginPct}%`}
-              tone={marginPct >= 0 ? 'good' : 'bad'} note={t.financialsAvailable === false ? 'Starts after release' : money(margin)} />
+              tone={marginPct >= 0 ? 'good' : 'bad'} note={t.financialsAvailable === false ? (t.revenueKnown ? 'Shown for your 24 most-watched titles' : 'Starts after release') : money(margin)} />
             <div className={cx(css.dcell, css.wide)}>
               <span>WHERE THEY CAME FROM</span>
               <div className={css.srclist}>
@@ -255,7 +260,16 @@ const DossierBody: React.FC<{
                 <button className={cx(css.dact, css.primary)} onClick={() => onAction?.('renew-rights')}>RENEW THE RIGHTS</button>
                 <button className={cx(css.dact, css.danger)} onClick={() => onAction?.('lapse')}>LET IT LAPSE</button>
               </>
-            ) : <p className={css.actnote}>Imported from your production house. Existing grants elsewhere still limit where this title can play.</p>}
+            ) : (
+              <>
+                {/* B14b: a series from your own studio goes on through your studio's Vault */}
+                {t.nextSeason?.ready && (
+                  <button className={cx(css.dact, css.primary)} data-order-season onClick={() => onAction?.('order-season')}>ORDER SEASON {t.nextSeason.number}</button>
+                )}
+                {t.nextSeason && <div className={css.actnote} data-next-season-note>{t.nextSeason.note}</div>}
+                <p className={css.actnote}>Imported from your production house. Existing grants elsewhere still limit where this title can play.</p>
+              </>
+            )}
             {/* #150: the Campaign Studio replaces the old War Room's artwork and homepage buttons */}
             {campaigns && (
               <>

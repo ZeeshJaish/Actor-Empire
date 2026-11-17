@@ -51,11 +51,12 @@ test('a sparse legacy release retains an explicitly unknown owner without corrup
  assert.equal(Math.round((next.player.money-p.money)*100),receipt.actorPaidCents);
  const replay=commitCinemaWeek(next.player,next.result);assert.equal(replay.applied,false);assert.deepEqual(replay.player,next.player);
  const unsettled=structuredClone(r.player);unsettled.world.cinemaMarket!.titles['old-active'].basis='UNSETTLED_WEEKLY';
- assert.throws(()=>processCinemaMarketWeek(unsettled,getAbsoluteWeek(p.age,p.currentWeek)+1),/Missing canonical cinema producer/);
+ const settlesExternally=(pl:any,owner:string)=>{const n=processCinemaMarketWeek(pl,getAbsoluteWeek(p.age,p.currentWeek)+1);assert.ok(Object.hasOwn(n.player.world.cinemaMarket!.externalProducerBalancesCents||{},owner),owner);};
+ settlesExternally(unsettled,'legacy-owner:old-active');
  const reassigned=structuredClone(r.player);reassigned.activeReleases[0].projectDetails.studioId='missing-known-studio';
- assert.throws(()=>processCinemaMarketWeek(reassigned,getAbsoluteWeek(p.age,p.currentWeek)+1),/Missing canonical cinema producer/);
+ settlesExternally(reassigned,'missing-known-studio');
  const named=fixture();named.activeReleases[0].projectDetails.studioId='missing-known-studio';
- assert.throws(()=>processCinemaMarketWeek(named,getAbsoluteWeek(p.age,p.currentWeek)+1),/Missing canonical cinema producer/);
+ settlesExternally(named,'missing-known-studio');
 });
 test('migration is idempotent and survives JSON reload',()=>{const r=migrateCinemaState(fixture(),1000);assert.deepEqual(migrateCinemaState(r.player,1000).player,r.player);const json=JSON.parse(JSON.stringify(r.player));assert.deepEqual(migrateCinemaState(json,1000).player,json)});
 test('fully settled NPC gross is preserved and cannot enter new payouts',()=>{

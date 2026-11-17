@@ -252,8 +252,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
             .filter((item: any, index) => item && (index === 0 || String(item.id) !== projectId))
             .filter((item: any) => (item.type === 'SERIES' || item.projectType === 'SERIES' || item.projectDetails?.type === 'SERIES' || item.episodeRatings?.length));
         const group = groupSeriesRows(rows).find(item => item.seasons.some(season => season.row === project));
-        return getSeriesEpisodeRatings(group);
-    }, [isSeriesProject, project, player.pastProjects, player.activeReleases]);
+        /* B19: a weekly season shows the episodes out so far */
+        return getSeriesEpisodeRatings(group, undefined, getAbsoluteWeek(player.age, player.currentWeek));
+    }, [isSeriesProject, project, player.pastProjects, player.activeReleases, player.age, player.currentWeek]);
 
     const sequelEligibility = React.useMemo(() => getContinuationEligibility({
         player,

@@ -250,7 +250,8 @@ export const Boardroom = ({
 
   const largest = (lines: LedgerLine[]) => lines.reduce<LedgerLine | null>((top, line) => (line.amount > (top?.amount ?? 0) ? line : top), null);
   const topIn = largest(state.weeklyRevenue);
-  const topOut = largest(state.weeklyCosts);
+  /* U1 (2026-11-16): the three biggest costs, each with its amount, instead of one "Most out" */
+  const topOuts = [...state.weeklyCosts].filter(line => line.amount > 0).sort((a, b) => b.amount - a.amount).slice(0, 3);
   const closes = cash?.closes ?? [];
   const cashChange = closes.length ? closes[closes.length - 1].cash - closes[0].cash : 0;
   const door = (label: string, line: string, onClick?: () => void, dot?: boolean) => onClick ? (
@@ -349,14 +350,21 @@ export const Boardroom = ({
                     <em className={room.splitOut} style={{ flexGrow: Math.max(1, costs) }} />
                   </i>
                   <span className={room.weekCells}>
-                    <span><small>IN</small><b className={room.inText}>{money(revenue)}</b></span>
-                    <span><small>OUT</small><b className={room.outText}>{money(-costs)}</b></span>
+                    <span><small>REVENUE</small><b className={room.inText}>{money(revenue)}</b></span>
+                    <span><small>COSTS</small><b className={room.outText}>{money(-costs)}</b></span>
                     <span><small>NET</small><b className={net >= 0 ? room.inText : room.outText}>{signedMoney(net)}</b></span>
                   </span>
-                  {(topIn || topOut) && (
+                  {topIn && (
                     <span className={room.weekMost}>
-                      {topIn && <span>Most in · <b>{topIn.label}</b></span>}
-                      {topOut && <span>Most out · <b>{topOut.label}</b></span>}
+                      <span>Most in · <b>{topIn.label}</b></span>
+                    </span>
+                  )}
+                  {topOuts.length > 0 && (
+                    <span className={room.weekCosts} data-week-top-costs>
+                      <small>BIGGEST COSTS THIS WEEK</small>
+                      {topOuts.map(line => (
+                        <span key={line.id}><b>{line.label}</b><em>{money(-line.amount)}</em></span>
+                      ))}
                     </span>
                   )}
                 </div>

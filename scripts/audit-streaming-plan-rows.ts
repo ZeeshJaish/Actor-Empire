@@ -48,7 +48,8 @@ async function main() {
     const levels = { PLAYBACK_QUALITY: 0, DELIVERY_CAPACITY: 0, RELIABILITY: 0, DATA_RECOMMENDATIONS: 0, SECURITY: 0, CONTENT_OPERATIONS: 0, ADVERTISING_COMMERCE: 0, PRODUCT_EXPERIENCE: 0 };
     assert.deepEqual(streamingPlanOfferLocks(offer({ kids: true, aiChannels: true, autoplay: true }), bare, levels).map(lock => [lock.row, lock.needs, lock.techId]), [
         ['kids', 'Unlock Kids profiles and parental controls in Tech', 'FAM_KIDS'],
-        ['aiChannels', 'Unlock AI channels in Tech', 'AI_CHANNELS'],
+        /* U5 (2026-11-16): AI channels is a Streaming+ Pack step, and its lock now says so */
+        ['aiChannels', 'Unlock AI channels in Tech (Streaming+ Pack)', 'AI_CHANNELS'],
         ['autoplay', 'Unlock Autoplay and previews in Tech', 'AI_AUTOPLAY'],
     ]);
     assert.deepEqual(streamingPlanOfferLocks(offer({ kids: false }), bare, levels), [], 'Off needs nothing');

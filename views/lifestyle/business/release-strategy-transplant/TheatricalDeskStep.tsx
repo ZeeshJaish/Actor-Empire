@@ -74,6 +74,8 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
     <section className={css.map} aria-label="Distribution map">
       <span className={css.seclabel}>WHERE IT OPENS</span>
       <p className={css.secnote}>Tap the markets that get your opening weekend.</p>
+      {/* B7: how long it stays in cinemas (services/boxOffice/boxOfficeLiveSettlement.ts resolveCinemaRunEnd) */}
+      <p className={css.secnote} data-run-rule>The cinema run ends when weekly takings fall under 3% of the opening week, or by week 16 (26 if it still sells well, 30 at most). Streaming follows.</p>
       <div className={css.mapVisual}>
         <MapNavigationToolbar
           scope="theatrical"

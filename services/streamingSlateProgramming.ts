@@ -20,9 +20,10 @@
  * Originals are not scheduled here: their premiere is cleared by the release
  * authorization in the Originals studio, after delivery and localization.
  */
-import { getStreamingContentAvailability } from './streamingContentAvailability';
+import { getStreamingCatalogueReadContext, getStreamingContentAvailability } from './streamingContentAvailability';
 import type {
     OwnedStreamingLedgerEntry,
+    OwnedStreamingPlatformState,
     OwnedStreamingSlateEntry,
     Player,
     StreamingOriginalReleasePattern,
@@ -31,7 +32,7 @@ import type {
 import { createDeterministicId } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
 import { compactOwnedStreamingPlatformForPersistence, normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
-import { getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle, streamingLicenceWaitsForSlate } from './streamingCatalog';
+import { createStreamingCatalogTitleReadIndex, getStreamingCatalogLicenseStatus, resolveStreamingCatalogTitle, streamingLicenceWaitsForSlate } from './streamingCatalog';
 import { getOwnedStreamingProgramEntries, getStreamingOriginalLiveStatus, getStreamingSlateCandidates } from './streamingOriginals';
 import { ORIGINAL_LICENCE_WEEKS } from './originalsDeal';
 import { getStreamingOpeningLock } from './streamingOpeningLock';
@@ -115,8 +116,10 @@ const hasPremiered = (player: Player, projectId: string, source: OwnedStreamingS
     return Boolean(licence && !streamingLicenceWaitsForSlate(licence));
 };
 
-const withSlate = (player: Player, entries: OwnedStreamingSlateEntry[], now: number, ledgerKey: string, summary: string, metadata: Record<string, string | number>): Player => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+/* B17: inside a Schedule all batch the platform is already normalized and is compacted once
+   at the end (prepared), instead of twice per title. */
+const withSlate = (player: Player, entries: OwnedStreamingSlateEntry[], now: number, ledgerKey: string, summary: string, metadata: Record<string, string | number>, prepared?: OwnedStreamingPlatformState): Player => {
+    const platform = prepared || normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const revision = (platform.launchSlate?.revision || 0) + 1;
     const idempotencyKey = `programming-slate:${revision}:${now}:${ledgerKey}`;
     const ledger: OwnedStreamingLedgerEntry = {
@@ -128,14 +131,12 @@ const withSlate = (player: Player, entries: OwnedStreamingSlateEntry[], now: num
         source: 'PLAYER_ACTION',
         metadata: { revision, ...metadata },
     };
-    return {
-        ...player,
-        ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
-            ...platform,
-            launchSlate: { entries, revision, programmedAtAbsoluteWeek: now },
-            eventLedger: [...platform.eventLedger, ledger],
-        }, player.id),
+    const next = {
+        ...platform,
+        launchSlate: { entries, revision, programmedAtAbsoluteWeek: now },
+        eventLedger: [...platform.eventLedger, ledger],
     };
+    return { ...player, ownedStreamingPlatform: prepared ? next : compactOwnedStreamingPlatformForPersistence(next, player.id) };
 };
 
 /* ── Before launch: the opening programme ────────────────────────────────────
@@ -254,11 +255,13 @@ const planOpeningAutoFill = (player: Player, fresh: boolean): StreamingSlateAuto
     const kept = fresh ? [] : (state.platform.launchSlate?.entries || []);
     const busy = new Set(kept.map(entry => entry.launchWeek));
     const onSlate = new Set(kept.map(entry => entry.projectId));
-    const shelf = getStreamingSlateCandidates(player)
+    /* B17: one read index for every title's rating, not a career-wide lookup per title */
+    const titleIndex = createStreamingCatalogTitleReadIndex(player, state.platform);
+    const shelf = getStreamingSlateCandidates(player, state.platform, titleIndex)
         .filter(candidate => !onSlate.has(candidate.projectId))
         /* an Original still being made is the player's call, not Auto-fill's */
         .filter(candidate => candidate.source !== 'ORIGINAL' || originalReadyToOpen(player, candidate.projectId))
-        .map(candidate => ({ ...candidate, rating: resolveStreamingCatalogTitle(player, candidate.projectId)?.rating ?? 0 }))
+        .map(candidate => ({ ...candidate, rating: resolveStreamingCatalogTitle(player, candidate.projectId, state.platform, titleIndex)?.rating ?? 0 }))
         .sort((left, right) => (Number(right.source === 'ORIGINAL') - Number(left.source === 'ORIGINAL'))
             || (right.rating - left.rating) || left.title.localeCompare(right.title));
     const plan: StreamingSlateAutoFillItem[] = [];
@@ -277,7 +280,7 @@ const autoFillOpening = (player: Player, fresh: boolean): { player: Player; chan
     const current = state.platform.launchSlate?.entries || [];
     const plan = planOpeningAutoFill(player, fresh);
     if (!plan.length && !(fresh && current.length)) return { player, changed: false, scheduled: [] };
-    const candidates = new Map(getStreamingSlateCandidates(player).map(candidate => [candidate.projectId, candidate]));
+    const candidates = new Map(getStreamingSlateCandidates(player, state.platform).map(candidate => [candidate.projectId, candidate]));
     const added = plan.flatMap(item => {
         const candidate = candidates.get(item.projectId);
         return candidate ? [openingEntry(state.platform, candidate, item.absoluteWeek, undefined, { marketingPlan: item.marketingPlan })] : [];
@@ -321,6 +324,8 @@ const scheduleOriginal = (
     week: number,
     now: number,
     releasePattern?: StreamingOriginalReleasePattern,
+    /** B17: inside a Schedule all batch (platform normalized; compacted once at the end) */
+    prepared = false,
 ): Result => {
     const found = originalOnTheShelf(player, projectId);
     if (!found) {
@@ -343,6 +348,16 @@ const scheduleOriginal = (
         source: 'PLAYER_ACTION',
         metadata: { commissionId: commission.id, projectId, premiereAtAbsoluteWeek: week, scope: 'GLOBAL', releasePattern: pattern },
     };
+    const nextPlatform: OwnedStreamingPlatformState = {
+        ...platform,
+        originalCommissions: platform.originalCommissions.map(item => (item.id !== commission.id ? item : {
+            ...item,
+            releasePlan: { scope: 'GLOBAL', releasePattern: pattern, marketingPlan: 'STANDARD', premiereAtAbsoluteWeek: week, authorizedAtAbsoluteWeek: now },
+            /* a licence's three years run from its premiere */
+            ...(item.deal === 'LICENCE' ? { licenceEndsAtAbsoluteWeek: week + ORIGINAL_LICENCE_WEEKS } : {}),
+        })),
+        eventLedger: [...platform.eventLedger, ledger],
+    };
     return {
         player: {
             ...player,
@@ -357,16 +372,7 @@ const scheduleOriginal = (
                     hiddenStats: { ...item.projectDetails!.hiddenStats, ownedStreamingReleaseScope: 'GLOBAL', ownedStreamingReleasePattern: pattern },
                 },
             })),
-            ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence({
-                ...platform,
-                originalCommissions: platform.originalCommissions.map(item => (item.id !== commission.id ? item : {
-                    ...item,
-                    releasePlan: { scope: 'GLOBAL', releasePattern: pattern, marketingPlan: 'STANDARD', premiereAtAbsoluteWeek: week, authorizedAtAbsoluteWeek: now },
-                    /* a licence's three years run from its premiere */
-                    ...(item.deal === 'LICENCE' ? { licenceEndsAtAbsoluteWeek: week + ORIGINAL_LICENCE_WEEKS } : {}),
-                })),
-                eventLedger: [...platform.eventLedger, ledger],
-            }, player.id),
+            ownedStreamingPlatform: prepared ? nextPlatform : compactOwnedStreamingPlatformForPersistence(nextPlatform, player.id),
         },
         changed: true,
     };
@@ -390,23 +396,35 @@ const unscheduleOriginal = (player: Player, platform: Player['ownedStreamingPlat
     };
 };
 
+type SlateTitleInput = {
+    projectId: string;
+    absoluteWeek: number;
+    marketingPlan: StreamingSlateMarketingPlan;
+    releasePattern?: StreamingOriginalReleasePattern;
+};
+
+/* B17 (2026-11-15): what one Schedule all batch reads once. Placing a title changes only that
+   title's own slate entry (or its Original's release plan), so the shelf list and each title's
+   early-access state are the same for every title in the batch. */
+interface SlateBatch {
+    candidates: Map<string, ReturnType<typeof getStreamingSlateCandidates>[number]>;
+    earlyAccess: ReadonlySet<string>;
+}
+
 /**
  * Put a title on the slate for a week (or move one that has not premiered yet,
  * or change its campaign). The title must be on the shelves, not yet premiered,
  * and its licence must still run in that week.
  */
-export const scheduleStreamingSlateTitle = (
-    player: Player,
-    input: {
-        projectId: string;
-        absoluteWeek: number;
-        marketingPlan: StreamingSlateMarketingPlan;
-        releasePattern?: StreamingOriginalReleasePattern;
-    },
-): Result => {
+export const scheduleStreamingSlateTitle = (player: Player, input: SlateTitleInput): Result => {
     /* before launch the same call plans the opening programme (input.absoluteWeek is its programme week) */
     if (beforeLaunch(player)) return scheduleOpeningTitle(player, input);
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    return scheduleLiveTitle(player, normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id), input, null);
+};
+
+/** The checks and the write for one premiere once the service is live. batch: inside Schedule all,
+    where the platform is already normalized and is compacted once at the end. */
+const scheduleLiveTitle = (player: Player, platform: OwnedStreamingPlatformState, input: SlateTitleInput, batch: SlateBatch | null): Result => {
     const launchAt = platform.launchCommit?.committedAtAbsoluteWeek;
     if (launchAt === undefined || platform.lifecycle !== 'ACTIVE') return { player, changed: false, reason: 'NOT_LIVE' };
     const now = getAbsoluteWeek(player.age, player.currentWeek);
@@ -416,7 +434,7 @@ export const scheduleStreamingSlateTitle = (
         return { player, changed: false, reason: 'WEEK_OUT_OF_RANGE' };
     }
     const upcoming = upcomingLicence(player, input.projectId, now);
-    const candidate = getStreamingSlateCandidates(player).find(item => item.projectId === input.projectId)
+    const candidate = (batch ? batch.candidates.get(input.projectId) : getStreamingSlateCandidates(player, platform).find(item => item.projectId === input.projectId))
         ?? (upcoming ? {
             projectId: upcoming.sourceProjectId, title: upcoming.titleAtSigning, source: 'LICENSED_WINDOW' as const,
             projectType: upcoming.projectType || 'MOVIE', genre: upcoming.genre || 'Licensed',
@@ -425,9 +443,12 @@ export const scheduleStreamingSlateTitle = (
     if (hasPremiered(player, candidate.projectId, candidate.source, now, launchAt)) return { player, changed: false, reason: 'ALREADY_PREMIERED' };
     /* #245: moving it on would keep it fresh for ever. #291: its rhythm can still change, in the same week */
     const sameWeek = candidate.source === 'ORIGINAL' && platform.originalCommissions.find(item => item.canonicalProjectId === candidate.projectId)?.releasePlan?.premiereAtAbsoluteWeek === week;
-    if (!sameWeek && getStreamingContentAvailability(player, candidate.projectId).status === 'EARLY_ACCESS') return { player, changed: false, reason: 'EARLY_ACCESS_RUNNING' };
+    /* B17: the status is read without its route rows (it does not depend on them), so one premiere no longer prices every country */
+    const earlyAccess = batch ? batch.earlyAccess.has(candidate.projectId)
+        : getStreamingContentAvailability(player, candidate.projectId, undefined, false).status === 'EARLY_ACCESS';
+    if (!sameWeek && earlyAccess) return { player, changed: false, reason: 'EARLY_ACCESS_RUNNING' };
     /* #291: an Original takes its week like anything else on the shelves. The Campaign Studio is what gives it weight now */
-    if (candidate.source === 'ORIGINAL') return scheduleOriginal(player, platform, candidate.projectId, week, now, input.releasePattern);
+    if (candidate.source === 'ORIGINAL') return scheduleOriginal(player, platform, candidate.projectId, week, now, input.releasePattern, Boolean(batch));
     if (candidate.source === 'LICENSED_WINDOW') {
         /* a licence must cover the premiere week: started by then, not yet ended */
         const licences = player.ownedStreamingPlatform.catalogLicenses.filter(licence => licence.sourceProjectId === candidate.projectId && licence.status === 'ACTIVE');
@@ -469,7 +490,7 @@ export const scheduleStreamingSlateTitle = (
     return {
         player: withSlate(planned, entries, now, `${candidate.projectId}:${week}`,
             `${candidate.title} ${existing ? 'moved to' : 'programmed for'} year ${when.year}, week ${when.week} with ${marketingPlan === 'EVENT' ? 'an' : 'a'} ${marketingPlan.toLowerCase()} campaign.`,
-            { projectId: candidate.projectId, premiereAtAbsoluteWeek: week, marketingPlan }),
+            { projectId: candidate.projectId, premiereAtAbsoluteWeek: week, marketingPlan }, batch ? platform : undefined),
         changed: true,
     };
 };
@@ -525,8 +546,15 @@ export interface StreamingSlateAutoFillItem {
     marketingPlan: StreamingSlateMarketingPlan;
 }
 
-/** The shelves: titles on the platform but not on the service, that the slate can premiere. */
-const shelfTitles = (player: Player, now: number, launchAt: number) => getStreamingSlateCandidates(player).flatMap(candidate => {
+/** The shelves: titles on the platform but not on the service, that the slate can premiere.
+    B17: one normalized platform and one read index for every title, not a career-wide lookup per title. */
+const shelfTitles = (player: Player, now: number, launchAt: number) => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const titleIndex = createStreamingCatalogTitleReadIndex(player, platform);
+    return getStreamingSlateCandidates(player, platform, titleIndex).flatMap(candidate => shelfTitle(player, now, launchAt, candidate,
+        resolveStreamingCatalogTitle(player, candidate.projectId, platform, titleIndex)?.rating ?? 0));
+};
+const shelfTitle = (player: Player, now: number, launchAt: number, candidate: ReturnType<typeof getStreamingSlateCandidates>[number], rating: number) => {
     /* #291: a delivered Original with no week yet is on the shelves */
     const original = candidate.source === 'ORIGINAL' ? originalOnTheShelf(player, candidate.projectId) : null;
     if (candidate.source === 'ORIGINAL' && (!original || original.commission.releasePlan)) return [];
@@ -537,9 +565,9 @@ const shelfTitles = (player: Player, now: number, launchAt: number) => getStream
     return [{
         ...candidate,
         rightsEnd: original?.commission.licenceEndsAtAbsoluteWeek ?? (licence && !perpetual(licence) ? licence.expiresAtAbsoluteWeek : Number.POSITIVE_INFINITY),
-        rating: resolveStreamingCatalogTitle(player, candidate.projectId)?.rating ?? 0,
+        rating,
     }];
-});
+};
 
 /** The premieres the player set on the slate that are still ahead (Originals keep their own record). */
 const plannedEntries = (player: Player) => {
@@ -629,14 +657,34 @@ export const planStreamingSlateAutoFill = (player: Player, options: { fresh?: bo
 export const autoFillStreamingSlate = (player: Player, options: { fresh?: boolean } = {}): { player: Player; changed: boolean; scheduled: StreamingSlateAutoFillItem[] } => {
     if (beforeLaunch(player)) return autoFillOpening(player, Boolean(options.fresh));
     const cleared = options.fresh ? clearStreamingSlatePlans(player) : null;
-    let next = cleared?.player ?? player;
+    const start = cleared?.player ?? player;
+    const plan = planStreamingSlateAutoFill(start);
+    if (!plan.length) return { player: start, changed: Boolean(cleared?.changed), scheduled: [] };
+    /* B17 (2026-11-15): Schedule all used to run the whole one-title path for every title: the
+       platform normalized twice and compacted, every shelf title looked up again, and the title's
+       availability priced in every country. 50 premieres from a 562-title catalogue took 63 s on a
+       Mac. Now the platform is normalized once, the shelves and early-access states are read once,
+       each title goes through the same checks, and the platform is compacted once at the end. */
+    const context = getStreamingCatalogueReadContext(start);
+    const { platform } = context;
+    const batch: SlateBatch = {
+        candidates: new Map(getStreamingSlateCandidates(start, platform, context.titleIndex).map(candidate => [candidate.projectId, candidate])),
+        earlyAccess: new Set(plan.filter(item => getStreamingContentAvailability(start, item.projectId, undefined, false, context).status === 'EARLY_ACCESS')
+            .map(item => item.projectId)),
+    };
+    let next: Player = { ...start, ownedStreamingPlatform: platform };
     const scheduled: StreamingSlateAutoFillItem[] = [];
-    planStreamingSlateAutoFill(next).forEach(item => {
-        const result = scheduleStreamingSlateTitle(next, item);
+    plan.forEach(item => {
+        const result = scheduleLiveTitle(next, next.ownedStreamingPlatform, item, batch);
         if (!result.changed) return;
         next = result.player;
         scheduled.push(item);
     });
-    return { player: next, changed: Boolean(cleared?.changed) || scheduled.length > 0, scheduled };
+    if (!scheduled.length) return { player: start, changed: Boolean(cleared?.changed), scheduled };
+    return {
+        player: { ...next, ownedStreamingPlatform: compactOwnedStreamingPlatformForPersistence(next.ownedStreamingPlatform, next.id) },
+        changed: true,
+        scheduled,
+    };
 };
 

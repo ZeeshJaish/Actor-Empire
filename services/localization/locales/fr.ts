@@ -7473,6 +7473,7 @@ export const frTranslations: Record<TranslationKey, string> = {
         'imdb.project.episodeRatings': 'Notes des épisodes',
         'imdb.project.seasonAverage': 'Moyenne de saison',
         'imdb.project.noEpisodeRatings': 'Les notes d’épisodes apparaîtront après la première de cette saison.',
+        'imdb.project.episodesAiring': '{aired} épisodes sur {total} diffusés. Le prochain arrive la semaine prochaine.',
         'imdb.project.seasonShort': 'S{season}',
         'imdb.project.episodeShort': 'E{episode}',
         'imdb.project.rating.awesome': 'Excellent',

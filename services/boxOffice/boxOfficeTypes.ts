@@ -381,6 +381,12 @@ export interface CinemaSettledTitle {
     satisfactionAdmissions?:number;
     lastSettledWeek: number;
     closed: boolean;
+    /** B7: the takings of the film's opening week (its first settled week with tickets) */
+    openingWeekGrossCents?: number;
+    /** B7: weeks in a row under 3% of the opening week */
+    lowWeeks?: number;
+    /** B7: why the whole run ended, when it was the film's own end rather than every country stopping */
+    runEndReason?: 'FLOOR' | 'WINDOW' | 'STREAMING';
 }
 export interface CinemaCommittedTitle extends CinemaGrossSplit {
     soundtrackReceiptsCents?:number;

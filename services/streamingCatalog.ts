@@ -776,6 +776,27 @@ export const acceptStreamingCatalogCounter = (
 export const streamingLicenceWaitsForSlate = (license: Pick<OwnedStreamingCatalogLicense, 'origin' | 'holdForSlate'>): boolean =>
     license.origin === 'STARTER' || license.holdForSlate === true;
 
+/* B16 (2026-11-15): a title the player bought before launch used to skip the hold, so at launch every one of
+   them streamed from opening night and left the Slate (a player who bought 300 catalogue titles and planned
+   12 opening weeks lost the other 288 from the Slate). Purchases hold before launch now; a save made before
+   this fix that has not launched yet gets the same hold on its earlier purchases. A launched service keeps
+   what is already streaming. */
+const PRELAUNCH_PURCHASE_ORIGINS: ReadonlySet<string> = new Set(['STUDIO_MARKET', 'PLATFORM_TRADE', 'CATALOGUE_ACQUISITION']);
+const prelaunchPurchaseWithoutHold = (license: OwnedStreamingCatalogLicense) => (
+    !license.holdForSlate && license.status === 'ACTIVE' && PRELAUNCH_PURCHASE_ORIGINS.has(String(license.origin || '')));
+export const holdPrelaunchPurchasesForSlate = (player: Player): Player => {
+    const platform = player?.ownedStreamingPlatform;
+    if (!platform || platform.launchCommit || platform.lifecycle === 'ACTIVE' || !Array.isArray(platform.catalogLicenses)) return player;
+    if (!platform.catalogLicenses.some(prelaunchPurchaseWithoutHold)) return player;
+    return {
+        ...player,
+        ownedStreamingPlatform: {
+            ...platform,
+            catalogLicenses: platform.catalogLicenses.map(license => (prelaunchPurchaseWithoutHold(license) ? { ...license, holdForSlate: true } : license)),
+        },
+    };
+};
+
 /** Purchases the player's team makes on its own (the Head of Content's market buys) go on the service by themselves,
     as they always did: only what the player buys waits for the Slate. Clears the hold on every licence `after` added. */
 export const releaseSlateHoldOnNewLicences = (before: Player, after: Player): Player => {

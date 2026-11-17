@@ -11,6 +11,7 @@ import { creatorPositiveReward, recordCreatorSpend, readCreatorWorld } from './c
 import { quoteSponsorshipValue } from './sponsorshipEconomy';
 import { applyFinalCut } from './finalCut';
 import { ensureActorCareerBalance, getCareerLearningGain, getCareerPassivePreparation, getCareerFinalPerformance, getCareerPublicityGain, getCareerProductionStartPerformance, isPersonalCareerActing, getCareerFameDecay, applyCareerReleaseRecognition, getCareerReportedOutcome } from './actorCareerBalance';
+import { roleOfferWanted } from './roleOfferPreference';
 import { createSeriesStreamingBids, quoteSeriesStreamingRights } from './seriesStreamingValue';
 import { settleStockCash } from './stockSettlement';
 import { syncLinkedNpcRelationships } from './relationshipBond';
@@ -124,6 +125,7 @@ import { getInstagramPostComments, pickInstagramMicroBrand } from './instagramLo
 import { checkForDirectorDecision, checkForProductionCrisis } from './productionService';
 import { applyProductionHouseReleaseOutcome, processBusinessWeek, recalculateBusinessValuation, resolveProjectType } from './businessLogic';
 import { getAbsoluteWeek, getRelationshipAge, getInteractionAgeInWeeks, getRelationshipContactAbsoluteWeek, getStreamingWeeksUntilStart, inferStreamingStartWeekAbsolute } from './legacyLogic';
+import { releaseOpeningSlateOriginal } from './openingSlateOriginalRelease';
 import { hasNoAds, resetWeeklyEnergy, spendPlayerEnergy } from './premiumLogic';
 import { advanceLuxeConnections, advanceTinderConnections } from './datingLogic';
 import { generateNpcVentureRoleOffer, getNpcVentureOfferText } from './npcVentureLogic';
@@ -4285,6 +4287,10 @@ const processGameWeekInScope = async (
             } else { nextCommitments.push({ ...updatedC, phaseWeeksLeft: weeksLeft }); }
         } else if (updatedC.projectPhase === 'AWAITING_RELEASE') {
             const isStudioProject = updatedC.projectDetails?.studioId !== undefined;
+            /* 2026-11-16 (player report): an Original on the opening slate had no way to get a release, so it waited here for
+               ever (no IMDb page, no Renew or sequel). From its opening week it is released like a Slate premiere. */
+            const opening = releaseOpeningSlateOriginal(nextPlayer, updatedC);
+            updatedC = opening.job;
 
             if (updatedC.projectDetails?.releaseStrategy) {
                 if (weeksLeft <= 0) {
@@ -4384,7 +4390,10 @@ const processGameWeekInScope = async (
                     const isOwnedPlatformOriginal = Boolean(updatedC.projectDetails.hiddenStats.ownedStreamingOriginal);
                     if (isOwnedPlatformOriginal) {
                         const ownedPlatformName = nextPlayer.ownedStreamingPlatform.identity?.name || 'EMPIRE+';
-                        logsToAdd.push({ msg: `📺 "${updatedC.name}" premiered as a ${ownedPlatformName} Original! IMDb Page Created.`, type: 'positive' });
+                        /* an older save's opening Original premiered long ago: it only gets its record now */
+                        logsToAdd.push(opening.late
+                            ? { msg: `📺 "${updatedC.name}" now has its IMDb page (it opened ${ownedPlatformName}).`, type: 'positive' }
+                            : { msg: `📺 "${updatedC.name}" premiered as a ${ownedPlatformName} Original! IMDb Page Created.`, type: 'positive' });
                     } else if (updatedC.projectDetails.hiddenStats.ownPlatformRelease) {
                         /* #244: on the player's own service: the Slate has its week since the wizard */
                         const ownedPlatformName = nextPlayer.ownedStreamingPlatform.identity?.name || 'EMPIRE+';
@@ -6330,7 +6339,8 @@ const processGameWeekInScope = async (
 
             if (f.type === 'PROJECT_OFFER' || f.type === 'PROJECT_OFFER_PREMIUM') {
                 const offer = generateDirectOffer(nextPlayer);
-                if (offer) {
+                /* U12 (2026-11-16): the player's choice of which role offers reach the inbox (default: all) */
+                if (offer && roleOfferWanted(nextPlayer, offer)) {
                     if (f.type === 'PROJECT_OFFER_PREMIUM') {
                         offer.estimatedIncome *= 1.5;
                         offer.projectName = `[PRESTIGE] ${offer.projectName}`;
@@ -6983,7 +6993,8 @@ const processGameWeekInScope = async (
     if (nextPlayer.team.agent) {
         try {
             const agentOffer = generateAgentOffers(nextPlayer);
-            if (agentOffer) {
+            /* U12 (2026-11-16): the player's choice of which role offers reach the inbox (default: all) */
+            if (agentOffer && roleOfferWanted(nextPlayer, agentOffer)) {
                 const enrichedOffer = enrichAuditionOpportunity(agentOffer, nextPlayer);
                 const identity = getCharacterIdentityLabels(enrichedOffer.characterProfile!).join(' · ');
                 const industryLine = getRoleOfferMessageLine(enrichedOffer);
@@ -7153,7 +7164,8 @@ const processGameWeekInScope = async (
     try {
         const usedTitles = [...createProjectTitleReservations(nextPlayer)];
         const breakthroughInvite = generateBreakthroughAuditionInvite(nextPlayer, usedTitles, language);
-        if (breakthroughInvite) {
+        /* U12 (2026-11-16): every role offer passes the player's choice (default: all) */
+        if (breakthroughInvite && roleOfferWanted(nextPlayer, breakthroughInvite.opportunity)) {
             nextPlayer.inbox.unshift({
                 id: `breakthrough_invite_${Date.now()}_${Math.random()}`,
                 sender: breakthroughInvite.sender,
@@ -7180,7 +7192,7 @@ const processGameWeekInScope = async (
 
     try {
         const directOffer = generateDirectOffer(nextPlayer);
-        if (directOffer) {
+        if (directOffer && roleOfferWanted(nextPlayer, directOffer)) {
             const enrichedDirectOffer = enrichAuditionOpportunity(directOffer, nextPlayer);
             const directIdentity = getCharacterIdentityLabels(enrichedDirectOffer.characterProfile!).join(' · ');
             const directIndustryLine = getRoleOfferMessageLine(enrichedDirectOffer);
@@ -7211,7 +7223,7 @@ const processGameWeekInScope = async (
     if (currentNpcVentureOfferAbsoluteWeek - lastNpcVentureOfferWeek >= 7 + Math.floor(Math.random() * 4)) {
         try {
             const ventureOffer = generateNpcVentureRoleOffer(nextPlayer);
-            if (ventureOffer) {
+            if (ventureOffer && roleOfferWanted(nextPlayer, ventureOffer.opportunity)) {
                 nextPlayer.inbox.unshift({
                     id: `npc_venture_offer_${Date.now()}`,
                     sender: t(language, 'services.npcVenture.inbox.sender', { ventureName: ventureOffer.venture.name }),

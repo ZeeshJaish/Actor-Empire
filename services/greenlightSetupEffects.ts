@@ -61,8 +61,18 @@ export const getGearQuality = (averageLevel: number): number => {
     return level <= 8 ? 4 * (1 - Math.exp(-level / 4)) : 4 * (1 - Math.exp(-2)) + (level - 8) * 0.115;
 };
 
-/** What one of the four lines gives at this level, the number a gear button shows */
-export const getGearLineQuality = (level: number): number => Math.round((getGearQuality(level) / 4) * 10) / 10;
+/** What one of the four lines gives at this level, the number a gear button shows.
+    B28 (2026-11-15): two decimals, so every upgrade shows what it adds (levels 6→7 and 8→10 read as +0.0 before). */
+export const getGearLineQuality = (level: number): number => Math.round((getGearQuality(level) / 4) * 100) / 100;
+
+/* B28 (2026-11-15): owned gear fed its level (0–10) into a curve built for rental quality (2–30), so a fully upgraded
+   line topped out at 0.9 against Cutting-Edge rental's 1.5, and some upgrades added nothing. Each owned level now
+   stands for a rental quality: level 1 = Indie Kit, 3 = Prosumer, 5 = Standard, 8 = High-End, 10 = Cutting-Edge. */
+const OWNED_GEAR_QUALITY_BY_LEVEL = [0, 2, 3, 5, 6, 8, 10, 12, 15, 22, 30] as const;
+export const getOwnedGearQualityLevel = (level: number): number => {
+    const safe = Math.max(0, Math.min(10, Math.floor(Number(level) || 0)));
+    return OWNED_GEAR_QUALITY_BY_LEVEL[safe];
+};
 
 export const PACING_EFFECTS: Record<SetupPacing, { pull: number; hold: number }> = {
     SLOW: { pull: -0.08, hold: 0.06 },

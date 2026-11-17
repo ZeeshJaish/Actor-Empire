@@ -1,5 +1,5 @@
 import { calculateCinemaCraftQuality } from '../../../services/boxOffice/boxOfficeDelivery';
-import { getEffectsCostShare } from '../../../services/greenlightSetupEffects';
+import { getEffectsCostShare, getOwnedGearQualityLevel } from '../../../services/greenlightSetupEffects';
 import { interpolateProductionBudget } from '../../../services/studioProductionEconomy';
 import { getOwnedEquipmentProjectCost } from '../../../services/studioProductionEconomy';
 
@@ -273,8 +273,9 @@ export const calculateGreenlightEstimatedQuality = ({
 }): number => {
     return calculateCinemaCraftQuality({
         scriptQuality, directorQuality, castingStrength, crewQualities,
+        /* B28: an owned level stands for a rental quality (level 10 = Cutting-Edge) */
         equipmentQualityLevels: Object.entries(equipmentChoices).map(([id, choice]) => choice === 'OWNED'
-            ? ownedEquipmentLevels[id] ?? 0 : gearTiers[choice]?.quality ?? 0),
+            ? getOwnedGearQualityLevel(ownedEquipmentLevels[id] ?? 0) : gearTiers[choice]?.quality ?? 0),
         locationQualities, storyFitQualityAdjustment, backgroundAuthenticity, backgroundReliability, backgroundSetCare, setupQualityAdjustment,
     });
 };

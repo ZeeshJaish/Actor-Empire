@@ -271,6 +271,10 @@ function cloudFootprintNeeds(data: BuildData, region: RegionView, providerId: Cl
   const standard = expectedStandard(0);
   for (const country of region.countries) {
     const geography = COUNTRY_GEOGRAPHY[code(country.code)];
+    /* B10 (2026-11-15): a country that must be served from inside its borders (parts of Pakistan, China) can only be
+       covered by cloud in its own cities; the target used to size the nearest site anywhere, which can't serve it */
+    const eligible = hasDataResidencyRule(code(country.code)) ? sites.filter(site => code(site.code) === code(country.code)) : sites;
+    if (!eligible.length) continue;
     for (const place of audiencePlaces(code(country.code), geography ? { lat: geography[1], lng: geography[2] } : undefined)) {
       const missedByServers = serverSources.reduce((missed, source) => {
         const km = distanceKm(source.lat, source.lng, place.lat, place.lng);
@@ -278,9 +282,9 @@ function cloudFootprintNeeds(data: BuildData, region: RegionView, providerId: Cl
         return missed * (1 - strength);
       }, 1);
       if (1 - missedByServers >= standard) continue;
-      let nearest = sites[0];
+      let nearest = eligible[0];
       let nearestKm = Number.POSITIVE_INFINITY;
-      for (const site of sites) {
+      for (const site of eligible) {
         const km = distanceKm(site.coord.lat, site.coord.lng, place.lat, place.lng);
         if (km < nearestKm) { nearest = site; nearestKm = km; }
       }
@@ -609,7 +613,11 @@ export function placeRegion(data: BuildData, draft: BuildDraft, regionId: string
   const others = draft.facilities.filter(facility => regionOfCity(data, facility.cityId) !== regionId || facility.built);
   const notes: string[] = [];
   const placed: Facility[] = [];
-  let sequence = 0;
+  /* B8: rooms kept from the plan keep their ids, so new ones count on from the highest */
+  let sequence = inRegion.reduce((most, facility) => {
+    const match = /-(\d+)$/.exec(facility.id);
+    return !facility.built && match ? Math.max(most, Number(match[1])) : most;
+  }, 0);
   const idFor = (listing: FacilityListing) => `pl-${regionId}-${listing.id}-${(sequence += 1)}`;
 
   /* --- servers --------------------------------------------------------------- */
@@ -619,6 +627,17 @@ export function placeRegion(data: BuildData, draft: BuildDraft, regionId: string
     TITAN: Math.max(0, setup.servers.TITAN - standing.servers.TITAN),
   };
   const total = planRacks(want);
+  /* B8 (2026-11-15): + or − on a tier re-dealt every unbuilt rack in the region, so rooms moved: 25 → 26 Titans in
+     Europe moved a Reykjavik room and pushed the Russian rooms past capacity (2 countries needing attention became 46).
+     When the region already has a plan and one tier moves by a few racks (or none move, as when the cloud slider is
+     dragged), the plan stays and only the difference moves: an added rack goes to the city the full deal would give one
+     more, a removed rack leaves the city furthest over its share. Adding can then only keep or improve coverage.
+     A new setup (Suggest network, a what-if, Start over) still redraws the region. */
+  const plannedRooms = inRegion.filter(facility => !facility.built && facility.tenure !== 'CLOUD');
+  const plannedServers = setupOfRooms(plannedRooms).servers;
+  const tierSteps = OPEN_TIERS.map(tier => ({ tier, step: want[tier] - plannedServers[tier] }));
+  const moving = tierSteps.filter(entry => entry.step !== 0);
+  const incremental = plannedRooms.length > 0 && moving.length <= 1 && moving.every(entry => Math.abs(entry.step) <= 4);
   if (total > 0) {
     const sites = serverSites(data, region);
     const assigned = assignAudience(region, sites);
@@ -638,53 +657,98 @@ export function placeRegion(data: BuildData, draft: BuildDraft, regionId: string
     const openingIds = new Set(region.opening.map(country => country.id));
     const homeOf = (cityId: string) => (openingIds.has(sites.find(site => site.id === cityId)!.countryId) ? 0 : 1);
     const counts = allot(total, sites, anyWeight ? weights : new Map(sites.map(site => [site.id, 1])), MINIMUM_ROOM, positions, cityId => coverage.get(cityId)!, cityId => green.get(cityId)!, homeOf);
-    /* Each city's racks by tier, in the region's proportions: the tiers are
-       laid out as one interleaved run — a Workhorse, a Workhorse, a Titan, a
-       Scout … in the region's mix — and dealt to the cities in order, so a
-       city with two racks gets two and a region that is mostly Workhorses
-       stays mostly Workhorses everywhere. Splitting tier by tier (#103–#108)
-       gave the Scouts and the Titans to the heaviest cities on top of their
-       Workhorses and left the lightest cities with one rack (#109). */
-    const run: ServerTier[] = [];
-    const dealt: Record<ServerTier, number> = { SCOUT: 0, WORKHORSE: 0, TITAN: 0 };
-    for (let i = 1; i <= total; i += 1) {
-      let next: ServerTier = 'WORKHORSE';
-      let most = Number.NEGATIVE_INFINITY;
-      for (const tier of ['TITAN', 'WORKHORSE', 'SCOUT'] as ServerTier[]) {
-        const due = (want[tier] / total) * i - dealt[tier];
-        if (due > most + 1e-9) { most = due; next = tier; }
-      }
-      run.push(next);
-      dealt[next] += 1;
-    }
-    const order = [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || (weights.get(b[0]) ?? 0) - (weights.get(a[0]) ?? 0))
-      .map(([cityId]) => cityId);
-    const perSite = new Map<string, Record<ServerTier, number>>();
-    let cursor = 0;
-    for (const cityId of order) {
-      const n = counts.get(cityId) ?? 0;
-      const plan: Record<ServerTier, number> = { SCOUT: 0, WORKHORSE: 0, TITAN: 0 };
-      for (let k = 0; k < n; k += 1) plan[run[cursor + k]] += 1;
-      cursor += n;
-      perSite.set(cityId, plan);
-    }
     let spill: TierPlan = {};
-    for (const cityId of order) {
-      const city = sites.find(candidate => candidate.id === cityId)!;
-      const plan = perSite.get(cityId) ?? { SCOUT: 0, WORKHORSE: 0, TITAN: 0 };
-      const packed = packCity(data, city, { ...plan, SCOUT: (plan.SCOUT ?? 0) + (spill.SCOUT ?? 0), WORKHORSE: (plan.WORKHORSE ?? 0) + (spill.WORKHORSE ?? 0), TITAN: (plan.TITAN ?? 0) + (spill.TITAN ?? 0) }, idFor);
-      placed.push(...packed.rooms);
-      spill = packed.left;
-    }
-    /* What no city could take, tried once more across every site in weight
-       order, then given up on and said. */
-    if (planRacks(spill) > 0) {
-      for (const city of sites) {
-        if (planRacks(spill) === 0) break;
-        const packed = packCity(data, city, spill, idFor);
+    if (incremental) {
+      const rooms = plannedRooms.map(room => ({ ...room }));
+      const racksIn = (cityId: string) => rooms.filter(room => room.cityId === cityId).reduce((sum, room) => sum + planRacks(tiersOf(room)), 0);
+      const weightOf = (cityId: string) => weights.get(cityId) ?? 0;
+      for (const { tier, step } of tierSteps) {
+        for (let added = 0; added < step; added += 1) {
+          /* the city the full deal gives the most more than it has now */
+          const order = [...sites].sort((left, right) => (
+            ((counts.get(right.id) ?? 0) - racksIn(right.id)) - ((counts.get(left.id) ?? 0) - racksIn(left.id))
+            || weightOf(right.id) - weightOf(left.id) || left.id.localeCompare(right.id)));
+          let done = false;
+          for (const city of order) {
+            const index = rooms.findIndex(room => {
+              if (room.cityId !== city.id) return false;
+              const listing = listingFor(data, room);
+              return Boolean(listing) && fitsPlan(listing!, { ...tiersOf(room), [tier]: tiersOf(room)[tier] + 1 });
+            });
+            if (index >= 0) {
+              const room = rooms[index];
+              rooms[index] = fillRoom(listingFor(data, room)!, room, { ...tiersOf(room), [tier]: tiersOf(room)[tier] + 1 });
+              done = true;
+              break;
+            }
+            const packed = packCity(data, city, { [tier]: 1 }, idFor);
+            if (packed.rooms.length) { rooms.push(...packed.rooms); done = true; break; }
+          }
+          if (!done) spill = { ...spill, [tier]: (spill[tier] ?? 0) + 1 };
+        }
+        for (let removed = 0; removed < -step; removed += 1) {
+          /* the room in the city furthest over its share; the smaller room first, so a room empties before others shrink */
+          const holders = rooms.map((room, index) => ({ room, index })).filter(entry => tiersOf(entry.room)[tier] > 0);
+          if (!holders.length) break;
+          holders.sort((left, right) => (
+            (racksIn(right.room.cityId) - (counts.get(right.room.cityId) ?? 0)) - (racksIn(left.room.cityId) - (counts.get(left.room.cityId) ?? 0))
+            || planRacks(tiersOf(left.room)) - planRacks(tiersOf(right.room)) || right.room.id.localeCompare(left.room.id)));
+          const { room, index } = holders[0];
+          const plan = { ...tiersOf(room), [tier]: tiersOf(room)[tier] - 1 };
+          if (planRacks(plan) === 0) rooms.splice(index, 1);
+          else rooms[index] = fillRoom(listingFor(data, room)!, room, plan);
+        }
+      }
+      placed.push(...rooms);
+    } else {
+      /* Each city's racks by tier, in the region's proportions: the tiers are
+         laid out as one interleaved run — a Workhorse, a Workhorse, a Titan, a
+         Scout … in the region's mix — and dealt to the cities in order, so a
+         city with two racks gets two and a region that is mostly Workhorses
+         stays mostly Workhorses everywhere. Splitting tier by tier (#103–#108)
+         gave the Scouts and the Titans to the heaviest cities on top of their
+         Workhorses and left the lightest cities with one rack (#109). */
+      const run: ServerTier[] = [];
+      const dealt: Record<ServerTier, number> = { SCOUT: 0, WORKHORSE: 0, TITAN: 0 };
+      for (let i = 1; i <= total; i += 1) {
+        let next: ServerTier = 'WORKHORSE';
+        let most = Number.NEGATIVE_INFINITY;
+        for (const tier of ['TITAN', 'WORKHORSE', 'SCOUT'] as ServerTier[]) {
+          const due = (want[tier] / total) * i - dealt[tier];
+          if (due > most + 1e-9) { most = due; next = tier; }
+        }
+        run.push(next);
+        dealt[next] += 1;
+      }
+      const order = [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || (weights.get(b[0]) ?? 0) - (weights.get(a[0]) ?? 0))
+        .map(([cityId]) => cityId);
+      const perSite = new Map<string, Record<ServerTier, number>>();
+      let cursor = 0;
+      for (const cityId of order) {
+        const n = counts.get(cityId) ?? 0;
+        const plan: Record<ServerTier, number> = { SCOUT: 0, WORKHORSE: 0, TITAN: 0 };
+        for (let k = 0; k < n; k += 1) plan[run[cursor + k]] += 1;
+        cursor += n;
+        perSite.set(cityId, plan);
+      }
+      spill = {};
+      for (const cityId of order) {
+        const city = sites.find(candidate => candidate.id === cityId)!;
+        const plan = perSite.get(cityId) ?? { SCOUT: 0, WORKHORSE: 0, TITAN: 0 };
+        const packed = packCity(data, city, { ...plan, SCOUT: (plan.SCOUT ?? 0) + (spill.SCOUT ?? 0), WORKHORSE: (plan.WORKHORSE ?? 0) + (spill.WORKHORSE ?? 0), TITAN: (plan.TITAN ?? 0) + (spill.TITAN ?? 0) }, idFor);
         placed.push(...packed.rooms);
         spill = packed.left;
+      }
+      /* What no city could take, tried once more across every site in weight
+         order, then given up on and said. */
+      if (planRacks(spill) > 0) {
+        for (const city of sites) {
+          if (planRacks(spill) === 0) break;
+          const packed = packCity(data, city, spill, idFor);
+          placed.push(...packed.rooms);
+          spill = packed.left;
+        }
       }
     }
     unplaced.SCOUT = spill.SCOUT ?? 0;

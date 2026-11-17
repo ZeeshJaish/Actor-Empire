@@ -8,18 +8,17 @@
  * added and the cost per thousand of them instead of joins; the season's best is one of its own 12 weeks.
  * Before: finished campaigns read DRAFT · NOT STARTED with a made-up "estimated reach", and the recommendation
  * engine was four cards that only opened the War Room.
- * #144: a card opens the campaign scenes prototype (the Burj Khalifa and a billboard) for Zeesh's OK; their
- * backdrops start loading in the background when the tab opens, never on the tap.
+ * U13 (2026-11-15): the #144 first-look card (the campaign scenes prototype, the Burj Khalifa and a billboard) is
+ * gone: players got stuck scrolling on it, and it loaded two full-size photos whenever the tab opened. The scenes
+ * live in the campaign studio itself.
  */
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import r from './presentation/screens/AudienceDesk/AudienceRoom.module.css';
 import { cx } from './presentation/cx';
 import { Poster } from '../../content-market-exact/Poster';
 import { compact } from './audienceAtlasModel';
 import type { AudienceCampaignRow, AudienceCampaignsView } from './audienceRoomModel';
 import { gameYearWeekShort } from '../../services/gameWeek';
-import { CampaignScenePreview } from '../campaigns/scenes/CampaignScenePreview';
-import { CAMPAIGN_SCENES } from '../campaigns/scenes/sceneCatalogue';
 import type { CreativeSubject } from '../campaigns/scenes/defaultCreative';
 
 const money = (value: number) => `$${compact(value)}`;
@@ -33,15 +32,8 @@ export const AudienceCampaignsTab: React.FC<{
   onOpenTitle?: (projectId: string) => void;
   /** #144: what the scenes' made-for-you creative shows: your top title and your service */
   scenesSubject?: CreativeSubject | null;
-}> = ({ campaigns, week, onOpenTitle, scenesSubject }) => {
+}> = ({ campaigns, week, onOpenTitle }) => {
   const { running, done } = campaigns;
-  const [scenes, setScenes] = useState(false);
-  /* the backdrops load while the tab is read, so the preview opens on the tap with its pictures */
-  useEffect(() => {
-    if (!scenesSubject) return;
-    /* #156: only the two the preview shows, not every format's scene */
-    [CAMPAIGN_SCENES.BURJ_KHALIFA, CAMPAIGN_SCENES.CITY_BILLBOARD].forEach(scene => { const image = new Image(); image.decoding = 'async'; image.src = scene.backdrop; });
-  }, [Boolean(scenesSubject)]);
   /* #136: joins are the measure once campaigns bring them; otherwise (an ad-supported service, or no joins yet) the
      viewers added and the cost per thousand of them, never a row of zeros and dashes */
   const byJoin = campaigns.gradeBasis === 'JOIN';
@@ -50,20 +42,6 @@ export const AudienceCampaignsTab: React.FC<{
   );
   return (
     <div className={r.room}>
-      {/* ── #144: the campaign scenes, a first look ── */}
-      {scenesSubject && (
-        <button type="button" className={cx(r.scenesCard, r.rise)} onClick={() => setScenes(true)}>
-          <span className={r.scenesThumb} style={{ backgroundImage: `url(${CAMPAIGN_SCENES.BURJ_KHALIFA.backdrop})` }} aria-hidden="true" />
-          <span>
-            <small>NEW · CAMPAIGN SCENES</small>
-            <b>Your campaign on the Burj Khalifa</b>
-            <em>And on a city billboard, with your own image. A first look before every format gets its scene.</em>
-          </span>
-          <i aria-hidden="true">→</i>
-        </button>
-      )}
-      {scenes && scenesSubject && <CampaignScenePreview subject={scenesSubject} onClose={() => setScenes(false)} />}
-
       {/* ── the season so far ── */}
       <section className={cx(r.card, r.season, r.rise)}>
         <div className={r.eyebrow}>LAST 12 WEEKS · CAMPAIGNS</div>

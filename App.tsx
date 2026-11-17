@@ -1,4 +1,7 @@
 import { isQuietPlayerUpdate, markQuietPlayerUpdate } from './services/quietPlayerUpdates';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { runHardwareBack } from './services/hardwareBack';
 import { claimCreatorAction } from './services/creatorEconomy';
 import { acknowledgeStockControlNotice } from './services/stockControlNotices';
 import { isStockSaveRecoveryError } from './services/stockSaveCompatibility';
@@ -663,6 +666,27 @@ export const App: React.FC = () => {
   const [initialMobileStockId, setInitialMobileStockId] = useState<string | null>(null);
   const [initialMobileAppMode, setInitialMobileAppMode] = useState<'BOXOFFICE' | 'MESSAGES' | 'BANK' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  /* B5 (2026-11-15): Android's back button closed the game. It now closes what is open, else goes back the way the
+     screen's own back arrow does, else Home, and on Home asks "Exit the game?" (services/hardwareBack.ts). */
+  const [exitPromptOpen, setExitPromptOpen] = useState(false);
+  const hardwareBackStateRef = useRef({ page: Page.HOME as Page, busy: false });
+  hardwareBackStateRef.current = { page: activePage, busy: isProcessing };
+  useEffect(() => {
+    const onBack = () => runHardwareBack({
+      onHome: hardwareBackStateRef.current.page === Page.HOME,
+      goHome: () => setActivePage(Page.HOME),
+      askExit: () => setExitPromptOpen(true),
+      busy: hardwareBackStateRef.current.busy,
+    });
+    const testHook = window as unknown as { __aeHardwareBack?: () => string };
+    testHook.__aeHardwareBack = onBack;
+    if (Capacitor.getPlatform() !== 'android') return () => { delete testHook.__aeHardwareBack; };
+    const listener = CapacitorApp.addListener('backButton', () => { onBack(); });
+    return () => {
+      delete testHook.__aeHardwareBack;
+      void listener.then(handle => handle.remove()).catch(() => undefined);
+    };
+  }, []);
   const weekProcessingLockRef = useRef(false);
   /* Perf plan Phase 3 (2026-11-09): from the tap on Age Up Week until the processed week reaches the game,
      a tap that changes the career would be overwritten when the week lands. Those taps wait; the main
@@ -2372,6 +2396,12 @@ export const App: React.FC = () => {
       setPlayer(prepared);
   };
 
+  /* B29 (2026-11-15): the phone's "message read" flag. It is made on the live save, so it needs no rebuild, and it
+     waits for the next real save (the quiet mark): the message opens at once, whatever the career's size. */
+  const handleQuietUiUpdate = (updatedPlayer: Player) => {
+      setPlayer(markQuietPlayerUpdate(updatedPlayer));
+  };
+
   const handleTrustedMarketUpdate = (updatedPlayer: Player) => {
       const prepared = prepareTrustedMarketUpdateForUi(updatedPlayer);
       // Lag round (2026-11-09): a UI-memory change (a room visited) keeps its quiet mark.
@@ -3953,6 +3983,22 @@ export const App: React.FC = () => {
 	          onBuy={() => handlePremiumPurchase('streaming_plus')}
 	          onRestore={handleRestorePurchases}
 	      />
+	      {exitPromptOpen && (
+	          /* B5: leaving sends the game to the background like the Home button (its usual save runs then); nothing is saved on the tap */
+	          <div role="dialog" aria-modal="true" aria-label="Exit the game" data-exit-prompt
+	              className="fixed inset-0 z-[300] flex items-end justify-center bg-black/60 px-4 pb-[max(24px,calc(env(safe-area-inset-bottom)+16px))]"
+	              onClick={() => setExitPromptOpen(false)}>
+	              <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-zinc-900 p-5 text-white shadow-2xl" onClick={event => event.stopPropagation()}>
+	                  <h2 className="text-lg font-black">Exit the game?</h2>
+	                  <p className="mt-1 text-sm text-zinc-400">Your career is saved as you leave.</p>
+	                  <div className="mt-4 grid grid-cols-2 gap-3">
+	                      <button type="button" className="min-h-12 rounded-2xl bg-zinc-800 font-bold" onClick={() => setExitPromptOpen(false)}>Stay</button>
+	                      <button type="button" data-exit-confirm className="min-h-12 rounded-2xl bg-amber-400 font-black text-black"
+	                          onClick={() => { setExitPromptOpen(false); void CapacitorApp.minimizeApp().catch(() => CapacitorApp.exitApp()).catch(() => undefined); }}>Exit</button>
+	                  </div>
+	              </div>
+	          </div>
+	      )}
 	      {toastMessage && (
 	          <div className="fixed top-[max(1.5rem,calc(env(safe-area-inset-top)+8px))] left-1/2 -translate-x-1/2 z-[60] bg-zinc-900 border border-zinc-700 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-top fade-in duration-300 min-w-[300px]">
 	              {toastMessage.tone === 'warning'
@@ -4293,6 +4339,7 @@ export const App: React.FC = () => {
                         <MobilePage
                             player={player}
                             onUpdatePlayer={handleUpdatePlayer}
+                            onQuietUpdatePlayer={handleQuietUiUpdate}
                             onNavVisibilityChange={setIsBottomNavVisible}
                             onFullBleedChange={setIsFullBleedMobileSurface}
                             initialForbesStudioId={initialForbesStudioId ?? undefined}

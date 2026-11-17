@@ -70,7 +70,8 @@ import {
   type StreamingCanonicalBuildSource,
 } from '../../services/streamingCanonicalBuildData';
 import { STREAMING_SERVER_TIERS } from '../../services/streamingServerTiers';
-import { getStreamingServerSite } from '../../services/streamingServerSites';
+import { getStreamingServerSite, hasDataResidencyRule } from '../../services/streamingServerSites';
+import { shareStreamingCapacity, streamingRegionCountryKey } from '../../services/streamingCapacityShare';
 import { streamingEligibleMarketFacilities } from '../../services/streamingMarketRoute';
 import { createStreamingLaunchRehearsal } from '../../services/streamingLaunchRehearsal';
 import {
@@ -757,19 +758,34 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         inputs.openingDemandForecast?.byMarket?.[market.id]
           ?? Math.round(likelyDemand * market.audience / totalAudience),
       ]));
-      const demandByRegion = new Map<string, number>();
-      for (const market of inputs.markets || []) {
-        demandByRegion.set(market.region,
-          (demandByRegion.get(market.region) || 0) + (demandByMarket.get(market.id) || 0));
-      }
       const capacityByFacilityId = new Map(build.capacity.facilities.map(item => [item.facilityId, item]));
       const steadyByRegion = new Map<string, number>();
+      const steadyByRegionCountry = new Map<string, number>();
       for (const facility of build.facilities) {
-        const regionId = getStreamingServerSite(facility.cityId)?.regionId;
+        const site = getStreamingServerSite(facility.cityId);
+        const regionId = site?.regionId;
         if (!regionId) continue;
-        steadyByRegion.set(regionId, (steadyByRegion.get(regionId) || 0)
-          + (capacityByFacilityId.get(facility.id)?.steadyStreams || 0));
+        const steady = capacityByFacilityId.get(facility.id)?.steadyStreams || 0;
+        steadyByRegion.set(regionId, (steadyByRegion.get(regionId) || 0) + steady);
+        if (site.countryCode) {
+          const key = streamingRegionCountryKey(regionId, site.countryCode);
+          steadyByRegionCountry.set(key, (steadyByRegionCountry.get(key) || 0) + steady);
+        }
       }
+      /* B9 (2026-11-16): capacity is shared over the viewers the network reaches, a residency market's own rooms first
+         (services/streamingCapacityShare). It was steady ÷ the region's whole demand, reached or not: "1M carried,
+         748.7K served" with the map green, and every market of a region called overloaded when only the viewers
+         outside reach were over. */
+      const capacityShares = shareStreamingCapacity({
+        markets: (inputs.markets || []).map(market => ({
+          id: market.id,
+          regionId: market.region,
+          reachableDemand: (demandByMarket.get(market.id) || 0) * (coverageById.get(market.id)?.coveredShare || 0),
+          residency: hasDataResidencyRule(market.id),
+        })),
+        steadyByRegion,
+        steadyByRegionCountry,
+      });
       const totalTitles = Math.max(0, inputs.catalogueTitles);
       const rights = inputs.catalogueRights;
       const globalTitles = Math.max(
@@ -786,12 +802,12 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         const servedBy = Array.from(new Set(serving.map(facility => getStreamingServerSite(facility.cityId)?.name || facility.cityId)));
         const primaryRole = serving[0]?.role;
         const marketDemand = demandByMarket.get(market.id) || 0;
-        const regionalDemand = demandByRegion.get(market.region) || 0;
         const regionalSteady = steadyByRegion.get(market.region) || 0;
-        const capacityShare = regionalDemand > 0 ? Math.min(1, regionalSteady / regionalDemand) : 0;
+        const capacity = capacityShares.get(market.id);
+        const capacityShare = capacity?.share ?? 0;
         const coveredShare = Math.min(reachedShare, (coverage?.coveredShare || 0) * capacityShare);
         const cloudServedShare = Math.min(coveredShare, (coverage?.cloudServedShare || 0) * capacityShare);
-        const overloaded = regionalDemand > regionalSteady;
+        const overloaded = capacity?.overloaded ?? false;
         const state: CountryService['state'] = !coverage || regionalSteady <= 0 || reachedShare <= 0
           ? 'NONE'
           : overloaded || coveredShare < .25 ? 'UNSTABLE'
@@ -838,7 +854,10 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
         return { ...service, state, coveredShare, coveredPeak: Math.round(service.peak * coveredShare),
           cloudServedShare: Math.min(service.cloudServedShare || 0, coveredShare),
           startupMs: country.startupTimeMs ?? 0, buffering: country.bufferingRiskPercent,
-          fix: routeShare === 0 ? 'Review regional reach and local delivery restrictions'
+          /* U8 (2026-11-16): a market no room can reach says where a room has to go */
+          fix: routeShare === 0 ? (hasDataResidencyRule(service.marketId)
+            ? `Outside range: ${service.name} needs a room inside ${service.name}`
+            : `Outside every room's range: put a room in or near ${service.name}`)
             : (country.unreachablePercent || 0) > 0 ? 'Improve geographic reach in this region'
               : country.failedPercent > 0 ? 'Add capacity on the affected delivery route'
                 : country.bufferingRiskPercent >= 15 ? 'Review delivery quality and local route load' : service.fix };

@@ -16,7 +16,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import css from './OnlineScenes.module.css';
 import type { CampaignFormatId } from '../../../types';
-import { creativeUrl } from './sceneArt';
+import { creativeUrl, showArt } from './sceneArt';
+import { SceneBoundary } from './SceneBoundary';
 
 type Creative = HTMLCanvasElement | HTMLImageElement;
 export type OnlineFormatId = Extract<CampaignFormatId, 'SOCIAL_FEED' | 'SHORT_VIDEO' | 'SEARCH' | 'CREATORS' | 'CTV'>;
@@ -28,7 +29,7 @@ const DESIGN_W = 320;
 const DESIGN_H = 200;
 const cx = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(' ');
 
-export const OnlineScene: React.FC<{
+const OnlineSceneBody: React.FC<{
   formatId: OnlineFormatId | LaunchDoorSceneId;
   creative: Creative | null;
   /** the campaign's subject (a title, or the service) and the service's own name */
@@ -56,6 +57,8 @@ export const OnlineScene: React.FC<{
     creativeUrl(creative, 600).then(url => { if (alive) setArt(url); }).catch(() => undefined);
     return () => { alive = false; };
   }, [creative]);
+  /* 2026-11-16: the picture stays alive while this card shows it (sceneArt's cache) */
+  useEffect(() => (art ? showArt(art) : undefined), [art]);
   const picture = art ? { backgroundImage: `url(${art})` } : undefined;
   const initial = (brandName || 'N').trim().charAt(0).toUpperCase();
   const handle = (brandName || 'service').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -171,3 +174,11 @@ export const OnlineScene: React.FC<{
     </div>
   );
 };
+
+/* 2026-11-16: each card in its own boundary: if it fails to draw, it keeps a plain tile in the service's colour and the
+   page goes on (it used to take the whole game to the Startup Recovery screen) */
+export const OnlineScene: typeof OnlineSceneBody = props => (
+  <SceneBoundary fallback={<div className={css.online} style={{ ['--hue' as string]: props.hue }} />}>
+    <OnlineSceneBody {...props} />
+  </SceneBoundary>
+);

@@ -2503,6 +2503,7 @@ export const StudioAcquisitionDesk: React.FC<StudioAcquisitionDeskProps> = (prop
         playerName: player.name,
         signingQuoteKey: signingQuote.quoteKey,
         signingTermsValid: signingQuote.valid,
+        signingProblem: signingQuote.problem,
         signingPrice: signingQuote.additionalPrice,
         publicControlReady: controlReadiness.eligible,
         entryBlockReason,

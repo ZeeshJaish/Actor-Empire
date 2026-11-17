@@ -1,6 +1,6 @@
 import { getPrepaidScriptDevelopmentCash } from '../../../services/scriptDevelopmentFinance';
 import { CinemaForecastPanel } from '../../../components/CinemaForecastPanel';
-import { prepareCinemaPackageExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
+import { prepareCinemaPackageAttentionParts, prepareCinemaPackageExposure } from '../../../services/boxOffice/boxOfficeExposureAdapters';
 import { calculateActorRoleSalary, calculateDirectorProjectSalary } from '../../../services/talentService';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
@@ -1108,8 +1108,11 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                 const isCastDefault = castList.length === 2 && castList.every(c => !c.actorId);
                 if (details.castList && details.castList.length > 0 && isCastDefault) {
                     const returningBase = selectedScript.returningTalent || currentReturningTalent || [];
+                    /* 2026-11-16: the role the player played in the last one comes back as the player (it came back as an
+                       actor with no profile: "Profile unavailable", a fee and a deal to negotiate with yourself) */
+                    const isYou = (c: any) => Boolean(c.isPlayer) || (Boolean(player.id) && c.actorId === player.id);
                     const newCastList = details.castList.filter((c: any) => (
-                        shouldPreserveReturningMovieRole(c.actorId, player.flags.extraNPCs || [])
+                        isYou(c) || shouldPreserveReturningMovieRole(c.actorId, player.flags.extraNPCs || [])
                     )).map((c: any) => {
                         let salary = c.salary || 0;
                         // Check if this actor is in the returning talent list to get their new demand
@@ -1122,9 +1125,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                             id: c.roleId || c.id,
                             role: c.roleName || c.role,
                             roleType: c.roleType,
-                            actorId: c.actorId === 'UNKNOWN' ? null : c.actorId,
-                            actorName: c.name || c.actorName,
-                            salary: salary,
+                            actorId: isYou(c) ? 'PLAYER_SELF' : c.actorId === 'UNKNOWN' ? null : c.actorId,
+                            actorName: isYou(c) ? player.name : c.name || c.actorName,
+                            salary: isYou(c) ? 0 : salary,
                             characterId: c.characterId,
                             characterName: c.characterName,
                             sourceUniverseId: c.sourceUniverseId,
@@ -1140,7 +1143,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                         const merged = [...(selectedScript.returningTalent || []), ...prev];
                         const existingKeys = new Set(merged.map((talent: any) => `${talent.id}:${talent.role}`));
                         const additions = details.castList
-                            .filter((c: any) => c.actorId && c.actorId !== 'UNKNOWN' && shouldPreserveReturningMovieRole(c.actorId, player.flags.extraNPCs || []))
+                            .filter((c: any) => c.actorId && c.actorId !== 'UNKNOWN' && !isYou(c) && shouldPreserveReturningMovieRole(c.actorId, player.flags.extraNPCs || []))
                             .map((c: any) => {
                                 const role = c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR';
                                 const originalSalary = Math.max(100_000, Math.floor(c.salary || lastInstallment.budget * (c.roleType === 'LEAD' ? 0.08 : 0.03) || 100_000));
@@ -2677,6 +2680,13 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             genre: selectedScript?.genre || 'unknown',
         });
 
+        /* B21: a pitch's story names its lead; a lead the player renamed on the Cast step is named in the story too */
+        const pitchHeroName = originalCommission?.pitch?.heroName?.trim();
+        const leadCharacterName = castList.find(role => role.roleType === 'LEAD')?.characterName?.trim();
+        const scriptWithLeadName = selectedScript && pitchHeroName && leadCharacterName && leadCharacterName !== pitchHeroName && selectedScript.logline
+            ? { ...selectedScript, logline: selectedScript.logline.split(pitchHeroName).join(leadCharacterName) }
+            : selectedScript;
+
         const {
             directorData,
             estimatedBudget,
@@ -2699,7 +2709,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
         } = buildGreenlightProject({
             player,
             studio,
-            selectedScript,
+            selectedScript: scriptWithLeadName,
             selectedScriptId,
             selectedLocations,
             castList,
@@ -2973,6 +2983,17 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
     // Real-time Budget Calculation for UI
     const currentEstimatedBudget = budgetBreakdown.total + musicBudget;
 
+    /* U2 (2026-11-16): what the film's Attention is made of, for the tap on the header's Attention (films only) */
+    const attentionParts = useMemo(() => {
+        if (resolveProjectType(selectedScript?.projectType,selectedScript?.type) !== 'MOVIE') return null;
+        const project = {type:'MOVIE',studioId:studio.id,genre:selectedScript?.genres?.[0] || 'DRAMA',hiddenStats:{},
+            castList:castList.filter(c=>c.actorId).map(c=>({id:c.actorId,actorId:c.actorId,name:c.actorId,type:'ACTOR',
+                roleType:c.roleType,isPlayer:c.actorId==='PLAYER_SELF',image:''})),
+        } as ProjectDetails;
+        return prepareCinemaPackageAttentionParts({player,project,titleId:'greenlight-preview',storyAttention:selectedScript?.hype ?? 20,
+            musicAttention:selectedMusicPlan?.musicBuzz || 0});
+    }, [castList, player, selectedMusicPlan?.musicBuzz, selectedScript, studio.id]);
+
     const currentEstimatedBuzz = useMemo(() => {
         if (resolveProjectType(selectedScript?.projectType,selectedScript?.type) === 'MOVIE') {
             const project = {type:'MOVIE',studioId:studio.id,genre:selectedScript?.genres?.[0] || 'DRAMA',hiddenStats:{},
@@ -3097,26 +3118,39 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
         setCastList(previous => previous.filter(role => role.id !== roleId));
     };
 
+    /** a role billed as `roleType`, its audience view following the billing while it is still the default one */
+    const withRoleType = (role: GreenlightCastRole, roleType: GreenlightCastRole['roleType']): GreenlightCastRole => {
+        const priorDefault = getDefaultCharacterStoryRole(role.roleType);
+        const storyRole = !role.storyRole || role.storyRole === priorDefault
+            ? getDefaultCharacterStoryRole(roleType)
+            : role.storyRole;
+        return {
+            ...role,
+            roleType,
+            storyRole,
+            abilityType: role.abilityType || 'NONE',
+            role: roleType === 'LEAD'
+                ? 'Lead Actor'
+                : roleType === 'SUPPORTING'
+                    ? 'Supporting Actor'
+                    : roleType === 'CAMEO'
+                        ? 'Cameo Appearance'
+                        : 'Extra',
+        };
+    };
+
     const changeCastRoleType = (roleId: string, roleType: GreenlightCastRole['roleType']) => {
+        setCastList(previous => previous.map(role => (role.id !== roleId ? role : withRoleType(role, roleType))));
+    };
+
+    /* 2026-11-16 (player report, EJ): "can only add supporting roles even if you choose to make them a main character on
+       the plot". The main character is the lead: choosing it as the plot function bills the role as Lead (any other
+       plot function leaves the billing as it is). */
+    const changeCastIdentity = (roleId: string, patch: Partial<GreenlightCastRole>) => {
         setCastList(previous => previous.map(role => {
             if (role.id !== roleId) return role;
-            const priorDefault = getDefaultCharacterStoryRole(role.roleType);
-            const storyRole = !role.storyRole || role.storyRole === priorDefault
-                ? getDefaultCharacterStoryRole(roleType)
-                : role.storyRole;
-            return {
-                ...role,
-                roleType,
-                storyRole,
-                abilityType: role.abilityType || 'NONE',
-                role: roleType === 'LEAD'
-                    ? 'Lead Actor'
-                    : roleType === 'SUPPORTING'
-                        ? 'Supporting Actor'
-                        : roleType === 'CAMEO'
-                            ? 'Cameo Appearance'
-                            : 'Extra',
-            };
+            const next = { ...role, ...patch };
+            return patch.storyFunction === 'PROTAGONIST' && role.roleType !== 'LEAD' ? withRoleType(next, 'LEAD') : next;
         }));
     };
 
@@ -3165,17 +3199,22 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
         }));
     };
 
+    /* 2026-11-16 (player report, EJ: "deleted the characters and added a new lead role but it only says supporting"):
+       a cast with no lead gets its lead first; after that, a new role is supporting */
     const addCastRole = () => {
-        setCastList(previous => [
-            ...previous,
-            {
-                id: `role_${Date.now()}`,
-                role: 'Supporting Actor',
-                roleType: 'SUPPORTING',
-                actorId: null,
-                identitySource: 'AUTO',
-            },
-        ]);
+        setCastList(previous => {
+            const lead = !previous.some(role => role.roleType === 'LEAD');
+            return [
+                ...previous,
+                {
+                    id: `role_${Date.now()}`,
+                    role: lead ? 'Lead Actor' : 'Supporting Actor',
+                    roleType: lead ? 'LEAD' : 'SUPPORTING',
+                    actorId: null,
+                    identitySource: 'AUTO',
+                },
+            ];
+        });
     };
 
     const continueFromCast = () => {
@@ -3273,7 +3312,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             const compass = selectedStoryCompass;
             const words = (value: unknown) => String(value || '').toLowerCase().replace(/_/g, ' ').replace(/^./, letter => letter.toUpperCase());
             return (
-                <LockedShell {...shellProps}>
+                <LockedShell {...shellProps} note={`${lockedStudioName} chose the cast. You name the characters.`}>
                     <LockedCast
                         dna={compass ? [
                             { label: 'Focus', value: words(compass.perspective) },
@@ -3283,6 +3322,9 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                             { label: 'Tone', value: words(compass.tone) },
                         ] : []}
                         balance={liveCastStoryRead?.balanceScore}
+                        /* B21: the characters are named here, with the studio Greenlight's own handlers */
+                        onRename={changeCastCharacterName}
+                        onRenameDone={fillDefaultCastCharacterName}
                         roles={castList.map((role, roleIndex) => {
                             const person = peopleOf(role.actorId);
                             const roleKind = (role.roleType === 'EXTRA' ? 'CAMEO' : role.roleType) as RoleType;
@@ -3491,6 +3533,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                 } : undefined}
                 selectedScriptId={selectedScriptId}
                 currentEstimatedBuzz={currentEstimatedBuzz}
+                attentionParts={attentionParts}
                 currentEstimatedQuality={currentEstimatedQuality}
                 budgetBreakdown={budgetBreakdown}
                 musicBudget={musicBudget}
@@ -3597,9 +3640,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                         onCharacterSelectionChange={changeCastCharacterSelection}
                         onCharacterNameChange={changeCastCharacterName}
                         onCharacterNameBlur={fillDefaultCastCharacterName}
-                        onIdentityChange={(roleId, patch) => {
-                            setCastList(previous => previous.map(role => role.id === roleId ? { ...role, ...patch } : role));
-                        }}
+                        onIdentityChange={changeCastIdentity}
                         onNegotiate={handleNegotiate}
                         onSelectActor={setSelectingActorFor}
                         onAddRole={addCastRole}

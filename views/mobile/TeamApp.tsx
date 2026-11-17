@@ -5,6 +5,7 @@ import { getPlayerLanguage, t } from '../../services/i18n';
 import { ArrowLeft, Send, Camera, Clock, DollarSign, XCircle, AlertTriangle, Dumbbell, Sparkles, Megaphone, HeartPulse, CheckCircle, Stethoscope, ChevronRight } from 'lucide-react';
 import { getPublicistWeekSummary } from '../../services/industryWorld';
 import { getAbsoluteWeek } from '../../services/legacyLogic';
+import { getCareerFameCeiling, getCareerFameDecay, getCareerPublicityGain } from '../../services/actorCareerBalance';
 
 interface TeamAppProps {
   player: Player;
@@ -234,18 +235,51 @@ export const TeamApp: React.FC<TeamAppProps> = ({ player, onBack, onHireAgent, o
                   </div>
               </div>
           )}
+          {/* 16 Nov (Zeesh: "isnt fitting with the app ui ... ajeeb sa kuch add kiya hai"): the media desk was a dark
+              panel on a light page. It is now a card like the publicist's own above it: a blue label, a count badge, plain
+              text, and this week's fame numbers in a small grid like Cost / Focus. */}
           {roleType === 'PUBLICIST' && current && (
-              <div className="mb-6 border-l-4 border-violet-500 bg-slate-950 p-4 text-white shadow-sm">
+              <div data-media-desk className="mb-6 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-3">
-                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300">This week's media desk</div>
-                      <div className="font-mono text-xs text-slate-400">{publicistWeekSummary.interventionsUsed}/{publicistWeekSummary.capacity}</div>
+                      <div className="text-xs font-bold uppercase text-blue-500">This week's media desk</div>
+                      <div className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600">{publicistWeekSummary.interventionsUsed}/{publicistWeekSummary.capacity}</div>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-300">{publicistWeekSummary.summary}</p>
+                  <p className="mt-1.5 text-sm leading-5 text-slate-600">{publicistWeekSummary.summary}</p>
                   {publicistWeekSummary.interventions.slice(-2).map(intervention => (
-                      <div key={intervention.id} className="mt-3 border-t border-slate-800 pt-3 text-[11px] leading-4 text-slate-400">
+                      <div key={intervention.id} className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-4 text-slate-500">
                           {intervention.summary}
                       </div>
                   ))}
+                  {/* U3 (2026-11-16): "Losing fame with an Elite publicist." A publicist lifts fame only up to what recent
+                      work supports; above it fame fades. The weekly numbers, as the week applies them. */}
+                  {(() => {
+                      const gain = getCareerPublicityGain(player);
+                      const fade = getCareerFameDecay(player.stats.fame);
+                      const ceiling = Math.round(getCareerFameCeiling(player));
+                      return (
+                          <div data-publicist-fame className="mt-3">
+                              <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-center">
+                                  <div>
+                                      <div className="text-[10px] font-bold uppercase text-slate-400">Publicist</div>
+                                      <div className="mt-0.5 text-sm font-bold text-emerald-600">+{gain.toFixed(2)}</div>
+                                  </div>
+                                  <div>
+                                      <div className="text-[10px] font-bold uppercase text-slate-400">Fading</div>
+                                      <div className="mt-0.5 text-sm font-bold text-rose-500">−{fade.toFixed(2)}</div>
+                                  </div>
+                                  <div>
+                                      <div className="text-[10px] font-bold uppercase text-slate-400">Fame cap</div>
+                                      <div className="mt-0.5 text-sm font-bold text-slate-800">{ceiling}</div>
+                                  </div>
+                              </div>
+                              <p className="mt-2 text-xs leading-4 text-slate-500">
+                                  {player.stats.fame >= ceiling
+                                      ? `Your recent work supports fame up to ${ceiling}, so the publicist can't lift it higher. New roles raise it.`
+                                      : `Your recent work supports fame up to ${ceiling}.`}
+                              </p>
+                          </div>
+                      );
+                  })()}
               </div>
           )}
 

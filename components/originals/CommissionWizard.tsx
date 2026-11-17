@@ -207,17 +207,19 @@ export const CommissionWizard: React.FC<{
     onClose: () => void;
     onOpenProductionHouse?: () => void;
     initialPitchId?: string | null;
+    /** 2026-11-16: open on one of your own scripts (a spin-off's, to cast it) */
+    initialScriptId?: string | null;
     onCommissioned: () => void;
-}> = ({ player, onUpdatePlayer, onClose, onOpenProductionHouse, initialPitchId = null, onCommissioned }) => {
+}> = ({ player, onUpdatePlayer, onClose, onOpenProductionHouse, initialPitchId = null, initialScriptId = null, onCommissioned }) => {
     const pitches = useMemo(() => getLiveOriginalPitches(player), [player.ownedStreamingPlatform?.originalPitches]);
     const ownScripts = useMemo(() => getCommissionableScripts(player), [player.businesses]);
     const studios = useMemo(() => getOriginalsStudios(player), [player.age, player.currentWeek]);
     const ownStudios = useMemo(() => (player.businesses || []).filter(item => item.type === 'PRODUCTION_HOUSE' && item.isActive && item.studioState), [player.businesses]);
     const [stage, setStage] = useState<'SCRIPT' | 'STUDIO'>('SCRIPT');
     const [making, setMaking] = useState<{ studio: Business; mode: OriginalWizardMode; concept: any; key: string } | null>(null);
-    const [tab, setTab] = useState<'PITCHES' | 'SCRIPTS'>(initialPitchId || pitches.length || !ownScripts.length ? 'PITCHES' : 'SCRIPTS');
+    const [tab, setTab] = useState<'PITCHES' | 'SCRIPTS'>(initialScriptId && ownScripts.some(item => item.script.id === initialScriptId) ? 'SCRIPTS' : initialPitchId || pitches.length || !ownScripts.length ? 'PITCHES' : 'SCRIPTS');
     const [pitchId, setPitchId] = useState<string | null>(initialPitchId || pitches[0]?.id || null);
-    const [scriptId, setScriptId] = useState<string | null>(ownScripts[0]?.script.id || null);
+    const [scriptId, setScriptId] = useState<string | null>((initialScriptId && ownScripts.some(item => item.script.id === initialScriptId) ? initialScriptId : null) || ownScripts[0]?.script.id || null);
     const [episodeChoice, setEpisodeChoice] = useState<Record<string, number>>({});
     const [readingPitch, setReadingPitch] = useState(false);
     /* an outside studio's id, or a studio of the player's own */

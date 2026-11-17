@@ -22,6 +22,7 @@ import {
 } from './streamingFinanceRoom';
 import { getStreamingPublicMarkets } from './streamingPublicMarkets';
 import { resolveStreamingCatalogTitle } from './streamingCatalog';
+import { buildProjectPosterIndex } from './projectPosterIndex';
 
 export type StudioFinanceInitialTab = 'snapshot' | 'performance' | 'ledger' | 'capital';
 
@@ -223,12 +224,8 @@ const titleFormat = (player: Player, projectId: string, genre: string): TitleFin
 };
 
 const titlesFrom = (model: StreamingFinanceRoomModel, player: Player): TitleFinance[] => {
-    const posterById = new Map([
-        ...(player.pastProjects || []),
-        ...player.businesses.flatMap(business => business.studioState?.scripts || []),
-    ].flatMap(source => source.customPoster
-        ? [[String(source.id), source.customPoster] as const]
-        : []));
+    /* B20: the same poster lookup as the Library (it read only the archive and scripts) */
+    const posterById = buildProjectPosterIndex(player);
     return model.titlePerformance.map((title) => ({
         id: title.projectId,
         name: title.title,

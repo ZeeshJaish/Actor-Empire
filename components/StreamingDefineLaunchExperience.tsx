@@ -212,7 +212,10 @@ export const buildStreamingLaunchCountry = (market: typeof STREAMING_WORLD_MARKE
     languages,
     rightsEstimate: profile?.entryCosts.rights ?? market.openingRightsEstimate,
     rivals: market.rivals.map(rival => ({ name: rival.name, share: rival.watchSharePercent })),
-    localizationNote: `Audience preference: ${market.localizationNote} Language capability is developed separately through Technology and Content.`,
+    /* U14 (2026-11-16): "Viewers want a language I can't make." The note ended "Language capability is developed
+       separately through Technology and Content", which named no way to meet it. A studio can't choose a film's
+       language yet, so it says the two ways there are: license titles in the main language, or localize. */
+    localizationNote: `Audience preference: ${market.localizationNote} To meet it, license titles made in ${[...languages].sort((a, b) => b.share - a.share)[0]?.name || 'its main language'} in the Content Market, or subtitle and dub yours on the Localization desk.`,
     complianceCost: profile?.entryCosts.compliance ?? entry.plannedOverheadEstimate,
     dossier: {
       levels: {

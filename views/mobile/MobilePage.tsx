@@ -26,6 +26,7 @@ import { XApp } from './XApp';
 import { YoutubeApp } from './YoutubeApp';
 import { GuideView } from '../../components/GuideView'; // Imported GuideView
 import { getAbsoluteWeek } from '../../services/legacyLogic';
+import { markQuietPlayerUpdate } from '../../services/quietPlayerUpdates';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { normalizeUniverseMap, buildUniverseContractProject } from '../../services/universeLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
@@ -74,6 +75,8 @@ interface MobilePageProps {
   onDeleteMessage?: (id: string) => void;
   onTradeStock?: (stockId: string, amount: number) => void;
   onUpdatePlayer?: (player: Player) => void;
+  /** B29: a change that only remembers what the player has seen (a message read): no rebuild, no save on the tap */
+  onQuietUpdatePlayer?: (player: Player) => void;
   onOpenRightsMarket?: (opportunityId?: string) => void;
   onOpenStreamingContentOffer?: (offerId: string) => void;
   onOpenStreamingRights?: () => void;
@@ -232,11 +235,16 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       };
   };
 
+  /* B29 (2026-11-15): opening an unread message rebuilt the whole career (and then saved it) to flip one flag: 5–10 s
+     on a late career before the message showed. The flag is set on the live save at once and rides along with the
+     next real save; losing it to a crash only shows the message as new again. */
   const handleMarkMessageRead = (id: string) => {
       const updatedInbox = props.player!.inbox.map(message =>
           message.id === id ? { ...message, isRead: true } : message
       );
-      handleUpdatePlayer({ ...props.player!, inbox: updatedInbox });
+      const read = markQuietPlayerUpdate({ ...props.player!, inbox: updatedInbox });
+      if (props.onQuietUpdatePlayer) props.onQuietUpdatePlayer(read);
+      else handleUpdatePlayer(read);
   };
 
   // --- HANDLER: Accept Offers (Modified for Multi-Film) ---
@@ -952,6 +960,7 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                         onAccept={handleAcceptMessage} // Use local smart handler
                         onDelete={props.onDeleteMessage!}
                         onMarkRead={handleMarkMessageRead}
+                        onQuietUpdatePlayer={props.onQuietUpdatePlayer}
                         onOpenRightsMarket={props.onOpenRightsMarket}
                         onOpenStreamingContentOffer={props.onOpenStreamingContentOffer}
                         onOpenStreamingRights={props.onOpenStreamingRights}

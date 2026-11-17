@@ -16,8 +16,13 @@ export const getListedCompanyValuation = (player: Pick<Player, 'world'>, stock: 
         && (stock.outstandingShares ?? outstandingShares) === outstandingShares
         && outstandingShares * .01 <= getStockMarketCapCeiling(stock);
     const studio = stock.relatedStudioId ? player.world?.studios?.[stock.relatedStudioId] : undefined;
-    const cash = ledgerDollars(studio?.cashReserve);
-    const debt = ledgerDollars(studio?.ai?.finance?.debtPrincipalMillions);
+    /* B24 (2026-11-15): cinema costs can take an AI studio's cash below zero between its weekly books. That shortfall is
+       owed money: cash 0 and the shortfall added to its debt (it made every figure "unverified" and refused takeovers). */
+    const rawCash = studio?.cashReserve;
+    const shortfall = typeof rawCash === 'number' && Number.isFinite(rawCash) && rawCash < 0 ? ledgerDollars(-rawCash) : 0;
+    const cash = shortfall ? 0 : ledgerDollars(rawCash);
+    const ledgerDebt = ledgerDollars(studio?.ai?.finance?.debtPrincipalMillions);
+    const debt = ledgerDebt !== undefined && shortfall !== undefined ? ledgerDebt + shortfall : undefined;
     const enterprise = cash !== undefined && debt !== undefined ? equityMarketCap + debt - cash : undefined;
     const enterpriseValue = enterprise !== undefined && Number.isSafeInteger(Math.round(enterprise * 100))
         ? Math.max(0, enterprise) : undefined;

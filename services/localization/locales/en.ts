@@ -7558,6 +7558,7 @@ export const enTranslations: Record<TranslationKey, string> = {
         'imdb.project.episodeRatings': 'Episode Ratings',
         'imdb.project.seasonAverage': 'Season average',
         'imdb.project.noEpisodeRatings': 'Episode scores will appear after this season premieres.',
+        'imdb.project.episodesAiring': '{aired} of {total} episodes out. The next one airs next week.',
         'imdb.project.seasonShort': 'S{season}',
         'imdb.project.episodeShort': 'E{episode}',
         'imdb.project.rating.awesome': 'Awesome',

@@ -22,6 +22,8 @@ import { readNetworkSignals } from '../../services/streamingNetworkSignals';
 import { normalizeStreamingRightsCalendarState } from '../../services/streamingRightsCalendar';
 import { getOwnedStreamingProgramEntries, getStreamingSlateCandidates } from '../../services/streamingOriginals';
 import { streamingLicenceWaitsForSlate } from '../../services/streamingCatalog';
+import { getLatestStreamingTitleWeekRows } from '../../services/streamingTitleWeekPerformance';
+import { buildProjectPosterIndex } from '../../services/projectPosterIndex';
 import { isStreamingOpeningProgrammeOpen, originalOnTheShelf, planStreamingSlateAutoFill } from '../../services/streamingSlateProgramming';
 import { getStreamingViewerPersonal, getStreamingViewerPlans, getStreamingViewerQuality, streamingNetworkPictureTier } from '../../services/streamingViewerQuality';
 import { getStreamingViewerOutage } from '../../services/streamingViewerOutage';
@@ -42,26 +44,14 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
   const context = getStreamingCatalogueReadContext(player, preparedContext);
   const { platform } = context;
   const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-  const latestPerformance = platform.weeklyHistory.at(-1)?.operations?.titlePerformance ?? [];
-  const performanceByProject = new Map(latestPerformance.map(item => [item.projectId, item]));
+  /* B16: every title's latest week (the weekly record keeps 24; the viewing engine's rows fill in the rest) */
+  const performanceByProject = new Map([...getLatestStreamingTitleWeekRows(player, platform)].map(([projectId, read]) => [projectId, read.row]));
   const projectIds = [...new Set([...platform.catalogProjectIds, ...platform.originalCommissions.flatMap(c => c.canonicalProjectId ? [c.canonicalProjectId] : [])])];
   const countries = getOwnedPlatformPackageCountryIds(platform);
-  /* The player's own art wins wherever they set it, read the way Viewer Mode
-     reads it: released and active films, productions still in the works, the
-     legacy studio list, and an Original's own script. Everything else draws
-     its generated one-sheet. */
-  const posterById = new Map<string, CustomPoster>();
-  const addPoster = (id: unknown, poster: CustomPoster | null | undefined) => {
-    if (poster && id !== undefined && id !== null && !posterById.has(String(id))) posterById.set(String(id), poster);
-  };
-  (player.pastProjects || []).forEach(project => addPoster(project.id, project.customPoster));
-  (player.activeReleases || []).forEach(release => addPoster(release.id, release.projectDetails?.customPoster));
-  (player.commitments || []).forEach(commitment => addPoster(commitment.id, commitment.projectDetails?.customPoster));
-  (Array.isArray(player.flags?.legacyStudioProjects) ? player.flags.legacyStudioProjects as Array<Record<string, any>> : [])
-    .forEach(project => addPoster(project.id, project.customPoster || project.projectDetails?.customPoster));
-  const scripts = new Map(player.businesses.flatMap(business => (business.studioState?.scripts || []).map(script => [String(script.id), script] as const)));
-  scripts.forEach((script, id) => addPoster(id, script.customPoster));
-  platform.originalCommissions.forEach(commission => addPoster(commission.canonicalProjectId, scripts.get(String(commission.scriptId))?.customPoster));
+  /* The player's own art wins wherever they set it: B20, one shared lookup (releases, the archive, productions,
+     the legacy studio list, scripts, an Original's own poster, the studio's library and concepts). Everything
+     else draws its generated one-sheet. */
+  const posterById: Map<string, CustomPoster> = buildProjectPosterIndex(player);
   /* renewal talks the rights calendar has open for this platform's licences */
   const renewalByProject = new Map(Object.values(normalizeStreamingRightsCalendarState(player.world.streamingRightsCalendar).renewalCases)
     .filter(item => item.incumbentBuyer.type === 'PLAYER_PLATFORM' && item.sourceExpiresAtAbsoluteWeek >= absoluteWeek)
@@ -523,7 +513,24 @@ export const createCanonicalBoardroomState = (player: Player): BoardroomState =>
     /* #163: directors' pay and the investors' weekly profit share were hidden inside operations */
     ...((latest.governanceCost || 0) > 0 ? [{ id: 'GOVERNANCE', label: 'Board and investors', amount: latest.governanceCost || 0 }] : []),
     { id: 'FINANCING', label: 'Financing', amount: latest.financingCost },
-    { id: 'OPERATIONS', label: 'Content, growth and operations', amount: Math.max(0, latest.totalCashCost - latest.partnerRevenueShareCost - latest.infrastructureCost - delivery - latest.leadershipCost - (latest.governanceCost || 0) - latest.financingCost), note: latest.headline },
+    /* U1 (2026-11-16): "Why am I losing so much money?" Everything else was one line, "Content, growth and operations",
+       usually the week's biggest, so the loss read as content's fault. No content is in it: licences are paid when
+       signed and the books spread them (contentAmortization), outside this cash week. It is split into what the
+       weekly loop really charged (streamingWeeklyLoop: deductibleOperatingCost + market costs), the rest kept whole. */
+    ...(() => {
+      const growth = (latest.weeklyPlanCost || 0) + (latest.growthPlanCost || 0) + (latest.campaignCost || 0);
+      const markets = (latest.marketOperatingCost || 0) + (latest.marketPolicyCost || 0) + (latest.rightsComplianceCost || 0);
+      const tech = (latest.technologyCampusCost || 0) + (latest.productSuiteCost || 0);
+      const listed = latest.partnerRevenueShareCost + latest.infrastructureCost + delivery + latest.leadershipCost
+        + (latest.governanceCost || 0) + latest.financingCost + growth + markets + tech;
+      const other = Math.max(0, latest.totalCashCost - listed);
+      return [
+        ...(growth > 0 ? [{ id: 'GROWTH', label: 'Marketing and growth', amount: growth }] : []),
+        ...(markets > 0 ? [{ id: 'MARKETS', label: 'Markets, taxes and compliance', amount: markets }] : []),
+        ...(tech > 0 ? [{ id: 'TECHNOLOGY', label: 'Technology and products', amount: tech }] : []),
+        { id: 'OPERATIONS', label: 'Other operations', amount: other, note: latest.headline },
+      ];
+    })(),
   ] : [
     { id: 'LEADERSHIP', label: 'Leadership', amount: executiveCosts + boardCosts },
     { id: 'NETWORK', label: 'Infrastructure', amount: platform.infrastructureSetup?.weeklyOperatingCost ?? 0 },

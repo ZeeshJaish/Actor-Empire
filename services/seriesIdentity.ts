@@ -1,5 +1,5 @@
 import type { SeasonEpisodeRatings } from '../types';
-import { generateEpisodeRatings, inferSeasonNumber } from './episodeRatings';
+import { generateEpisodeRatings, getAiredEpisodeCount, inferSeasonNumber, limitToAiredEpisodes } from './episodeRatings';
 
 /**
  * #272: one series, one key, one season number.
@@ -105,10 +105,12 @@ export const getSeasonRatings = (row: any): SeasonEpisodeRatings[] => {
     return mine.length ? mine : generateFor(row, ratings[0]?.episodes?.length || 8);
 };
 
-/** The whole show's ratings, season by season, for the one grid on its page */
-export const getSeriesEpisodeRatings = <T,>(group: SeriesGroup<T> | null | undefined, rawOf: (row: T) => any = row => row): SeasonEpisodeRatings[] => (
+/** The whole show's ratings, season by season, for the one grid on its page.
+    now (B19): a weekly season shows only the episodes out by that week. */
+export const getSeriesEpisodeRatings = <T,>(group: SeriesGroup<T> | null | undefined, rawOf: (row: T) => any = row => row, now?: number): SeasonEpisodeRatings[] => (
     (group?.seasons || [])
-        .flatMap(({ season, row }) => getSeasonRatings(rawOf(row)).slice(0, 1).map(rating => ({ ...rating, season })))
+        .flatMap(({ season, row }) => getSeasonRatings(rawOf(row)).slice(0, 1)
+            .map(rating => limitToAiredEpisodes({ ...rating, season }, getAiredEpisodeCount(rawOf(row), now))))
         .sort((a, b) => a.season - b.season)
 );
 

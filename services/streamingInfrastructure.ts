@@ -1021,12 +1021,37 @@ export const getStreamingInfrastructureForecast = (
     player, context?.player === player ? context.platform : normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id), inputDraft,
 );
 
+/* B11 (2026-11-15): before launch the Build's three tier prices (Basic, Premium, Family) follow the plans on screen:
+   the cheapest paid plan, the middle one and the dearest, kept inside each tier's range and the $2 / $3 gaps. Worked in
+   cents: in dollars 13.99 + 3 is 16.990000000000002, so a $13.99 / $16.99 pair (exactly $3) failed the gap check. And
+   commissioning read a copy saved earlier, which could differ from the plans the checklist had passed. */
+const priceCents = (value: unknown): number => Math.round((Number(value) || 0) * 100);
+export const mirrorStreamingPlanPricesToTiers = (
+    plans: ReadonlyArray<{ monthly?: unknown }> | undefined,
+    fallback: Record<StreamingSubscriptionTierId, number>,
+): Record<StreamingSubscriptionTierId, number> => {
+    const paid = (plans || []).map(plan => priceCents(plan.monthly)).filter(price => price > 0).sort((a, b) => a - b);
+    const basic = Math.min(1499, Math.max(399, paid[0] ?? priceCents(fallback.BASIC)));
+    const premium = Math.min(2499, Math.max(799, basic + 200, paid[Math.floor(paid.length / 2)] ?? priceCents(fallback.PREMIUM)));
+    const family = Math.min(3499, Math.max(1199, premium + 300, paid[paid.length - 1] ?? priceCents(fallback.FAMILY)));
+    return { BASIC: basic / 100, PREMIUM: premium / 100, FAMILY: family / 100 };
+};
+/* before launch, the draft's tiers are the plans on screen (B11) */
+const withPlanLadder = (
+    platform: OwnedStreamingPlatformState,
+    draft: OwnedStreamingInfrastructureSetupDraft,
+): OwnedStreamingInfrastructureSetupDraft => {
+    const plans = platform.serviceConfiguration?.pricing?.plans;
+    if (platform.launchCommit || !plans?.length) return draft;
+    return { ...draft, subscriptionPrices: mirrorStreamingPlanPricesToTiers(plans, draft.subscriptionPrices) };
+};
+
 export const validateStreamingInfrastructureDraft = (
     player: Player,
     inputDraft?: OwnedStreamingInfrastructureSetupDraft | null,
 ): { valid: boolean; issues: StreamingInfrastructureValidationIssue[]; forecast: StreamingInfrastructureForecast } => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const draft = inputDraft || platform.infrastructureSetupDraft || createDefaultStreamingInfrastructureDraft(player);
+    const draft = withPlanLadder(platform, inputDraft || platform.infrastructureSetupDraft || createDefaultStreamingInfrastructureDraft(player));
     const forecast = getStreamingInfrastructureForecast(player, draft);
     const issues: StreamingInfrastructureValidationIssue[] = [];
     const sameInfrastructure = Boolean(
@@ -1064,7 +1089,7 @@ export const validateStreamingInfrastructureDraft = (
     } else {
         STREAMING_SUBSCRIPTION_TIERS.forEach(tier => {
             const price = draft.subscriptionPrices[tier.id];
-            if (!Number.isFinite(price) || price < tier.minPrice || price > tier.maxPrice) {
+            if (!Number.isFinite(price) || priceCents(price) < priceCents(tier.minPrice) || priceCents(price) > priceCents(tier.maxPrice)) {
                 issues.push({
                     step: 3,
                     code: 'PRICE_RANGE',
@@ -1073,8 +1098,8 @@ export const validateStreamingInfrastructureDraft = (
             }
         });
         if (
-            draft.subscriptionPrices.PREMIUM < draft.subscriptionPrices.BASIC + 2
-            || draft.subscriptionPrices.FAMILY < draft.subscriptionPrices.PREMIUM + 3
+            priceCents(draft.subscriptionPrices.PREMIUM) < priceCents(draft.subscriptionPrices.BASIC) + 200
+            || priceCents(draft.subscriptionPrices.FAMILY) < priceCents(draft.subscriptionPrices.PREMIUM) + 300
         ) {
             issues.push({
                 step: 3,
@@ -1248,7 +1273,7 @@ export const commitStreamingInfrastructureSetup = (
     inputDraft?: OwnedStreamingInfrastructureSetupDraft | null,
 ): CommitStreamingInfrastructureResult => {
     const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const draft = inputDraft || platform.infrastructureSetupDraft || createDefaultStreamingInfrastructureDraft(player);
+    const draft = withPlanLadder(platform, inputDraft || platform.infrastructureSetupDraft || createDefaultStreamingInfrastructureDraft(player));
     const comparisonSetup = platform.pendingInfrastructureSetup || platform.infrastructureSetup;
     const comparisonStrategy = platform.pendingInfrastructureSetup?.strategy || platform.infrastructureStrategy;
     const samePrices = STREAMING_SUBSCRIPTION_TIERS.every(tier => (

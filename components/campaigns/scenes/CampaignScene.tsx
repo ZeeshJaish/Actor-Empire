@@ -22,7 +22,8 @@ import css from './CampaignScenes.module.css';
 import { coverFrame, quadMatrix3d } from './sceneGeometry';
 import { drawLedFacade, drawLedReflection, drawLedRing, drawReflection } from './ledFacade';
 import { drawDrones, droneFleet, type Drone } from './droneShow';
-import { backdropPixels, faceArtUrl, faceShape } from './sceneArt';
+import { backdropPixels, faceArtUrl, faceShape, showArt } from './sceneArt';
+import { SceneBoundary } from './SceneBoundary';
 import type { CampaignScene as SceneDefinition } from './sceneCatalogue';
 
 type Creative = HTMLCanvasElement | HTMLImageElement;
@@ -36,7 +37,7 @@ const cx = (...names: Array<string | false | null | undefined>) => names.filter(
 /* a print's light: the #144 billboard's lamps below, or (#156) lamps above, the day, dusk */
 const LIGHT_CLASS: Record<string, string> = { BELOW: css.boardLight, ABOVE: css.lightAbove, DAY: css.lightDay, DUSK: css.lightDusk };
 
-export const CampaignScene: React.FC<{
+const CampaignSceneBody: React.FC<{
   scene: SceneDefinition;
   creative: Creative | null;
   /** changes to run the launch moment again; 0 shows the scene at rest, the creative already up */
@@ -48,10 +49,12 @@ export const CampaignScene: React.FC<{
   idle?: boolean;
   /** #156: hold the motion still (off screen) */
   paused?: boolean;
+  /** 2026-11-17: called once the photo is in and the creative is drawn on it (See it live waits for it) */
+  onReady?: () => void;
   /** #156: what a drone show writes, and in which hue */
   label?: string;
   hue?: number;
-}> = ({ scene, creative, play, className, compact = false, idle = false, paused = false, label = '', hue = 214 }) => {
+}> = ({ scene, creative, play, className, compact = false, idle = false, paused = false, label = '', hue = 214, onReady }) => {
   const box = useRef<HTMLDivElement>(null);
   const camera = useRef<HTMLDivElement>(null);
   const arts = useRef<Array<HTMLDivElement | null>>([]);
@@ -67,6 +70,7 @@ export const CampaignScene: React.FC<{
   const [frame, setFrame] = useState({ scale: 1, x: 0, y: 0 });
   const [artUrl, setArtUrl] = useState<string | null>(null);
   const [lit, setLit] = useState(0);
+  const [photoIn, setPhotoIn] = useState(false);
 
   /* 2026-11-11: a scene leaving the page gives its canvases' memory back at once (iOS keeps a detached
      canvas's pixels until it is collected, and a page of light shows ran out of memory) */
@@ -77,6 +81,14 @@ export const CampaignScene: React.FC<{
       if (canvas) { canvas.width = 0; canvas.height = 0; }
     });
   }, []);
+
+  /* 2026-11-16: the picture this scene shows stays alive while it is shown (sceneArt's cache) */
+  useEffect(() => (artUrl ? showArt(artUrl) : undefined), [artUrl]);
+  /* 2026-11-17: ready when the photo is in and the creative is on it (a face's art, or a light show / drone show drawn) */
+  const ready = photoIn && (!creative && scene.kind !== 'DRONES' ? true : scene.kind === 'QUAD' ? Boolean(artUrl) : lit > 0);
+  const readyRef = useRef(onReady);
+  readyRef.current = onReady;
+  useEffect(() => { if (ready) readyRef.current?.(); }, [ready]);
 
   /* cover the box, keeping the scene's focus in view */
   useLayoutEffect(() => {
@@ -96,31 +108,40 @@ export const CampaignScene: React.FC<{
       if (!glow.current) return;
       glow.current.width = scene.width;
       glow.current.height = scene.height;
-      glow.current.getContext('2d')!.drawImage(source, 0, 0);
+      glow.current.getContext('2d')?.drawImage(source, 0, 0);
+    };
+    /* 2026-11-16: a phone out of canvas memory: the scene stays at rest without its lights, never an error */
+    const safely = (drawIt: () => void) => {
+      try { drawIt(); } catch (error) { console.warn('[campaign scene] lights not drawn:', (error as Error)?.message || error); }
     };
     /* a format card draws no light show (see the canvases below): nothing to read or draw */
     if (compact && scene.kind !== 'QUAD') return undefined;
     if (scene.kind === 'DRONES') {
       if (!led.current || !reflection.current) return undefined;
-      fleet.current = droneFleet(scene, label, hue);
-      drawDrones(led.current, scene, fleet.current, 1);
-      glowFrom(led.current);
-      drawReflection(reflection.current, scene, led.current, scene.sky[3]);
-      setLit(count => count + 1);
+      safely(() => {
+        fleet.current = droneFleet(scene, label, hue);
+        drawDrones(led.current!, scene, fleet.current, 1);
+        glowFrom(led.current!);
+        drawReflection(reflection.current!, scene, led.current!, scene.sky[3]);
+        setLit(count => count + 1);
+      });
       return undefined;
     }
     if (!creative) { setArtUrl(null); return undefined; }
     if (scene.kind === 'QUAD') {
-      faceArtUrl(scene, creative, compact ? 600 : 1200).then(url => { if (alive) setArtUrl(url); }).catch(() => undefined);
+      /* B4: a card's face is ~170 px wide on a phone; 480 px covers it at 3x */
+      faceArtUrl(scene, creative, compact ? 480 : 1200).then(url => { if (alive) setArtUrl(url); }).catch(() => undefined);
       return () => { alive = false; };
     }
     const draw = (mask: ImageData | null) => {
       if (!alive || !led.current || !reflection.current) return;
-      if (scene.kind === 'RING') drawLedRing(led.current, scene, creative, compact);
-      else drawLedFacade(led.current, scene, creative, mask);
-      glowFrom(led.current);
-      drawLedReflection(reflection.current, scene, led.current);
-      setLit(count => count + 1);
+      safely(() => {
+        if (scene.kind === 'RING') drawLedRing(led.current!, scene, creative, compact);
+        else drawLedFacade(led.current!, scene, creative, mask);
+        glowFrom(led.current!);
+        drawLedReflection(reflection.current!, scene, led.current!);
+        setLit(count => count + 1);
+      });
     };
     if (scene.kind === 'LED_FACADE' && scene.skyMask) backdropPixels(scene, scene.thumb).then(draw).catch(() => draw(null));
     else draw(null);
@@ -193,8 +214,12 @@ export const CampaignScene: React.FC<{
     const glowLayer = glow.current;
     if (scene.kind === 'DRONES') {
       water.style.opacity = '1';
+      /* 2026-11-16: no canvas memory: the sky stays empty rather than the scene failing */
+      const fly = (progress: number) => {
+        try { drawDrones(ledLayer, scene, fleet.current, progress); return true; } catch { return false; }
+      };
       if (rest || !fleet.current.length) {
-        drawDrones(ledLayer, scene, fleet.current, 1);
+        fly(1);
         if (glowLayer) glowLayer.style.opacity = '0.8';
         return undefined;
       }
@@ -203,8 +228,7 @@ export const CampaignScene: React.FC<{
       const started = performance.now() + 700;
       const tick = (now: number) => {
         const progress = Math.min(1, Math.max(0, (now - started) / 2600));
-        drawDrones(ledLayer, scene, fleet.current, progress);
-        if (progress < 1) raf = requestAnimationFrame(tick);
+        if (fly(progress) && progress < 1) raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
       if (glowLayer) { glowLayer.style.opacity = '0'; run(glowLayer, { opacity: [0, 0.8] }, { duration: 1.4, delay: 2.6 }); }
@@ -259,8 +283,11 @@ export const CampaignScene: React.FC<{
   const boardH = scene.kind === 'QUAD' ? BOARD_W / faceShape(scene) : 0;
   const screen = scene.kind === 'QUAD' && scene.surface === 'SCREEN';
   /* #159: a shaded print takes the photo's own light instead of a drawn one */
-  const shading = scene.kind === 'QUAD' && Boolean(scene.shading);
-  const light = scene.kind === 'QUAD' && !screen && !shading ? LIGHT_CLASS[scene.light ?? 'BELOW'] : null;
+  /* B4 (2026-11-15): on a format card (compact) no extra copies of the photo over the face and no blend layers: each
+     card stacked two full photo copies with blend and filter per face plus a light and a sweep layer, which filled a
+     phone's graphics memory as the list scrolled. The full "See it live" preview keeps all of it. */
+  const shading = !compact && scene.kind === 'QUAD' && Boolean(scene.shading);
+  const light = !compact && scene.kind === 'QUAD' && !screen && !shading ? LIGHT_CLASS[scene.light ?? 'BELOW'] : null;
   const polygon = (quad: Array<[number, number]>) => `polygon(${quad.map(([x, y]) => `${x}px ${y}px`).join(', ')})`;
   const margin = scene.kind === 'QUAD' ? scene.margin ?? 0 : 0;
 
@@ -269,7 +296,8 @@ export const CampaignScene: React.FC<{
       <div className={css.stage} style={stage}>
         <div className={css.camera} ref={camera}>
           <div className={css.drift} style={{ transformOrigin: `${scene.focus[0]}px ${scene.focus[1]}px` }}>
-            <img className={css.backdrop} src={compact ? scene.thumb : scene.backdrop} alt="" draggable={false} decoding="async" />
+            <img className={css.backdrop} src={compact ? scene.thumb : scene.backdrop} alt="" draggable={false} decoding="async"
+              onLoad={() => setPhotoIn(true)} onError={() => setPhotoIn(true)} />
             {scene.kind === 'QUAD' && faces.map((quad, index) => (
               <div key={index} className={cx(css.board, screen && css.screenBoard)}
                 style={{ width: BOARD_W, height: boardH, transform: quadMatrix3d(BOARD_W, boardH, quad), borderRadius: scene.radius ?? 0 }}>
@@ -283,8 +311,8 @@ export const CampaignScene: React.FC<{
                 {light && <i className={light} />}
                 {screen && <i className={css.screenSheen} />}
                 {(scene.seams || []).map(at => <i key={at} className={css.seam} style={{ left: `${at * 100}%` }} />)}
-                {index === 0 && <i className={css.boardShade} ref={lamps} />}
-                {index === 0 && <i className={css.boardSweep} ref={sweep} />}
+                {index === 0 && !compact && <i className={css.boardShade} ref={lamps} />}
+                {index === 0 && !compact && <i className={css.boardSweep} ref={sweep} />}
               </div>
             ))}
             {/* #159: the photo itself over the wrap, cut to the face: its shadows and joins darken the print, its
@@ -315,3 +343,15 @@ export const CampaignScene: React.FC<{
     </div>
   );
 };
+
+/* 2026-11-16: each scene in its own boundary. If it fails to draw, the card keeps the place's photo and the page goes
+   on (it used to take the whole game to the Startup Recovery screen) */
+export const CampaignScene: typeof CampaignSceneBody = props => (
+  <SceneBoundary fallback={(
+    <div className={cx(css.scene, props.className)}>
+      <img src={props.scene.thumb} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+    </div>
+  )}>
+    <CampaignSceneBody {...props} />
+  </SceneBoundary>
+);

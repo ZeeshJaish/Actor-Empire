@@ -39,6 +39,7 @@ import type { Lot as ExactContentMarketLot, Offer as ExactContentMarketOffer } f
 import '../styles/streaming-content-market.css';
 import { markQuietPlayerUpdate } from '../services/quietPlayerUpdates';
 import { normalizeOwnedStreamingPlatformState, compactOwnedStreamingPlatformForPersistence } from '../services/ownedStreamingPlatform';
+import { buildProjectPosterIndex } from '../services/projectPosterIndex';
 
 const money = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(2).replace(/\.00$/, '')}M` : `$${Math.round(n).toLocaleString()}`;
 const countries = (ids: string[]) => ids.length ? ids.map(id => getStreamingDayOneMarket(id)?.country || id).join(', ') : 'Worldwide';
@@ -214,10 +215,8 @@ export default function StreamingContentMarket({ player, brand, onUpdatePlayer, 
     const inAuctionRoom = platform.buyerAuctionSessions.some(session => session.id === draft.selectedId);
     // The room reads its persisted session directly. Rebuilding the entire
     // storefront on every bid/timer tick blocked feedback behind unrelated work.
-    const posterById = useMemo(() => inAuctionRoom ? new Map<string, string>() : new Map(
-        [...(readPlayer.pastProjects || []), ...readPlayer.businesses.flatMap(business => business.studioState?.scripts || [])]
-            .flatMap(source => source.customPoster ? [[String(source.id), source.customPoster] as const] : []),
-    ), [readPlayer, inAuctionRoom]);
+    /* B20: the same poster lookup as the Library (it read only the archive and scripts) */
+    const posterById = useMemo(() => (inAuctionRoom ? new Map() as ReturnType<typeof buildProjectPosterIndex> : buildProjectPosterIndex(readPlayer)), [readPlayer, inAuctionRoom]);
     const marketSnapshot = useMemo(() => {
         if (inAuctionRoom) return null;
         const listings = getContentMarketListings(readPlayer);

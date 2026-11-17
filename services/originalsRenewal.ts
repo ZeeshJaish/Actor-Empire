@@ -6,7 +6,7 @@ import { finalizeOriginalCommission, type OriginalCommissionMoment, type Origina
 import { getSeasonEffects, getStudioSeasonShares } from './originalsEpisodeBudget';
 import { getStudioFee, ORIGINAL_LICENCE_WEEKS, type OriginalBill, LICENCE_SHARE_OF_MAKING } from './originalsDeal';
 import { getOriginalsStudio, getStudioShootWeeks } from './originalsStudios';
-import { getOriginalMaking } from './originalsTitleDetail';
+import { getOriginalMaking, getOriginalPremiereAt } from './originalsTitleDetail';
 import { isOutsideOriginal } from './outsideOriginals';
 import { createProductionCalendar } from './productionCalendar';
 import { spendPlayerEnergy } from './premiumLogic';
@@ -21,7 +21,7 @@ import { getTitleRating } from './titleRating';
 export const ORIGINAL_EVIDENCE_WEEKS = 4;
 const EXTEND_SHARE = 0.35;
 const SPIN_OFF_SHARE = 0.72;
-const SPIN_OFF_NAMES = ['Origins', 'After Dark', 'The Next Chapter', 'Legacies', 'The Long Way Home', 'First Blood', 'Beyond', 'Bloodlines'];
+export const SPIN_OFF_NAMES = ['Origins', 'After Dark', 'The Next Chapter', 'Legacies', 'The Long Way Home', 'First Blood', 'Beyond', 'Bloodlines'];
 
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
 const money = (value: number) => (value >= 1e6 ? `$${String(+(value / 1e6).toFixed(1))}M` : `$${Math.round(value / 1e3)}K`);
@@ -39,19 +39,58 @@ const hitOf = (player: Player, projectId: string): { hit: number; word: string }
     return { hit, word: hit >= 0.7 ? 'A big hit' : hit >= 0.35 ? 'A solid show' : 'A quiet one' };
 };
 
+/* 2026-11-16 (player report): a record still inside a job or a release keeps its people in projectDetails; the next one
+   reads them flat, so a sequel ordered from one lost its cast and director */
+const flatRow = (row: any): any => {
+    const details = row?.projectDetails;
+    if (!details) return row;
+    return {
+        ...row,
+        name: row.name || details.title,
+        castList: row.castList || details.castList || [],
+        genre: row.genre || details.genre,
+        format: row.format || details.format,
+        description: row.description || details.description,
+        directorName: row.directorName || details.directorName,
+        directorId: row.directorId || details.directorId,
+        writerId: row.writerId || details.writerId,
+        writerName: row.writerName || details.writerName,
+        franchiseId: row.franchiseId || details.franchiseId,
+        projectQuality: row.projectQuality ?? details.hiddenStats?.qualityScore,
+        budget: row.budget ?? details.estimatedBudget,
+        episodeBudgetShares: row.episodeBudgetShares ?? details.episodeBudgetShares,
+    };
+};
+
 const rowOf = (player: Player, projectId: string): any => {
-    const own = (player.pastProjects || []).find(item => item.id === projectId) || (player.activeReleases || []).find(item => item.id === projectId);
-    if (own) return own;
+    const own = (player.pastProjects || []).find(item => item.id === projectId) || (player.activeReleases || []).find(item => item.id === projectId)
+        /* 2026-11-15 (B14): the title page also finds an original among the commitments; Renew must find the same row */
+        || (player.commitments || []).find(item => item.id === projectId);
+    if (own) return flatRow(own);
     /* #294: what a bid-room order became reads the same way */
     const made: any = (player.world?.projects || []).find(item => item.id === projectId);
-    return made ? {
+    if (made) return {
         ...made,
         name: made.title,
         outsideOriginal: true,
         projectQuality: made.quality,
         imdbRating: made.rating,
         castList: made.leadActorName ? [{ id: made.leadActorId, name: made.leadActorName, role: 'Lead', isPlayer: false, image: '', type: 'ACTOR', roleType: 'LEAD', actorId: made.leadActorId }] : [],
-    } : undefined;
+    };
+    /* 2026-11-15 (B14): a live original whose row is only in the world's productions (a studio out in the world made
+       it) or only in the service's books had no row here, so Renew vanished with no reason. Read what is there. */
+    const production: any = Object.values(player.world?.industryProductions || {}).find((item: any) => item?.canonicalProjectId === projectId);
+    if (production) return {
+        id: projectId,
+        name: production.title || production.projectTitle || production.name,
+        outsideOriginal: true,
+        projectQuality: production.quality ?? production.qualityScore,
+        budget: production.budget ?? production.productionBudget,
+        budgetTier: production.budgetTier,
+        castList: [],
+    };
+    const asset: any = (player.ownedStreamingPlatform?.contentAccounting?.assets || []).find((item: any) => item?.projectId === projectId && item?.source === 'ORIGINAL');
+    return asset ? { id: projectId, name: asset.title, castList: [] } : undefined;
 };
 const commissionOf = (player: Player, commissionId: string) => player.ownedStreamingPlatform?.originalCommissions?.find(item => item.id === commissionId);
 
@@ -129,7 +168,8 @@ export const getOriginalFutureView = (player: Player, commissionId: string, epis
     const commission = commissionOf(player, commissionId);
     if (!commission?.canonicalProjectId) return null;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const premiere = commission.releasePlan?.premiereAtAbsoluteWeek;
+    /* 2026-11-16: an opening-slate Original has no release plan; its week is on the opening slate (the same first-numbers wait as any other) */
+    const premiere = getOriginalPremiereAt(player, commission);
     const making = getOriginalMaking(player, commission);
     const ends = commission.licenceEndsAtAbsoluteWeek;
     const ended = commission.lifecycleDecision?.type === 'CANCEL';

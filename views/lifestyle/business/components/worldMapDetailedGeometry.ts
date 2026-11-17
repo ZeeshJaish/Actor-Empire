@@ -83,6 +83,69 @@ export const WORLD_BORDERS_PATH: string = WORLD_PATH(mesh(
 
 export const WORLD_GRATICULE_PATH: string = WORLD_PATH(geoGraticule().step([20, 20])()) || '';
 
+/* B12 (2026-11-16): the full-detail world paths are 0.3–0.85M characters each (land 848K, shelf 812K, borders 306K)
+   and the Network atlas draws them ten times: 8.8M characters that the browser parsed on opening and repainted on
+   every animated frame, so the Build froze on phones. A map drawn small does not need points closer together than a
+   fraction of a pixel, so it can ask for a lighter copy: each ring keeps a point only when it lands at least
+   `tolerance` map units (MAP_WIDTH is 1000) from the last one kept, its first and last points always, one decimal.
+   A closed ring smaller than the tolerance (a sub-pixel islet) is left out. Paths with anything but M/L/Z are
+   returned as they are. Nothing else changes: maps that zoom right in keep asking for the full paths. */
+export const lightenMapPath = (d: string, tolerance: number): string => {
+    if (!(tolerance > 0) || !d || !/^[MLZ0-9.,\-\s]*$/.test(d)) return d;
+    const tolerance2 = tolerance * tolerance;
+    const out: string[] = [];
+    let ring: Array<[number, number]> = [];
+    let closed = false;
+    const flush = () => {
+        if (ring.length) {
+            let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity;
+            for (const [x, y] of ring) {
+                if (x < minX) minX = x; if (x > maxX) maxX = x;
+                if (y < minY) minY = y; if (y > maxY) maxY = y;
+            }
+            if (!(closed && Math.max(maxX - minX, maxY - minY) < tolerance)) {
+                const kept: Array<[number, number]> = [ring[0]];
+                for (let index = 1; index < ring.length - 1; index += 1) {
+                    const [x, y] = ring[index];
+                    const [lastX, lastY] = kept[kept.length - 1];
+                    if ((x - lastX) ** 2 + (y - lastY) ** 2 >= tolerance2) kept.push(ring[index]);
+                }
+                if (ring.length > 1) kept.push(ring[ring.length - 1]);
+                out.push(kept.map(([x, y], index) => `${index ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join('') + (closed ? 'Z' : ''));
+            }
+        }
+        ring = [];
+        closed = false;
+    };
+    for (const part of d.match(/[MLZ][^MLZ]*/g) || []) {
+        if (part[0] === 'Z') { closed = true; flush(); continue; }
+        if (part[0] === 'M') flush();
+        const [x, y] = part.slice(1).split(',').map(Number);
+        if (Number.isFinite(x) && Number.isFinite(y)) ring.push([x, y]);
+    }
+    flush();
+    return out.join('');
+};
+
+const lightPathCache = new Map<string, string>();
+/** A cached lighter copy of `d` (see lightenMapPath); `key` names the path, tolerance 0 returns it as it is. */
+export const lightMapPath = (key: string, d: string, tolerance: number): string => {
+    if (!(tolerance > 0)) return d;
+    const id = `${tolerance}|${key}`;
+    const cached = lightPathCache.get(id);
+    if (cached !== undefined) return cached;
+    const light = lightenMapPath(d, tolerance);
+    lightPathCache.set(id, light);
+    return light;
+};
+
+/** The world's land, shelf and borders at a tolerance (0 = full detail). The shelf is a soft glow, never finer than 1. */
+export const getWorldMapLayers = (tolerance: number): { land: string; shelf: string; borders: string } => ({
+    land: lightMapPath('world-land', WORLD_LAND_PATH, tolerance),
+    shelf: lightMapPath('world-shelf', WORLD_SHELF_PATH, tolerance > 0 ? Math.max(1, tolerance) : 0),
+    borders: lightMapPath('world-borders', WORLD_BORDERS_PATH, tolerance),
+});
+
 const countryPathCache = new Map<string, string>();
 export const getCountryPath = (countryId: string): string => {
     const cached = countryPathCache.get(countryId);

@@ -78,13 +78,19 @@ const EXPIRED_LINES = [
 const idName = (value: string): string => value.replace(/[_:-]+/g, ' ').replace(/\b\w/g, character => character.toUpperCase()).trim();
 const claimSubject = (claim: IndustryMediaClaim, names?: IndustryMediaClaimNames): string => {
     const projectId = claim.target.projectId;
-    if (!projectId || claim.subjectName !== idName(projectId)) return claim.subjectName;
+    /* B27: a claim written with the old "an untitled film" fallback takes the film's name once it is known */
+    if (!projectId || (claim.subjectName !== idName(projectId) && claim.subjectName !== 'an untitled film')) return claim.subjectName;
     return names?.project(projectId) || claim.subjectName;
 };
+/* B27: "The an untitled film report" → "The untitled film report" (claims written before the fix), and a title that
+   starts with its own article: "the The Second Orbit story" → "The Second Orbit story" */
+const tidyArticles = (text: string): string => text
+    .replace(/\b(The|the|That|that) (an?|the) /g, '$1 ')
+    .replace(/\b[Tt]he (The|A|An) (?=[A-Z0-9])/g, '$1 ');
 
 const resolutionHeadline = (claim: IndustryMediaClaim, subject: string, sourceName: string, recentLines: readonly string[] = []): string => (
     claim.status === 'OPEN' ? claim.headline
-        : sentenceStart(fillCopy(pickFreshCopy(`claim-resolution:${claim.id}:${claim.status}`, RESOLUTION_HEADLINES[claim.status], recentLines), { subject, source: sourceName }))
+        : sentenceStart(tidyArticles(fillCopy(pickFreshCopy(`claim-resolution:${claim.id}:${claim.status}`, RESOLUTION_HEADLINES[claim.status], recentLines), { subject, source: sourceName })))
 );
 const resolutionText = (claim: IndustryMediaClaim): string => {
     if (claim.status === 'OPEN') return claim.resolution?.explanation || '';
@@ -259,7 +265,10 @@ export const refreshIndustryClaimNews = (player: Player, items: NewsItem[]): New
             };
         }
         if (subject === claim.subjectName) return item;
-        const swap = (text: string) => text.split(claim.subjectName).join(subject);
+        /* B27: also at the start of a sentence ("An untitled film has a flop written all over it") */
+        const capital = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+        const swap = (text: string) => tidyArticles(text.split(claim.subjectName).join(subject)
+            .split(capital(claim.subjectName)).join(capital(subject)));
         return { ...item, headline: swap(item.headline), ...(item.subtext ? { subtext: swap(item.subtext) } : {}) };
     });
 };

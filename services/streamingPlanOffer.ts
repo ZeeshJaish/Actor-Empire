@@ -13,6 +13,7 @@
  * changes. A plan with an offer has its features follow the offer, so every engine that still
  * reads features keeps working. Pure: nothing here saves.
  */
+import { STREAMING_PLUS_NAME, STREAMING_PLUS_TECH_IDS } from './streamingPlusPack';
 import type {
     OwnedStreamingPlanOffer,
     OwnedStreamingPricingPlan,
@@ -176,9 +177,13 @@ export interface StreamingPlanOfferLock {
     combination?: true;
 }
 
-const unlock = (row: StreamingPlanOfferRow, id: StreamingTechId): StreamingPlanOfferLock => (
-    { row, needs: `Unlock ${getStreamingTechDefinition(id)?.name || id} in Tech`, techId: id }
-);
+/* U5 (2026-11-16): "Bought tech but plan features stay locked." Every row already named its tech, but the 12K–24K
+   pictures, Ultra HDR, 16-bit colour, Personal sound and AI channels steps are in the Streaming+ Pack, and Tech refuses
+   them without it, so "Unlock AI Channels in Tech" sent a player round in a circle. Those locks name the Pack too. */
+const unlock = (row: StreamingPlanOfferRow, id: StreamingTechId): StreamingPlanOfferLock => {
+    const name = getStreamingTechDefinition(id)?.name || id;
+    return { row, needs: STREAMING_PLUS_TECH_IDS.has(id) ? `Unlock ${name} in Tech (${STREAMING_PLUS_NAME})` : `Unlock ${name} in Tech`, techId: id };
+};
 
 /**
  * The rows of an offer the service cannot sell yet, each with what it needs. Every tech row

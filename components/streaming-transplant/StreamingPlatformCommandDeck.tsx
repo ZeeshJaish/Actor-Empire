@@ -198,7 +198,9 @@ export const PlatformHQ: React.FC<{
   onOpenOpeningBuild?: () => void;
   /** the Streaming Hall tour, from its first card (2026-11-08) */
   onReplayTour?: () => void;
-}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenBrandStudio, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack, onOpenOpeningBuild, onReplayTour }) => {
+  /** B26: the share price, a chip on the home only (listed companies) */
+  stockChip?: React.ReactNode;
+}> = ({ brand, state, onBack, onCommission, onOpenDivision, onEvent, onOpenViewer, onOpenBrandStudio, onOpenFinance, onOpenTitle, onSeeAll, onOpenLaunchTrack, onOpenOpeningBuild, onReplayTour, stockChip }) => {
   const tf = typeFace(brand);
   const longName = (brand.name || '').length > 14;
   const [pulse, setPulse] = useState(0);
@@ -294,18 +296,23 @@ export const PlatformHQ: React.FC<{
                 fund the company was a button that appeared on the Build screen
                 once you were ALREADY over budget, or a chip three taps into the
                 Boardroom. The number you look at every week is now the door. */}
-            {onOpenFinance ? (
-              <button type="button" className={cx(css.hero, css.heroTap)} onClick={onOpenFinance} data-hq-tour="treasury"
-                aria-label={`Treasury ${money(state.treasury)}. Open financing.`}>
-                <span className={css.hlabel}>TREASURY</span>
-                <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
-              </button>
-            ) : (
-              <div className={css.hero} data-hq-tour="treasury">
-                <span className={css.hlabel}>TREASURY</span>
-                <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
-              </div>
-            )}
+            {/* B26 v2 (Zeesh 2026-11-16: the chip row made the header busy): once listed, the share price is one quiet
+                line under the Treasury, like "+1.15M this week" under the subscribers. It is its own tap (why it moved). */}
+            <div className={css.heroSide}>
+              {onOpenFinance ? (
+                <button type="button" className={cx(css.hero, css.heroTap)} onClick={onOpenFinance} data-hq-tour="treasury"
+                  aria-label={`Treasury ${money(state.treasury)}. Open financing.`}>
+                  <span className={css.hlabel}>TREASURY</span>
+                  <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
+                </button>
+              ) : (
+                <div className={css.hero} data-hq-tour="treasury">
+                  <span className={css.hlabel}>TREASURY</span>
+                  <b className={cx(css.hval, css.green)}>{money(state.treasury)}</b>
+                </div>
+              )}
+              {stockChip}
+            </div>
           </div>
 
           {/* the one thing a production house cannot show: the service, running */}

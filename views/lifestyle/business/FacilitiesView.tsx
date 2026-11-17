@@ -7,9 +7,10 @@ import {
     getInHouseScriptCost,
     getInHouseWriterSkill,
     getInfrastructureLineAnnualOverhead,
+    getOwnedEquipmentProjectCost,
     getStudioAnnualInfrastructureOverhead,
 } from '../../../services/studioProductionEconomy';
-import { getGearLineQuality } from '../../../services/greenlightSetupEffects';
+import { getGearLineQuality, getOwnedGearQualityLevel } from '../../../services/greenlightSetupEffects';
 import { ArrowLeft, Building2, PenTool, Video, Users, Clapperboard, MonitorPlay, Camera, Lightbulb, Mic, Box, Zap } from 'lucide-react';
 
 interface FacilitiesViewProps {
@@ -218,7 +219,11 @@ export const FacilitiesView: React.FC<FacilitiesViewProps> = ({ player, studio, 
                                                     <>
                                                         <div className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                                                             {/* #306: what it really adds to a film, the number the gear step shows. It read +3 a level. */}
-                                                            <Zap size={10} /> Quality: +{getGearLineQuality(currentLevel)}
+                                                            <Zap size={10} /> Quality: +{getGearLineQuality(getOwnedGearQualityLevel(currentLevel)).toFixed(2)}
+                                                        </div>
+                                                        {/* B28: what using it on one film costs */}
+                                                        <div data-gear-per-film className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                                                            Per film: {formatMoney(getOwnedEquipmentProjectCost(currentLevel))}
                                                         </div>
                                                         <div className="text-[10px] text-blue-400 font-bold flex items-center gap-1">
                                                             <Box size={10} /> {getEquipmentStageName(item.id, currentLevel)}

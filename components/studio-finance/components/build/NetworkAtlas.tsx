@@ -28,12 +28,11 @@
 
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
-  WORLD_BORDERS_PATH,
   WORLD_GRATICULE_PATH,
-  WORLD_LAND_PATH,
-  WORLD_SHELF_PATH,
   getCountryPath,
   getRegionGeometry,
+  getWorldMapLayers,
+  lightMapPath,
   projectLonLat,
 } from '../../../../views/lifestyle/business/components/worldMapDetailedGeometry';
 import { REGION_MAP_OVERLAYS } from '../../../../services/regionMap';
@@ -314,8 +313,18 @@ const REGION_BOX = new Map(REGION_MAP_OVERLAYS.map(region => [region.id, boxFrom
 const REGION_HIT = REGION_MAP_OVERLAYS.map(region => ({
   id: region.id as string,
   label: region.shortLabel,
-  path: getRegionGeometry(region.countryIds).path,
+  /* B12: hit areas only, never seen, so the light copy */
+  path: lightMapPath(`region-hit:${region.id}`, getRegionGeometry(region.countryIds).path, 1),
 }));
+
+/* B12 (2026-11-16): how much detail the ground needs at this zoom. Half a screen pixel, in map units, rounded down
+   to a level the geometry caches (1, 0.5 or 0.25 units); closer in than that, the full paths. Read off where the
+   camera is going (or the box a pinch holds), not the frames of the flight, so the paths change once per move. */
+const DETAIL_LEVELS = [1, 0.5, 0.25];
+export function atlasDetailTolerance(frameWidthPx: number, boxWidthUnits: number): number {
+  const halfPixel = 0.5 * Math.max(1, boxWidthUnits) / Math.max(1, frameWidthPx);
+  return DETAIL_LEVELS.find(level => level <= halfPixel) ?? 0;
+}
 
 /** Where a city sits, as a box tight enough to read its neighbours. */
 function cityBox(city: City): Box {
@@ -574,6 +583,9 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
   const [manual, setManual] = useState<Box | null>(null);
   useEffect(() => { setManual(null); }, [regionId, cityId]);
   const view = manual ?? flown;
+  /* B12: the ground at the detail this zoom can show (see atlasDetailTolerance) */
+  const detail = atlasDetailTolerance(frameSize.w, (manual ?? target).w);
+  const ground = useMemo(() => getWorldMapLayers(detail), [detail]);
 
   /* One pointer pans, two pinch. A tap is a pointer that barely moved, and it
      falls through to whatever it landed on — a pin, a continent, or the sea. */
@@ -928,7 +940,7 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
           <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
         </linearGradient>
         <clipPath id="bw-land-clip">
-          <path d={WORLD_LAND_PATH} />
+          <path d={ground.land} />
         </clipPath>
         {/* A field, in two layers (#111).
 
@@ -984,23 +996,23 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
       {/* --- the continental shelf: three strokes of falling light around
               every landmass. Same three the shared atlas uses. ------------- */}
       <g className="bw-atlas-shelf">
-        <path d={WORLD_SHELF_PATH} strokeWidth={16} style={{ ['--o' as string]: '0.07' }} vectorEffect="non-scaling-stroke" />
-        <path d={WORLD_SHELF_PATH} strokeWidth={8} style={{ ['--o' as string]: '0.1' }} vectorEffect="non-scaling-stroke" />
-        <path d={WORLD_SHELF_PATH} strokeWidth={3} style={{ ['--o' as string]: '0.15' }} vectorEffect="non-scaling-stroke" />
+        <path d={ground.shelf} strokeWidth={16} style={{ ['--o' as string]: '0.07' }} vectorEffect="non-scaling-stroke" />
+        <path d={ground.shelf} strokeWidth={8} style={{ ['--o' as string]: '0.1' }} vectorEffect="non-scaling-stroke" />
+        <path d={ground.shelf} strokeWidth={3} style={{ ['--o' as string]: '0.15' }} vectorEffect="non-scaling-stroke" />
       </g>
 
       {/* --- land stands above the sea and casts down into it -------------- */}
-      <path d={WORLD_LAND_PATH} className="bw-atlas-relief" transform="translate(0,7)" />
-      <path d={WORLD_LAND_PATH} className="bw-atlas-relief is-deep" transform="translate(0,12)" />
+      <path d={ground.land} className="bw-atlas-relief" transform="translate(0,7)" />
+      <path d={ground.land} className="bw-atlas-relief is-deep" transform="translate(0,12)" />
 
       {/* --- the land: grey, everywhere, always ----------------------------
           A region you are not opening in has no colour of its own. It is
           ground. The only colours on this map are the two that mean
           something. */}
-      <path d={WORLD_LAND_PATH} fill="url(#bw-atlas-ground)" />
+      <path d={ground.land} fill="url(#bw-atlas-ground)" />
       {/* Every country's edge, so the ground you have not opened reads as
           countries rather than as one grey slab (#113). */}
-      <path d={WORLD_BORDERS_PATH} className="bw-atlas-coast" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+      <path d={ground.borders} className="bw-atlas-coast" vectorEffect="non-scaling-stroke" pointerEvents="none" />
 
       {/* --- the markets you are opening in: red, from the moment you choose
           them, and the same red afterwards. A market is a promise you made;
@@ -1011,7 +1023,7 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
         {marketGeography.map(market => market.path ? (
           <path
             key={market.id}
-            d={market.path}
+            d={lightMapPath(`country:${market.code}`, market.path, detail)}
             className={finished.has(market.code) ? 'bw-atlas-market is-served' : 'bw-atlas-market'}
             data-code={market.code}
             strokeWidth={1.4}
@@ -1160,8 +1172,8 @@ export const NetworkAtlas = React.memo(function NetworkAtlas({
       )}
 
       {/* --- the light on the ground, and the lines drawn on it ------------ */}
-      <path d={WORLD_LAND_PATH} fill="url(#bw-atlas-gloss)" fillOpacity={0.38} pointerEvents="none" />
-      <path d={WORLD_BORDERS_PATH} className="bw-atlas-borders" vectorEffect="non-scaling-stroke" />
+      <path d={ground.land} fill="url(#bw-atlas-gloss)" fillOpacity={0.38} pointerEvents="none" />
+      <path d={ground.borders} className="bw-atlas-borders" vectorEffect="non-scaling-stroke" />
 
       {/* --- the routes between your own sites ------------------------------
           A mesh, not a star (#111). Every room links to its two nearest

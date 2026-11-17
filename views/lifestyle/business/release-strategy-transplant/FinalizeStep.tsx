@@ -40,7 +40,8 @@ export const FinalizeStep: React.FC<FinalizeStepModel & { energyCost: number; di
   <span className={css.manifesthead}>THE STRATEGY</span>
   <div className={css.manifest}>
     <Chip label="DISTRIBUTION" value={yourPlatformName ? 'Your platform' : route === 'STREAMING' ? 'Streaming' : 'Theatrical'} />
-    {yourPlatformName && <Chip label="WHERE" value={yourPlatformName} sub="No bids and no fee" />}
+    {/* U9 (2026-11-15): "No bids and no fee" read as "earns nothing". It is an internal transfer: the service earns from it */}
+    {yourPlatformName && <Chip label="WHERE" value={yourPlatformName} sub="Internal transfer, no fee: your service earns from its viewers" />}
     {route === 'THEATRICAL' && <Chip label="FOOTPRINT" value={`${screenCount.toLocaleString()} screens`} sub={`${regionCount} regions`} />}
     {route === 'THEATRICAL' && <Chip label="WHO CARRIES IT" value={partnerNames.length ? `${partnerNames.length} chains` : 'None'} sub={partnerNames.join(' · ')} />}
     {!yourPlatformName && route === 'STREAMING' && buyerNames.length > 1 && <Chip label="BUYERS" value={`${buyerNames.length} platforms`} sub={buyerNames.join(' · ')} />}

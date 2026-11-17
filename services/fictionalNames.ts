@@ -10,7 +10,9 @@ import { PACK_TALENT_ALIASES } from './packTalentAliases';
 export const BUILTIN_NAME_VERSION = 2;
 const own = <T>(record: Readonly<Record<string, T>>, name: string): T | undefined =>
     Object.prototype.hasOwnProperty.call(record, name) ? record[name] : undefined;
-const key = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
+/* 2026-11-16 (final break test): a project with no director name (an opening-slate Original released by B30) crashed
+   the week here; a missing name is now simply no name */
+const key = (value: string) => String(value ?? '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 const reverse = (entries: Readonly<Record<string, string>>) => new Map(
     Object.entries(entries).flatMap(([canonical, display]) => [[key(canonical), canonical], [key(display), canonical]]),
 );

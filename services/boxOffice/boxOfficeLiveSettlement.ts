@@ -17,6 +17,44 @@ import { dollarsToCinemaCents, classifyCinemaProfit } from './boxOfficeSettlemen
 import type { CinemaWeekInput, CinemaWeekResult, CinemaCommitResult, CinemaCommittedTitle } from './boxOfficeTypes';
 /** Weekly cinema receipts kept in the save (lag round 2026-11-09; was 52). */
 export const CINEMA_RECEIPT_WEEKS_KEPT = 12;
+
+/* B7 (2026-11-15): a film played in each country separately and counted as "in cinemas" until every country had
+   stopped. A country stops after two weak weeks, and the tuning had no week limit, so one small country with a
+   trickle of tickets kept a film in cinemas 65 to 100+ weeks (players saw $40M a week fall to $1K), and everything
+   after it (streaming, bids, "live by itself next week") waited. The run now also ends for the whole film:
+   - when a week's takings fall below 3% of its opening week, two weeks running;
+   - at its window: 16 weeks, 26 if it still takes 15% of its opening by then, 30 if it still takes 30%, never more.
+   Every country closes together in that week's settlement. A run already past its window in an old save ends at
+   the next settlement, as an ordinary final week.
+   16 Nov (Zeesh: "cinema me bhi hai ya streaming me bhi hai, dono saath me ... real world me kya scene hai"): a
+   streaming window no longer ends the run (it did on 15 Nov). In the real world a film keeps playing after it reaches
+   homes, on fewer screens and for less money: in the US the home release came 32–39 days after opening on average
+   in 2025, and India's multiplexes hold Hindi and Hollywood films for 8 weeks. Where it opened late (an Asian market,
+   say), it can still be fresh. The cinema engine already counts this country by country: where a window is near or
+   open, people wait and watch at home (cinemaHomeChoice), so takings there fall, and the floor or the window above
+   ends the run. */
+export const CINEMA_RUN_FLOOR_SHARE = 0.03;
+export const CINEMA_RUN_FLOOR_WEEKS = 2;
+export const CINEMA_RUN_WINDOW_WEEKS = 16;
+export const CINEMA_RUN_LEGS_WEEKS = 26;
+export const CINEMA_RUN_MAX_WEEKS = 30;
+export const CINEMA_RUN_LEGS_SHARE = 0.15;
+export const CINEMA_RUN_LONG_LEGS_SHARE = 0.3;
+export type CinemaRunEndReason = 'FLOOR' | 'WINDOW';
+export const resolveCinemaRunEnd = (facts: {
+    /** 1 in the release week */
+    weeksOut: number;
+    weekGrossCents: number;
+    openingGrossCents?: number;
+    lowWeeks: number;
+}): CinemaRunEndReason | null => {
+    if (facts.lowWeeks >= CINEMA_RUN_FLOOR_WEEKS) return 'FLOOR';
+    if (facts.weeksOut >= CINEMA_RUN_MAX_WEEKS) return 'WINDOW';
+    const share = facts.openingGrossCents ? facts.weekGrossCents / facts.openingGrossCents : 0;
+    if (facts.weeksOut >= CINEMA_RUN_LEGS_WEEKS && share < CINEMA_RUN_LONG_LEGS_SHARE) return 'WINDOW';
+    if (facts.weeksOut >= CINEMA_RUN_WINDOW_WEEKS && share < CINEMA_RUN_LEGS_SHARE) return 'WINDOW';
+    return null;
+};
 const sum = (ns: number[]) => ns.reduce((a, b) => { const n = a + b; if (!Number.isSafeInteger(n))
     throw new RangeError('Cinema money overflow'); return n; }, 0);
 const amount = (n: number) => { if (!Number.isSafeInteger(n) || n < 0)
@@ -84,7 +122,15 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
             throw new Error('Cinema title already settled');
         const cost = sum(result.costEvents.filter(c => c.titleId === row.titleId).map(c => c.amountCents));
         const runs = result.nextState.runs.filter(r => r.titleId === row.titleId);
-        const closed = runs.length ? runs.every(r => r.closed) : result.absoluteWeek - title.market!.releaseWeek >= 4;
+        /* B7: the whole film's run ends at its floor or its window (see resolveCinemaRunEnd; streaming no longer ends it) */
+        const releaseWeek = title.market!.releaseWeek;
+        const weeksOut = result.absoluteWeek - releaseWeek + 1;
+        const firstWeekBefore = release?.weeklyGross?.find(gross => gross > 0);
+        const openingGrossCents = prior.openingWeekGrossCents
+            ?? (prior.grossCents === 0 && row.grossCents > 0 ? row.grossCents : firstWeekBefore ? Math.round(firstWeekBefore * 100) : undefined);
+        const lowWeeks = openingGrossCents !== undefined && weeksOut >= 2 && row.grossCents < openingGrossCents * CINEMA_RUN_FLOOR_SHARE ? (prior.lowWeeks || 0) + 1 : 0;
+        const runEnd = resolveCinemaRunEnd({ weeksOut, weekGrossCents: row.grossCents, openingGrossCents, lowWeeks });
+        const closed = (runs.length ? runs.every(r => r.closed) : result.absoluteWeek - releaseWeek >= 4) || runEnd !== null;
         const cinemaMarker = { schemaVersion: 1 as const, settlementBasis: prior.basis, activationWeek: prior.activationWeek, audienceBasis: prior.basis === 'LEGACY_ACTIVE' ? 'LEGACY_ESTIMATE' as const : 'TRACKED' as const };
         const music = release ? calculateWeeklySoundtrackRevenue(release.projectDetails, { week: release.weekNum, theatricalGross: row.grossCents / 100, catalog: getMusicArtistCatalog(next.world), seed: `cinema:${state.clockEpoch}:${result.absoluteWeek}:${row.titleId}` }) : undefined;
         const musicCents = dollarsToCinemaCents(music?.totalRevenue || 0);
@@ -130,13 +176,14 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
             if (studio.ai)
                 studio.ai.ledger = [...studio.ai.ledger, { id: sourceId, absoluteWeek: result.absoluteWeek, category: 'RIGHTS_INCOME' as const, amountMillions: net / 1e8, balanceAfterMillions: studio.cashReserve, description: `${title.id}: net collected cinema receipts after signed shares and booking costs` }].slice(-STUDIO_AI_LEDGER_LIMIT);
         }
-        else if (outside || (prior.basis==='LEGACY_ACTIVE' && prior.ownerId===`legacy-owner:${title.id}` && title.owner.id===prior.ownerId)) {
-            // Sparse legacy imports can lack producer identity. Keep their new
-            // net receipts in the existing external ledger; never guess a studio.
+        else {
+            // Sparse legacy imports can lack producer identity, and so can a film whose producer no longer exists
+            // (2026-11-15, B2): a legacy heir keeps the parent's cinema market but not the parent's outside stakes,
+            // and a studio can be gone while its film still plays. Stopping the week here blocked those careers
+            // for ever ("Week N was not applied"). Their net receipts go to the external producer ledger, as legacy
+            // imports already did; never guess a studio, never pay the player.
             state.externalProducerBalancesCents = { ...state.externalProducerBalancesCents, [title.owner.id]: sum([state.externalProducerBalancesCents?.[title.owner.id] || 0, net]) };
         }
-        else
-            throw new Error(`Missing canonical cinema producer ${title.owner.id}`);
         const actorPayee = release?.actorRoyaltyPayeeId || 'PLAYER_SELF';
         if (actor && actorPayee !== 'PLAYER_SELF')
             next.world = creditSignedActorBackend(next.world, actorPayee, (release as any)?.legacyParentName || actorPayee, sourceId, actor / 100, result.absoluteWeek);
@@ -188,7 +235,9 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
             exhibitorReceiptsCents: prior.exhibitorReceiptsCents + row.exhibitorReceiptsCents, distributionDeductionsCents: prior.distributionDeductionsCents + row.distributionDeductionsCents,
             bookingCostCents: prior.bookingCostCents + cost, investorPaidCents: prior.investorPaidCents + investor, talentPaidCents: prior.talentPaidCents + talent, actorPaidCents: prior.actorPaidCents + actor,
             satisfactionScoreUnits: (prior.satisfactionScoreUnits || 0) + Math.round((row.satisfactionScore || 0) * 100) * (row.firstAdmissions + row.repeatAdmissions), satisfactionAdmissions: (prior.satisfactionAdmissions || 0) + row.firstAdmissions + row.repeatAdmissions,
-            firstAdmissions: prior.firstAdmissions + row.firstAdmissions, repeatAdmissions: prior.repeatAdmissions + row.repeatAdmissions, lastSettledWeek: result.absoluteWeek, closed };
+            firstAdmissions: prior.firstAdmissions + row.firstAdmissions, repeatAdmissions: prior.repeatAdmissions + row.repeatAdmissions, lastSettledWeek: result.absoluteWeek, closed,
+            ...(openingGrossCents !== undefined ? { openingWeekGrossCents: openingGrossCents } : {}), lowWeeks,
+            ...(closed && runEnd ? { runEndReason: runEnd } : {}) };
         state.bookingContracts={...state.bookingContracts,[row.titleId]:title.market!.bookingContract || 'REVENUE_SHARE'};
         if (release) {
             release.weeklyDistributionBreakdowns = [...(release.weeklyDistributionBreakdowns || []), cinemaDistributionReport(input, result, physicalSupply, row.titleId, release.weekNum - 1)];
@@ -214,6 +263,14 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
             screens: row.screens || 0 });
     }
     const receipt = { id: `cinema:${state.clockEpoch}:${result.absoluteWeek}`, absoluteWeek: result.absoluteWeek, clockEpoch: state.clockEpoch, inputFingerprint: result.inputFingerprint, receiptSignature: signature, titles: committed };
+    /* 16 Nov (final break test): a title that stopped being settled (its film left the market in an old save) stayed
+       "in cinemas" for ever: 66 weeks in one test career, shown as a run in progress and kept in the save. A title that
+       has played and then missed more than 4 settlements is closed at its window. A running film is settled every
+       week, so it is never touched. */
+    for (const t of Object.values(state.titles)) {
+        if (!t.closed && t.lastSettledWeek >= t.activationWeek && result.absoluteWeek - t.lastSettledWeek > 4)
+            state.titles[t.titleId] = { ...t, closed: true, runEndReason: t.runEndReason || 'WINDOW' };
+    }
     state.lastProcessedAbsoluteWeek = result.absoluteWeek;
     // Only the player-only owner can consume this already-detached market. The
     // diagnostic getter and public proposals can escape, so their independent

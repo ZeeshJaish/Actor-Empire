@@ -22,6 +22,7 @@ assert.throws(()=>commitCinemaWeek(rogueSource,rogue),/Cinema source or ownershi
 assert.equal(JSON.stringify(rogueSource),rogueBefore);
 const broken=mixedCinemaFixture();broken.player.activeReleases.find(r=>r.id==='owned')!.projectDetails.studioId='missing-owner' as never;
 const durable=JSON.stringify(broken.player);
-assert.throws(()=>close(clonePlayerForWeekProcessing(broken.player),broken.week),/Missing canonical cinema producer/);
+const settledBroken=close(clonePlayerForWeekProcessing(broken.player),broken.week);
+assert.ok(Object.hasOwn(settledBroken.world.cinemaMarket.externalProducerBalancesCents||{},'missing-owner'),'B2: a missing producer settles into the external ledger');
 assert.equal(JSON.stringify(broken.player),durable,'A late failed close cannot mutate the durable prior player');
 console.log(JSON.stringify({passed:11,mixedSettlementExact:true,noResultExposure:true,publicSourceGuardRetained:true,replayPaysNothing:true,failedCandidateDiscardable:true}));

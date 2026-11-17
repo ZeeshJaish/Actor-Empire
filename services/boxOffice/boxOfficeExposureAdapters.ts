@@ -3,7 +3,7 @@ import { getAbsoluteWeek, getInheritedStudioProjects } from '../legacyLogic';
 import { calculateStudioPrestigeScore } from '../studioPrestige';
 import { WORLD_COUNTRY_DEFINITIONS } from '../worldEconomy/worldCountryRegistry';
 import { normalizeCinemaTitle } from './boxOfficeInputs';
-import { appendCinemaExposureEvent, buildCinemaExposure, getCinemaRecognitionShare, projectCinemaForecastInput, readCinemaExposureRecord } from './boxOfficeAwareness';
+import { appendCinemaExposureEvent, buildCinemaExposure, getCinemaAttentionParts, getCinemaRecognitionShare, projectCinemaForecastInput, readCinemaExposureRecord } from './boxOfficeAwareness';
 import { CINEMA_EXPOSURE_PROFILE, CINEMA_EXPOSURE_TUNING_VERSION } from './boxOfficeProfiles';
 import type { CinemaExposureCohort, CinemaExposureInput, CinemaExposureRecord, CinemaKnownInputs } from './boxOfficeTypes';
 
@@ -41,6 +41,11 @@ export const prepareCinemaPackageExposure = ({ player, project, titleId, storyAt
     return { version: 1, attentionBasis: 'PACKAGE', attentionPotential: buildCinemaExposure(input).attentionPotential,
         storyAttention: input.storyAttention, musicAttention: input.musicAttention, events: [] };
 };
+
+/** U2 (2026-11-16): the parts behind prepareCinemaPackageExposure's attentionPotential, for the Greenlight's breakdown. */
+export const prepareCinemaPackageAttentionParts = ({ player, project, titleId, storyAttention, musicAttention }: {
+    player: Player; project: ProjectDetails; titleId: string; storyAttention: number; musicAttention: number;
+}) => getCinemaAttentionParts({ ...packageInput(player, project, titleId), storyAttention: score(storyAttention), musicAttention: score(musicAttention) });
 
 /** Called at a real public Greenlight/release confirmation, never a private estimate. */
 export const commitCinemaAnnouncement = (player: Player, project: ProjectDetails, titleId: string, absoluteWeek: number): ProjectDetails => {

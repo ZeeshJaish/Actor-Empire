@@ -98,6 +98,19 @@ export const createIndustryMediaClaimNames = (player: Player): IndustryMediaClai
         const title = typeof project?.name === 'string' ? project.name.trim() : '';
         if (title && typeof project.id === 'string') titles.set(project.id, title);
     });
+    /* B27 (2026-11-15): the player's films in release or being made, the world's announced projects and the service's
+       Originals had no name here, so their news read "an untitled film" (and "The an untitled film report …") */
+    const add = (id: unknown, title: unknown) => {
+        const name = typeof title === 'string' ? title.trim() : '';
+        if (name && typeof id === 'string' && id && !titles.has(id)) titles.set(id, name);
+    };
+    (player.activeReleases || []).forEach(release => add(release.id, release.name || release.projectDetails?.title));
+    (player.commitments || []).forEach(commitment => add(commitment.id, commitment.name || commitment.projectDetails?.title));
+    (player.world?.projects || []).forEach(project => add(project.id, (project as { title?: unknown }).title));
+    (player.ownedStreamingPlatform?.originalCommissions || []).forEach(commission => {
+        add(commission.canonicalProjectId, commission.title);
+        add(commission.id, commission.title);
+    });
     const platforms = (player.world?.platforms || {}) as unknown as Record<string, { name?: unknown } | undefined>;
     return {
         project: id => (id ? titles.get(id) : undefined),
@@ -108,10 +121,11 @@ export const createIndustryMediaClaimNames = (player: Player): IndustryMediaClai
     };
 };
 
+/* B27: a project nobody can name gets no story ('' is dropped by the builders) rather than "an untitled film" */
 const subjectNameFor = (event: IndustryEventFact, names?: IndustryMediaClaimNames): string => (
     names?.project(event.productionId) || names?.project(event.projectId)
     || (event.projectId
-        ? (event.companyName ? `${event.companyName}'s next film` : 'an untitled film')
+        ? (event.companyName ? `${event.companyName}'s next film` : '')
         : event.companyName || displayName(event.companyId || event.platformId || 'industry subject'))
 );
 
@@ -311,6 +325,7 @@ export const buildIndustryMediaClaimCandidates = (
     const leakCandidates = buildIndustryMediaLeakCandidates(player, absoluteWeek)
         .filter(item => !openSignatures.has(`${item.story.subjectKey}:${item.category}:${JSON.stringify(item.target)}`));
     return [...publicCandidates, ...leakCandidates]
+        .filter(item => item.subjectName)
         .sort((left, right) => right.score - left.score || left.event.id.localeCompare(right.event.id) || left.category.localeCompare(right.category));
 };
 

@@ -21,10 +21,11 @@ assert.deepEqual(fixture.player, original, 'Reusing the detached candidate canno
 const broken = mixedCinemaFixture();
 broken.player.activeReleases.find(r => r.id === 'owned')!.projectDetails.studioId = 'missing-owner' as never;
 const durable = structuredClone(broken.player), failedCandidate = clonePlayerForWeekProcessing(broken.player);
-assert.throws(() => Reflect.apply(processAndCommitCinemaWeek, undefined,
-    [failedCandidate, broken.week, undefined, { reuseDetachedWeekCandidate: true }]), /Missing canonical cinema producer/);
-assert.notEqual(failedCandidate.world.studios!.UNIVERSAL.cashReserve, durable.world.studios!.UNIVERSAL.cashReserve,
-    'The injected error must occur after an earlier producer settlement, not before all mutation');
-assert.deepEqual(broken.player, durable, 'Discarding a partially settled detached candidate preserves the entire durable prior player');
+// 2026-11-15 (B2): a missing producer no longer stops the week; it settles into the external producer ledger.
+const settledCandidate = Reflect.apply(processAndCommitCinemaWeek, undefined,
+    [failedCandidate, broken.week, undefined, { reuseDetachedWeekCandidate: true }]) as any;
+assert.ok(Object.hasOwn((settledCandidate.player ?? settledCandidate).world.cinemaMarket.externalProducerBalancesCents || {}, 'missing-owner'),
+    'B2: the missing producer\'s receipts land in the external ledger');
+assert.deepEqual(broken.player, durable, 'Settling a detached candidate preserves the entire durable prior player');
 // The integration cases above separately verify committed JSON replay pays once.
 console.log(JSON.stringify({ ownedWeekChecks: 9, exactPlayerAndResult: true, lateFailurePreservesPrior: true, coldArchiveReadsBeforeObservation: coldArchiveReads - 1 }));

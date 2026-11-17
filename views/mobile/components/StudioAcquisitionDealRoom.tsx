@@ -123,6 +123,8 @@ export interface StudioAcqConfig {
   signingQuoteKey?: string;
   signingPrice?: number;
   signingTermsValid?: boolean;
+  /** B24: the figure that cannot be settled, in words */
+  signingProblem?: string;
   publicControlReady?: boolean;
   entryBlockReason?: string;
 }
@@ -1311,7 +1313,13 @@ export const phaseForCase = (acquisitionCase?: AcquisitionCase, controlReady = f
   return 'DOSSIER';
 };
 
-const actionFailureCopy = (reason?: string): string => {
+/* B24 (2026-11-15): it told the player to recover a backup, which helps nobody: it now names the figure and the way to
+   send the save in */
+const unsettledCopy = (problem?: string): string => (
+  `${problem ? `This deal can't be settled: ${problem} is not a figure the game can pay out.` : "This deal's saved figures can't be settled safely."} Nothing changed. Please send this save from the start menu (Send to dev) so it can be fixed.`
+);
+const actionFailureCopy = (reason?: string, problem?: string): string => {
+  if (reason === 'UNREPRESENTABLE_AMOUNT') return unsettledCopy(problem);
   const energyMatch = reason?.match(/^Needs (\d+)E$/);
   if (energyMatch) {
     return `You need ${energyMatch[1]} energy to continue. Your money and shares are safe.`;
@@ -1424,7 +1432,7 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
   );
   const handleResult = (result: DealRoomAction, nextPhase?: AcqPhase) => {
     if (!result.success) {
-      setNotice(actionFailureCopy(result.reason));
+      setNotice(actionFailureCopy(result.reason, cfg.signingProblem));
       return false;
     }
     setNotice(null);
@@ -1478,7 +1486,7 @@ export const StudioAcquisitionDealRoom: React.FC<StudioAcquisitionDealRoomProps>
   };
   const sign = () => {
     if (cfg.signingTermsValid === false) {
-      setNotice(actionFailureCopy('UNREPRESENTABLE_AMOUNT'));
+      setNotice(actionFailureCopy('UNREPRESENTABLE_AMOUNT', cfg.signingProblem));
       return { success: false, reason: 'UNREPRESENTABLE_AMOUNT' };
     }
     const result = onCompleteAcquisition(cfg.signingQuoteKey);

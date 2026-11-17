@@ -81,12 +81,17 @@
         filter: none !important;
       }
 
+      /* U11 (2026-11-15): Smooth Mode flickered. Animations ran for 0.01 ms but kept their delays, so an element
+         showed its starting frame (often hidden) for the delay and then jumped. Now duration and delay are both 0:
+         every animation lands on its last frame at once, and transitions do not run. */
       .smooth-mode *,
       .smooth-mode *::before,
       .smooth-mode *::after {
-        animation-duration: 0.01ms !important;
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
         animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
         scroll-behavior: auto !important;
       }
 

@@ -45,8 +45,10 @@ const budget = calculateGreenlightBudget({
     },
 });
 
+/* B28 (2026-11-15): owned gear costs about 40% of renting the same quality. Level 2 stands for rental quality 3
+   (between Indie Kit $10K and Prosumer $100K: $40K to rent), so $16K a film; it was $283K, dearer than renting. */
 assert.deepEqual(budget, {
-    total: 30_533_000,
+    total: 30_266_000,
     baseCost: 5_000_000,
     scriptCost: 2_000_000,
     cast: 6_250_000,
@@ -54,7 +56,7 @@ assert.deepEqual(budget, {
     director: 3_000_000,
     crew: 10_000_000,
     locationCost: 3_000_000,
-    equipmentCost: 783_000,
+    equipmentCost: 516_000,
     effectsCost: 0,
 });
 
@@ -65,12 +67,13 @@ assert.equal(
 );
 assert.equal(
     calculateMaxGreenlightMarketingBudget(115_000_000, budget.total, 2_000_000),
-    82_450_000,
+    /* B28: the same fixture's budget is $267K lower (owned gear), so $82.734M rounds down to $82.70M */
+    82_700_000,
     'Marketing capacity should remain quantized to $50k steps.',
 );
 assert.equal(
     calculateGreenlightPackageBudget(budget.total, 2_000_000, 12_345_678),
-    44_878_678,
+    44_611_678, // B28: the same $267K lower budget
     'Package budget should combine production, music, and campaign reserve.',
 );
 assert.equal(calculateInvestorRaisePercent(16_500_000, 50_000_000), 33);
@@ -131,6 +134,6 @@ assert.equal(calculateGreenlightEstimatedQuality({
     backgroundAuthenticity: 70,
     backgroundReliability: 60,
     backgroundSetCare: 80,
-}), 80); // Weighted craft + bounded gear/location/story/background contributions.
+}), 81); // Weighted craft + bounded gear/location/story/background contributions. B28: owned level 2 counts as rental quality 3 (80 → 81).
 
 console.log('Greenlight calculation audit passed.');

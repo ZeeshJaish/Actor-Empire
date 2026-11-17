@@ -6,6 +6,8 @@ import type { CinemaChoiceRequest, CinemaTitleAudienceState, CinemaViewingEviden
 
 const clamp = (n: number, lo = 0, hi = 1): number => Math.max(lo, Math.min(hi, Number.isFinite(n) ? n : 0));
 const fraction = (n: number): number => clamp(n / 100);
+/** 16 Nov: the films people most want on a big screen (the same spectacle genres the title's urgency favours) */
+const BIG_SCREEN_GENRES = new Set<string>(['ACTION', 'ADVENTURE', 'SCI_FI', 'SUPERHERO', 'FANTASY']);
 const people = (n: number): number => Math.floor(Math.max(0, n));
 // Same persona preferences as WE6; no changes to streaming's calculations or audience wallets.
 export const CINEMA_PERSONA_GENRES: Record<string, readonly string[]> = {
@@ -196,7 +198,13 @@ export const buildCinemaAudienceSnapshot = (input: CinemaWeekInput): {choices: C
             const utility = clamp(fraction(m.interest)*fit*(.65+.35*fraction(facts.urgency))
                 *(1+Math.min(P.maxFavoriteLift,attachment*P.favoriteLift)+buildup*.5)*fatigue*feedback
                 *(facts.universeId ? .65+.35*fraction(seen?facts.accessibility:title.delivery.estimatedQuality??55)+familiarity*.15 : 1));
-            const home=cinemaHomeChoice({absoluteWeek:input.absoluteWeek,streamingAlternatives:alternativesByCohort.get(cohort.id)},cohort,title.genre,facts);
+            /* 16 Nov (Zeesh: "kuch films ki kafi hype hai to people choose to experience it on big picture"): how much this
+               audience wants it on a big screen once it can also watch it at home: a spectacle (the genre's urgency), a
+               premium screen, its hype (the package's attention: cast, script, music, studio), its fans and franchise,
+               and what the people who saw it say */
+            const bigScreenPull=clamp((BIG_SCREEN_GENRES.has(title.genre)?.15:0)+.15*fraction(facts.urgency)+(facts.format==='PREMIUM'?.15:0)
+                +.25*fraction(title.exposure?.attentionPotential||0)+.15*Math.max(attachment,buildup)+.25*observedSatisfaction*responseConfidence);
+            const home=cinemaHomeChoice({absoluteWeek:input.absoluteWeek,streamingAlternatives:alternativesByCohort.get(cohort.id)},cohort,title.genre,facts,bigScreenPull);
             const releaseAge = Math.max(0,input.absoluteWeek-facts.releaseWeek-P.openingInterestGraceWeeks);
             // A real recommendation can keep an already-aware viewer interested.
             // Final quality alone cannot buy staying power before anyone has watched.

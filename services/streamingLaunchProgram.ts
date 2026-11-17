@@ -24,7 +24,7 @@ import {
     getStreamingStorefrontLockReason,
 } from './streamingStorefront';
 import { normalizeStreamingPricingConfiguration } from './streamingPricingEconomy';
-import { getStreamingInfrastructureForecast } from './streamingInfrastructure';
+import { getStreamingInfrastructureForecast, mirrorStreamingPlanPricesToTiers } from './streamingInfrastructure';
 import { resolveStreamingTechTree, streamingTechDownloadsAllowed, streamingTechExtraMemberAllowed, streamingTechFeatureAllowed, streamingTechScreens } from './streamingTechTreeCatalogue';
 import { streamingLaunchUnlockLock } from './streamingLaunchUnlocks';
 import {
@@ -743,10 +743,11 @@ export const saveStreamingPricingPlan = (
     /* The Build wizard's three price tiers (Basic, Premium, Family) mirror the plans before launch.
        With plans of any number and price, they follow the paid plans from cheapest to dearest,
        kept inside the tiers' ranges and gaps so a plan line-up never blocks commissioning. */
-    const paidPrices = safePricing.plans.map(plan => Number(plan.monthly) || 0).filter(price => price > 0).sort((a, b) => a - b);
-    const tierBasic = Math.min(14.99, Math.max(3.99, paidPrices[0] ?? platform.subscriptionPrices.BASIC));
-    const tierPremium = Math.min(24.99, Math.max(7.99, tierBasic + 2, paidPrices[Math.floor(paidPrices.length / 2)] ?? platform.subscriptionPrices.PREMIUM));
-    const tierFamily = Math.min(34.99, Math.max(11.99, tierPremium + 3, paidPrices.at(-1) ?? platform.subscriptionPrices.FAMILY));
+    /* B11: the same reading the Build's commission checks, in cents */
+    const tiers = mirrorStreamingPlanPricesToTiers(safePricing.plans, platform.subscriptionPrices);
+    const tierBasic = tiers.BASIC;
+    const tierPremium = tiers.PREMIUM;
+    const tierFamily = tiers.FAMILY;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     /* a live service's newsworthy change goes on its ledger, and next week's news reports it (#68) */
     const change = platform.launchCommit ? describeStreamingPricingChange(platform.serviceConfiguration.pricing, safePricing) : null;

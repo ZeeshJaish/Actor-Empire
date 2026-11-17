@@ -302,11 +302,15 @@ export function prepareStreamingFullPlatformQa(source:Player):Player {
 
  // The catalogue: Content Market collections, signed through the real service (10 energy each).
  player=prepareContentMarketDiscovery(player);
+ const beforeCollections=player;
  for(const collection of getContentMarketCollections(player)) {
   if(player.ownedStreamingPlatform.catalogLicenses.length>=CATALOGUE_TARGET) break;
   const bought=purchaseContentMarketCollection(ensureEnergy(player,10),collection.id,collection.signature);
   if(bought.changed) player=bought.player;
  }
+ /* B16 (2026-11-15): a collection bought before launch now waits on the shelves for the Slate. The test company's
+    catalogue is its history, as if the Slate had programmed it, so it goes on the service at launch as before. */
+ player=releaseSlateHoldOnNewLicences(beforeCollections,player);
  if(player.ownedStreamingPlatform.catalogLicenses.length<20) throw Error('The Content Market offered too few collections this cycle. No changes were saved.');
 
  // Opening slate: the flagship Original plus the two strongest licensed titles.

@@ -3720,7 +3720,10 @@ const normalizeOriginalPitchState = (value: unknown): OwnedStreamingOriginalPitc
     };
 };
 
-const normalizeOriginalCommission = (value: unknown): OwnedStreamingOriginalCommission | null => {
+/** 2026-11-15 (B13): a commission is a small identity record (about half a kilobyte); this bound only stops runaway data. */
+export const OWNED_STREAMING_ORIGINAL_COMMISSION_LIMIT = 1000;
+
+export const normalizeOriginalCommission = (value: unknown): OwnedStreamingOriginalCommission | null => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const source = asRecord(value);
     const id = cleanText(source.id, '', 180);
@@ -3788,6 +3791,9 @@ const normalizeOriginalCommission = (value: unknown): OwnedStreamingOriginalComm
             : null,
         ...(source.way === 'PITCH' || source.way === 'OUTSIDE' || source.way === 'OWN_STUDIO' ? { way: source.way } : {}),
         ...(source.deal === 'BUY' || source.deal === 'LICENCE' ? { deal: source.deal } : {}),
+        /* B20: a poster set on the Original's page: a saved picture kept by its id (never a picture inside the save) */
+        ...(cleanText(asRecord(source.customPoster).posterMediaId, '', 200)
+            ? { customPoster: { type: 'IMAGE' as const, posterMediaId: cleanText(asRecord(source.customPoster).posterMediaId, '', 200) } } : {}),
         ...(Number.isFinite(Number(source.making)) && source.making !== undefined ? { making: Math.round(Number(source.making)) } : {}),
         ...(Number.isFinite(Number(source.fee)) && source.fee !== undefined ? { fee: Math.round(Number(source.fee)) } : {}),
         ...(Number.isFinite(Number(source.feePercent)) && source.feePercent !== undefined ? { feePercent: Math.round(Number(source.feePercent)) } : {}),
@@ -4621,12 +4627,15 @@ const normalizeOwnedStreamingPlatformStateFresh = (
         ...(source.originalPitches && typeof source.originalPitches === 'object' ? { originalPitches: normalizeOriginalPitchState(source.originalPitches) } : {}),
         ...(source.audienceReport && typeof source.audienceReport === 'object' && Array.isArray((source.audienceReport as any).gaps) ? { audienceReport: source.audienceReport as OwnedStreamingAudienceReport } : {}),
         contentAccounting: normalizeStreamingContentAccounting(source.contentAccounting),
+        /* 2026-11-15 (B13): this kept only the newest 40, so a service's 41st original pushed the oldest out of
+           its own record: the Originals count stuck at 40, and older originals lost their page, Renew and filter
+           entry. A commission is a small identity record; keep them all (the bound only stops runaway data). */
         originalCommissions: dedupeByKey(
             asArray<unknown>(source.originalCommissions)
                 .map(normalizeOriginalCommission)
                 .filter((commission): commission is OwnedStreamingOriginalCommission => Boolean(commission)),
             commission => commission.id,
-        ).slice(-40),
+        ).slice(-OWNED_STREAMING_ORIGINAL_COMMISSION_LIMIT),
         launchSlateDraft: normalizeLaunchSlate(source.launchSlateDraft),
         launchSlate: normalizeLaunchSlate(source.launchSlate),
         launchCommit: normalizeLaunchCommit(source.launchCommit),

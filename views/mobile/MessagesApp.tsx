@@ -13,6 +13,7 @@ import { PHASE_ONE_ENERGY_COSTS } from '../../services/energyCosts';
 import { getCharacterIdentityLabels, getOpportunityCharacterProfile } from '../../services/characterIdentityLogic';
 import { resolveStreamingPlatformBrandById } from '../../services/streamingPlatformBrandRegistry';
 import { isDeveloperMessage } from '../../services/developerNotes';
+import { ROLE_OFFER_PREFERENCES, deleteAllMessages, getRoleOfferPreference, setRoleOfferPreference } from '../../services/roleOfferPreference';
 import { ZEDBURY_PATH, ZEDBURY_VIEWBOX } from '../../assets/zedbury';
 
 /* Zeesh, 2026-11-09: the developer's note reads like a letter from the studio (it was an emoji in a white circle on a
@@ -80,6 +81,8 @@ interface MessagesAppProps {
   onOpenStudioAcquisition?: (studioId?: string, studioName?: string) => void;
   onOpenStudioContinuation?: (studioId?: string, scriptId?: string) => void;
   onDeclinePlatformCommission?: (offerId: string) => void;
+  /** U12: a change that needs no save on the tap (saved with the next real save) */
+  onQuietUpdatePlayer?: (player: Player) => void;
   onResolveShareholderVote?: (
       voteId: string,
       selectedVote: 'FOR' | 'AGAINST',
@@ -87,7 +90,7 @@ interface MessagesAppProps {
   onImmersiveReviewChange?: (active: boolean) => void;
 }
 
-export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStreamingContentOffer, onOpenStreamingRights, onOpenStudioAcquisition, onOpenStudioContinuation, onDeclinePlatformCommission, onResolveShareholderVote, onImmersiveReviewChange }) => {
+export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAccept, onDelete, onMarkRead, onOpenRightsMarket, onOpenStreamingContentOffer, onOpenStreamingRights, onOpenStudioAcquisition, onOpenStudioContinuation, onDeclinePlatformCommission, onResolveShareholderVote, onImmersiveReviewChange, onQuietUpdatePlayer }) => {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeShareholderVoteId, setActiveShareholderVoteId] = useState<string | null>(null);
@@ -111,6 +114,20 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
   } | null>(null);
 
   const messages = player.inbox || [];
+  /* U12 (2026-11-16): which role offers reach the inbox, and Delete all with a second tap to confirm (3 s) */
+  const offerPreference = getRoleOfferPreference(player);
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  useEffect(() => {
+      if (!deleteArmed) return undefined;
+      const timer = window.setTimeout(() => setDeleteArmed(false), 3000);
+      return () => window.clearTimeout(timer);
+  }, [deleteArmed]);
+  const runDeleteAll = () => {
+      if (!onQuietUpdatePlayer) return;
+      if (!deleteArmed) { setDeleteArmed(true); return; }
+      setDeleteArmed(false);
+      onQuietUpdatePlayer(deleteAllMessages(player));
+  };
   /* 2026-11-11: the streaming Rights Desk notice shares the property report's card, not its door */
   const streamingRightsNotice = selectedMessage?.type === 'RIGHTS_REPORT' && selectedMessage.data?.kind === 'STREAMING_RIGHTS_URGENT';
   const selectedRightsStatus = selectedMessage?.type === 'RIGHTS_NEGOTIATION'
@@ -445,6 +462,33 @@ export const MessagesApp: React.FC<MessagesAppProps> = ({ player, onBack, onAcce
             {/* LIST */}
             {!selectedMessage && (
                 <div>
+                    {/* U12 (2026-11-16): "No way to stop movie offers or clear messages." */}
+                    {/* 16 Nov (Zeesh: the header "acha nahi lag rha, symmetric bhi nahi"): one line, its name on the left and
+                        Delete all on the right, then the four choices as one even switch, nothing wraps */}
+                    {onQuietUpdatePlayer && (
+                        <div className="border-b border-slate-200 bg-white px-4 pb-3 pt-2.5" data-inbox-tools>
+                            <div className="flex min-h-8 items-center justify-between gap-3">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Role offers</span>
+                                {messages.length > 0 && (
+                                    <button type="button" data-delete-all onClick={runDeleteAll}
+                                        className={`flex min-h-8 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold transition-colors ${deleteArmed ? 'bg-rose-600 text-white' : 'text-rose-600 hover:bg-rose-50'}`}>
+                                        <Trash2 size={12} aria-hidden="true" />
+                                        {deleteArmed ? `Tap again to delete ${messages.length}` : `Delete all · ${messages.length}`}
+                                    </button>
+                                )}
+                            </div>
+                            <div className="mt-1.5 grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1" role="radiogroup" aria-label="Which role offers reach your inbox">
+                                {ROLE_OFFER_PREFERENCES.map(option => (
+                                    <button key={option.id} type="button" role="radio" aria-checked={offerPreference === option.id}
+                                        data-offer-preference={option.id}
+                                        onClick={() => { if (offerPreference !== option.id) onQuietUpdatePlayer(setRoleOfferPreference(player, option.id)); }}
+                                        className={`min-h-8 rounded-lg px-1 text-[11px] font-bold transition-colors ${offerPreference === option.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {messages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-[60vh] text-slate-400">
                             <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4 text-2xl">📭</div>

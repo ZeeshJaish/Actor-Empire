@@ -1,5 +1,8 @@
 import { gameWeekShort } from '../../services/gameWeek';
 import { getListedCompanyValuation } from '../../services/stockValuation';
+import { valueOwnedStreamingPlatform } from '../../services/valuation/streamingValuation';
+import { getReadableStreamingBrandInk, normalizeStreamingBrandHex, resolveStreamingPlatformBrandById } from '../../services/streamingPlatformBrandRegistry';
+import type { StreamingCompanySummary } from '../../types';
 import { beginPublicControlTransfer } from '../../services/publicStockControl';
 
 import { getOutstandingLoanBalance } from '../../services/loanLogic';
@@ -199,17 +202,21 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
 
   // STUDIOS
   const mergedStudioIds = getMergedStudioIds(player);
+  /* B25 (2026-11-15): a fully merged banner dropped off the list. It stays, says which studio it merged into, and its
+     cash is counted with that studio (merged cash is pooled there). */
+  const studioNameById = new Map((player.businesses || []).map(business => [business.id, business.name]));
   const playerOwnedStudios = (player.businesses || [])
     .filter((business): business is Business => business.type === 'PRODUCTION_HOUSE')
-    .filter(business => business.studioState?.operatingModel !== 'FULL_MERGER')
     .map(business => {
-        const dollarValuation = Math.max(business.stats?.valuation || 0, business.balance || 0);
+        const merged = business.studioState?.operatingModel === 'FULL_MERGER';
+        const dollarValuation = merged ? Math.max(0, business.stats?.valuation || 0) : Math.max(business.stats?.valuation || 0, business.balance || 0);
         return {
             id: business.id,
             name: business.name,
+            mergedInto: merged ? studioNameById.get(String(business.studioState?.mergedIntoStudioId || '')) || 'its group' : undefined,
             valuation: dollarValuation / 1_000_000_000,
             reputation: business.stats?.brandHealth || business.stats?.customerSatisfaction || 50,
-            cashReserve: Math.floor((business.balance || 0) / 1_000_000),
+            cashReserve: merged ? 0 : Math.floor((business.balance || 0) / 1_000_000),
             recentHits: business.studioState?.financeLedger?.filter(entry => entry.amount > 0).length || 0,
             archetype: 'PLAYER STUDIO',
             castingBias: { reputation: 1 + ((business.stats?.brandHealth || 50) / 200) },
@@ -359,14 +366,44 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
   }, [initialStudioId, initialStudioName, player.world.studios, player.businesses]);
 
   // STREAMERS
-  const platformRanking = getForbesStreamingCompanies(player).map(company => ({
-      ...company,
-      subscribers: company.subscribersMillions || 0,
-      valuation: company.valuationBillions || 0,
-      churnRate: company.corePlatformId
-          ? player.world.platforms?.[company.corePlatformId]?.churnRate || PLATFORMS[company.corePlatformId].churnRate
-          : undefined,
-  }));
+  /* B25 (2026-11-15): the player's own network was missing: the list reads the world's companies only. It joins the
+     ranking from the owned network (subscribers, value, cash, markets) in its own colours, with a YOU badge. */
+  const ownNetwork = React.useMemo((): (StreamingCompanySummary & { isPlayer: true; churnLabel?: string }) | null => {
+      const owned = player.ownedStreamingPlatform;
+      const identity = owned?.identity;
+      if (!owned || !identity?.name || (owned.lifecycle !== 'ACTIVE' && owned.lifecycle !== 'SUSPENDED')) return null;
+      const base = resolveStreamingPlatformBrandById(`PLAYER_${identity.slug || identity.name}`, identity.name);
+      const primaryColor = normalizeStreamingBrandHex(identity.primaryColor, base.primaryColor);
+      const secondaryColor = normalizeStreamingBrandHex(identity.secondaryColor, base.secondaryColor);
+      let valuationBillions = 0;
+      try { valuationBillions = Math.max(0, valueOwnedStreamingPlatform(owned).equityValue) / 1_000_000_000; } catch { valuationBillions = 0; }
+      const markets = new Set<string>((owned.marketOperations || [])
+          .filter(operation => operation.scope === 'COUNTRY' && operation.status === 'ACTIVE')
+          .map(operation => String(operation.countryId)));
+      const churn = Number(owned.metrics?.churnRate);
+      return {
+          id: 'PLAYER_NETWORK', name: identity.name, kind: 'PLAYER', isPlayer: true,
+          brand: { ...base, primaryColor, secondaryColor, accentColors: [primaryColor, secondaryColor], onPrimaryColor: getReadableStreamingBrandInk(primaryColor) },
+          subscribersMillions: Math.max(0, Number(owned.metrics?.subscribers) || 0) / 1_000_000,
+          valuationBillions,
+          cashMillions: (Number(owned.treasuryCash) || 0) / 1_000_000,
+          activeCountryIds: [...markets],
+          lastProcessedAbsoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
+          churnLabel: Number.isFinite(churn) && churn > 0 ? `${(churn > 1 ? churn : churn * 100).toFixed(1)}%` : undefined,
+      };
+  }, [player.ownedStreamingPlatform, player.age, player.currentWeek]);
+  const platformRanking = [
+      ...getForbesStreamingCompanies(player).map(company => ({
+          ...company,
+          isPlayer: false,
+          subscribers: company.subscribersMillions || 0,
+          valuation: company.valuationBillions || 0,
+          churnRate: company.corePlatformId
+              ? player.world.platforms?.[company.corePlatformId]?.churnRate || (PLATFORMS as Record<string, { churnRate?: string } | undefined>)[company.corePlatformId]?.churnRate
+              : undefined,
+      })),
+      ...(ownNetwork ? [{ ...ownNetwork, subscribers: ownNetwork.subscribersMillions || 0, valuation: ownNetwork.valuationBillions || 0, churnRate: ownNetwork.churnLabel }] : []),
+  ].sort((left, right) => right.subscribers - left.subscribers || right.valuation - left.valuation || left.id.localeCompare(right.id));
 
 
   const formatValuation = (val: number) => {
@@ -739,6 +776,11 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                             </div>
                                             {studio.isPlayerOwned && <span className="ml-auto shrink-0 rounded border border-amber-200/70 bg-amber-400 px-2 py-1 text-[7px] font-black uppercase tracking-[0.12em] text-black">Owned by You</span>}
                                     </div>
+                                    {studio.mergedInto ? (
+                                        <div data-forbes-merged className="mt-2 truncate text-[8px] uppercase tracking-widest font-black text-amber-300/70">
+                                            Merged into {studio.mergedInto}
+                                        </div>
+                                    ) : null}
                                     {studio.isNpcVenture && studio.ownerName && (
                                         <div className="mt-2 truncate text-[8px] uppercase tracking-widest font-black text-zinc-600">
                                             {tr('forbes.foundedBy', { name: studio.ownerName })}
@@ -804,8 +846,9 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                     {platformRanking.map((plat, idx) => (
                         <div
                             key={plat.id}
-                            className="bg-zinc-900/40 backdrop-blur-xl border p-5 rounded-[2.25rem] overflow-hidden relative group hover:bg-zinc-900/60 transition-all duration-700"
-                            style={{ borderColor: `${plat.brand.primaryColor}24` }}
+                            data-forbes-network={plat.isPlayer ? 'you' : undefined}
+                            className={`bg-zinc-900/40 backdrop-blur-xl border p-5 rounded-[2.25rem] overflow-hidden relative group hover:bg-zinc-900/60 transition-all duration-700 ${plat.isPlayer ? 'shadow-[0_0_35px_rgba(245,158,11,0.10)]' : ''}`}
+                            style={{ borderColor: plat.isPlayer ? 'rgba(245,158,11,0.45)' : `${plat.brand.primaryColor}24` }}
                         >
                             <div className="absolute top-0 left-0 w-1.5 h-full opacity-25 group-hover:opacity-50 transition-opacity" style={{ backgroundColor: plat.brand.primaryColor }}></div>
                             
@@ -814,8 +857,9 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
                                         {idx + 1}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="mb-2 min-w-0 overflow-hidden">
-                                            <StreamingPlatformBrand brand={plat.brand} variant="LOCKUP" size="MD" />
+                                        <div className="mb-2 flex min-w-0 items-center gap-2 overflow-hidden">
+                                            <div className="min-w-0 overflow-hidden"><StreamingPlatformBrand brand={plat.brand} variant="LOCKUP" size="MD" /></div>
+                                            {plat.isPlayer ? <span className="shrink-0 rounded bg-amber-500 px-1.5 text-[8px] font-bold text-black">{tr('forbes.you')}</span> : null}
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <div className="text-[8px] text-zinc-500 font-black uppercase tracking-[0.3em]">{tr('forbes.globalNetwork')}</div>
@@ -842,8 +886,8 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
 
                             <div className="relative z-10 mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-white/5 pt-3 text-[8px] font-black uppercase tracking-[0.16em] text-zinc-600">
                                 <span>Cash <b className="ml-1 text-zinc-300">{formatPlatformCash(plat.cashMillions || 0)}</b></span>
-                                <span>Tech <b className="ml-1 text-zinc-300">{Math.round(plat.technology || 0)}</b></span>
-                                <span>Catalogue <b className="ml-1 text-zinc-300">{Math.round(plat.cataloguePower || 0)}</b></span>
+                                {plat.isPlayer ? null : <span>Tech <b className="ml-1 text-zinc-300">{Math.round(plat.technology || 0)}</b></span>}
+                                {plat.isPlayer ? null : <span>Catalogue <b className="ml-1 text-zinc-300">{Math.round(plat.cataloguePower || 0)}</b></span>}
                                 <span className="ml-auto">{gameWeekShort(Math.max(0, plat.lastProcessedAbsoluteWeek || 0))}</span>
                             </div>
 
