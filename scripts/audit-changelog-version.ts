@@ -14,11 +14,11 @@ const assert = (condition: unknown, message: string) => {
 
 const latest = getLatestChangelogEntry();
 assert(latest.version === APP_DISPLAY_VERSION, `latest changelog ${latest.version} does not match app version ${APP_DISPLAY_VERSION}`);
-assert(APP_DISPLAY_VERSION === '1.0.28', `app version should be 1.0.28, got ${APP_DISPLAY_VERSION}`);
-const expectedVersions = Array.from({ length: 29 }, (_, index) => `1.0.${28 - index}`);
+assert(APP_DISPLAY_VERSION === '1.0.29', `app version should be 1.0.29, got ${APP_DISPLAY_VERSION}`);
+const expectedVersions = Array.from({ length: 30 }, (_, index) => `1.0.${29 - index}`);
 assert(
   CHANGELOG_ENTRIES.map(entry => entry.version).join('|') === expectedVersions.join('|'),
-  `changelog should include every version from 1.0.28 through 1.0.0 in order`,
+  `changelog should include every version from 1.0.29 through 1.0.0 in order`,
 );
 
 const seenVersions = new Set<string>();
@@ -81,6 +81,13 @@ assert(hotfix2?.type === 'PATCH' && hotfix2.highlights?.length === 4, '1.0.28 sh
 assert(/\$150M, 65 Fame and 55 Reputation/.test(hotfix2?.summary || ''), '1.0.28 should still say when streaming unlocks');
 assert(/Clear the markets/.test(entryText('1.0.28')) && /Send to dev/.test(entryText('1.0.28')), '1.0.28 should name the market and save fixes');
 assert(!/loophole|calculation|formula|sandbox|worker|patch/i.test(entryText('1.0.28')), '1.0.28 should describe player-facing changes only');
+/* 1.0.29 (2026-11-18): the third round of fixes, and a word that the faster week is being rebuilt */
+const hotfix3 = CHANGELOG_ENTRIES.find(item => item.version === '1.0.29');
+assert(hotfix3?.type === 'PATCH' && hotfix3.highlights?.length === 4, '1.0.29 should be a patch with four headline tiles');
+assert(/\$150M, 65 Fame and 55 Reputation/.test(hotfix3?.summary || ''), '1.0.29 should still say when streaming unlocks');
+assert(/Week N was not applied/.test(entryText('1.0.29')) && /Renew and sequels/.test(entryText('1.0.29')), '1.0.29 should name the week and Originals fixes');
+assert(/faster weeks/i.test(entryText('1.0.29')) && hotfix3?.highlights?.some(tile => /rebuilding the week/i.test(tile.text)), '1.0.29 should say the faster week is being rebuilt');
+assert(!/loophole|calculation|formula|sandbox|worker|patch|\bmemo\b|\bcache\b/i.test(entryText('1.0.29')), '1.0.29 should describe player-facing changes only');
 
 const settingsPage = read('views/SettingsPage.tsx');
 assert(settingsPage.includes("'CHANGELOG'"), 'SettingsPage must include CHANGELOG mode');
@@ -116,23 +123,23 @@ const savedPlayTime = migratePlayerSave({ ...INITIAL_PLAYER, totalPlayTimeMs: 3_
 assert(savedPlayTime.totalPlayTimeMs === 3_726_500, 'valid accumulated play time must survive migration');
 
 const packageJson = JSON.parse(read('package.json'));
-assert(packageJson.version === '1.0.28', 'package.json version must be 1.0.28');
+assert(packageJson.version === '1.0.29', 'package.json version must be 1.0.29');
 assert(packageJson.scripts?.['audit:changelog-version'], 'package.json must expose audit:changelog-version');
 
 const packageLock = JSON.parse(read('package-lock.json'));
-assert(packageLock.version === '1.0.28', 'package-lock root version must be 1.0.28');
-assert(packageLock.packages?.['']?.version === '1.0.28', 'package-lock package version must be 1.0.28');
+assert(packageLock.version === '1.0.29', 'package-lock root version must be 1.0.29');
+assert(packageLock.packages?.['']?.version === '1.0.29', 'package-lock package version must be 1.0.29');
 
 const androidGradle = read('android/app/build.gradle');
-assert(androidGradle.includes('versionCode 28'), 'Android versionCode must be 28');
-assert(androidGradle.includes('versionName "1.0.28"'), 'Android versionName must be 1.0.28');
+assert(androidGradle.includes('versionCode 29'), 'Android versionCode must be 29');
+assert(androidGradle.includes('versionName "1.0.29"'), 'Android versionName must be 1.0.29');
 
 const androidMetadata = read('android/app/release/output-metadata.json');
-assert(androidMetadata.includes('"versionCode": 28'), 'Android output metadata versionCode must be 28');
-assert(androidMetadata.includes('"versionName": "1.0.28"'), 'Android output metadata versionName must be 1.0.28 (rewritten by the release build)');
+assert(androidMetadata.includes('"versionCode": 29'), 'Android output metadata versionCode must be 29');
+assert(androidMetadata.includes('"versionName": "1.0.29"'), 'Android output metadata versionName must be 1.0.29 (rewritten by the release build)');
 
 const iosProject = read('ios/App/App.xcodeproj/project.pbxproj');
-assert((iosProject.match(/CURRENT_PROJECT_VERSION = 29;/g) || []).length >= 2, 'iOS build number must be 29 (1.0.28 build 28 was replaced by 29 with Week Ahead on iPhone)');
-assert((iosProject.match(/MARKETING_VERSION = 1.0.28;/g) || []).length >= 2, 'iOS marketing version must be 1.0.28');
+assert((iosProject.match(/CURRENT_PROJECT_VERSION = 30;/g) || []).length >= 2, 'iOS build number must be 30 (1.0.28 used builds 28 and 29)');
+assert((iosProject.match(/MARKETING_VERSION = 1.0.29;/g) || []).length >= 2, 'iOS marketing version must be 1.0.29');
 
 console.log('Changelog and version audit passed.');

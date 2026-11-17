@@ -66,6 +66,80 @@ const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntr
 );
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  /* 1.0.29 (2026-11-18): the third round of fixes from players' reports and the crash reports, plus a word that the faster
+     week is being rebuilt (Zeesh: "week processing me kaam chal rha … would be needing a week"). Player-facing only; it
+     repeats how streaming unlocks for players updating from an older version. */
+  changelogEntry(
+    '1.0.29',
+    'Your Reports, Fixed',
+    'PATCH',
+    'November 2026',
+    'Stuck weeks, Originals that would not renew and 40 more fixes from your reports. New here? Streaming unlocks at $150M, 65 Fame and 55 Reputation, in Lifestyle.',
+    [
+      {
+        heading: 'Coming next',
+        items: [
+          'Much faster weeks. We are rebuilding how a week is processed, and a lot is changing to make it faster. It needs about one more week.',
+        ],
+      },
+      {
+        heading: 'Weeks and saves',
+        items: [
+          '"Week N was not applied" no longer stops big careers.',
+          'Slower phones get more time to save a week, so a week is not retried again and again.',
+          'If a week or a save fails, the message says sorry and sends us a report in one tap.',
+          'Opening a message no longer freezes the game.',
+          'The Box Office no longer crashes when you run a streaming service.',
+          'The campaign list no longer crashes on phones that run low on picture memory.',
+          'Android: Back closes the open sheet, then goes Home, and asks before you leave the game.',
+        ],
+      },
+      {
+        heading: 'Originals and streaming',
+        items: [
+          'Renew and sequels work for every Original, including the ones on your opening slate.',
+          "A new season keeps last season's background extras, and you can change them for each season.",
+          'Name every character on your Originals, and pick lead roles in the Cast step.',
+          'Posters show everywhere, and Originals have a poster button.',
+          'Weekly series get one episode rating a week instead of all on day one.',
+          'You can keep more than 40 Originals, and the lost ones are back.',
+          'The season 2 fund deadline is the full 104 weeks.',
+          '"Schedule all" no longer freezes, and bought titles can go on the Slate.',
+          'Live titles show their viewers.',
+          "Adding a rack no longer lowers any country's coverage.",
+          'Served viewers follow your real reach, and Asia can now pass the rehearsal.',
+          'The Network and Build pages open without a freeze.',
+          'Tiny countries like Vatican City no longer show as at risk.',
+          'Commissioning no longer refuses a plan that is ready.',
+          'The Rights Desk mails you only about your own deals.',
+        ],
+      },
+      {
+        heading: 'Films and business',
+        items: [
+          'Type any amount for each marketing channel.',
+          'Films leave cinemas on time.',
+          'Choose Buyer works in the sale room, and a takeover counts a cash shortfall as debt.',
+          'Your service shows in the Forbes rankings, and a merged banner tells you how to sell it.',
+          'The share price is one quiet line on your HQ home. Tap it to see why it moved.',
+          'Owned gear: every level adds quality, and owning costs less than renting.',
+          'News names the film instead of "an untitled film", and Market names no longer repeat.',
+          "The Boardroom shows revenue, costs and this week's biggest costs.",
+          'Tap Attention to see what builds it.',
+          'The media desk shows why your fame is fading.',
+          'Choose which role offers reach you, and delete them all in one tap.',
+          'Rate Actor Empire from Settings.',
+        ],
+      },
+    ],
+    [
+      { icon: 'FIX', title: 'Weeks keep moving', text: '"Week N was not applied" is fixed on big careers.' },
+      { icon: 'STREAMING', title: 'Originals renew', text: 'Renew, sequels, posters and character names fixed.' },
+      { icon: 'FILM', title: 'Type your budget', text: 'Type any amount for each marketing channel.' },
+      { icon: 'SPARKLES', title: 'Faster weeks soon', text: "We're rebuilding the week. It needs about a week." },
+    ],
+    'Thank you for every report. Keep them coming.',
+  ),
   /* 1.0.28 (2026-11-13): the second hotfix from players' reports (Discord, Telegram, X, DMs) plus Week Ahead, the faster
      late-game week. Player-facing only; it repeats how streaming unlocks for players updating from 1.0.25 or 1.0.26. */
   changelogEntry(
