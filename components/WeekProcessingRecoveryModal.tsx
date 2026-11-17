@@ -1,5 +1,7 @@
 import React from 'react';
 import { Download, House, RefreshCw, ShieldCheck } from 'lucide-react';
+import { RecoveryReportCard } from './RecoveryReportCard';
+import type { RecoveryReportHandle } from '../services/recoveryReports';
 
 interface WeekProcessingRecoveryModalProps {
     age: number;
@@ -12,6 +14,8 @@ interface WeekProcessingRecoveryModalProps {
     onRetry: () => void;
     onReturnToMenu: () => void;
     onExportBackup: () => void;
+    /** Sends a report about this week (RecoveryReportCard). */
+    onSendReport?: () => RecoveryReportHandle | null;
 }
 
 export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalProps> = ({
@@ -25,6 +29,7 @@ export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalPr
     onRetry,
     onReturnToMenu,
     onExportBackup,
+    onSendReport,
 }) => (
     <div className="fixed inset-0 z-[330] flex items-center justify-center bg-black/90 p-5 pt-[max(1.25rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+10px))] backdrop-blur-md">
         <section
@@ -71,6 +76,8 @@ export const WeekProcessingRecoveryModal: React.FC<WeekProcessingRecoveryModalPr
                     </div>
                     <div className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] text-zinc-600">Age {age} • Week {week}</div>
                 </div>
+
+                {onSendReport && <div className="mt-5"><RecoveryReportCard onSend={onSendReport} /></div>}
 
                 <div className="mt-6 space-y-2.5">
                     <button

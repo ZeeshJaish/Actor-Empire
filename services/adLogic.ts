@@ -255,6 +255,11 @@ const loadRewarded = (): Promise<boolean> => {
     return load;
 };
 
+/** 2026-11-17: an ad is on screen or a tap is fetching one, or the ad privacy form is open. Nothing else (the store's
+ *  rating popup, services/storeReview.ts) may open over it. */
+export const isAdOnScreen = (): boolean =>
+    activeAd !== null || interstitialState === 'SHOWING' || rewardedState === 'SHOWING' || privacyOptionsOpen;
+
 /** Keeps one rewarded ad loaded in the background. Never loads during a show, nor soon after a failed load. */
 export const preloadRewarded = () => {
     if (!isNativeAds() || !initialized) return;

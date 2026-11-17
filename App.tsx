@@ -49,8 +49,8 @@ import { createBusiness, normalizeStudioState } from './services/businessLogic';
 import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Briefcase, Baby, ChevronRight } from 'lucide-react';
 import { useGameActions } from './hooks/useGameActions';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
-import { showAd, initAds } from './services/adLogic';
-import { careerStartFlag, forcedAdCareerWeek, isForcedAdTrouble, noteAdClosed, noteForcedAdWeekPassed, noteRealPurchase, setForcedAdContext, showForcedAd } from './services/forcedAds';
+import { showAd, initAds, isAdOnScreen } from './services/adLogic';
+import { careerStartFlag, forcedAdCareerWeek, isForcedAdTrouble, msSinceLastAd, noteAdClosed, noteForcedAdWeekPassed, noteRatingAsked, noteRealPurchase, setForcedAdContext, showForcedAd } from './services/forcedAds';
 import { rewardedCashAmount } from './services/rewardedCash';
 import { announceStreamingPlusUnlocked, setStreamingPlusOwnedNow } from './services/streamingPlusEvents';
 import { hasStreamingPlus } from './services/streamingPlusPack';
@@ -121,6 +121,19 @@ import {
   stopPerformanceTrace,
   trackGameEvent,
 } from './services/firebaseService';
+import { RecoveryModeScreen } from './components/RecoveryModeScreen';
+import { recoveryModeReport, saveRecoveryReport, sendRecoveryReport, weekFailureReport, type RecoveryReportHandle } from './services/recoveryReports';
+import {
+  findStoreReviewMoment,
+  noteStoreReviewSession,
+  noteStoreReviewTrouble,
+  noteStoreReviewWeek,
+  readStoreReviewState,
+  requestStoreReview,
+  storeReviewHoldReason,
+  STORE_REVIEW_RULES,
+  type StoreReviewMoment,
+} from './services/storeReview';
 
 type GameStatus = 'START_MENU' | 'CREATION' | 'PLAYING' | 'DEATH_SCREEN';
 const LOCAL_STORAGE_SAVE_MIRROR_BUDGET_BYTES = 600_000;
@@ -595,13 +608,18 @@ const normalizeSponsorshipOffer = (offer: SponsorshipOffer): SponsorshipOffer =>
     };
 };
 
-type GameErrorBoundaryProps = { onRecover: () => void; children: React.ReactNode };
-type GameErrorBoundaryState = { hasError: boolean };
+type GameErrorBoundaryProps = {
+    onRecover: () => void;
+    /** 2026-11-17: sends a report with the caught error (RecoveryModeScreen). */
+    onReport?: (error: { message: string; stack: string }) => RecoveryReportHandle | null;
+    children: React.ReactNode;
+};
+type GameErrorBoundaryState = { hasError: boolean; errorMessage: string; errorStack: string };
 
-class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErrorBoundaryState> {
+export class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErrorBoundaryState> {
     declare props: GameErrorBoundaryProps;
     declare setState: (state: Partial<GameErrorBoundaryState>) => void;
-    state: GameErrorBoundaryState = { hasError: false };
+    state: GameErrorBoundaryState = { hasError: false, errorMessage: '', errorStack: '' };
 
     constructor(props: GameErrorBoundaryProps) {
         super(props);
@@ -611,32 +629,26 @@ class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, GameErro
         return { hasError: true };
     }
 
-    componentDidCatch(error: Error) {
+    componentDidCatch(error: Error, info?: React.ErrorInfo) {
         console.error('Game render crash recovered by boundary:', error);
         recordNonFatal(error, 'react_render_boundary_recovered');
+        noteStoreReviewTrouble('recovery_mode');
+        this.setState({
+            errorMessage: String(error?.message || error || 'unknown').slice(0, 300),
+            errorStack: String(info?.componentStack || error?.stack || '').trim().slice(0, 900),
+        });
     }
 
     handleRecover = () => {
         this.props.onRecover();
-        this.setState({ hasError: false });
+        this.setState({ hasError: false, errorMessage: '', errorStack: '' });
     };
 
     render() {
         if (this.state.hasError) {
-            return (
-                <div className="h-screen bg-black flex flex-col items-center justify-center text-white p-6 text-center">
-                    <div className="text-xl font-black uppercase tracking-widest mb-3">Recovery Mode</div>
-                    <p className="text-sm text-zinc-400 max-w-xs mb-6">
-                        A save or screen error was detected. You can return to the menu instead of getting stuck on a black screen.
-                    </p>
-                    <button
-                        onClick={this.handleRecover}
-                        className="px-6 py-3 rounded-xl bg-white text-black font-bold hover:bg-zinc-200"
-                    >
-                        Return To Menu
-                    </button>
-                </div>
-            );
+            const { onReport } = this.props;
+            return <RecoveryModeScreen onRecover={this.handleRecover}
+                onSendReport={onReport ? () => onReport({ message: this.state.errorMessage, stack: this.state.errorStack }) : undefined} />;
         }
 
         return this.props.children;
@@ -792,6 +804,9 @@ export const App: React.FC = () => {
      the next start, with its last screen, save time and memory (services/sessionBreadcrumb.ts) */
   useEffect(() => {
     const previous = takeUncleanPreviousSession();
+    // store ratings: count this start; a session that ended by itself holds the rating ask back
+    noteStoreReviewSession();
+    if (previous) noteStoreReviewTrouble('session_ended_unexpectedly');
     if (previous) {
       recordNonFatal(new Error('The previous session ended while the game was open'), 'session_ended_unexpectedly', {
         last_screen: previous.screen || 'unknown',
@@ -812,6 +827,48 @@ export const App: React.FC = () => {
     };
   }, []);
   useEffect(() => { noteSessionLive({ screen: gameStatus }); }, [gameStatus]);
+  /* Store ratings (services/storeReview.ts): a week's happy moment waits here for a calm Home screen (no popup, no
+     ad, no week running), then the store's own popup is asked, unless the rules hold it back by then. */
+  const pendingReviewMomentRef = useRef<{ moment: StoreReviewMoment; at: number } | null>(null);
+  const [reviewMomentTick, setReviewMomentTick] = useState(0);
+  const reviewCalm = gameStatus === 'PLAYING' && activePage === Page.HOME && !isProcessing && !isShowingAd
+    && !pendingWeekProcessingFailure && !pendingSaveRecovery && !player.pendingEvent && !(player.pendingEvents?.length);
+  useEffect(() => {
+    if (!pendingReviewMomentRef.current || !reviewCalm) return;
+    // Only while a moment waits (at most 10 minutes): once a second, until no sheet or popup has been open for 2 s.
+    let calmSince = 0;
+    const timer = window.setInterval(() => {
+      const pending = pendingReviewMomentRef.current;
+      if (!pending || Date.now() - pending.at > 10 * 60_000) {
+        pendingReviewMomentRef.current = null;
+        window.clearInterval(timer);
+        return;
+      }
+      // A sheet counts as open when it is on screen and can be touched. Closed sheets stay in the page, slid down and
+      // untouchable (pointer-events: none, inherited from their wrapper), like Home's energy ledger.
+      const sheetOpen = [...document.querySelectorAll('[aria-modal="true"], [role="dialog"]')].some(element => {
+        const box = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return box.width > 0 && box.height > 0 && box.bottom > 0 && box.top < window.innerHeight - 1
+          && box.right > 0 && box.left < window.innerWidth
+          && style.visibility !== 'hidden' && style.pointerEvents !== 'none' && Number(style.opacity) > 0.05;
+      });
+      // never over an ad (week break, task break, rewarded) or this soon after one; the rating then waits its turn
+      if (sheetOpen || isAdOnScreen() || msSinceLastAd() < STORE_REVIEW_RULES.quietAfterAdMs) { calmSince = 0; return; }
+      if (!calmSince) { calmSince = Date.now(); return; }
+      if (Date.now() - calmSince < 2000) return;
+      window.clearInterval(timer);
+      pendingReviewMomentRef.current = null;
+      const hold = storeReviewHoldReason(readStoreReviewState(), Date.now());
+      if (hold) {
+        trackGameEvent('review_prompt_held', { trigger: pending.moment, reason: hold });
+        return;
+      }
+      // no forced ad lands right after the rating popup (forcedAds: RATING)
+      if (requestStoreReview(pending.moment)) noteRatingAsked();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [reviewCalm, reviewMomentTick]);
   useEffect(() => {
     const shell = shellRef.current;
     const viewport = window.visualViewport;
@@ -1840,6 +1897,7 @@ export const App: React.FC = () => {
             } else {
                 const verifiedLoad = preloaded?.kind === 'VERIFIED' ? preloaded.verifiedLoad : await loadVerifiedGameData(storageKey);
                 if (verifiedLoad.status === 'RECOVERY_AVAILABLE') {
+                    noteStoreReviewTrouble('save_recovery');
                     setPendingSaveRecovery({
                         slot,
                         storageKey,
@@ -1899,6 +1957,7 @@ export const App: React.FC = () => {
                 if (previous) {
                     try {
                         migratePlayerSave(previous);
+                        noteStoreReviewTrouble('save_recovery');
                         setPendingSaveRecovery({ slot, storageKey, previous, violations: error.issues.map(issue => issue.detail) });
                         setCurrentSlot(null);
                         return;
@@ -1968,6 +2027,18 @@ export const App: React.FC = () => {
     setPendingSaveRecovery(null);
     setCurrentSlot(null);
   };
+
+  /* 2026-11-17 (Zeesh): the recovery popups say sorry and send a report in one tap (services/recoveryReports.ts).
+     Sending never changes or saves the career. */
+  const fallbackReportPlayer = () => migratePlayerSave(INITIAL_PLAYER);
+  const handleSendWeekFailureReport = () => pendingWeekProcessingFailure
+    ? sendRecoveryReport(playerRef.current, weekFailureReport(pendingWeekProcessingFailure, String(activePage)), fallbackReportPlayer)
+    : null;
+  const handleSendSaveRecoveryReport = () => pendingSaveRecovery
+    ? sendRecoveryReport(pendingSaveRecovery.previous, saveRecoveryReport(pendingSaveRecovery), fallbackReportPlayer)
+    : null;
+  const handleSendRecoveryModeReport = (error: { message: string; stack: string }) =>
+    sendRecoveryReport(playerRef.current, recoveryModeReport(error, String(activePage)), fallbackReportPlayer);
 
   /* 2026-11-12: a slot's save exactly as stored (it never opens it), so even a career that cannot
      open can reach the developer for repair */
@@ -2757,6 +2828,14 @@ export const App: React.FC = () => {
             week: syncedPlayerState.currentWeek,
             saveSlot: currentSlot,
         });
+        /* store ratings: every applied week counts; a happy moment (an award won, a finished hit) in a quick week
+           without the break ad waits for a calm Home screen (services/storeReview.ts) */
+        noteStoreReviewWeek();
+        const reviewMoment = findStoreReviewMoment(player, syncedPlayerState);
+        if (reviewMoment && !triggerAd && performance.now() - startedAt <= STORE_REVIEW_RULES.maxHappyWeekMs) {
+            pendingReviewMomentRef.current = { moment: reviewMoment, at: Date.now() };
+            setReviewMomentTick(tick => tick + 1);
+        }
 
         if (medicalPromptToShow) {
             setPendingMedicalPrompt(medicalPromptToShow);
@@ -2837,6 +2916,7 @@ export const App: React.FC = () => {
         console.error('Week processing failed:', error);
         weekAheadRef.current?.abandon();
         const failurePresentation = describeWeekProcessingFailure(activeWeekStageRef.current, error);
+        noteStoreReviewTrouble('week_not_applied');
         setPendingWeekProcessingFailure({
             age: player.age,
             week: player.currentWeek,
@@ -3851,7 +3931,7 @@ export const App: React.FC = () => {
   const showDebtBanner = gameStatus === 'PLAYING' && isBottomNavVisible && player.money < 0 && !showDebtModal;
 
   return (
-    <GameErrorBoundary onRecover={handleRecoverToMenu}>
+    <GameErrorBoundary onRecover={handleRecoverToMenu} onReport={handleSendRecoveryModeReport}>
     <div ref={shellRef} className="ae-game-shell bg-black text-white font-sans selection:bg-amber-500 selection:text-black" data-shell-nav-visible={gameStatus === 'PLAYING' && isBottomNavVisible ? 'true' : 'false'} data-debt-banner={showDebtBanner ? 'true' : 'false'}>
       <div className="fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-zinc-950 to-zinc-950 pointer-events-none" />
 
@@ -3864,6 +3944,7 @@ export const App: React.FC = () => {
               isRecovering={isRecoveringSave}
               onRecover={handleRecoverSave}
               onCancel={handleCancelSaveRecovery}
+              onSendReport={handleSendSaveRecoveryReport}
           />
       )}
 
@@ -3879,6 +3960,7 @@ export const App: React.FC = () => {
               onRetry={handleRetryFailedWeek}
               onExportBackup={() => void handleExportFailedWeekBackup()}
               onReturnToMenu={handleRecoverToMenu}
+              onSendReport={handleSendWeekFailureReport}
           />
       ) : null}
 

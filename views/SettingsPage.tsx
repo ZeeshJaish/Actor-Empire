@@ -11,6 +11,7 @@ import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '
 import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent, getIssueReportDelivery, onIssueReportDeliveryChanged, type IssueReportDelivery } from '../services/firebaseService';
 import { CountryFlagSvg } from '../components/studio-finance/components/FlagField';
+import { APP_STORE_ID, noteStoreReviewTrouble, openStoreReviewPage } from '../services/storeReview';
 
 interface SettingsPageProps {
   player: Player;
@@ -246,12 +247,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
     optionId === 'en' ? tr('settings.languageSourceSub') : tr('settings.languageInterfaceSub')
   );
 
+  /* 2026-11-17: Rate Actor Empire opens this phone's store (services/storeReview.ts). Without the store plugin (a web
+     build, or an app not rebuilt yet) it opens the store's web page. */
+  const rateOnAppStore = Capacitor.getPlatform() === 'ios'
+    || (!Capacitor.isNativePlatform() && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent));
+  const openRateGamePage = async () => {
+    if (await openStoreReviewPage()) return;
+    window.open(rateOnAppStore
+      ? `https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`
+      : 'https://play.google.com/store/apps/details?id=com.zeeshapps.actorempire', '_blank', 'noopener');
+  };
+
   const handleSubmitIssueReport = () => {
     markTraceAction('issue_report_send_tapped', {
       last_screen: 'Settings',
       flow: 'in_app_support',
       save_slot: player.flags?.lastLoadedSlot || '',
     });
+    // someone reporting a problem is not asked for a rating soon after
+    noteStoreReviewTrouble('issue_report');
     const issueId = submitPlayerIssueReport(player, {
       category: reportCategory,
       details: reportDetails,
@@ -1045,15 +1059,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             </div>
           </a>
 
-          <a href="https://apps.apple.com/us/app/actor-empire/id6757667257" target="_blank" rel="noreferrer" className="w-full flex items-center justify-between p-4 bg-zinc-900/55 rounded-2xl hover:bg-zinc-800 transition-colors border border-white/5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500 rounded-lg text-black"><Star size={20}/></div>
-              <div className="text-left">
+          {/* 2026-11-17: the store page for this phone's store (it was the App Store on Android too), with no question
+              about liking the game next to it (services/storeReview.ts) */}
+          <button type="button" data-rate-game onClick={() => { void openRateGamePage(); }} className="w-full flex items-center justify-between gap-3 p-4 bg-zinc-900/55 rounded-2xl hover:bg-zinc-800 transition-colors border border-white/5 text-left">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 bg-amber-500 rounded-lg text-black shrink-0"><Star size={20}/></div>
+              <div className="min-w-0">
                 <div className="font-bold text-white">{tr('settings.rateUs')}</div>
-                <div className="text-xs text-zinc-500">{tr('settings.rateUsSub')}</div>
+                <div className="text-xs text-zinc-500">{tr(rateOnAppStore ? 'settings.rateUsSubAppStore' : 'settings.rateUsSubPlay')}</div>
               </div>
             </div>
-          </a>
+            <ChevronRight size={18} className="text-zinc-600 shrink-0" />
+          </button>
 
           <a href="https://buymeacoffee.com/actorempire" target="_blank" rel="noreferrer" className="w-full flex items-center justify-between p-4 bg-[#FFDD00] rounded-2xl hover:opacity-90 transition-all border border-black/10">
             <div className="flex items-center gap-3">

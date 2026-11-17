@@ -1,5 +1,7 @@
 import React from 'react';
 import { ArchiveRestore, ShieldCheck } from 'lucide-react';
+import { RecoveryReportCard } from './RecoveryReportCard';
+import type { RecoveryReportHandle } from '../services/recoveryReports';
 
 interface SaveRecoveryModalProps {
     playerName: string;
@@ -9,6 +11,8 @@ interface SaveRecoveryModalProps {
     isRecovering: boolean;
     onRecover: () => void;
     onCancel: () => void;
+    /** Sends a report about this save (RecoveryReportCard). */
+    onSendReport?: () => RecoveryReportHandle | null;
 }
 
 export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
@@ -18,6 +22,7 @@ export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
     isRecovering,
     onRecover,
     onCancel,
+    onSendReport,
 }) => (
     <div className="fixed inset-0 z-[320] flex items-center justify-center bg-black/90 p-5 pt-[max(1.25rem,calc(env(safe-area-inset-top)+10px))] pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+10px))] backdrop-blur-md">
         <section
@@ -50,6 +55,8 @@ export const SaveRecoveryModal: React.FC<SaveRecoveryModalProps> = ({
                         <span>Week {week}</span>
                     </div>
                 </div>
+
+                {onSendReport && <div className="mt-5"><RecoveryReportCard onSend={onSendReport} /></div>}
 
                 <div className="mt-6 space-y-2.5">
                     <button

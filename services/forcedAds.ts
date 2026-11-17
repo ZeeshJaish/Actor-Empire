@@ -30,6 +30,7 @@ export type ForcedAdBlocker =
     | 'PURCHASE'
     | 'COOLDOWN_TIME'
     | 'COOLDOWN_WEEKS'
+    | 'RATING'
     | 'NOT_LOADED';
 
 export const FORCED_AD_RULES = {
@@ -37,6 +38,8 @@ export const FORCED_AD_RULES = {
     cooldownWeeks: 8,
     firstCareerWeek: 24,
     afterPurchaseMs: 10 * 60_000,
+    /** 2026-11-17: no break this soon after the store's rating popup was asked (services/storeReview.ts) */
+    afterRatingMs: 3 * 60_000,
     /** the short beat between the work and the ad */
     beatMs: 350,
 } as const;
@@ -54,6 +57,7 @@ interface ForcedAdMemory {
     lastAdAt: number;
     weeksSinceForced: number;
     lastPurchaseAt: number;
+    lastRatingAt: number;
 }
 
 const STORAGE_KEY = 'ae.forcedAds.v1';
@@ -62,7 +66,7 @@ const STORAGE_KEY = 'ae.forcedAds.v1';
 let context: ForcedAdContext = { noAds: true, careerWeek: 0, decisionOpen: false, inTrouble: false, storeOpen: false };
 
 const readMemory = (): ForcedAdMemory => {
-    const fallback: ForcedAdMemory = { lastAdAt: 0, weeksSinceForced: 99, lastPurchaseAt: 0 };
+    const fallback: ForcedAdMemory = { lastAdAt: 0, weeksSinceForced: 99, lastPurchaseAt: 0, lastRatingAt: 0 };
     try {
         const raw = window.localStorage.getItem(STORAGE_KEY);
         if (!raw) return fallback;
@@ -71,6 +75,7 @@ const readMemory = (): ForcedAdMemory => {
             lastAdAt: Number.isFinite(parsed.lastAdAt) ? Number(parsed.lastAdAt) : 0,
             weeksSinceForced: Number.isFinite(parsed.weeksSinceForced) ? Number(parsed.weeksSinceForced) : 99,
             lastPurchaseAt: Number.isFinite(parsed.lastPurchaseAt) ? Number(parsed.lastPurchaseAt) : 0,
+            lastRatingAt: Number.isFinite(parsed.lastRatingAt) ? Number(parsed.lastRatingAt) : 0,
         };
     } catch {
         return fallback;
@@ -117,6 +122,15 @@ export const noteRealPurchase = () => {
     saveMemory();
 };
 
+/** 2026-11-17: the store's rating popup was asked: no forced ad right after it (afterRatingMs). */
+export const noteRatingAsked = (now = Date.now()) => {
+    getMemory().lastRatingAt = now;
+    saveMemory();
+};
+
+/** How long ago an ad last started or closed (forced or rewarded): the rating popup keeps away from ads. */
+export const msSinceLastAd = (now = Date.now()): number => now - getMemory().lastAdAt;
+
 export const forcedAdBlocker = (
     moment: ForcedAdMoment,
     overrides: Partial<ForcedAdContext> = {},
@@ -132,6 +146,7 @@ export const forcedAdBlocker = (
     if (moment !== 'WEEK' && at.decisionOpen) return 'DECISION';
     if (now - remembered.lastPurchaseAt < FORCED_AD_RULES.afterPurchaseMs) return 'PURCHASE';
     if (now - remembered.lastAdAt < FORCED_AD_RULES.cooldownMs) return 'COOLDOWN_TIME';
+    if (now - remembered.lastRatingAt < FORCED_AD_RULES.afterRatingMs) return 'RATING';
     if (remembered.weeksSinceForced < FORCED_AD_RULES.cooldownWeeks) return 'COOLDOWN_WEEKS';
     if (!isInterstitialReady()) return 'NOT_LOADED';
     return null;
@@ -200,6 +215,6 @@ if (isDev() && typeof window !== 'undefined') {
     (window as unknown as Record<string, unknown>).__aeForcedAds = {
         context: () => context,
         memory: () => ({ ...getMemory() }),
-        reset: () => { memory = { lastAdAt: 0, weeksSinceForced: 99, lastPurchaseAt: 0 }; saveMemory(); },
+        reset: () => { memory = { lastAdAt: 0, weeksSinceForced: 99, lastPurchaseAt: 0, lastRatingAt: 0 }; saveMemory(); },
     };
 }
