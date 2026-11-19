@@ -1,5 +1,7 @@
+import { decodePhoto, PHOTO_SOURCE_LIMIT_BYTES } from './photoIntake';
+
 export const STREAMING_BRAND_MARK_DATA_URL_LIMIT = 1_500_000;
-export const STREAMING_BRAND_MARK_SOURCE_LIMIT = 12 * 1024 * 1024;
+export const STREAMING_BRAND_MARK_SOURCE_LIMIT = PHOTO_SOURCE_LIMIT_BYTES;
 
 const CANONICAL_MARK_PATTERN = /^data:image\/(?:png|jpeg|jpg|webp|svg\+xml);/i;
 
@@ -25,40 +27,6 @@ interface DecodedImage {
     dispose: () => void;
 }
 
-const decodeWithImageElement = (file: File): Promise<DecodedImage> => new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.decoding = 'async';
-    image.onload = () => resolve({
-        source: image,
-        width: image.naturalWidth,
-        height: image.naturalHeight,
-        dispose: () => URL.revokeObjectURL(objectUrl),
-    });
-    image.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('This image format cannot be decoded on this device. Export it as PNG, WebP, JPG, or SVG and try again.'));
-    };
-    image.src = objectUrl;
-});
-
-const decodeImage = async (file: File): Promise<DecodedImage> => {
-    if (typeof createImageBitmap === 'function') {
-        try {
-            const bitmap = await createImageBitmap(file);
-            return {
-                source: bitmap,
-                width: bitmap.width,
-                height: bitmap.height,
-                dispose: () => bitmap.close(),
-            };
-        } catch {
-            // SVG and a few mobile formats decode more reliably through an image element.
-        }
-    }
-    return decodeWithImageElement(file);
-};
-
 const renderCanonicalCanvas = (decoded: DecodedImage, size: number): HTMLCanvasElement => {
     const canvas = document.createElement('canvas');
     canvas.width = size;
@@ -81,16 +49,13 @@ const renderCanonicalCanvas = (decoded: DecodedImage, size: number): HTMLCanvasE
 
 /** Normalize a browser-decodable image into a transparent, square safe-area asset. */
 export const convertStreamingBrandMark = async (file: File): Promise<ConvertedStreamingBrandMark> => {
-    const recognizedImageExtension = /\.(?:png|jpe?g|webp|svg|gif|bmp|avif|heic|heif)$/i.test(file.name);
-    if (!file.type.startsWith('image/') && !recognizedImageExtension) throw new Error('Choose an image file for your platform mark.');
-    if (file.size > STREAMING_BRAND_MARK_SOURCE_LIMIT) throw new Error('That image is too large. Choose a file under 12 MB.');
-
-    const decoded = await decodeImage(file);
+    /* 18 Nov 2026: through the game's one photo intake (services/photoIntake.ts).
+       - The picture decides, not its label or name.
+       - It is turned the right way up.
+       - The 80-megapixel and 20,000 px limits this upload already had now apply to every photo in the game. */
+    const decoded: DecodedImage = await decodePhoto(file, 1024);
     try {
         if (!decoded.width || !decoded.height) throw new Error('The uploaded image has no readable dimensions.');
-        if (decoded.width > 20_000 || decoded.height > 20_000 || decoded.width * decoded.height > 80_000_000) {
-            throw new Error('That image has extreme dimensions. Resize it below 80 megapixels and try again.');
-        }
         const attempts = [
             { size: 1024, quality: 0.9 },
             { size: 768, quality: 0.84 },

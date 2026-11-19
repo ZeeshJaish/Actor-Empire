@@ -14,6 +14,7 @@ import { getAbsoluteWeek } from '../services/legacyLogic';
 import { getGenderedAvatar, NPC_DATABASE } from '../services/npcLogic';
 import { createBusiness } from '../services/businessLogic';
 import { calculateYoutubeCreatorScore, getYoutubePublicImageLabel } from '../services/youtubeLogic';
+import { PhotoIntakeError, photoIntakeMessage, preparePhotoDataUrl } from '../services/photoIntake';
 import { ALL_GENRES, formatGenreLabel } from '../services/genreCatalog';
 import { getPlayerLanguage, t } from '../services/i18n';
 import { Heart, Smile, Star, Zap, DollarSign, BadgeDollarSign, Brain, Calendar, Activity, TrendingUp, Trophy, X, Sliders, Users, Film, Tv, PlayCircle, Lock, FastForward, Key, AlertTriangle, Mic2, Mail, FileText, Dumbbell, Sparkles, Settings, ShoppingCart, Clapperboard, ZapOff, Crown, Skull, Camera, UploadCloud, Check, MessageSquareQuote, Globe, BarChart3, PieChart } from 'lucide-react';
@@ -314,65 +315,24 @@ export const HomePage: React.FC<HomePageProps> = ({ player, onNextWeek, isProces
       }
   };
 
-  const compressImage = (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-          const blobUrl = URL.createObjectURL(file);
-          const img = new Image();
-
-          img.onload = () => {
-              URL.revokeObjectURL(blobUrl);
-              const canvas = document.createElement('canvas');
-              const MAX_SIZE = 300;
-              let width = img.width;
-              let height = img.height;
-
-              if (width > height) {
-                  if (width > MAX_SIZE) {
-                      height *= MAX_SIZE / width;
-                      width = MAX_SIZE;
-                  }
-              } else if (height > MAX_SIZE) {
-                  width *= MAX_SIZE / height;
-                  height = MAX_SIZE;
-              }
-
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              if (!ctx) {
-                  reject(new Error('Canvas context failed'));
-                  return;
-              }
-              ctx.drawImage(img, 0, 0, width, height);
-              resolve(canvas.toDataURL('image/jpeg', 0.7));
-          };
-
-          img.onerror = (err) => {
-              URL.revokeObjectURL(blobUrl);
-              reject(err);
-          };
-
-          img.src = blobUrl;
-      });
-  };
-
+  /* 18 Nov 2026: a picked profile photo goes through the game's one photo intake (services/photoIntake.ts).
+     - The picture decides, not the file label some Android galleries leave empty.
+     - It is turned the right way up.
+     - It is kept as a 300 px JPEG in the save, as before. */
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
-      if (!file.type.startsWith('image/')) {
-          setAvatarError('Please upload a valid image file.');
-          return;
-      }
       setIsCompressing(true);
       setAvatarError('');
       try {
-          const compressed = await compressImage(file);
+          const compressed = await preparePhotoDataUrl(file, { maxSide: 300, quality: 0.7 });
           setSelectedAvatar(compressed);
           setSelectedProfileSelection(null);
           setIsCustomUpload(true);
       } catch (err) {
-          console.error('Avatar processing failed', err);
-          setAvatarError('Could not process that photo. Try a smaller image.');
+          /* a picture the game cannot use is told to the player, not logged as an error */
+          if (!(err instanceof PhotoIntakeError)) console.error('Avatar processing failed', err);
+          setAvatarError(photoIntakeMessage(err));
       } finally {
           setIsCompressing(false);
           if (fileInputRef.current) fileInputRef.current.value = '';

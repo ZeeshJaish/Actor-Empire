@@ -6,6 +6,7 @@ import { ClothingItem, Player, Property, Vehicle, YoutubeBrandDeal, YoutubeColla
 import { calculateYoutubeMerchQuote, calculateYoutubeCreatorScore, generateYoutubeFeed, getWeeksSinceYoutubeUpload, getYoutubeMerchDropFailure, getYoutubePublicImageLabel, resolveYoutubeMerchDrop, YOUTUBE_MERCH_COOLDOWN_WEEKS, YOUTUBE_MERCH_TIERS, YOUTUBE_MONETIZATION_SUBS, YOUTUBE_MONETIZATION_VIEWS } from '../../services/youtubeLogic';
 import { spendPlayerEnergy } from '../../services/premiumLogic';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
+import { encodePhotoCanvas, photoIntakeMessage, preparePhotoForEditor } from '../../services/photoIntake';
 import { AIRCRAFT_CATALOG, BOAT_CATALOG, CAR_CATALOG, CLOTHING_CATALOG, MOTORCYCLE_CATALOG, PROPERTY_CATALOG } from '../../services/lifestyleLogic';
 import { getLifestyleAssetImageInfo } from '../../services/lifestyleAssetImages';
 import { getPlayerLanguage, t } from '../../services/i18n';
@@ -32,7 +33,6 @@ const VIDEO_TYPES: { type: YoutubeVideoType, labelKey: string, cost: number, ene
 
 const THUMBNAIL_WIDTH = 1280;
 const THUMBNAIL_HEIGHT = 720;
-const MAX_THUMBNAIL_SOURCE_SIZE = 12 * 1024 * 1024;
 type ThumbnailFitMode = 'cover' | 'contain';
 type YoutubeVideoReaction = 'LIKE' | 'DISLIKE';
 type YoutubeContentAsset = Property | Vehicle | ClothingItem;
@@ -113,7 +113,8 @@ const createFittedThumbnailBlob = async (
         drawHeight
     );
 
-    return canvasToBlob(canvas, 'image/webp', 0.78);
+    /* WebP, or JPEG where the device cannot write WebP (Safari used to save a PNG several times bigger) */
+    return encodePhotoCanvas(canvas, { quality: 0.78 });
 };
 
 const YoutubeThumbnail: React.FC<{ video: YoutubeVideo; className?: string; children?: React.ReactNode }> = ({ video, className = '', children }) => {
@@ -820,26 +821,27 @@ export const YoutubeApp: React.FC<YoutubeAppProps> = ({ player, onBack, onUpdate
         if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
     };
 
-    const handleThumbnailUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    /* 18 Nov 2026: a picked thumbnail goes through the game's one photo intake (services/photoIntake.ts).
+       - The picture decides, not the file label some Android galleries leave empty.
+       - Big phone photos are shrunk instead of refused.
+       - The editor gets a working copy that is the right way up. */
+    const handleThumbnailUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
+        event.target.value = '';
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            setThumbnailError('Please choose an image file.');
-            return;
-        }
-        if (file.size > MAX_THUMBNAIL_SOURCE_SIZE) {
-            setThumbnailError('That image is too large. Please choose one under 12MB.');
-            return;
-        }
-
-        if (draftThumbnailSourceUrl) URL.revokeObjectURL(draftThumbnailSourceUrl);
-        setDraftThumbnailSourceUrl(URL.createObjectURL(file));
-        setDraftThumbnailZoom(1);
-        setDraftThumbnailOffsetX(0);
-        setDraftThumbnailOffsetY(0);
-        setDraftThumbnailFitMode('cover');
-        setIsThumbnailEditorOpen(true);
         setThumbnailError('');
+        try {
+            const working = await preparePhotoForEditor(file);
+            if (draftThumbnailSourceUrl) URL.revokeObjectURL(draftThumbnailSourceUrl);
+            setDraftThumbnailSourceUrl(working.url);
+            setDraftThumbnailZoom(1);
+            setDraftThumbnailOffsetX(0);
+            setDraftThumbnailOffsetY(0);
+            setDraftThumbnailFitMode('cover');
+            setIsThumbnailEditorOpen(true);
+        } catch (error) {
+            setThumbnailError(photoIntakeMessage(error));
+        }
     };
 
     const createYoutubeVideo = (

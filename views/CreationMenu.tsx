@@ -2,6 +2,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { User, Calendar, Check, ArrowRight, UploadCloud, AtSign, X, Shuffle } from 'lucide-react';
 import { Gender } from '../types';
+import { PhotoIntakeError, photoIntakeMessage, preparePhotoDataUrl } from '../services/photoIntake';
 import { ProfilePictureBuilder } from './avatar/ProfilePictureBuilder';
 import {
   ProfileBuilderGender,
@@ -115,76 +116,25 @@ export const CreationMenu: React.FC<CreationMenuProps> = ({ onStartGame }) => {
     onStartGame(name, parsedAge, gender, selectedAvatar, finalHandle);
   };
 
-  const compressImage = (file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-          // Optimization: Use createObjectURL instead of FileReader to avoid 
-          // loading the huge base64 string into memory before resizing.
-          const blobUrl = URL.createObjectURL(file);
-          const img = new Image();
-          
-          img.onload = () => {
-              // Revoke URL to free memory immediately
-              URL.revokeObjectURL(blobUrl);
-
-              const canvas = document.createElement('canvas');
-              // Limit max dimensions to 300px to keep save file small
-              const MAX_SIZE = 300;
-              let width = img.width;
-              let height = img.height;
-
-              if (width > height) {
-                  if (width > MAX_SIZE) {
-                      height *= MAX_SIZE / width;
-                      width = MAX_SIZE;
-                  }
-              } else {
-                  if (height > MAX_SIZE) {
-                      width *= MAX_SIZE / height;
-                      height = MAX_SIZE;
-                  }
-              }
-
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                  ctx.drawImage(img, 0, 0, width, height);
-                  // Export as JPEG with 0.7 quality for compression
-                  resolve(canvas.toDataURL('image/jpeg', 0.7));
-              } else {
-                  reject(new Error("Canvas context failed"));
-              }
-          };
-
-          img.onerror = (err) => {
-              URL.revokeObjectURL(blobUrl);
-              reject(err);
-          };
-
-          img.src = blobUrl;
-      });
-  };
-
+  /* 18 Nov 2026: a picked profile photo goes through the game's one photo intake (services/photoIntake.ts).
+     - The picture decides, not the file label some Android galleries leave empty.
+     - It is turned the right way up.
+     - It is kept as a 300 px JPEG in the save, as before. */
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Basic validation
-      if (!file.type.startsWith('image/')) {
-          setError("Please upload an image file.");
-          return;
-      }
-      
       setIsCompressing(true);
       setError('');
-      
+
       try {
-          const compressed = await compressImage(file);
+          const compressed = await preparePhotoDataUrl(file, { maxSide: 300, quality: 0.7 });
           setSelectedAvatar(compressed);
           setSelectedProfileSelection(null);
           setIsCustomUpload(true);
       } catch (err) {
-          console.error("Image processing failed", err);
-          setError("Failed to process image. Try a smaller file.");
+          /* a picture the game cannot use is told to the player, not logged as an error */
+          if (!(err instanceof PhotoIntakeError)) console.error("Image processing failed", err);
+          setError(photoIntakeMessage(err));
       } finally {
           setIsCompressing(false);
           // Reset input so same file can be selected again if needed

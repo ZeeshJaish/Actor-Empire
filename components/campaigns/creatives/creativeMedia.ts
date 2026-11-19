@@ -2,7 +2,10 @@
  * A campaign creative in the game's media store (#148; plan §20.10 point 5: "images go into the game's media store
  * (`mediaStorage`, a new `campaign_creative` kind, the same store posters and Instagram images use), so they travel
  * with save transfers").
- *  - a picked file is read into an image (12 MB at most, as posters allow);
+ *  - a picked file goes through the game's one photo intake (`services/photoIntake.ts`, 18 Nov 2026):
+ *    - it is read by what it is, so a file some Android galleries leave unlabelled still works;
+ *    - it is turned the right way up;
+ *    - it becomes a working copy of at most 2048 px a side for the cropper;
  *  - the crop is drawn at the frame's kept size (`creativeOutputSize`) and encoded as JPEG, which every browser the
  *    game runs in can write;
  *  - its media id is made at once, so the campaign can hold it while the store writes in the background; the store
@@ -14,21 +17,23 @@ import { recordNonFatal } from '../../../services/firebaseService';
 import { useEffect, useState } from 'react';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../../services/mediaStorage';
 import { creativeOutputSize, cropSource, type CreativeCrop } from './creativeFrames';
+import { loadPhotoElement, PHOTO_SOURCE_LIMIT_BYTES, preparePhotoForEditor } from '../../../services/photoIntake';
 
-export const MAX_CREATIVE_SOURCE_BYTES = 12 * 1024 * 1024;
+export const MAX_CREATIVE_SOURCE_BYTES = PHOTO_SOURCE_LIMIT_BYTES;
 const JPEG_QUALITY = 0.86;
 const KEEP = { maxItems: 240, maxBytes: 96 * 1024 * 1024 };
 
-/** The picked file as an image, or why not. Its `src` is an object URL the cropper shows; the caller revokes it. */
-export const readCreativeFile = (file: File): Promise<HTMLImageElement> => new Promise((resolve, reject) => {
-  if (!file.type.startsWith('image/')) { reject(new Error('Pick an image file.')); return; }
-  if (file.size > MAX_CREATIVE_SOURCE_BYTES) { reject(new Error('That image is over 12 MB. Pick a smaller one.')); return; }
-  const url = URL.createObjectURL(file);
-  const image = new Image();
-  image.onload = () => resolve(image);
-  image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That image could not be read.')); };
-  image.src = url;
-});
+/** The picked file as an image, or why not (a player-facing reason). Its `src` is an object URL the cropper shows; the
+    caller revokes it. */
+export const readCreativeFile = async (file: File): Promise<HTMLImageElement> => {
+  const working = await preparePhotoForEditor(file);
+  try {
+    return await loadPhotoElement(working.url);
+  } catch (error) {
+    URL.revokeObjectURL(working.url);
+    throw error;
+  }
+};
 
 /** The crop drawn at the frame's kept size. */
 export const renderCrop = (image: HTMLImageElement, ratio: number, crop: CreativeCrop): HTMLCanvasElement => {

@@ -10,6 +10,7 @@ import css from './CampaignScenes.module.css';
 import { CampaignScene } from './CampaignScene';
 import { CAMPAIGN_SCENES, type CampaignSceneId } from './sceneCatalogue';
 import { makeDefaultCreative, type CreativeSubject } from './defaultCreative';
+import { loadPhotoElement, photoIntakeMessage, preparePhotoForEditor } from '../../../services/photoIntake';
 
 const ORDER: CampaignSceneId[] = ['BURJ_KHALIFA', 'CITY_BILLBOARD'];
 const TAB: Partial<Record<CampaignSceneId, string>> = { BURJ_KHALIFA: 'Burj Khalifa', CITY_BILLBOARD: 'Billboard' };
@@ -37,16 +38,23 @@ export const CampaignScenePreview: React.FC<{ subject: CreativeSubject; onClose:
   }, [subject.title, subject.service, subject.hue, subject.brandHue]);
   useEffect(() => () => urls.current.forEach(url => URL.revokeObjectURL(url)), []);
 
+  /* 18 Nov 2026: a picked picture goes through the game's one photo intake (services/photoIntake.ts). The picture
+     decides, not the file label some Android galleries leave empty, and a picture that cannot be used says why. */
+  const [uploadProblem, setUploadProblem] = useState('');
   const upload = (file: File | undefined) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    const url = URL.createObjectURL(file);
-    urls.current.push(url);
-    const image = new Image();
-    image.onload = () => {
-      setUploads(current => ({ ...current, [sceneId]: image }));
-      setPlay(count => count + 1);
-    };
-    image.src = url;
+    if (!file) return;
+    const forScene = sceneId;
+    setUploadProblem('');
+    preparePhotoForEditor(file)
+      .then(working => {
+        urls.current.push(working.url);
+        return loadPhotoElement(working.url);
+      })
+      .then(image => {
+        setUploads(current => ({ ...current, [forScene]: image }));
+        setPlay(count => count + 1);
+      })
+      .catch(error => setUploadProblem(photoIntakeMessage(error)));
   };
   const pick = (id: CampaignSceneId) => {
     if (id === sceneId) return;
@@ -92,6 +100,7 @@ export const CampaignScenePreview: React.FC<{ subject: CreativeSubject; onClose:
           {uploads[sceneId] && <button type="button" onClick={reset}>Use made-for-you</button>}
         </div>
       </div>
+      {uploadProblem && <p className={css.note} role="alert">{uploadProblem}</p>}
     </div>
   );
 };

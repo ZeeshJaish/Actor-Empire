@@ -7,6 +7,7 @@ import { getIndustryMediaCampaignParticipationDraft, getIndustryMediaSocialProfi
 import { getInstagramPostComments, getInstagramPresetCaption, getLocalizedInstagramPostConfig, INSTAGRAM_POST_CONFIGS } from '../../services/instagramLogic';
 import { getPlayerLanguage, t } from '../../services/i18n';
 import { loadMediaBlob, pruneMediaStore, saveMediaBlob } from '../../services/mediaStorage';
+import { encodePhotoCanvas, photoIntakeMessage, preparePhotoForEditor } from '../../services/photoIntake';
 import { Camera, Heart, MessageCircle, Send, Search, User, Grid, ArrowLeft, Video, Sparkles, Popcorn, Zap, XCircle, Check, Briefcase, Handshake, Smile, Lock, Coffee, Images, Clapperboard, Flame, Shirt, Bookmark, BarChart3, ImagePlus, Music2 } from 'lucide-react';
 import { IndustryClaimContextPanel, getIndustryClaimPresentation } from './IndustryClaimContext';
 import { IndustryNarrativeContext } from './IndustryNarrativeContext';
@@ -68,7 +69,8 @@ const createFittedInstagramBlob = async (
         drawHeight
     );
 
-    return canvasToBlob(canvas, 'image/webp', 0.78);
+    /* WebP, or JPEG where the device cannot write WebP (Safari used to save a PNG several times bigger) */
+    return encodePhotoCanvas(canvas, { quality: 0.78 });
 };
 
 const InstagramPostVisual: React.FC<{
@@ -590,24 +592,26 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
       resetImageDraft();
   };
 
-  const handleImageSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+  /* 18 Nov 2026: a picked photo goes through the game's one photo intake (services/photoIntake.ts).
+     - The picture decides, not the file label some Android galleries leave empty.
+     - Big phone photos are shrunk instead of refused.
+     - The editor gets a working copy that is the right way up. */
+  const handleImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
+      event.target.value = '';
       if (!file) return;
-      if (!file.type.startsWith('image/')) {
-          setImageError('Choose an image file for the post.');
-          return;
-      }
-      if (file.size > 12 * 1024 * 1024) {
-          setImageError('That image is too large. Try one under 12MB.');
-          return;
-      }
-      if (imageSourceUrl) URL.revokeObjectURL(imageSourceUrl);
-      setImageSourceUrl(URL.createObjectURL(file));
-      setImageZoom(1);
-      setImageOffsetX(0);
-      setImageOffsetY(0);
-      setImageFitMode('cover');
       setImageError('');
+      try {
+          const working = await preparePhotoForEditor(file);
+          if (imageSourceUrl) URL.revokeObjectURL(imageSourceUrl);
+          setImageSourceUrl(working.url);
+          setImageZoom(1);
+          setImageOffsetX(0);
+          setImageOffsetY(0);
+          setImageFitMode('cover');
+      } catch (error) {
+          setImageError(photoIntakeMessage(error));
+      }
   };
 
   const handleCreatePost = async () => {

@@ -1,7 +1,8 @@
 import { CustomPoster, Player } from '../types';
 import { saveMediaBlob, StoredMediaMeta } from './mediaStorage';
+import { encodePhotoCanvas, PHOTO_SOURCE_LIMIT_BYTES, preparePhoto } from './photoIntake';
 
-export const MAX_CUSTOM_POSTER_SOURCE_BYTES = 12 * 1024 * 1024;
+export const MAX_CUSTOM_POSTER_SOURCE_BYTES = PHOTO_SOURCE_LIMIT_BYTES;
 const POSTER_MAX_WIDTH = 900;
 const POSTER_MAX_HEIGHT = 1350;
 const POSTER_WEBP_QUALITY = 0.8;
@@ -34,15 +35,6 @@ export const hasCustomPosterImage = (poster?: CustomPoster | null): boolean => (
     )
 );
 
-const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> => (
-    new Promise((resolve, reject) => {
-        canvas.toBlob(blob => {
-            if (blob) resolve(blob);
-            else reject(new Error('Could not encode poster image.'));
-        }, type, quality);
-    })
-);
-
 const loadImage = (src: string): Promise<HTMLImageElement> => (
     new Promise((resolve, reject) => {
         const image = new Image();
@@ -60,29 +52,14 @@ const getFittedPosterSize = (width: number, height: number) => {
     };
 };
 
+/* 18 Nov 2026: a picked poster goes through the game's one photo intake (services/photoIntake.ts):
+   - the picture decides, not the file label some Android galleries leave empty;
+   - big phone photos are shrunk instead of refused;
+   - EXIF turns are honoured;
+   - it is written as WebP, or as JPEG where the device cannot write WebP. */
 export const createCustomPosterBlobFromFile = async (file: File): Promise<CustomPosterBlobResult> => {
-    if (!file.type.startsWith('image/')) {
-        throw new Error('Please choose an image file.');
-    }
-    if (file.size > MAX_CUSTOM_POSTER_SOURCE_BYTES) {
-        throw new Error('That image is too large. Please choose one under 12MB.');
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    try {
-        const image = await loadImage(objectUrl);
-        const size = getFittedPosterSize(image.naturalWidth || image.width, image.naturalHeight || image.height);
-        const canvas = document.createElement('canvas');
-        canvas.width = size.width;
-        canvas.height = size.height;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Could not prepare poster image.');
-        context.drawImage(image, 0, 0, size.width, size.height);
-        const blob = await canvasToBlob(canvas, 'image/webp', POSTER_WEBP_QUALITY);
-        return { blob, ...size };
-    } finally {
-        URL.revokeObjectURL(objectUrl);
-    }
+    const photo = await preparePhoto(file, { maxWidth: POSTER_MAX_WIDTH, maxHeight: POSTER_MAX_HEIGHT, quality: POSTER_WEBP_QUALITY });
+    return { blob: photo.blob, width: photo.width, height: photo.height };
 };
 
 const createCustomPosterBlobFromDataUrl = async (dataUrl: string): Promise<CustomPosterBlobResult> => {
@@ -93,8 +70,13 @@ const createCustomPosterBlobFromDataUrl = async (dataUrl: string): Promise<Custo
     canvas.height = size.height;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Could not prepare poster image.');
+    context.fillStyle = '#09090b';
+    context.fillRect(0, 0, size.width, size.height);
     context.drawImage(image, 0, 0, size.width, size.height);
-    const blob = await canvasToBlob(canvas, 'image/webp', POSTER_WEBP_QUALITY);
+    /* WebP, or JPEG where the device cannot write WebP (Safari used to write a PNG several times bigger) */
+    const blob = await encodePhotoCanvas(canvas, { quality: POSTER_WEBP_QUALITY });
+    canvas.width = 0;
+    canvas.height = 0;
     return { blob, ...size };
 };
 

@@ -28,6 +28,9 @@ import { getProjectAlumniStories } from '../../../../services/livingEnsemble';
 import { resolveStreamingPlatformBrandById } from '../../../../services/streamingPlatformBrandRegistry';
 import { getStreamingRightsProjectLine } from '../../../../components/StreamingRightsCalendar';
 
+/* film grain for the made-for-you poster, drawn in the game (fractal noise), no outside request */
+const POSTER_GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
+
 const formatMoney = (val: number) => {
     if (val === 0) return '$0';
     if (val >= 1_000_000_000_000) return `$${(val/1_000_000_000_000).toFixed(2)}T`;
@@ -629,7 +632,8 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
         const bgGradient = activePoster?.bgGradient || getPosterBg(displayTitle);
         return (
             <div className={`w-full aspect-[2/3] rounded-2xl overflow-hidden relative bg-gradient-to-br ${bgGradient} flex flex-col items-center justify-center p-6 text-center border border-white/10 shadow-2xl group`}>
-                <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+                {/* 18 Nov 2026: the grain is drawn here; the outside noise.svg it used to load now answers 402 */}
+                <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: POSTER_GRAIN }}></div>
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10"></div>
                 <div className="relative z-10 w-full h-full flex flex-col justify-center gap-4">
                     <h3 className="mb-2 hidden text-3xl font-black uppercase leading-none tracking-tighter text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)] lg:block">
@@ -690,7 +694,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
+                accept="image/*"
                 onChange={handleImageUpload}
                 className="hidden"
                 aria-hidden="true"
