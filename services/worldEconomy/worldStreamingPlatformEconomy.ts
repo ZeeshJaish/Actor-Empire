@@ -300,16 +300,28 @@ export const synchronizeWorldStreamingPlatformEconomy = (
     absoluteWeek: number,
 ): Player => {
     const normalizedWorld = normalizeWorldPlatformAi(player, player.world, absoluteWeek);
-    const ecosystem = structuredClone(normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, absoluteWeek));
+    /* Week-speed Phase 2a (2026-11-18): copy on write instead of a deep clone of the whole ecosystem (~8 ms M4 a week).
+       The sync writes two fields of each operator with a summary and three fields of every market, so only those
+       objects (and the two records that hold them) are copied, at the same keys; key order is the same as assigning
+       the fields to a clone. Everything else is shared with the normalised ecosystem it came from, which nothing here
+       changes; the ecosystem turn clones before it edits. */
+    const baseEcosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, absoluteWeek);
+    const operators = { ...baseEcosystem.operators };
+    const markets = { ...baseEcosystem.markets };
+    const ecosystem = { ...baseEcosystem, operators, markets };
     const platforms = { ...(normalizedWorld.platforms || {}) };
-    Object.values(ecosystem.operators).forEach(operator => {
-        const summary = economy.platforms[operator.id];
+    Object.entries(baseEcosystem.operators).forEach(([operatorKey, baseOperator]) => {
+        const summary = economy.platforms[baseOperator.id];
         if (!summary) return;
-        operator.subscriberMillions = accountsToMillions(summary.endingPaidAccounts);
-        operator.marketMomentum = Object.fromEntries(summary.countryEconomy.map(country => [
-            country.countryId,
-            round2((country.joinAccounts - country.cancellationAccounts) / Math.max(1, country.endingPaidAccounts) * 100),
-        ]));
+        const operator = {
+            ...baseOperator,
+            subscriberMillions: accountsToMillions(summary.endingPaidAccounts),
+            marketMomentum: Object.fromEntries(summary.countryEconomy.map(country => [
+                country.countryId,
+                round2((country.joinAccounts - country.cancellationAccounts) / Math.max(1, country.endingPaidAccounts) * 100),
+            ])),
+        };
+        operators[operatorKey] = operator;
         if (operator.corePlatformId && platforms[operator.corePlatformId]) {
             const platform = platforms[operator.corePlatformId]!;
             platforms[operator.corePlatformId] = {
@@ -338,7 +350,7 @@ export const synchronizeWorldStreamingPlatformEconomy = (
             };
         }
     });
-    Object.values(ecosystem.markets).forEach(market => {
+    Object.entries(baseEcosystem.markets).forEach(([marketKey, market]) => {
         const rows = Object.values(economy.platforms)
             .map(summary => ({ summary, country: summary.countryEconomy.find(country => country.countryId === market.countryId) }))
             .filter((row): row is typeof row & { country: NonNullable<typeof row.country> } => Boolean(row.country));
@@ -349,9 +361,12 @@ export const synchronizeWorldStreamingPlatformEconomy = (
             sharePercent: row.country.endingPaidAccounts / Math.max(1, total) * 100,
         }] : []
         )));
-        market.shares = repairedShares.shares;
-        market.othersSharePercent = repairedShares.othersSharePercent;
-        market.lastRebalancedAtAbsoluteWeek = absoluteWeek;
+        markets[marketKey] = {
+            ...market,
+            shares: repairedShares.shares,
+            othersSharePercent: repairedShares.othersSharePercent,
+            lastRebalancedAtAbsoluteWeek: absoluteWeek,
+        };
     });
     return {
         ...player,

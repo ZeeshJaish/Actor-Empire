@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { resolveSaveFaceTable } from './saveFaceTable';
 import { APP_DISPLAY_VERSION } from './appVersion';
 import { BRIDGE_CHUNK_CHARS, splitForBridge } from './bridgeChunks';
 import { exportPublicGameData, loadGameData, replaceAllVerifiedGameData } from './storage';
@@ -16,6 +17,10 @@ import type { Player } from '../types';
 
 const ARCHIVE_FORMAT = 'actor-empire-save-transfer';
 const ARCHIVE_FORMAT_VERSION = 1;
+/* Week-speed Phase 2a (2026-11-17), the transfer reader: from 2b, an export whose saves hold a 2b shape (the face table,
+   cinema receipt v2) is written as version 2. This build already reads versions 1 and 2 (the save readers handle the
+   shapes), and answers anything newer with an update message instead of "not a valid file". It still writes 1. */
+const ARCHIVE_FORMAT_VERSIONS_READ: readonly number[] = [1, 2];
 const SIGNATURE_ALGORITHM = 'HMAC-SHA256';
 const TRANSFER_SECRET = 'actor-empire-android-transfer-v1:7e74c91f4f2b4a2d9e0b0a8b2c1d6f35';
 const ACTOR_EMPIRE_KEY_PREFIX = 'actorEmpire';
@@ -60,7 +65,7 @@ export interface SaveTransferEntry {
 
 interface SaveTransferBody {
   format: typeof ARCHIVE_FORMAT;
-  formatVersion: typeof ARCHIVE_FORMAT_VERSION;
+  formatVersion: number;
   appVersion: string;
   exportedAt: string;
   platform: string;
@@ -460,7 +465,11 @@ const parseArchive = async (rawText: string): Promise<SaveTransferArchive> => {
   if (looksLikeLegacyRawSave(archive)) {
     throw new Error('This looks like a raw save, not a signed transfer file. Open the old build, tap Export Game Data, then import the .aesave file here.');
   }
-  if (archive?.format !== ARCHIVE_FORMAT || archive?.formatVersion !== ARCHIVE_FORMAT_VERSION) {
+  if (archive?.format === ARCHIVE_FORMAT && Number.isInteger(archive?.formatVersion)
+    && archive.formatVersion > Math.max(...ARCHIVE_FORMAT_VERSIONS_READ)) {
+    throw new Error('This transfer file was made by a newer version of Actor Empire. Please update the game, then import it again.');
+  }
+  if (archive?.format !== ARCHIVE_FORMAT || !ARCHIVE_FORMAT_VERSIONS_READ.includes(archive?.formatVersion)) {
     throw new Error('This is not a valid Actor Empire transfer file.');
   }
   if (archive.signature?.algorithm !== SIGNATURE_ALGORITHM || typeof archive.signature.value !== 'string') {
@@ -497,7 +506,8 @@ export const prepareSaveTransferImportEntries = async (
 
     const sourceFingerprint = await hashTransferValue(entry.value);
     const importedPlayer = markSaveTransferImported(
-      migratePlayerSave(entry.value as any),
+      // Phase 2a: a version 2 export can hold 2b's face table; the pictures go back before the career is migrated
+      migratePlayerSave(resolveSaveFaceTable(entry.value) as any),
       {
         sourceFingerprint,
         archiveAppVersion: context.archiveAppVersion,

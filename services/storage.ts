@@ -8,6 +8,7 @@ import {
   loadVerifiedGameData as loadVerifiedGeneration,
   recoverPreviousGameData as recoverPreviousGeneration,
   peekVerifiedPreviousGameData as peekPreviousGeneration,
+  peekVerifiedPreviousCopy as peekPreviousCopy,
   saveVerifiedGameData as saveVerifiedGeneration,
   stageVerifiedGameDataBatch as stageVerifiedGenerationBatch,
   promoteStagedGameDataBatch as promoteStagedGenerationBatch,
@@ -137,7 +138,7 @@ export const saveVerifiedGameData = async (
   key: string,
   player: Player,
   manifest: SaveIntegrityManifest,
-  options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean } = {},
+  options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean; requireLive?: { digest: string; token: string | null } } = {},
 ): Promise<void> => saveVerifiedGeneration(indexedDbGenerationStore, key, player, manifest, options);
 
 /* Week Ahead (2026-11-12): the worker writes the week's save with its own store (services/weekAhead). */
@@ -164,9 +165,69 @@ export const peekVerifiedPreviousGameData = async (key: string): Promise<Player 
   peekPreviousGeneration(indexedDbGenerationStore, key)
 );
 
+/** Phase 2a (2026-11-17): the verified backup copy with its save time and writer (read only), or null. */
+export const peekVerifiedPreviousCopy = async (key: string) => (
+  peekPreviousCopy(indexedDbGenerationStore, key)
+);
+
 export const recoverPreviousGameData = async (key: string): Promise<Player> => (
   recoverPreviousGeneration(indexedDbGenerationStore, key)
 );
+
+/* Phase 1 of the week-speed plan (2026-11-17), the purchase ledger (plan rule 5), on today's A/B save. Each paid
+   consumable the game grants is written here, outside every slot, before the save that carries it, so a restored
+   backup (Recover Safe Save, the bad-head fallback) or any older copy can get it back: when a career opens, each
+   entry for that slot and career that the career has not processed, and that came after the opened copy was
+   saved, is granted again once and saved (App.tsx). Play and StoreKit never hand over a finished or consumed
+   purchase again, so nothing else could. Older builds never read this key (they list only actorEmpireSave_N). */
+export interface PurchaseLedgerEntry {
+  transactionId: string;
+  productId: string;
+  slot: number;
+  careerId: string;
+  /** When the grant was applied (before the save that carries it was prepared). */
+  at: number;
+}
+const PURCHASE_LEDGER_KEY = 'actorEmpirePurchaseLedger';
+const PURCHASE_LEDGER_LIMIT = 300;
+const readLedgerEntries = (value: unknown): PurchaseLedgerEntry[] => {
+  const entries = value && typeof value === 'object' && (value as { kind?: unknown }).kind === 'ACTOR_EMPIRE_PURCHASE_LEDGER'
+    ? (value as { entries?: unknown }).entries : null;
+  return Array.isArray(entries)
+    ? entries.filter((entry): entry is PurchaseLedgerEntry => Boolean(entry && typeof entry.transactionId === 'string'
+      && typeof entry.productId === 'string' && typeof entry.careerId === 'string' && Number.isFinite(entry.slot) && Number.isFinite(entry.at)))
+    : [];
+};
+/** Adds grants to the ledger in one small transaction (read, merge by transaction id, write). */
+export const addPurchaseLedgerEntries = async (entries: PurchaseLedgerEntry[]): Promise<void> => {
+  if (entries.length === 0) return;
+  const db = await openDB();
+  try {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(PURCHASE_LEDGER_KEY);
+    request.onsuccess = () => {
+      const current = readLedgerEntries(request.result);
+      const known = new Set(current.map(entry => entry.transactionId));
+      const merged = [...current, ...entries.filter(entry => !known.has(entry.transactionId))].slice(-PURCHASE_LEDGER_LIMIT);
+      store.put({ kind: 'ACTOR_EMPIRE_PURCHASE_LEDGER', version: 1, entries: merged }, PURCHASE_LEDGER_KEY);
+    };
+    await waitForIndexedDbTransaction(transaction, { operation: 'record purchase ledger' });
+  } finally {
+    db.close();
+  }
+};
+export const readPurchaseLedger = async (): Promise<PurchaseLedgerEntry[]> => {
+  const db = await openDB();
+  try {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const request = transaction.objectStore(STORE_NAME).get(PURCHASE_LEDGER_KEY);
+    await waitForIndexedDbTransaction(transaction, { operation: 'read purchase ledger' });
+    return readLedgerEntries(request.result);
+  } finally {
+    db.close();
+  }
+};
 
 export const replaceAllVerifiedGameData = async (entries: VerifiedSaveBatchEntry[]): Promise<void> => {
   const staged = await stageVerifiedGenerationBatch(indexedDbGenerationStore, entries);

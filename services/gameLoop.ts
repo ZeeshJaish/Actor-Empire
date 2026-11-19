@@ -114,7 +114,7 @@ import { processStreamingRightsCalendarWeek } from './streamingRightsCalendar';
 import { processStreamingOpportunityPremieres } from './streamingOpportunityMarket';
 import { buildStreamingPlatformRunsForProject, summarizeStreamingPlatformRuns } from './streamingReleaseRuns';
 import { resolveStreamingPlatformBrandById } from './streamingPlatformBrandRegistry';
-import { getForbesStreamingCompanies } from './streamingPlatformEcosystem';
+import { getForbesStreamingCompany } from './streamingPlatformEcosystem';
 import { processStreamingCataloguePackagesWeek } from './streamingCataloguePackages';
 import { getSeasonEffects } from './originalsEpisodeBudget';
 import { processStreamingCataloguePackageStrategyAutomation } from './streamingCataloguePackageAutomation';
@@ -5768,7 +5768,7 @@ const processGameWeekInScope = async (
             const seasonBars = getSeasonEffects(rel.projectDetails.episodeBudgetShares);
             const nextStreamingRuns = streamingRuns.map(run => {
                 if (run.isLeaving || settlementAbsoluteWeek < run.startWeekAbsolute) return run;
-                const company = getForbesStreamingCompanies(nextPlayer).find(candidate => candidate.id === run.platformId);
+                const company = getForbesStreamingCompany(nextPlayer, run.platformId);
                 const simulationPlatformId = getStreamingSimulationPlatformId(run.platformId, company?.subscribersMillions || 0);
                 const previousViews = run.weeklyViews[run.weeklyViews.length - 1] || 0;
                 const rawRunViews = calculateStreamingViewership(
@@ -5932,7 +5932,7 @@ const processGameWeekInScope = async (
                 weeklyStreamingRevenue,
                 rel.streaming.weekOnPlatform,
                 getStreamingSimulationPlatformId(rel.streaming.platformId,
-                    getForbesStreamingCompanies(nextPlayer).find(company => company.id === rel.streaming!.platformId)?.subscribersMillions || 0)
+                    getForbesStreamingCompany(nextPlayer, rel.streaming!.platformId)?.subscribersMillions || 0)
             );
             const newWeeklyStreamingBreakdowns = [
                 ...(rel.weeklyStreamingBreakdowns || []),

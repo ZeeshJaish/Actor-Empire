@@ -457,6 +457,29 @@ export const getStreamingOthersShare = (
 ): number => getVisibleStreamingCompaniesForMarket(player, countryId)
     .find(item => item.kind === 'OTHERS')?.sharePercent || 0;
 
+/** Who counts as a worldwide company on the Forbes list (shared by the list and the single-company lookup below). */
+const isVisibleGlobalOperator = (
+    state: ReturnType<typeof normalizeStreamingPlatformEcosystem>,
+    operator: StreamingEcosystemOperator,
+): boolean => {
+    if (operator.lifecycle === 'CLOSED' || operator.lifecycle === 'ACQUIRED') return false;
+    if (operator.kind === 'CORE_GLOBAL' || operator.kind === 'GLOBAL_REAL') return true;
+    if (operator.activeCountryIds.length < 3) return false;
+    const topTwoMarkets = operator.activeCountryIds.filter(countryId => {
+        const market = state.markets[countryId];
+        if (!market) return false;
+        const ranked = [...market.shares].sort((left, right) => right.sharePercent - left.sharePercent);
+        return ranked.slice(0, 2).some(item => item.operatorId === operator.id);
+    }).length;
+    return operator.subscriberMillions >= 12 || operator.valuationBillions >= 2 || topTwoMarkets >= 2;
+};
+
+const byForbesRank = (left: StreamingCompanySummary, right: StreamingCompanySummary): number => (
+    (right.subscribersMillions || 0) - (left.subscribersMillions || 0)
+    || (right.valuationBillions || 0) - (left.valuationBillions || 0)
+    || left.id.localeCompare(right.id)
+);
+
 export const getVisibleGlobalStreamingCompanies = (
     player: Pick<Player, 'world'>,
 ): StreamingCompanySummary[] => {
@@ -465,24 +488,9 @@ export const getVisibleGlobalStreamingCompanies = (
         player.world.streamingPlatformEcosystem?.lastProcessedAbsoluteWeek ?? 0,
     );
     return Object.values(state.operators)
-        .filter(operator => {
-            if (operator.lifecycle === 'CLOSED' || operator.lifecycle === 'ACQUIRED') return false;
-            if (operator.kind === 'CORE_GLOBAL' || operator.kind === 'GLOBAL_REAL') return true;
-            if (operator.activeCountryIds.length < 3) return false;
-            const topTwoMarkets = operator.activeCountryIds.filter(countryId => {
-                const market = state.markets[countryId];
-                if (!market) return false;
-                const ranked = [...market.shares].sort((left, right) => right.sharePercent - left.sharePercent);
-                return ranked.slice(0, 2).some(item => item.operatorId === operator.id);
-            }).length;
-            return operator.subscriberMillions >= 12 || operator.valuationBillions >= 2 || topTwoMarkets >= 2;
-        })
+        .filter(operator => isVisibleGlobalOperator(state, operator))
         .map(operator => toCompanySummary(player, operator))
-        .sort((left, right) => (
-            (right.subscribersMillions || 0) - (left.subscribersMillions || 0)
-            || (right.valuationBillions || 0) - (left.valuationBillions || 0)
-            || left.id.localeCompare(right.id)
-        ));
+        .sort(byForbesRank);
 };
 
 export const getForbesStreamingCompanies = (
@@ -504,9 +512,37 @@ export const getForbesStreamingCompanies = (
         }
     }
 
-    return [...companiesById.values()].sort((left, right) => (
-        (right.subscribersMillions || 0) - (left.subscribersMillions || 0)
-        || (right.valuationBillions || 0) - (left.valuationBillions || 0)
-        || left.id.localeCompare(right.id)
-    ));
+    return [...companiesById.values()].sort(byForbesRank);
+};
+
+/** Week-speed Phase 2 (N1, 2026-11-17): `getForbesStreamingCompanies(player).find(company => company.id === companyId)`
+ *  without building the whole list. It takes the list's own steps for this one id, in the same order:
+ *  - the worldwide pass first. The list keeps the last same-id company in rank order (Map.set overwrites), so this does too;
+ *  - otherwise the country pass, countries in sorted order; the first country that shows the company wins. A country is
+ *    skipped only when no operator with this id is active there, because then that market's list cannot show it.
+ *  A late career built the whole list (every country's market) in about a third of its weeks, 170-190 ms each time on an
+ *  M4, for one subscriber number per streaming run. */
+export const getForbesStreamingCompany = (
+    player: Pick<Player, 'world'>,
+    companyId: string | null | undefined,
+): StreamingCompanySummary | undefined => {
+    const state = normalizeStreamingPlatformEcosystem(
+        player.world.streamingPlatformEcosystem,
+        player.world.streamingPlatformEcosystem?.lastProcessedAbsoluteWeek ?? 0,
+    );
+    const operators = Object.values(state.operators).filter(operator => operator.id === companyId);
+    if (!operators.length) return undefined;
+    const worldwide = operators
+        .filter(operator => isVisibleGlobalOperator(state, operator))
+        .map(operator => toCompanySummary(player, operator))
+        .sort(byForbesRank);
+    if (worldwide.length) return worldwide[worldwide.length - 1];
+    for (const countryId of Object.keys(state.markets).sort()) {
+        const normalizedCountryId = clean(countryId).toUpperCase();
+        if (!operators.some(operator => operator.activeCountryIds.includes(normalizedCountryId))) continue;
+        const shown = getVisibleStreamingCompaniesForMarket(player, countryId)
+            .find(company => company.kind !== 'OTHERS' && company.id === companyId);
+        if (shown) return shown;
+    }
+    return undefined;
 };

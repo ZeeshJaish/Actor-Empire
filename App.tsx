@@ -66,7 +66,9 @@ import {
 } from './services/rewardedAdRecovery';
 import { clearEventReward, eventRewardKey, readEventReward } from './services/eventRewardAd';
 import { ensureTrackingPermission } from './services/trackingService';
-import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, getVerifiedLiveSave, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousGameData, recoverPreviousGameData, runInVerifiedSaveQueue, saveVerifiedGameData, setVerifiedLiveSave, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
+import { addPurchaseLedgerEntries, readPurchaseLedger, type PurchaseLedgerEntry } from './services/storage';
+import { NewerSaveFormatError, slotFormatKey } from './services/saveFormatGuard';
+import { createDeferredSaveSlotSummary, createSaveSlotSummary, deleteVerifiedGameData, getGameSaveSummary, getVerifiedLiveSave, listGameDataKeys, loadVerifiedGameData, peekVerifiedPreviousCopy, recoverPreviousGameData, runInVerifiedSaveQueue, saveVerifiedGameData, setVerifiedLiveSave, writeGameSaveSummary, type SaveSlotSummary } from './services/storage';
 import { buildLegacyStudioInheritance, createBloodlineSnapshot, getAbsoluteWeek, getLegacyInheritancePreview, getRelationshipAge, inferStreamingStartWeekAbsolute, inheritActorSkills, LEGACY_MIN_PLAYABLE_AGE } from './services/legacyLogic';
 import { getStreamingEstate, handoffOwnedStreamingPlatformToHeir, type StreamingHandoffChoice } from './services/streamingLegacy';
 import { applyPremiumPurchase, getRequiredPremiumProductForAsset, hasNoAds, hasPremiumProduct, isNonConsumablePremiumProduct, PremiumProductId, restoreWeeklyEnergy, spendPlayerEnergy, syncEnergyDisplay, syncWeeklyEnergyForCommitments } from './services/premiumLogic';
@@ -83,14 +85,20 @@ import { hydrateGenreXP } from './services/genreCatalog';
 import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
+import { markPortraitLoadDone } from './services/npcAvatar';
+import { readSaveWriteRecord } from './services/saveWriteLimits';
+import { getRecoveryFlaggedVersions, isSwitchOn, startSessionSwitches } from './services/remoteSwitches';
+import { findFlaggedVersionOffer, isRecoveryOfferAnswered, offerForFailedLoad, pointFromCopy, rememberRecoveryOfferAnswered, weeksLostByRestoring, type RecoveryPoint, type RecoveryReason } from './services/recoveryList';
 import { deliverDeveloperNotes } from './services/developerNotes';
 import { prepareExternalPlayerUpdateForUi, prepareProcessedWeekForUi, prepareTrustedMarketUpdateForUi } from './services/playerUiState';
 import { applyIndustryMediaCampaignParticipation } from './services/industryWorld';
 import { yieldForWeekProcessingPaint } from './services/weekProcessingScheduler';
 import { describeWeekProcessingFailure } from './services/weekProcessingRecovery';
 import { checkpointNativeMemoryPressure } from './services/nativeMemoryCheckpoint';
+import { getNativeDeviceInfo, withNativeBackgroundTask } from './services/nativeSupport';
+import { notePageHiddenOrMemory, notePageSaveStarted, notePageScreen, notePageWeekAhead, notePageWeekStage, type PageSaveKind } from './services/pageStateBreadcrumb';
 import { exportSaveSlotForSupport, exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
-import { noteSessionClean, noteSessionLive, takeUncleanPreviousSession } from './services/sessionBreadcrumb';
+import { noteSessionClean, noteSessionDetail, noteSessionLive, takeUncleanPreviousSession } from './services/sessionBreadcrumb';
 import { createCopyOnTouch } from './services/copyOnTouch';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
 import { externalizeCustomPostersInPlayer, hasEmbeddedCustomPosters } from './services/customPosterMedia';
@@ -109,6 +117,8 @@ import { applyProjectPromotionAttribution } from './services/projectPromotionAtt
 import { quoteRealEstateSale } from './services/realEstateLogic';
 import {
   addBreadcrumb,
+  isPerformanceTraceActive,
+  fetchRemoteSwitchesForNextLaunch,
   markGameCheckpoint,
   markTraceAction,
   markWeekProcessingStage,
@@ -161,6 +171,12 @@ type PendingSaveRecovery = {
   storageKey: string;
   previous: Player;
   violations: string[];
+  /** Week-speed Phase 2a (2026-11-17), the recovery list (services/recoveryList.ts): why it opened and what it offers. */
+  reason: RecoveryReason;
+  points: RecoveryPoint[];
+  careerId: string;
+  lastShown: { careerId: string; age: number; week: number } | null;
+  flaggedVersion?: string;
 };
 
 type PendingWeekProcessingFailure = {
@@ -198,6 +214,9 @@ const WEEK_AHEAD_MIN_WEEK_MS = 900;
 const WEEK_AHEAD_TAKE_TIMEOUT_MS = 90_000;
 const WEEK_AHEAD_SLOT_KEY = 'actorEmpire.weekAhead.slowWeekMs.';
 const WEEK_AHEAD_FORCE_KEY = 'actorEmpire.weekAhead.force';
+/* Phase 1 (2026-11-17): the system closed the game while Week Ahead ran for this slot (a kill, not a close). Week
+   Ahead then stays off for that slot until the next app version; a memory warning only stops it for the session. */
+const WEEK_AHEAD_KILLED_KEY = 'actorEmpire.weekAhead.offAfterKill.';
 /* Memory (2026-11-12, Redmi test): the worker holds a second copy of the career (+65–220 MB on a 66 MB career).
    Week Ahead runs only where the device reports 4 GB of memory or more (navigator.deviceMemory: Android WebView,
    Chrome). The iOS WebView does not report it, so the iOS app writes the phone's RAM in GiB into
@@ -214,12 +233,66 @@ const deviceAffordsWeekAhead = (): boolean => {
 /* After a memory warning from the system (iOS didReceiveMemoryWarning → 'actor-empire-memory-warning'), Week Ahead
    stays off until the app restarts: the worker's copy of the career is the first memory the game can give back. */
 let weekAheadOffForSession = false;
+/** Phase 1 (2026-11-17), week-speed plan Phase H item 6: Android's trim levels 20 (UI_HIDDEN, every time the game
+ *  leaves the screen) and 40 (BACKGROUND) are app switches, not memory pressure on the game. Each one used to start
+ *  a full-career save next to the hide save and turn Week Ahead off for the session. New native builds no longer
+ *  forward them (MainActivity.java); this covers the shells already installed. iOS and every other level as before. */
+/** Phase 1 (2026-11-17), telemetry v2 (plan item 8): the first cut of "the facts the world reads", to split the
+ *  player's actions between two weeks: an action that replaces one of these parts of the career can change what the
+ *  next week's world simulation sees; any other (a message read, a setting, a draft) cannot. The list comes from what
+ *  the cinema forecast reads (17 Nov) plus money and holdings; Phase 2's S1 refines it. */
+const WORLD_FACT_KEYS = ['world', 'activeReleases', 'commitments', 'pastProjects', 'outsideProductions', 'relationships',
+    'businesses', 'stockTakeovers', 'ownedStreamingPlatform', 'stats', 'money', 'stocks', 'portfolio'] as const;
+const isAndroidAppSwitchTrim = (event: Event): boolean => {
+    if (!isSwitchOn('androidTrimFilter')) return false;
+    const detail = event instanceof CustomEvent ? event.detail as { platform?: unknown; level?: unknown } | null : null;
+    return !!detail && typeof detail === 'object' && detail.platform === 'android' && (detail.level === 20 || detail.level === 40);
+};
+/** Phase 1 (2026-11-17): the phone model for kill reports (the Week Ahead gate becomes phone model x career size).
+ *  The native shells may inject it; otherwise Android's WebView names the model in its user agent. */
+const getDevicePhoneModel = (): string => {
+    const injected = (window as Window & { __aeDeviceModel?: unknown }).__aeDeviceModel;
+    if (typeof injected === 'string' && injected.trim()) return injected.trim().slice(0, 40);
+    const match = /Android [^;)]*;\s*([^;)]+?)(?:\s+Build\/|\))/.exec(typeof navigator !== 'undefined' ? navigator.userAgent || '' : '');
+    return match ? match[1].trim().slice(0, 40) : 'unknown';
+};
+/** Phase 1 (2026-11-17), telemetry v2: the phone's memory class (Android WebView's deviceMemory, iOS's injected GiB). */
+const getRamClass = (): string => {
+    const ios = Number((window as Window & { __aeDeviceMemoryGB?: number }).__aeDeviceMemoryGB);
+    const android = Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory);
+    const gb = Number.isFinite(ios) && ios > 0 ? ios : Number.isFinite(android) && android > 0 ? android : NaN;
+    if (!Number.isFinite(gb)) return 'unknown';
+    return gb < 3 ? 'lt3' : gb < 4 ? '3_4' : gb < 6 ? '4_6' : gb < 8 ? '6_8' : '8p';
+};
+/* Phase 1 (2026-11-17), plan item 8: this launch's switches, from what the previous launch read from Firebase. */
+startSessionSwitches({ ramClass: getRamClass(), version: APP_DISPLAY_VERSION });
+/** Phase 1 (2026-11-17), telemetry v2: the game's stored data (both copies of every slot) as a size class. */
+const sizeBucketOf = (storageMb: number | null): string => storageMb === null ? 'unknown'
+    : storageMb < 25 ? 'lt25' : storageMb < 75 ? '25_75' : storageMb < 150 ? '75_150' : '150p';
+/* Phase 1 (2026-11-17), the lost-week watermark (first form): the last week shown for each slot, kept outside
+   IndexedDB. Opening a career compares it with the copy that opened, and weeks shown but not in that copy are
+   reported. It is written only after a week is saved and shown, so it never runs ahead of the save (on Android a
+   kill can lose a late localStorage write, which makes it lag: lost weeks are under-counted, never invented). */
+const LAST_WEEK_SHOWN_KEY = 'actorEmpire.lastWeekShown.';
+const writeLastWeekShown = (slot: number, shown: Player) => {
+    try { localStorage.setItem(LAST_WEEK_SHOWN_KEY + slot, JSON.stringify({ careerId: shown.id, age: shown.age, week: shown.currentWeek, at: Date.now() })); } catch { /* optional */ }
+};
+const readLastWeekShown = (slot: number): { careerId: string; age: number; week: number } | null => {
+    try {
+        const value = JSON.parse(localStorage.getItem(LAST_WEEK_SHOWN_KEY + slot) || 'null');
+        return value && typeof value.careerId === 'string' && Number.isFinite(value.age) && Number.isFinite(value.week) ? value : null;
+    } catch { return null; }
+};
+const clearLastWeekShown = (slot: number) => { try { localStorage.removeItem(LAST_WEEK_SHOWN_KEY + slot); } catch { /* optional */ } };
 const readWeekAheadWanted = (slot: number | null): boolean => {
     if (!slot || typeof Worker !== 'function' || weekAheadOffForSession) return false;
     try {
+        if (localStorage.getItem(WEEK_AHEAD_KILLED_KEY + slot) === APP_DISPLAY_VERSION) return false;
         const forced = localStorage.getItem(WEEK_AHEAD_FORCE_KEY);
         if (forced === 'on') return true;
         if (forced === 'off') return false;
+        // Phase 1 (2026-11-17), plan item 8: Week Ahead can be switched off from Firebase (from the next launch).
+        if (!isSwitchOn('weekAhead')) return false;
         if (!deviceAffordsWeekAhead()) return false;
         return Number(localStorage.getItem(WEEK_AHEAD_SLOT_KEY + slot)) >= WEEK_AHEAD_MIN_WEEK_MS;
     } catch {
@@ -228,6 +301,38 @@ const readWeekAheadWanted = (slot: number | null): boolean => {
 };
 const rememberSlotWeekMs = (slot: number, weekMs: number) => {
     try { localStorage.setItem(WEEK_AHEAD_SLOT_KEY + slot, String(Math.round(weekMs))); } catch { /* optional */ }
+};
+/* Phase 1 of the week-speed plan (2026-11-17): play time counted while nothing else changed, kept beside the save
+   (see recordActivePlayTime). It belongs to the career and week it was written for, and a later full save that
+   carries at least as much play time removes it. Older builds never read it; they only miss those minutes. */
+const PLAY_TIME_SIDE_KEY = 'actorEmpire.playTimeSinceSave.';
+type PlayTimeSideRecord = { name: string; age: number; week: number; totalPlayTimeMs: number };
+const readPlayTimeSideRecord = (slot: number): PlayTimeSideRecord | null => {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(PLAY_TIME_SIDE_KEY + slot) || 'null');
+        return parsed && typeof parsed.totalPlayTimeMs === 'number' ? parsed as PlayTimeSideRecord : null;
+    } catch {
+        return null;
+    }
+};
+const writePlayTimeSideRecord = (slot: number, source: Player) => {
+    try {
+        const record: PlayTimeSideRecord = { name: source.name, age: source.age, week: source.currentWeek, totalPlayTimeMs: Math.max(0, source.totalPlayTimeMs || 0) };
+        localStorage.setItem(PLAY_TIME_SIDE_KEY + slot, JSON.stringify(record));
+    } catch { /* optional: the next full save carries play time anyway */ }
+};
+const clearPlayTimeSideRecord = (slot: number, saved: Player) => {
+    const record = readPlayTimeSideRecord(slot);
+    if (record && (saved.totalPlayTimeMs || 0) >= record.totalPlayTimeMs) {
+        try { localStorage.removeItem(PLAY_TIME_SIDE_KEY + slot); } catch { /* optional */ }
+    }
+};
+/** Adds play time from the side record when it belongs to this very career and week. */
+const withSidePlayTime = (slot: number | null, loaded: Player): number | null => {
+    if (!slot) return null;
+    const record = readPlayTimeSideRecord(slot);
+    if (!record || record.name !== loaded.name || record.age !== loaded.age || record.week !== loaded.currentWeek) return null;
+    return record.totalPlayTimeMs > (loaded.totalPlayTimeMs || 0) ? record.totalPlayTimeMs : null;
 };
 /* Zedbury Studios ident — the approved timing, kept verbatim from the design:
    the mark holds for 1150ms, then fades out over 320ms. The frame it leaves is
@@ -266,6 +371,13 @@ type StartupSlotPreloadResult =
       needsRecoveryCheckpoint: boolean;
       // anything that makes the tap write to the disk, which needs the loading screen as before
       diskWorkOnTap: boolean;
+      /** Phase 1 (2026-11-17): when the opened copy was saved, and whether the head record was not recognised. */
+      savedAt: number | null;
+      headFallback?: 'CURRENT' | 'PREVIOUS_NEWER';
+      /** Phase 1 (2026-11-17): a load repair changed the career, so the open saves it once. */
+      repaired: boolean;
+      /** Phase 2a (2026-11-17): the app version that wrote the opened copy, for the recovery list. */
+      appVersion: string | null;
     }
   | { kind: 'VERIFIED'; verifiedLoad: Awaited<ReturnType<typeof loadVerifiedGameData>> }
   | { kind: 'FAILED' };
@@ -663,11 +775,66 @@ export const App: React.FC = () => {
      older player back: the screen went back a week while the save held the new one (seen on a Redmi, reproduced
      every time in the browser). Updaters run here, in order, on that newest player, as React would run them. */
   const playerRef = useRef(player);
-  const setPlayer = useCallback((next: React.SetStateAction<Player>) => {
-      const value = typeof next === 'function' ? next(playerRef.current) : next;
+  /* Phase 1 of the week-speed plan (2026-11-17), for the ANRs: every player handed to React gets the next change
+     number, except a play-time-only count. A save notes the number its player carried, per slot. Leaving the app
+     with no change since that slot's last durable save then writes only play time to a tiny side record, instead
+     of a full-career save while Android is stopping the window. */
+  const changeCountRef = useRef(0);
+  const changeCountOfPlayerRef = useRef(new WeakMap<object, number>());
+  const durableChangeCountRef = useRef<Record<number, number>>({});
+  /** Phase 1 (2026-11-17): per slot, the saves being written now and the highest change number they carry. While
+   *  one carries every change, a hide or a memory warning needs no second save (one save at a time at a hide). */
+  const savingChangeCountRef = useRef<Record<number, { saves: number; carried: number }>>({});
+  /** Phase 1 (2026-11-17), the purchase ledger: when the copy each slot opened from was saved, and one token per
+   *  career open, so the ledger is checked once after every open (and after every recovery). */
+  const openedCopySavedAtRef = useRef<Record<number, number>>({});
+  /** Phase 1 (2026-11-17), telemetry v2: when the last week appeared (null: none since this career opened), and the
+   *  game's stored MB when it opened. */
+  const lastWeekOnScreenAtRef = useRef<number | null>(null);
+  /** Phase 1 (2026-11-17): lost weeks found by the open in progress (null: it has not opened a career). */
+  const openLostWeeksRef = useRef<number | null>(null);
+  const storageMbRef = useRef<number | null>(null);
+  const ledgerOpenTokenRef = useRef<string | null>(null);
+  const ledgerCheckedTokenRef = useRef<string | null>(null);
+  /** Phase 1 (2026-11-17), plan item 2: the career a slot just opened, when it equals that slot's stored copy (nothing
+   *  repaired, or the repair already saved). If the hydration on entering PLAYING then changes nothing either, the
+   *  open counts as saved: no full save just for opening a career. */
+  const openedCleanRef = useRef<{ slot: number; player: Player } | null>(null);
+  /** Phase 1 (2026-11-17), telemetry v2: the player's actions since the last week appeared, split by WORLD_FACT_KEYS. */
+  const actionsSinceWeekRef = useRef({ world: 0, other: 0 });
+  const setPlayer = useCallback((next: React.SetStateAction<Player>, options?: { playTimeOnly?: boolean }) => {
+      const before = playerRef.current;
+      const value = typeof next === 'function' ? next(before) : next;
+      if (!options?.playTimeOnly) {
+          changeCountRef.current += 1;
+          const touchesWorld = WORLD_FACT_KEYS.some(key => (before as any)?.[key] !== (value as any)?.[key]);
+          if (touchesWorld) actionsSinceWeekRef.current.world += 1; else actionsSinceWeekRef.current.other += 1;
+      }
+      changeCountOfPlayerRef.current.set(value, changeCountRef.current);
       playerRef.current = value;
       setPlayerState(value);
   }, []);
+  /** True when the live career has no change that this slot's last durable save did not carry. */
+  const isSlotDurable = (slot: number | null): boolean => !!slot
+      && changeCountRef.current <= (durableChangeCountRef.current[slot] ?? -1);
+  const isSlotDurableOrSaving = (slot: number | null): boolean => !!slot && (isSlotDurable(slot)
+      || changeCountRef.current <= (savingChangeCountRef.current[slot]?.carried ?? -1));
+  /** Runs one slot write, noted as in flight with the change number its player carries (see savingChangeCountRef). */
+  const trackSlotWrite = async <T,>(slot: number, carriedPlayer: Player, kind: PageSaveKind, write: () => Promise<T>): Promise<T> => {
+      const carried = changeCountOfPlayerRef.current.get(carriedPlayer) ?? -1;
+      const before = savingChangeCountRef.current[slot] || { saves: 0, carried: -1 };
+      savingChangeCountRef.current[slot] = { saves: before.saves + 1, carried: Math.max(before.carried, carried) };
+      const ended = notePageSaveStarted(kind);
+      try {
+          // Phase 1 (2026-11-17), plan item 6: on iOS the write runs inside a native background task.
+          return await withNativeBackgroundTask(write);
+      } finally {
+          ended();
+          const now = savingChangeCountRef.current[slot];
+          if (now && now.saves <= 1) delete savingChangeCountRef.current[slot];
+          else if (now) savingChangeCountRef.current[slot] = { saves: now.saves - 1, carried: now.carried };
+      }
+  };
   const [activePage, setActivePage] = useState<Page>(Page.HOME);
   const [lifestyleInitialView, setLifestyleInitialView] = useState<'MAIN' | 'ASSETS' | 'ACTIVITIES' | 'BUSINESS' | 'PRODUCTION_WIZARD' | 'PRODUCTION_GAME' | 'STREAMING_PLATFORM' | 'STREAMING_FINANCE' | 'STREAMING_STATUS' | 'STREAMING_TEAM' | 'STREAMING_OWNERSHIP' | 'STREAMING_SLATE' | 'STREAMING_RIGHTS' | null>(null);
   const [rightsMarketOpportunityId, setRightsMarketOpportunityId] = useState<string | null>(null);
@@ -808,24 +975,46 @@ export const App: React.FC = () => {
     noteStoreReviewSession();
     if (previous) noteStoreReviewTrouble('session_ended_unexpectedly');
     if (previous) {
-      recordNonFatal(new Error('The previous session ended while the game was open'), 'session_ended_unexpectedly', {
+      /* Phase 1 (2026-11-17): a kill while Week Ahead ran keeps it off for that slot until the next app version (its
+         worker's copy of the career may be what the phone could not hold). */
+      const killedSlot = Number(previous.slot) > 0 ? Number(previous.slot) : 0;
+      if (previous.weekAhead === 'on' && killedSlot > 0 && previous.version === APP_DISPLAY_VERSION) {
+        try { localStorage.setItem(WEEK_AHEAD_KILLED_KEY + killedSlot, APP_DISPLAY_VERSION); } catch { /* optional */ }
+        addBreadcrumb('week_ahead:off_after_kill', { slot: killedSlot });
+      }
+      // Phase 1 (2026-11-17): the native shells name the phone model and its memory (services/nativeSupport.ts).
+      void getNativeDeviceInfo().then(device => recordNonFatal(new Error('The previous session ended while the game was open'), 'session_ended_unexpectedly', {
         last_screen: previous.screen || 'unknown',
         last_week: previous.week || 'unknown',
         last_save_ms: previous.lastSaveMs ?? -1,
         last_heap_mb: previous.heapMb ?? -1,
         minutes_ago: Math.round((Date.now() - previous.at) / 60_000),
         last_version: previous.version || 'unknown',
-      });
+        /* Phase 1 (2026-11-17), for the Week Ahead gate: Week Ahead's state, the slot, the game's stored MB (both copies
+           of every slot) and the phone model, as one key because the Crashlytics key budget is nearly full. */
+        ended_ctx: `wa=${previous.weekAhead || 'off'};slot=${killedSlot};store_mb=${previous.storageMb ?? -1};model=${device?.model || getDevicePhoneModel()};mem_gb=${device?.totalMemGb ?? -1}`,
+      }));
     }
-    noteSessionLive({ version: APP_DISPLAY_VERSION });
-    const onVisibility = () => (document.visibilityState === 'hidden' ? noteSessionClean() : noteSessionLive());
+    noteSessionLive({ version: APP_DISPLAY_VERSION, weekAhead: 'off' });
+    /* Phase 1 (2026-11-17), plan item 8: read the switches for the next launch, once the game has settled. */
+    const switchesTimer = window.setTimeout(() => {
+      void fetchRemoteSwitchesForNextLaunch().catch(error => addBreadcrumb('switches:read_failed', { message: String((error as Error)?.message || error).slice(0, 80) }));
+    }, 15_000);
+    const onVisibility = () => {
+      // Phase 1 (2026-11-17): the hide breadcrumb's line for this moment (services/pageStateBreadcrumb.ts).
+      notePageHiddenOrMemory(document.visibilityState === 'hidden' ? 'hide' : 'show', { stage: weekProcessingLockRef.current ? activeWeekStageRef.current : undefined });
+      if (document.visibilityState === 'hidden') noteSessionClean(); else noteSessionLive();
+    };
     window.addEventListener('pagehide', noteSessionClean);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
+      window.clearTimeout(switchesTimer);
       window.removeEventListener('pagehide', noteSessionClean);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+  // Phase 1 (2026-11-17): the faces drawn so far are the game code's own (Week Ahead's worker gets these at start).
+  useEffect(() => { markPortraitLoadDone(); }, []);
   useEffect(() => { noteSessionLive({ screen: gameStatus }); }, [gameStatus]);
   /* Store ratings (services/storeReview.ts): a week's happy moment waits here for a calm Home screen (no popup, no
      ad, no week running), then the store's own popup is asked, unless the rules hold it back by then. */
@@ -870,6 +1059,20 @@ export const App: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [reviewCalm, reviewMomentTick]);
   useEffect(() => {
+    if (!currentSlot) return;
+    noteSessionLive({ slot: currentSlot });
+    /* Phase 1 (2026-11-17): the game's stored data, for the Week Ahead gate (phone model x career size). One cheap
+       estimate per opened career; it counts both copies of every slot. */
+    void navigator.storage?.estimate?.().then(estimate => {
+      if (estimate && typeof estimate.usage === 'number') {
+        const storageMb = Math.round(estimate.usage / 100_000) / 10;
+        storageMbRef.current = storageMb;
+        noteSessionDetail({ storageMb });
+      }
+    }).catch(() => { /* optional */ });
+  }, [currentSlot]);
+  useEffect(() => { notePageScreen(gameStatus === 'PLAYING' ? Page[activePage] || String(activePage) : gameStatus); }, [gameStatus, activePage]);
+  useEffect(() => {
     const shell = shellRef.current;
     const viewport = window.visualViewport;
     if (!shell || !viewport) return;
@@ -910,6 +1113,16 @@ export const App: React.FC = () => {
   };
   const hasProcessedStoreTransaction = (state: Player, transactionId?: string) =>
       !!transactionId && getProcessedStoreTransactionIds(state).includes(transactionId);
+  /** Phase 1 (2026-11-17), the purchase ledger: paid consumables granted to this slot's career, written before the save
+   *  that carries them. A failed ledger write never blocks the grant or its save (it is a safety net). */
+  const recordConsumableGrants = (slot: number | null | undefined, careerId: string, grants: Array<{ transactionId?: string; productId: PremiumProductId }>): Promise<void> => {
+      const at = Date.now();
+      const entries: PurchaseLedgerEntry[] = grants
+          .filter(grant => !!grant.transactionId && !isNonConsumablePremiumProduct(grant.productId))
+          .map(grant => ({ transactionId: grant.transactionId as string, productId: grant.productId, slot: slot || 0, careerId, at }));
+      if (!slot || entries.length === 0) return Promise.resolve();
+      return addPurchaseLedgerEntries(entries).catch(error => recordNonFatal(error, 'purchase_ledger_write_failed', { count: entries.length }));
+  };
   const markProcessedStoreTransaction = (state: Player, transactionId?: string) => {
       if (!transactionId) return;
       const processedIOSStoreTransactionIds = getProcessedStoreTransactionIds(state);
@@ -1010,6 +1223,8 @@ export const App: React.FC = () => {
           sourceByteEstimate?: number;
           /** Internal: this is the one retry after a failed write. */
           retriedWrite?: boolean;
+          /** Phase 1 (2026-11-17): what kind of save this is, for the hide breadcrumb. */
+          saveKind?: PageSaveKind;
           /** Week Ahead: nextPlayer is already prepared (compacted and signed) by the worker with this manifest;
            *  alreadyWritten: the worker also wrote it as this slot's save (read back and checked there). */
           preparedWeek?: { manifest: SaveIntegrityManifest; retainPrevious: boolean; needsRecoveryCheckpoint: boolean; alreadyWritten?: boolean };
@@ -1071,9 +1286,11 @@ export const App: React.FC = () => {
       }
       try {
           if (!options.preparedWeek?.alreadyWritten) {
-              await saveVerifiedGameData(`actorEmpireSave_${slot}`, playerToSave, prepared.manifest, {
-                  retainPrevious: prepared.retainPrevious,
-                  needsRecoveryCheckpoint: prepared.needsRecoveryCheckpoint,
+              await trackSlotWrite(slot, nextPlayer, options.weekDiagnostic ? 'week' : options.saveKind || 'other', async () => {
+                  await saveVerifiedGameData(`actorEmpireSave_${slot}`, playerToSave, prepared.manifest, {
+                      retainPrevious: prepared.retainPrevious,
+                      needsRecoveryCheckpoint: prepared.needsRecoveryCheckpoint,
+                  });
               });
           }
       } catch (error) {
@@ -1097,6 +1314,12 @@ export const App: React.FC = () => {
           });
           return nextPlayer;
       }
+      /* Phase 1 (2026-11-17): this slot is now durable up to the change number this player carried. */
+      const carriedChangeCount = changeCountOfPlayerRef.current.get(nextPlayer);
+      if (carriedChangeCount !== undefined && carriedChangeCount > (durableChangeCountRef.current[slot] ?? -1)) {
+          durableChangeCountRef.current[slot] = carriedChangeCount;
+      }
+      clearPlayTimeSideRecord(slot, playerToSave);
       setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(playerToSave) }));
       if (startupSlotPreloadRef.current?.slot === slot) startupSlotPreloadRef.current = null;
       if (prepared.needsRecoveryCheckpoint) {
@@ -1173,9 +1396,13 @@ export const App: React.FC = () => {
       slot: number,
       savedData: Player,
       source: 'indexeddb-slot' | 'legacy-indexeddb' | 'legacy-localstorage' | 'legacy-single-localstorage' = 'indexeddb-slot',
-      premigrated?: { player: Player; migratedFromVersion: unknown },
+      premigrated?: { player: Player; migratedFromVersion: unknown; repaired: boolean },
   ): Promise<{ player: Player; shouldPersist: boolean; carePackageGranted: boolean }> => {
-      const migrated = premigrated ? premigrated.player : migratePlayerSave(savedData);
+      /* Phase 1 (2026-11-17): a load repair (B13's commissions, B16's hold, ...) is saved at once, so the career
+         that then plays counts as saved, and an open that changed nothing saves nothing (see the hydration effect). */
+      let repairedNow = false;
+      const migrated = premigrated ? premigrated.player : migratePlayerSave(savedData, { onRepair: () => { repairedNow = true; } });
+      const migration = { repaired: premigrated ? premigrated.repaired : repairedNow };
       const migratedFromVersion = premigrated ? premigrated.migratedFromVersion : (savedData as Player)?.flags?.saveMigrationVersion;
       let optimized = migrated;
       let posterMediaMigrated = false;
@@ -1209,7 +1436,7 @@ export const App: React.FC = () => {
 
       return {
           player: optimized,
-          shouldPersist: (migratedFromVersion !== optimized.flags?.saveMigrationVersion) || posterMediaMigrated || carePackageGranted || entitlementResult.changed,
+          shouldPersist: (migratedFromVersion !== optimized.flags?.saveMigrationVersion) || migration.repaired || posterMediaMigrated || carePackageGranted || entitlementResult.changed,
           carePackageGranted,
       };
   };
@@ -1240,10 +1467,12 @@ export const App: React.FC = () => {
           const verifiedLoad = await loadVerifiedGameData(`actorEmpireSave_${slot}`);
           if (verifiedLoad.status !== 'CURRENT') return { kind: 'VERIFIED', verifiedLoad };
           const migratedFromVersion = verifiedLoad.player.flags?.saveMigrationVersion;
-          const migrated = migratePlayerSave(verifiedLoad.player);
+          let repaired = false;
+          const migrated = migratePlayerSave(verifiedLoad.player, { onRepair: () => { repaired = true; } });
           const diskWorkOnTap = migratedFromVersion !== migrated.flags?.saveMigrationVersion
+              || repaired
               || await hasEmbeddedCustomPosters(migrated);
-          return { kind: 'MIGRATED', migrated, migratedFromVersion, needsRecoveryCheckpoint: verifiedLoad.needsRecoveryCheckpoint, diskWorkOnTap };
+          return { kind: 'MIGRATED', migrated, migratedFromVersion, needsRecoveryCheckpoint: verifiedLoad.needsRecoveryCheckpoint, diskWorkOnTap, savedAt: verifiedLoad.savedAt, headFallback: verifiedLoad.headFallback, repaired, appVersion: verifiedLoad.appVersion };
       })()
           .catch((error): StartupSlotPreloadResult => {
               recordNonFatal(error, 'startup_slot_preload_failed', { save_slot: slot });
@@ -1336,13 +1565,17 @@ export const App: React.FC = () => {
     const hadStreamingPlus = hasPremiumProduct(playerRef.current, 'streaming_plus');
     handleGenericUpdate(prev => {
         const p = JSON.parse(JSON.stringify(prev)) as Player;
+        const granted: Array<{ transactionId?: string; productId: PremiumProductId }> = [];
         updates.forEach(update => {
             if (hasProcessedStoreTransaction(p, update.transactionId) || wasStoreTransactionDelivered(update.transactionId)) return;
             markProcessedStoreTransaction(p, update.transactionId);
             const message = applyPremiumPurchase(p, update.premiumProductId, getPlayerLanguage(p));
+            granted.push({ transactionId: update.transactionId, productId: update.premiumProductId });
             setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
         });
-        void persistSlotSave(slot, p, { rethrow: true })
+        // Phase 1 (2026-11-17): the ledger first, then the save, then StoreKit is told.
+        void recordConsumableGrants(slot, p.id, granted)
+            .then(() => persistSlotSave(slot, p, { rethrow: true }))
             .then(savedPlayer => {
                 setSaveSlots(previous => ({ ...previous, [slot]: savedPlayer }));
                 updates.forEach(update => rememberStoreTransactionDelivered(update.transactionId));
@@ -1543,7 +1776,14 @@ export const App: React.FC = () => {
             const indexedDbKeys = new Set(await listGameDataKeys());
             for (let i = 1; i <= 3; i++) {
                 const saveKey = `actorEmpireSave_${i}`;
-                if (!indexedDbKeys.has(saveKey)) continue;
+                if (!indexedDbKeys.has(saveKey)) {
+                    /* Phase 1 (2026-11-17), the format guard: a slot a newer version wrote in a format this build
+                       cannot read may hold no A/B copy; its marker still lists it, so no new career lands on it. */
+                    if (indexedDbKeys.has(slotFormatKey(saveKey)) && (await loadVerifiedGameData(saveKey)).status === 'NEWER_FORMAT') {
+                        summaries[i] = createDeferredSaveSlotSummary(saveKey, 'indexeddb');
+                    }
+                    continue;
+                }
                 const cachedSummary = getGameSaveSummary(saveKey);
                 summaries[i] = cachedSummary || createDeferredSaveSlotSummary(saveKey, 'indexeddb');
             }
@@ -1628,7 +1868,18 @@ export const App: React.FC = () => {
     window.addEventListener('pagehide', handlePageHide);
     window.addEventListener('pageshow', handlePageShow);
     const handleMemoryWarning = (event: Event) => {
+      if (isAndroidAppSwitchTrim(event)) return;
       const detail = event instanceof CustomEvent ? event.detail : {};
+      /* Phase 1 (2026-11-17): Week Ahead's worker holds a second copy of the career, the first memory the game can give
+         back, so it stops before anything else here. Week Ahead then stays off for the session (the effect below). */
+      const aheadClient = weekAheadRef.current;
+      if (aheadClient) {
+        weekAheadRef.current = null;
+        aheadClient.dispose();
+        noteSessionDetail({ weekAhead: 'off' });
+        notePageWeekAhead('off');
+      }
+      notePageHiddenOrMemory('memory', { ...(detail && typeof detail === 'object' ? detail as { level?: unknown } : {}), stage: weekProcessingLockRef.current ? activeWeekStageRef.current : undefined });
       markTraceAction('native_memory_warning', {
         flow: 'app_lifecycle',
         last_screen: Page[activePage] || String(activePage),
@@ -1640,6 +1891,18 @@ export const App: React.FC = () => {
         last_screen: Page[activePage] || String(activePage),
         save_slot: currentSlot,
       });
+      /* Phase 1 (2026-11-17), for the ANRs: a memory warning with nothing new since this slot's last durable save
+         writes nothing. It used to start a second full-career save right after the one a hide had just made. */
+      if (gameStatus === 'PLAYING' && isSwitchOn('hideSaveSkip') && !autosaveDueRef.current && isSlotDurableOrSaving(currentSlot)) {
+        markTraceAction('native_memory_checkpoint_skipped', {
+          flow: 'app_lifecycle',
+          save_slot: currentSlot,
+          checkpoint_status: 'SKIPPED',
+          // Phase 1 (2026-11-17): or a save that carries every change is being written right now.
+          checkpoint_reason: isSlotDurable(currentSlot) ? 'NO_CHANGE_SINCE_DURABLE_SAVE' : 'SAVE_WITH_THESE_CHANGES_RUNNING',
+        });
+        return;
+      }
       void checkpointNativeMemoryPressure({
         isPlaying: gameStatus === 'PLAYING',
         currentSlot,
@@ -1655,6 +1918,7 @@ export const App: React.FC = () => {
           const savedPlayer = await persistSlotSave(slot, committedPlayer, {
             rethrow: true,
             reason: 'AUTOSAVE',
+            saveKind: 'checkpoint',
           });
           setSaveSlots(prev => ({ ...prev, [slot]: savedPlayer }));
         },
@@ -1693,8 +1957,8 @@ export const App: React.FC = () => {
     setWeekAheadOn(gameStatus === 'PLAYING' && readWeekAheadWanted(currentSlot));
   }, [gameStatus, currentSlot]);
   useEffect(() => {
-    const stopWeekAheadOnMemoryWarning = () => {
-      if (weekAheadOffForSession) return;
+    const stopWeekAheadOnMemoryWarning = (event: Event) => {
+      if (weekAheadOffForSession || isAndroidAppSwitchTrim(event)) return;
       weekAheadOffForSession = true;
       addBreadcrumb('week_ahead:off_memory_warning', {});
       setWeekAheadOn(false);
@@ -1712,11 +1976,15 @@ export const App: React.FC = () => {
       () => { const live = getVerifiedLiveSave(saveKey); return live ? { key: saveKey, live } : null; },
     );
     weekAheadRef.current = client;
+    noteSessionDetail({ weekAhead: 'on', slot: currentSlot });
+    notePageWeekAhead('idle');
     client.setOnHome(weekAheadFocusRef.current);
     client.noteCareer(playerRef.current);
     return () => {
       client.dispose();
       if (weekAheadRef.current === client) weekAheadRef.current = null;
+      noteSessionDetail({ weekAhead: 'off' });
+      notePageWeekAhead('off');
     };
   }, [weekAheadOn, gameStatus, currentSlot]);
   useEffect(() => {
@@ -1768,8 +2036,11 @@ export const App: React.FC = () => {
         firstUnsavedChangeAtRef.current = null;
         setSaveSlots(prev => ({ ...prev, [currentSlot]: player }));
         const saveStartedAt = performance.now();
-        void persistSlotSave(currentSlot, player).finally(() => {
+        // Phase 1 (2026-11-17), telemetry v2: autosaves get their own trace.
+        if (!isPerformanceTraceActive('autosave')) startPerformanceTrace('autosave');
+        void persistSlotSave(currentSlot, player, { saveKind: 'autosave' }).finally(() => {
             lastAutosaveMsRef.current = performance.now() - saveStartedAt;
+            stopPerformanceTrace('autosave', { duration_ms: Math.round(lastAutosaveMsRef.current) }, { size_bucket: sizeBucketOf(storageMbRef.current), ram_class: getRamClass() });
             noteSessionLive({ lastSaveMs: Math.round(lastAutosaveMsRef.current), week: `${player.age}:${player.currentWeek}` });
         });
         autosaveTimerRef.current = null;
@@ -1809,6 +2080,17 @@ export const App: React.FC = () => {
       };
 
       playerRef.current = updatedPlayer;
+      /* Phase 1 (2026-11-17), for the ANRs: leaving the app with nothing changed since this slot's last durable
+         save (and no autosave waiting) writes only the play time, to a tiny side record that the next load adds
+         back. Any other change still gets the full save below, at once. */
+      if (persistImmediately && isSwitchOn('hideSaveSkip') && !autosaveDueRef.current && isSlotDurableOrSaving(currentSlot)) {
+        writePlayTimeSideRecord(currentSlot, updatedPlayer);
+        markQuietPlayerUpdate(updatedPlayer);
+        setPlayer(updatedPlayer, { playTimeOnly: true });
+        setSaveSlots(prev => ({ ...prev, [currentSlot]: updatedPlayer }));
+        markTraceAction('hide_full_save_skipped', { flow: 'app_lifecycle', save_slot: currentSlot });
+        return;
+      }
       // Lag round (2026-11-09): the once-a-minute play-time count rides with the next real save
       // instead of starting a full save every minute (seconds of freeze on a late career).
       // Leaving or hiding the app still saves it at once (persistImmediately).
@@ -1823,9 +2105,9 @@ export const App: React.FC = () => {
         firstUnsavedChangeAtRef.current = null;
       }
       markQuietPlayerUpdate(updatedPlayer);
-      setPlayer(updatedPlayer);
+      setPlayer(updatedPlayer, { playTimeOnly: true });
       setSaveSlots(prev => ({ ...prev, [currentSlot]: updatedPlayer }));
-      if (persistImmediately) void persistSlotSave(currentSlot, updatedPlayer);
+      if (persistImmediately) void persistSlotSave(currentSlot, updatedPlayer, { saveKind: 'hide' });
     };
 
     const handleVisibilityChange = () => {
@@ -1855,10 +2137,23 @@ export const App: React.FC = () => {
   const handleSelectSlot = async (slot: number) => {
     if (slotOpenInProgressRef.current) return;
     slotOpenInProgressRef.current = true;
+    // Phase 1 (2026-11-17), telemetry v2: from the slot tap until the career is on screen (or did not open).
+    const openTrace = 'career_open';
+    const openTraceStarted = !isPerformanceTraceActive(openTrace);
+    if (openTraceStarted) startPerformanceTrace(openTrace);
+    openLostWeeksRef.current = null;
     try {
       await openSelectedSlot(slot);
     } finally {
       slotOpenInProgressRef.current = false;
+      if (openTraceStarted) {
+        const lost = openLostWeeksRef.current;
+        stopPerformanceTrace(openTrace, lost !== null ? { lost_weeks: lost } : {}, {
+          result: lost !== null ? 'opened' : 'not_opened',
+          size_bucket: sizeBucketOf(storageMbRef.current),
+          ram_class: getRamClass(),
+        });
+      }
     }
   };
 
@@ -1891,24 +2186,36 @@ export const App: React.FC = () => {
             let currentIsUnverified = storageKind === 'localstorage';
             let needsRecoveryCheckpoint = false;
             let sourceByteEstimate: number | undefined;
+            let openedAppVersion: string | null = null;
             if (storageKind === 'localstorage') {
                 const raw = localStorage.getItem(storageKey);
                 savedData = raw ? JSON.parse(raw) as Player : null;
             } else if (preloaded?.kind === 'MIGRATED') {
                 needsRecoveryCheckpoint = preloaded.needsRecoveryCheckpoint;
+                openedAppVersion = preloaded.appVersion;
+                openedCopySavedAtRef.current[slot] = preloaded.savedAt ?? 0;
+                if (preloaded.headFallback) recordNonFatal(new Error('The save head record was not recognised'), 'save_head_unrecognised', { save_slot: slot, loaded: preloaded.headFallback });
             } else {
                 const verifiedLoad = preloaded?.kind === 'VERIFIED' ? preloaded.verifiedLoad : await loadVerifiedGameData(storageKey);
                 if (verifiedLoad.status === 'RECOVERY_AVAILABLE') {
                     noteStoreReviewTrouble('save_recovery');
+                    const offer = offerForFailedLoad(pointFromCopy({ player: verifiedLoad.previous, savedAt: verifiedLoad.previousSavedAt, appVersion: verifiedLoad.previousAppVersion }));
+                    trackGameEvent('save_recovery_offered', { reason: offer.reason, save_slot: slot });
                     setPendingSaveRecovery({
                         slot,
                         storageKey,
                         previous: verifiedLoad.previous,
                         violations: verifiedLoad.violations,
+                        reason: offer.reason,
+                        points: offer.points,
+                        careerId: String(verifiedLoad.previous.id || ''),
+                        lastShown: readLastWeekShown(slot),
                     });
                     setCurrentSlot(null);
                     return;
                 }
+                // Phase 1 (2026-11-17), the format guard: never opened (or written) by this build.
+                if (verifiedLoad.status === 'NEWER_FORMAT') throw new NewerSaveFormatError(storageKey);
                 if (verifiedLoad.status === 'UNRECOVERABLE') {
                     throw new Error('This career and its recovery generation could not be verified. Import a signed backup before deleting anything.');
                 }
@@ -1916,6 +2223,42 @@ export const App: React.FC = () => {
                 savedData = verifiedLoad.player;
                 currentIsUnverified = verifiedLoad.status === 'LEGACY_UNVERIFIED';
                 needsRecoveryCheckpoint = verifiedLoad.status === 'CURRENT' && verifiedLoad.needsRecoveryCheckpoint;
+                if (verifiedLoad.status === 'CURRENT') openedAppVersion = verifiedLoad.appVersion;
+                openedCopySavedAtRef.current[slot] = verifiedLoad.status === 'CURRENT' ? verifiedLoad.savedAt ?? 0 : 0;
+                if (verifiedLoad.status === 'CURRENT' && verifiedLoad.headFallback) {
+                    recordNonFatal(new Error('The save head record was not recognised'), 'save_head_unrecognised', { save_slot: slot, loaded: verifiedLoad.headFallback });
+                }
+            }
+            /* Week-speed Phase 2a (2026-11-17), the recovery list's second case (D15): a career written by a version
+               we flagged as buggy is offered, once, its copy from before that version. Asked before anything here can
+               save, because a save would replace that copy. */
+            const flaggedVersions = storageKind === 'localstorage' ? [] : getRecoveryFlaggedVersions();
+            const openedCareerId = String((preloaded?.kind === 'MIGRATED' ? preloaded.migrated.id : savedData?.id) || '');
+            if (flaggedVersions.length && openedAppVersion && openedCareerId) {
+                const backupCopy = await peekVerifiedPreviousCopy(storageKey).catch(() => null);
+                const offer = findFlaggedVersionOffer({
+                    flagged: flaggedVersions,
+                    currentAppVersion: openedAppVersion,
+                    backup: backupCopy ? pointFromCopy(backupCopy) : null,
+                    answered: version => isRecoveryOfferAnswered(slot, openedCareerId, version),
+                });
+                if (offer && backupCopy) {
+                    noteStoreReviewTrouble('save_recovery');
+                    trackGameEvent('save_recovery_offered', { reason: offer.reason, save_slot: slot, flagged_version: offer.flaggedVersion });
+                    setPendingSaveRecovery({
+                        slot,
+                        storageKey,
+                        previous: backupCopy.player,
+                        violations: [],
+                        reason: offer.reason,
+                        points: offer.points,
+                        careerId: openedCareerId,
+                        lastShown: readLastWeekShown(slot),
+                        flaggedVersion: offer.flaggedVersion,
+                    });
+                    setCurrentSlot(null);
+                    return;
+                }
             }
             const premigrated = storageKind !== 'localstorage' && preloaded?.kind === 'MIGRATED' ? preloaded : null;
             if (currentIsUnverified && savedData) sourceByteEstimate = estimateSaveJsonBytes(savedData);
@@ -1923,10 +2266,21 @@ export const App: React.FC = () => {
                 ? (storageKey === 'actorEmpireSave' ? 'legacy-single-localstorage' : 'legacy-localstorage')
                 : (storageKey === 'actorEmpireSave' ? 'legacy-indexeddb' : 'indexeddb-slot');
             const prepared = premigrated
-                ? await prepareLoadedPlayerSave(slot, premigrated.migrated, source, { player: premigrated.migrated, migratedFromVersion: premigrated.migratedFromVersion })
+                ? await prepareLoadedPlayerSave(slot, premigrated.migrated, source, { player: premigrated.migrated, migratedFromVersion: premigrated.migratedFromVersion, repaired: premigrated.repaired })
                 : savedData ? await prepareLoadedPlayerSave(slot, savedData, source) : null;
             if (!prepared) throw new Error(`Save slot ${slot} could not be loaded.`);
             existingSave = prepared.player;
+            ledgerOpenTokenRef.current = `${slot}:${Date.now()}`;
+            lastWeekOnScreenAtRef.current = null;
+            /* Phase 1 (2026-11-17), the lost-week watermark: weeks shown for this career that the opened copy lacks. */
+            const lastShown = readLastWeekShown(slot);
+            const lostWeeks = lastShown && lastShown.careerId === prepared.player.id
+                ? Math.max(0, getAbsoluteWeek(lastShown.age, lastShown.week) - getAbsoluteWeek(prepared.player.age, prepared.player.currentWeek))
+                : 0;
+            openLostWeeksRef.current = lostWeeks;
+            if (lostWeeks > 0) {
+                recordNonFatal(new Error('Weeks shown before were not in the save that opened'), 'lost_weeks_on_open', { save_slot: slot, lost_weeks: lostWeeks });
+            }
             setSaveSlots(prev => ({ ...prev, [slot]: prepared.player }));
             setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(prepared.player) }));
             if (currentIsUnverified || prepared.shouldPersist || source !== 'indexeddb-slot') {
@@ -1939,6 +2293,9 @@ export const App: React.FC = () => {
                     sourceByteEstimate,
                 });
             }
+            /* Phase 1 (2026-11-17): the stored copy now holds this career (it was saved just above, or loading
+               changed nothing in it), so it counts as saved unless the hydration on entering PLAYING changes it. */
+            openedCleanRef.current = { slot, player: prepared.player };
             if (prepared.carePackageGranted) {
                 setToastMessage({
                     title: 'Migration Care Package',
@@ -1955,12 +2312,15 @@ export const App: React.FC = () => {
         } catch (error) {
             if (isStockSaveRecoveryError(error)) {
                 const storageKey = saveSlotSummaries[slot]?.storageKey || `actorEmpireSave_${slot}`;
-                const previous = await peekVerifiedPreviousGameData(storageKey).catch(() => null);
-                if (previous) {
+                const previousCopy = await peekVerifiedPreviousCopy(storageKey).catch(() => null);
+                const previous = previousCopy?.player || null;
+                if (previousCopy && previous) {
                     try {
                         migratePlayerSave(previous);
                         noteStoreReviewTrouble('save_recovery');
-                        setPendingSaveRecovery({ slot, storageKey, previous, violations: error.issues.map(issue => issue.detail) });
+                        const offer = offerForFailedLoad(pointFromCopy(previousCopy));
+                        trackGameEvent('save_recovery_offered', { reason: offer.reason, save_slot: slot });
+                        setPendingSaveRecovery({ slot, storageKey, previous, violations: error.issues.map(issue => issue.detail), reason: offer.reason, points: offer.points, careerId: String(previous.id || ''), lastShown: readLastWeekShown(slot) });
                         setCurrentSlot(null);
                         return;
                     } catch { /* An incompatible previous save must not replace the current original. */ }
@@ -2001,12 +2361,24 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleRecoverSave = async () => {
+  const handleRecoverSave = async (pointIndex = 0) => {
     if (!pendingSaveRecovery || isRecoveringSave) return;
     const recovery = pendingSaveRecovery;
+    const point = recovery.points[Math.max(0, Math.min(pointIndex, recovery.points.length - 1))];
+    const weeksLost = point ? weeksLostByRestoring(point, recovery.lastShown, recovery.careerId) : 0;
     setIsRecoveringSave(true);
     try {
+        // Phase 2a: the A/B store's one backup copy is the only point today; later points restore through their own entry.
         await recoverPreviousGameData(recovery.storageKey);
+        /* Phase 2a: the player chose to give those weeks up, so the last week shown is now the restored copy's week
+           (later prompts and the lost-week count then start from it). */
+        writeLastWeekShown(recovery.slot, recovery.previous);
+        /* Phase 2a (2026-11-17): every restore is logged. The purchase ledger is applied again when the career opens. */
+        const logged = { reason: recovery.reason, point: point?.kind || 'PREVIOUS', weeks_lost: weeksLost, save_slot: recovery.slot, ...(recovery.flaggedVersion ? { flagged_version: recovery.flaggedVersion } : {}) };
+        addBreadcrumb('recovery:restored', logged);
+        trackGameEvent('save_recovery_restored', logged);
+        recordNonFatal(new Error('A career was restored from its recovery list'), 'save_recovery_restored', logged);
+        if (recovery.flaggedVersion) rememberRecoveryOfferAnswered(recovery.slot, recovery.careerId, recovery.flaggedVersion);
         setPendingSaveRecovery(null);
         setToastMessage({
             title: 'Career Recovered',
@@ -2025,8 +2397,17 @@ export const App: React.FC = () => {
   };
 
   const handleCancelSaveRecovery = () => {
-    if (isRecoveringSave) return;
+    if (isRecoveringSave || !pendingSaveRecovery) return;
+    const recovery = pendingSaveRecovery;
     setPendingSaveRecovery(null);
+    /* Phase 2a: an offer for a flagged version is answered by keeping the career too; it opens as it is, and the
+       offer is not shown again for this career and version. A failed save goes back to the slots, as before. */
+    if (recovery.reason === 'VERSION_FLAGGED' && recovery.flaggedVersion) {
+        rememberRecoveryOfferAnswered(recovery.slot, recovery.careerId, recovery.flaggedVersion);
+        addBreadcrumb('recovery:kept', { reason: recovery.reason, save_slot: recovery.slot, flagged_version: recovery.flaggedVersion });
+        void handleSelectSlot(recovery.slot);
+        return;
+    }
     setCurrentSlot(null);
   };
 
@@ -2056,6 +2437,7 @@ export const App: React.FC = () => {
 
   const handleDeleteSlot = async (slot: number) => {
     startupSlotPreloadRef.current = null;
+    clearLastWeekShown(slot);
     const summary = saveSlotSummaries[slot];
     const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
     if (summary?.storageKind !== 'localstorage') {
@@ -2105,6 +2487,8 @@ export const App: React.FC = () => {
     const confirmed = window.confirm('Importing a transfer file will replace the local Play Store saves on this device. Continue?');
     if (!confirmed) return;
     startupSlotPreloadRef.current = null;
+    // Phase 1 (2026-11-17): an imported career may be older than the weeks shown before; that is not a lost week.
+    [1, 2, 3].forEach(clearLastWeekShown);
 
     try {
       const result = await importSignedSaveArchiveFromFile({
@@ -2146,10 +2530,26 @@ export const App: React.FC = () => {
   // Init opportunities and feed on mount (Hydration logic)
   useEffect(() => {
     if (gameStatus === 'PLAYING') {
+      /* Phase 1 of the week-speed plan (2026-11-17), item 2: an open that makes nothing new is not saved. The career
+         a slot just opened is its stored copy, migrated (openedCleanRef; a load repair was saved already). This
+         hydration then rebuilds parts of it the same way at every open (the universes' status and rosters, energy,
+         defaults), which a save would not need to keep, since the next open rebuilds them again. What it makes NEW
+         is different: team candidates, weekly offers and a feed drawn at random, ids made from the clock, a legacy
+         business turned into a company. Those are marked below (madeNew) and saved once, as before. Anything else,
+         and the career counts as saved: no full save just for opening it (it used to follow every open).
+         A new fill added to this hydration must set madeNew. */
+      const opened = openedCleanRef.current;
+      openedCleanRef.current = null;
+      let cleanAfterOpen = false;
       setPlayer(prev => {
           const skipMigration = skipNextPlayingMigrationRef.current;
           skipNextPlayingMigrationRef.current = false;
           const safePlayer = (skipMigration ? { ...prev } : migratePlayerSave(prev)) as any;
+          const checkOpen = isSwitchOn('openSaveSkip') && skipMigration && !!opened && opened.slot === currentSlot && opened.player === prev;
+          let madeNew = false;
+          /* Phase 1 (2026-11-17): play time counted after the last full save, kept beside it (see recordActivePlayTime) */
+          const sidePlayTimeMs = withSidePlayTime(currentSlot, safePlayer);
+          if (sidePlayTimeMs !== null) safePlayer.totalPlayTimeMs = sidePlayTimeMs;
           if (!safePlayer.world || typeof safePlayer.world !== 'object') {
               safePlayer.world = clone(INITIAL_PLAYER.world);
           } else {
@@ -2220,17 +2620,18 @@ export const App: React.FC = () => {
           ].filter((id): id is string => Boolean(id));
 
           // Ensure Pools
-          if (!safePlayer.team.availableAgents?.length) safePlayer.team.availableAgents = getRandomAgents(3, hiredTeamIds);
-          if (!safePlayer.team.availableManagers?.length) safePlayer.team.availableManagers = getRandomManagers(2, hiredTeamIds);
-          if (!Array.isArray(safePlayer.team.availableTrainers) || safePlayer.team.availableTrainers.length === 0) safePlayer.team.availableTrainers = getRandomTrainers(2, hiredTeamIds);
-          if (!Array.isArray(safePlayer.team.availableStylists) || safePlayer.team.availableStylists.length === 0) safePlayer.team.availableStylists = getRandomStylists(2, hiredTeamIds);
-          if (!Array.isArray(safePlayer.team.availableTherapists) || safePlayer.team.availableTherapists.length === 0) safePlayer.team.availableTherapists = getRandomTherapists(2, hiredTeamIds);
-          if (!Array.isArray(safePlayer.team.availablePublicists) || safePlayer.team.availablePublicists.length === 0) safePlayer.team.availablePublicists = getRandomPublicists(2, hiredTeamIds);
-          if (!Array.isArray(safePlayer.team.availableWellness) || safePlayer.team.availableWellness.length === 0) safePlayer.team.availableWellness = getRandomWellness(2, hiredTeamIds);
+          if (!safePlayer.team.availableAgents?.length) { madeNew = true; safePlayer.team.availableAgents = getRandomAgents(3, hiredTeamIds); }
+          if (!safePlayer.team.availableManagers?.length) { madeNew = true; safePlayer.team.availableManagers = getRandomManagers(2, hiredTeamIds); }
+          if (!Array.isArray(safePlayer.team.availableTrainers) || safePlayer.team.availableTrainers.length === 0) { madeNew = true; safePlayer.team.availableTrainers = getRandomTrainers(2, hiredTeamIds); }
+          if (!Array.isArray(safePlayer.team.availableStylists) || safePlayer.team.availableStylists.length === 0) { madeNew = true; safePlayer.team.availableStylists = getRandomStylists(2, hiredTeamIds); }
+          if (!Array.isArray(safePlayer.team.availableTherapists) || safePlayer.team.availableTherapists.length === 0) { madeNew = true; safePlayer.team.availableTherapists = getRandomTherapists(2, hiredTeamIds); }
+          if (!Array.isArray(safePlayer.team.availablePublicists) || safePlayer.team.availablePublicists.length === 0) { madeNew = true; safePlayer.team.availablePublicists = getRandomPublicists(2, hiredTeamIds); }
+          if (!Array.isArray(safePlayer.team.availableWellness) || safePlayer.team.availableWellness.length === 0) { madeNew = true; safePlayer.team.availableWellness = getRandomWellness(2, hiredTeamIds); }
           safePlayer.team = sanitizeTeamPools(safePlayer);
 
           // Ensure Arrays
           if (!Array.isArray(safePlayer.commitments)) safePlayer.commitments = [];
+          if (safePlayer.commitments.some((commitment: any) => !commitment?.id)) madeNew = true;
           safePlayer.commitments = safePlayer.commitments.map((commitment: any) => normalizeCommitment(commitment));
           if (!Array.isArray(safePlayer.assetStates)) safePlayer.assetStates = [];
           safePlayer.assetStates = safePlayer.assetStates
@@ -2253,8 +2654,10 @@ export const App: React.FC = () => {
               }));
           if (typeof safePlayer.activeVehicleId !== 'string') safePlayer.activeVehicleId = null;
           if (!Array.isArray(safePlayer.activeReleases)) safePlayer.activeReleases = [];
+          if (safePlayer.activeReleases.some((release: any) => !release?.id)) madeNew = true;
           safePlayer.activeReleases = safePlayer.activeReleases.map((release: any) => normalizeActiveRelease(release, safePlayer.age, safePlayer.currentWeek));
           if (!Array.isArray(safePlayer.pastProjects)) safePlayer.pastProjects = [];
+          if (safePlayer.pastProjects.some((project: any) => !project?.id)) madeNew = true;
           safePlayer.pastProjects = safePlayer.pastProjects.map((project: any) => normalizePastProject(project));
           if (!Array.isArray(safePlayer.activeHealthConditions)) safePlayer.activeHealthConditions = [];
           if (!Array.isArray(safePlayer.news)) safePlayer.news = [];
@@ -2371,10 +2774,11 @@ export const App: React.FC = () => {
 
           if (safePlayer.weeklyOpportunities.jobs.length === 0 || safePlayer.weeklyOpportunities.auditions.length === 0) {
               const usedTitles = [...safePlayer.commitments.map((c: any) => c.name), ...safePlayer.activeReleases.map((r: any) => r.name), ...safePlayer.pastProjects.map((p: any) => p.name)];
+              madeNew = true;
               safePlayer.weeklyOpportunities = { auditions: generateAuditions(safePlayer, usedTitles), jobs: generatePartTimeJobs(safePlayer) };
           }
 
-          if (safePlayer.instagram.feed.length === 0) safePlayer.instagram.feed = generateWeeklyFeed(safePlayer);
+          if (safePlayer.instagram.feed.length === 0) { madeNew = true; safePlayer.instagram.feed = generateWeeklyFeed(safePlayer); }
 
           if (!Array.isArray(safePlayer.awards)) safePlayer.awards = [];
           safePlayer.awards = dedupeAwards(safePlayer.awards);
@@ -2420,6 +2824,7 @@ export const App: React.FC = () => {
           }));
           safePlayer.awards = dedupeAwards(safePlayer.awards || []);
           if (safePlayer.business) {
+              madeNew = true;
               const legacyName = String(safePlayer.business.type || '');
               const alreadyHasProductionHouse = safePlayer.businesses.some((biz: any) => biz.type === 'PRODUCTION_HOUSE');
               const indMap: Record<string, any> = {
@@ -2453,8 +2858,25 @@ export const App: React.FC = () => {
               }
               delete safePlayer.business;
           }
+          if (checkOpen && !madeNew) {
+              cleanAfterOpen = true;
+              markQuietPlayerUpdate(safePlayer);
+          }
           return safePlayer;
       });
+      actionsSinceWeekRef.current = { world: 0, other: 0 };
+      if (cleanAfterOpen && currentSlot) {
+          durableChangeCountRef.current[currentSlot] = changeCountRef.current;
+          // the render that showed the career already asked for an autosave; it has nothing to save
+          if (autosaveTimerRef.current) {
+              window.clearTimeout(autosaveTimerRef.current);
+              autosaveTimerRef.current = null;
+          }
+          autosaveDueRef.current = false;
+          firstUnsavedChangeAtRef.current = null;
+          markTraceAction('open_full_save_skipped', { flow: 'save_select', save_slot: currentSlot });
+          addBreadcrumb('open:full_save_skipped', { save_slot: currentSlot });
+      }
     }
   }, [gameStatus]);
 
@@ -2485,6 +2907,11 @@ export const App: React.FC = () => {
   const commitProcessedWeekPlayer = (processedPlayer: Player): Player => {
       const onScreen = prepareProcessedWeekForUi(processedPlayer);
       setPlayer(onScreen);
+      actionsSinceWeekRef.current = { world: 0, other: 0 };
+      if (currentSlot) writeLastWeekShown(currentSlot, onScreen);
+      /* Phase 1 (2026-11-17): both callers save the week before they show it (a failed save throws first), so
+         what is now on screen is durable. Without this, leaving the app after every week wrote a full save again. */
+      if (currentSlot) durableChangeCountRef.current[currentSlot] = changeCountRef.current;
       return onScreen;
   };
 
@@ -2631,6 +3058,14 @@ export const App: React.FC = () => {
     }
     const traceName = 'process_game_week';
     const startedAt = performance.now();
+    /* Phase 1 (2026-11-17), telemetry v2: week_to_screen runs from the tap to the week on screen (the forced ad and
+       decision popups come after it), beside process_game_week, which stays as it is (plus forced_ad at its stop). */
+    const readingMs = lastWeekOnScreenAtRef.current !== null ? Date.now() - lastWeekOnScreenAtRef.current : null;
+    // Phase 1 (2026-11-17), telemetry v2: the player's actions since the last week, at the tap.
+    const actionsAtTap = { ...actionsSinceWeekRef.current };
+    const weekToScreenTrace = 'week_to_screen';
+    let weekToScreenOpen = false;
+    let weekForcedAdShown = false;
     const activePageName = Page[activePage] || String(activePage);
     const weekRunId = `week_${player.age}_${player.currentWeek}_${Date.now().toString(36)}`;
     const previousHealthConditionIds = new Set(
@@ -2639,6 +3074,7 @@ export const App: React.FC = () => {
         .filter(Boolean),
     );
     weekProcessingLockRef.current = true;
+    notePageWeekStage('start');
     weekTapGuardRef.current = true;
     activeWeekRunIdRef.current = weekRunId;
     activeWeekStageRef.current = 'paint_wait';
@@ -2680,6 +3116,10 @@ export const App: React.FC = () => {
           week: player.currentWeek,
           screen: activePage,
         });
+        if (!isPerformanceTraceActive(weekToScreenTrace)) {
+          startPerformanceTrace(weekToScreenTrace);
+          weekToScreenOpen = true;
+        }
         /* Week Ahead (2026-11-12): when the background worker has prepared this exact career's week (or is still
            preparing it), that week is taken. It was played, finished and prepared for saving by the same code App
            runs below, on a structured copy, and it is saved here through the same verified path (written, read
@@ -2689,6 +3129,8 @@ export const App: React.FC = () => {
         const weekSaveKey = `actorEmpireSave_${currentSlot}`;
         let aheadTaken: WeekAheadTake | null = null;
         let aheadWritten: WeekAheadWriteOutcome | null = null;
+        // Phase 1 (2026-11-17), telemetry v2: was the week already prepared when the player tapped?
+        const aheadPreparedAtTap = weekAhead ? weekAhead.state().prepared : false;
         if (weekAhead && currentSlot) {
             activeWeekStageRef.current = 'week_ahead_take';
             markWeekProcessingStage('week_ahead_take', player, {
@@ -2698,11 +3140,17 @@ export const App: React.FC = () => {
             });
             // The worker writes the week as this slot's save while this thread reads it. This slot's save queue
             // is held until that write is confirmed, so no other save of the slot can land before or across it.
-            aheadTaken = await runInVerifiedSaveQueue(weekSaveKey, async () => {
-                const taken = await weekAhead.take(player, WEEK_AHEAD_TAKE_TIMEOUT_MS, { key: weekSaveKey, live: getVerifiedLiveSave(weekSaveKey) });
+            aheadTaken = await withNativeBackgroundTask(() => runInVerifiedSaveQueue(weekSaveKey, async () => {
+                /* Phase 1 (2026-11-17): waiting longer than this device takes to play the week itself never helps, so
+                   the wait is this slot's own main-path week plus 0.5 s (the 90 s cap stays for a slot never timed). */
+                const slotWeekMs = Number((() => { try { return localStorage.getItem(WEEK_AHEAD_SLOT_KEY + currentSlot); } catch { return null; } })());
+                const takeTimeoutMs = Number.isFinite(slotWeekMs) && slotWeekMs > 0
+                    ? Math.min(WEEK_AHEAD_TAKE_TIMEOUT_MS, Math.round(slotWeekMs) + 500)
+                    : WEEK_AHEAD_TAKE_TIMEOUT_MS;
+                const taken = await weekAhead.take(player, takeTimeoutMs, { key: weekSaveKey, live: getVerifiedLiveSave(weekSaveKey) });
                 if (taken?.written) aheadWritten = await taken.written;
                 return taken;
-            });
+            }));
         }
         let triggerAd = false;
         let weekSync: Omit<PostWeekSync, 'player'> = { shouldTriggerBabyQa: false, babyNamingDue: null, medicalPromptToShow: null };
@@ -2825,6 +3273,26 @@ export const App: React.FC = () => {
         activeWeekStageRef.current = 'commit_verified_week';
         suppressNextAutosaveRef.current = true;
         const weekOnScreen = commitProcessedWeekPlayer(persistedPlayerState);
+        if (weekToScreenOpen) {
+            weekToScreenOpen = false;
+            const engine = weekAhead?.drainEngineStats() ?? { busyMs: 0, discardedMs: 0 };
+            const takenWeek = aheadTaken as WeekAheadTake | null;
+            stopPerformanceTrace(weekToScreenTrace, {
+                ...(readingMs !== null ? { reading_ms: readingMs } : {}),
+                ...(takenWeek ? { waited_ms: takenWeek.waitedMs, prepared_ms: Math.round(takenWeek.result.timings.totalMs) } : {}),
+                engine_busy_ms: engine.busyMs,
+                engine_discarded_ms: engine.discardedMs,
+                actions_world: actionsAtTap.world,
+                actions_other: actionsAtTap.other,
+            }, {
+                path: readingMs === null ? 'first_week' : !weekAhead ? 'main' : takenWeek ? (aheadPreparedAtTap ? 'ahead_hit' : 'ahead_wait') : 'ahead_miss',
+                size_bucket: sizeBucketOf(storageMbRef.current),
+                ram_class: getRamClass(),
+                ad: triggerAd ? 1 : 0,
+                quick_tap: readingMs !== null && readingMs >= 300 && readingMs <= 1000 ? 1 : 0,
+            });
+        }
+        lastWeekOnScreenAtRef.current = Date.now();
         if (aheadTaken) weekAhead?.committed(weekOnScreen);
         weekTapGuardRef.current = false;
         addBreadcrumb('process_week:persisted', {
@@ -2881,11 +3349,17 @@ export const App: React.FC = () => {
         // shows while "Processing week" is still up, so it lands before the new week's screen and popups.
         noteForcedAdWeekPassed();
         if (triggerAd && !hasNoAds(syncedPlayerState)) {
-            await showForcedAd('WEEK', {
-                noAds: false,
-                careerWeek: forcedAdCareerWeek(syncedPlayerState),
-                inTrouble: isForcedAdTrouble(syncedPlayerState),
-            });
+            // Phase 1 (2026-11-17): the ad is timed in its own trace (week_to_screen ended before it).
+            startPerformanceTrace('week_forced_ad');
+            try {
+                weekForcedAdShown = await showForcedAd('WEEK', {
+                    noAds: false,
+                    careerWeek: forcedAdCareerWeek(syncedPlayerState),
+                    inTrouble: isForcedAdTrouble(syncedPlayerState),
+                });
+            } finally {
+                stopPerformanceTrace('week_forced_ad', {}, { shown: weekForcedAdShown ? 1 : 0 });
+            }
         }
         addBreadcrumb('process_week:success', {
             age: syncedPlayerState.age,
@@ -2966,10 +3440,16 @@ export const App: React.FC = () => {
       activeWeekRunIdRef.current = null;
       activeWeekStageRef.current = 'idle';
       weekProcessingLockRef.current = false;
+      notePageWeekStage(null);
       weekTapGuardRef.current = false;
       setIsProcessing(false);
       try {
-        stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt) });
+        // Phase 1 (2026-11-17), the plan's Phase H item 7: forced_ad (0 or 1) is set at the stop.
+        /* Phase 1 (2026-11-17), plan item 8: the save limit this week's write ran with (B3 turns a failed ~12 s week
+           plus a retry into one finished 20-90 s week, so the p90s are read with it). */
+        const saveLimitMs = currentSlot ? readSaveWriteRecord(`actorEmpireSave_${currentSlot}`)?.limitMs : undefined;
+        stopPerformanceTrace(traceName, { duration_ms: Math.round(performance.now() - startedAt), ...(saveLimitMs ? { save_limit_ms: saveLimitMs } : {}) }, { forced_ad: weekForcedAdShown ? 1 : 0 });
+        if (weekToScreenOpen) stopPerformanceTrace(weekToScreenTrace, {}, { path: 'failed' });
       } catch (error) {
         recordNonFatal(error, 'process_week_trace_cleanup_failed', {
           age: player.age,
@@ -3270,10 +3750,12 @@ export const App: React.FC = () => {
           if (!alreadyGranted) markProcessedStoreTransaction(p, result.transactionId);
           const message = alreadyGranted ? result.message : applyPremiumPurchase(p, productId, getPlayerLanguage(p));
           setToastMessage({ title: tr('app.purchases.confirmedTitle'), subtext: message });
+          // Phase 1 (2026-11-17): the ledger first, then the save, then the store is told (below).
+          const ledgerWritten = alreadyGranted ? Promise.resolve() : recordConsumableGrants(currentSlot, p.id, [{ transactionId: result.transactionId, productId }]);
           /* Android consumable: saved first, then finished with Play, so an interrupted app loses nothing */
           if (result.purchaseToken) {
               const token = result.purchaseToken;
-              const saving = currentSlot ? persistSlotSave(currentSlot, p, { rethrow: true }) : Promise.resolve(p);
+              const saving = ledgerWritten.then(() => currentSlot ? persistSlotSave(currentSlot, p, { rethrow: true }) : p);
               void saving
                   .then(savedPlayer => {
                       if (currentSlot) setSaveSlots(previous => ({ ...previous, [currentSlot]: savedPlayer }));
@@ -3286,7 +3768,7 @@ export const App: React.FC = () => {
           if (result.iosTransactionId && currentSlot) {
               const transactionId = result.iosTransactionId;
               const slot = currentSlot;
-              void persistSlotSave(slot, p, { rethrow: true })
+              void ledgerWritten.then(() => persistSlotSave(slot, p, { rethrow: true }))
                   .then(savedPlayer => {
                       setSaveSlots(previous => ({ ...previous, [slot]: savedPlayer }));
                       rememberStoreTransactionDelivered(transactionId);
@@ -3458,14 +3940,17 @@ export const App: React.FC = () => {
           });
           /* paid items the game never received: delivered once (by their order id), saved, then finished with Play */
           let delivered = 0;
+          const granted: Array<{ transactionId?: string; productId: PremiumProductId }> = [];
           unclaimed.forEach(item => {
               if (hasProcessedStoreTransaction(p, item.transactionId)) return;
               markProcessedStoreTransaction(p, item.transactionId);
               applyPremiumPurchase(p, item.productId, getPlayerLanguage(p));
+              granted.push({ transactionId: item.transactionId, productId: item.productId });
               delivered += 1;
           });
           if (unclaimed.length) {
-              const saving = currentSlot ? persistSlotSave(currentSlot, p, { rethrow: true }) : Promise.resolve(p);
+              // Phase 1 (2026-11-17): the ledger first, then the save, then Play is told.
+              const saving = recordConsumableGrants(currentSlot, p.id, granted).then(() => currentSlot ? persistSlotSave(currentSlot, p, { rethrow: true }) : p);
               void saving
                   .then(savedPlayer => {
                       if (currentSlot) setSaveSlots(previous => ({ ...previous, [currentSlot]: savedPlayer }));
@@ -3484,6 +3969,43 @@ export const App: React.FC = () => {
       if (!hadStreamingPlus && entitlementProductIds.includes('streaming_plus')) announceStreamingPlusUnlocked();
       if (entitlementProductIds.length) void syncPermanentPremiumEntitlementsToSavedSlots(entitlementProductIds);
   };
+
+  /* Phase 1 (2026-11-17), the purchase ledger: once after every career open (a recovery opens the career again), each
+     ledger grant for this slot and career that the opened copy does not carry (granted after that copy was saved,
+     and not in its processed list) is granted again, once, and the career is saved. */
+  useEffect(() => {
+      if (gameStatus !== 'PLAYING' || !currentSlot) return;
+      const token = ledgerOpenTokenRef.current;
+      if (!token || token === ledgerCheckedTokenRef.current) return;
+      ledgerCheckedTokenRef.current = token;
+      const slot = currentSlot;
+      const openedSavedAt = openedCopySavedAtRef.current[slot] ?? 0;
+      void readPurchaseLedger().then(entries => {
+          if (ledgerOpenTokenRef.current !== token) return; // another career opened since
+          const careerId = playerRef.current.id;
+          const missing = entries.filter(entry => entry.slot === slot && entry.careerId === careerId && entry.at > openedSavedAt
+              && !hasProcessedStoreTransaction(playerRef.current, entry.transactionId));
+          if (missing.length === 0) return;
+          handleGenericUpdate(prev => {
+              const p = JSON.parse(JSON.stringify(prev)) as Player;
+              let restored = 0;
+              missing.forEach(entry => {
+                  if (hasProcessedStoreTransaction(p, entry.transactionId)) return;
+                  markProcessedStoreTransaction(p, entry.transactionId);
+                  applyPremiumPurchase(p, entry.productId as PremiumProductId, getPlayerLanguage(p));
+                  restored += 1;
+              });
+              if (restored > 0) {
+                  addBreadcrumb('purchase_ledger:reapplied', { count: restored, save_slot: slot });
+                  setToastMessage({ title: tr('app.purchases.restoredTitle'), subtext: tr('app.purchases.recoveredSubtext', { count: String(restored) }) });
+                  void persistSlotSave(slot, p, { rethrow: true })
+                      .then(savedPlayer => setSaveSlots(previous => ({ ...previous, [slot]: savedPlayer })))
+                      .catch(error => recordNonFatal(error, 'purchase_ledger_reapply_persist_failed', { count: restored }));
+              }
+              return p;
+          });
+      }).catch(error => recordNonFatal(error, 'purchase_ledger_read_failed'));
+  }, [gameStatus, currentSlot]);
 
   // Play: purchases are checked again at launch, so a paid item interrupted mid-purchase still arrives.
   const androidPurchaseCheckDoneRef = useRef(false);
@@ -3862,6 +4384,7 @@ export const App: React.FC = () => {
 
   const handleRestartCareer = async () => {
     if (currentSlot) {
+        clearLastWeekShown(currentSlot);
         await deleteVerifiedGameData(`actorEmpireSave_${currentSlot}`);
         setSaveSlots(prev => ({ ...prev, [currentSlot]: null }));
         setPlayer(INITIAL_PLAYER);
@@ -3944,13 +4467,14 @@ export const App: React.FC = () => {
       {pendingSaveRecovery && (
           <SaveRecoveryModal
               playerName={pendingSaveRecovery.previous.name}
-              age={pendingSaveRecovery.previous.age}
-              week={pendingSaveRecovery.previous.currentWeek}
-              violations={pendingSaveRecovery.violations}
+              reason={pendingSaveRecovery.reason}
+              points={pendingSaveRecovery.points.map(point => ({ ...point, weeksLost: weeksLostByRestoring(point, pendingSaveRecovery.lastShown, pendingSaveRecovery.careerId) }))}
+              lastShown={pendingSaveRecovery.lastShown && pendingSaveRecovery.lastShown.careerId === pendingSaveRecovery.careerId ? pendingSaveRecovery.lastShown : null}
+              flaggedVersion={pendingSaveRecovery.flaggedVersion}
               isRecovering={isRecoveringSave}
               onRecover={handleRecoverSave}
               onCancel={handleCancelSaveRecovery}
-              onSendReport={handleSendSaveRecoveryReport}
+              onSendReport={pendingSaveRecovery.reason === 'LOAD_FAILED' ? handleSendSaveRecoveryReport : undefined}
           />
       )}
 

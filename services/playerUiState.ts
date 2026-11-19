@@ -1,6 +1,6 @@
 import type { Player } from '../types';
 import { sanitizeAwardRecords } from './awardLogic';
-import { markPlayerSettled, migratePlayerSave } from './saveMigration';
+import { isSettledValue, markPlayerSettled, markScreenUpdateSettled, migratePlayerSave } from './saveMigration';
 import { normalizeUniverseMap } from './universeLogic';
 
 const finalizePlayerUiState = (player: Player): Player => ({
@@ -10,7 +10,8 @@ const finalizePlayerUiState = (player: Player): Player => ({
         universes: normalizeUniverseMap(player.world?.universes),
     },
     awards: sanitizeAwardRecords(player.awards || []),
-    pastProjects: (player.pastProjects || []).map(project => ({
+    /* C5(h): settled past projects are this step's own output from the last screen update (sanitizing is idempotent) */
+    pastProjects: isSettledValue(player.pastProjects) ? player.pastProjects : (player.pastProjects || []).map(project => ({
         ...project,
         awards: sanitizeAwardRecords(project.awards || []),
     })),
@@ -18,7 +19,7 @@ const finalizePlayerUiState = (player: Player): Player => ({
 
 /** Use for imported, loaded, cheat, and component-originated state that may be legacy or partial. */
 export const prepareExternalPlayerUpdateForUi = (player: Player): Player => (
-    finalizePlayerUiState(migratePlayerSave(player, { fromScreen: true }))
+    markScreenUpdateSettled(finalizePlayerUiState(migratePlayerSave(player, { fromScreen: true })))
 );
 
 /** Use only after processGameWeek and persistence have produced a canonical current-schema player. */

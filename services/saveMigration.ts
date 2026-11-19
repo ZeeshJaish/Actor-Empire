@@ -6,7 +6,7 @@ import { ensureActorCareerBalance } from './actorCareerBalance';
 import { syncLinkedNpcRelationships } from './relationshipBond';
 import { initializeRecentProjectTitles } from './projectTitleGeneration';
 import { inspectStockSaveContainers, inspectStockSaveCompatibility, migrateStockPortfolio, recordStockQuoteRepairs, StockSaveRecoveryError } from './stockSaveCompatibility';
-import { CinemaMigrationError, inspectCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
+import { CinemaMigrationError, inspectCinemaSavedState, inspectSettledCinemaSavedState, migrateCinemaState } from './boxOffice/boxOfficeMigration';
 import { preserveCinemaCastRecognition } from './boxOffice/boxOfficeInputs';
 import { repairTalentNegotiations } from './talentNegotiation';
 import { isKnownDeceasedNpc, restoreContractActorProfiles } from './npcRetention';
@@ -36,6 +36,7 @@ import { normalizeOwnedStreamingPlatformState } from './ownedStreamingPlatform';
 import { restoreDroppedOriginalCommissions } from './originalsCommissionRepair';
 import { holdPrelaunchPurchasesForSlate } from './streamingCatalog';
 import { normalizeIndustryProductions } from './industryProductions';
+import type { IndustryProductionCommitment } from '../types';
 import {
     getCanonicalScheduledRivals,
     normalizeIndustryEventLedger,
@@ -187,6 +188,33 @@ export const markPlayerSettled = <T extends Pick<Player, 'world' | 'ownedStreami
     Object.values(player.world || {}).forEach(markSettled);
     return player;
 };
+/* Week-speed Phase 2, C5(h) (2026-11-17): the career's largest parts outside the world (a late career: past projects
+   11 MB, flags 6 MB, Instagram 2 MB). Each screen update deep-copied them (the merge with defaults) and walked every
+   copy again (the avatar check), ~40 ms M4 a tap. A screen update's own result marks them settled; the next screen
+   update that did not touch them keeps those objects, because they already went through this same migration (the
+   merge, the past-project step and the screen's final step give equal parts for parts they made). After a week or a
+   load they are not marked, so the first screen update after either one still runs everything. */
+const SCREEN_STABLE_FIELDS: ReadonlySet<string> = new Set(['pastProjects', 'flags', 'instagram']);
+export const isSettledValue = (value: unknown): boolean => isSettled(value);
+export const markScreenUpdateSettled = <T extends Player>(player: T): T => {
+    markPlayerSettled(player);
+    SCREEN_STABLE_FIELDS.forEach(key => markSettled((player as unknown as Record<string, unknown>)[key]));
+    return player;
+};
+/* Week-speed Phase 2, C5(h) (2026-11-17): normalizeIndustryProductions(registry, week) is a pure function. On a screen's
+   update a settled registry is the very object the last migration or week left, so its normalized form for that week
+   is remembered, and that result is remembered as its own normalized form (normalizing a normalized registry gives an
+   equal registry). ~18 ms M4 per tap on a late career. */
+const settledProductionRegistries = new WeakMap<object, { week: number; result: Record<string, IndustryProductionCommitment> }>();
+const normalizeSettledIndustryProductions = (registry: unknown, week: number): Record<string, IndustryProductionCommitment> => {
+    if (!registry || typeof registry !== 'object') return normalizeIndustryProductions(registry, week);
+    const known = settledProductionRegistries.get(registry);
+    if (known && known.week === week) return known.result;
+    const result = normalizeIndustryProductions(registry, week);
+    settledProductionRegistries.set(registry, { week, result });
+    settledProductionRegistries.set(result, { week, result });
+    return result;
+};
 /* the simulation's biggest slices: 27 MB, written only by the week, not in the defaults: a screen never needs its own copy, settled or not */
 const WORLD_SLICES_A_SCREEN_NEVER_WRITES: readonly string[] = [
     'worldStreamingViewing', 'worldStreamingCustomers', 'worldAudienceEconomy', 'worldAudienceParticipation',
@@ -237,6 +265,21 @@ const mergeDefaults = <T,>(defaults: T, incoming: unknown): T => {
     }
 
     return clone(incoming) as T;
+};
+
+/* C5(h): mergeDefaults' top level for a screen's update, key for key the same, except that a settled stable part is
+   kept as that object instead of a merged deep copy (see SCREEN_STABLE_FIELDS). */
+const mergeDefaultsForScreen = (defaults: Player, incoming: unknown): Player => {
+    if (!isPlainRecord(incoming)) return mergeDefaults(defaults, incoming);
+    const keep = (key: string, value: unknown) => SCREEN_STABLE_FIELDS.has(key) && isSettled(value);
+    const merged: Record<string, unknown> = {};
+    Object.entries(defaults as unknown as Record<string, unknown>).forEach(([key, defaultValue]) => {
+        merged[key] = keep(key, incoming[key]) ? incoming[key] : mergeDefaults(defaultValue, incoming[key]);
+    });
+    Object.entries(incoming).forEach(([key, value]) => {
+        if (!(key in merged)) merged[key] = keep(key, value) ? value : clone(value);
+    });
+    return merged as unknown as Player;
 };
 
 const readTimingNumber = (...values: unknown[]): number | undefined => {
@@ -1100,8 +1143,9 @@ const reverseLegacyImportedAcquisitionDebtCharge = (player: Player): Player => {
     };
 };
 
-const withCinemaMigration = (player: Player): Player => {
-    const result=migrateCinemaState(player,getAbsoluteWeek(player.age,player.currentWeek));
+const withCinemaMigration = (player: Player, options: { fromScreen?: boolean } = {}): Player => {
+    /* C5(h): a screen's update passes the settled cinema state it did not touch; its inspection is remembered */
+    const result=migrateCinemaState(player,getAbsoluteWeek(player.age,player.currentWeek),{settledCinemaState:Boolean(options.fromScreen)&&isSettled(player.world?.cinemaMarket)});
     if(result.status==='REJECTED')throw new CinemaMigrationError(result.diagnostics.map(d=>d.code));
     const migrated = { ...result.player, world: { ...result.player.world,
         recentProjectTitles: initializeRecentProjectTitles(result.player, getAbsoluteWeek(result.player.age, result.player.currentWeek)),
@@ -1119,25 +1163,62 @@ const withCinemaMigration = (player: Player): Player => {
         ? { ...migrated, commitments, activeReleases } : migrated);
     return migrateBuiltinNames(synchronized);
 };
-export const migratePlayerSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean } = {}): Player => (
-    /* 2026-11-11: repairRunawayRivalEconomy bounds the old 1.0.25 rival economy that blocked weeks in 1.0.26 */
-    /* 2026-11-15 (B13): restoreDroppedOriginalCommissions gives back originals the old 40-item cap dropped */
-    /* 2026-11-15 (B16): holdPrelaunchPurchasesForSlate keeps titles bought before launch on the shelves for the Slate */
-    /* 2026-11-18 (debt plan v2): repairInheritedAcquisitionDebt corrects formula debt taken over on the old runaway values */
-    markPlayerSettled(options.fromScreen ? migrateSave(input, options) : holdPrelaunchPurchasesForSlate(restoreDroppedOriginalCommissions(settleLegacySocialCounts(advanceOriginalPitches(healCopiedEpisodeRatings(repairInheritedAcquisitionDebt(repairRunawayRivalEconomy(migrateSave(input, options)).player).player))))))
-);
+/** onRepair (week-speed plan Phase 1, 2026-11-17): called when a load repair changed the career, so an open that
+ *  repaired nothing needs no full save just for being opened. */
+export const migratePlayerSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean; onRepair?: () => void } = {}): Player => {
+    const migration = migratePlayerSaveReportingRepairs(input, options);
+    if (migration.repaired) options.onRepair?.();
+    return migration.player;
+};
+
+/** The load repairs, run in this order after migrateSave. Each returns the very same object when it has nothing
+ *  to repair. (The chain used to be written inline in migratePlayerSave; the order and the steps are unchanged.)
+ *  - 2026-11-11: repairRunawayRivalEconomy bounds the old 1.0.25 rival economy that blocked weeks in 1.0.26 (first)
+ *  - 2026-11-18 (debt plan v2): repairInheritedAcquisitionDebt corrects formula debt taken over on the old runaway
+ *    values (second). It marks the career once with its repair version, so the first open after it is a repair.
+ *  - 2026-11-15 (B13): restoreDroppedOriginalCommissions gives back originals the old 40-item cap dropped
+ *  - 2026-11-15 (B16): holdPrelaunchPurchasesForSlate keeps titles bought before launch on the shelves for the Slate */
+const LOAD_REPAIRS_AFTER_RIVAL_ECONOMY: ReadonlyArray<(player: Player) => Player> = [
+    player => repairInheritedAcquisitionDebt(player).player,
+    healCopiedEpisodeRatings,
+    advanceOriginalPitches,
+    settleLegacySocialCounts,
+    restoreDroppedOriginalCommissions,
+    holdPrelaunchPurchasesForSlate,
+];
+
+/** migratePlayerSave, also saying whether a load repair changed the career (week-speed plan Phase 1, 2026-11-17):
+ *  a career that opens with nothing repaired and no format change needs no full save just for being opened. */
+export const migratePlayerSaveReportingRepairs = (
+    input: Partial<Player> | Player,
+    options: { fromScreen?: boolean } = {},
+): { player: Player; repaired: boolean } => {
+    if (options.fromScreen) return { player: markPlayerSettled(migrateSave(input, options)), repaired: false };
+    const migrated = migrateSave(input, options);
+    let current = repairRunawayRivalEconomy(migrated).player;
+    let repaired = current !== migrated;
+    for (const repair of LOAD_REPAIRS_AFTER_RIVAL_ECONOMY) {
+        const next = repair(current);
+        if (next !== current) repaired = true;
+        current = next;
+    }
+    return { player: markPlayerSettled(current), repaired };
+};
 
 const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: boolean }): Player => {
     const stockContainerIssues = inspectStockSaveContainers(input);
     if (stockContainerIssues.length) throw new StockSaveRecoveryError(stockContainerIssues, input);
-    const cinemaErrors=inspectCinemaSavedState(input.world?.cinemaMarket);
+    /* C5(h): a settled cinema state on a screen's update was inspected before; its codes are remembered */
+    const cinemaErrors=options.fromScreen && isSettled(input.world?.cinemaMarket)
+        ? inspectSettledCinemaSavedState(input.world!.cinemaMarket as object)
+        : inspectCinemaSavedState(input.world?.cinemaMarket);
     // Validate present raw financial facts before legacy defaults can erase corruption.
     const badMoney=(v:unknown)=>v!==undefined && (typeof v!=='number'||!Number.isFinite(v)||v<0);
     for(const release of input.activeReleases || [])if(badMoney(release.totalGross)||badMoney(release.totalStudioReceipts)||badMoney(release.budget))cinemaErrors.push('CINEMA_LEGACY_FINANCE_CORRUPT');
     for(const project of input.world?.projects || [])if(badMoney(project.boxOffice))cinemaErrors.push('CINEMA_LEGACY_FINANCE_CORRUPT');
     if(cinemaErrors.length)throw new CinemaMigrationError(cinemaErrors);
     const screenUpdate = options.fromScreen ? setAsideWhatAScreenDidNotTouch(input) : null;
-    const merged: Player = mergeDefaults(INITIAL_PLAYER, screenUpdate ? screenUpdate.rest : input);
+    const merged: Player = screenUpdate ? mergeDefaultsForScreen(INITIAL_PLAYER, screenUpdate.rest) : mergeDefaults(INITIAL_PLAYER, input);
     const base: Player = screenUpdate
         ? { ...merged, world: { ...merged.world, ...screenUpdate.kept }, ...(screenUpdate.platform ? { ownedStreamingPlatform: screenUpdate.platform } : {}) }
         : merged;
@@ -1160,7 +1241,9 @@ const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: bo
         ? sanitizeMigratedAwardEvent(base.pendingEvent)
         : null;
     const migratedAbsoluteWeek = getAbsoluteWeek(migratedAge, migratedCurrentWeek);
-    const migratedIndustryProductions = normalizeIndustryProductions(
+    const migratedIndustryProductions = (options.fromScreen && isSettled(base.world?.industryProductions)
+        ? normalizeSettledIndustryProductions
+        : normalizeIndustryProductions)(
         base.world?.industryProductions,
         migratedAbsoluteWeek,
     );
@@ -1236,7 +1319,8 @@ const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: bo
             && !toObjectSeries<any>(migratedPendingEvent.data?.nominations).length
                 ? null
                 : migratedPendingEvent,
-        pastProjects: dedupeByKey(
+        /* C5(h): settled past projects came out of this same step (see SCREEN_STABLE_FIELDS) */
+        pastProjects: untouched(base.pastProjects) ? base.pastProjects : dedupeByKey(
             toObjectSeries<any>(base.pastProjects).map(migratePastProject),
             project => project.id
         ),
@@ -1446,7 +1530,7 @@ const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: bo
         && business.config?.productionType !== 'Acquired Studio'
     )) || productionHouses[0];
 
-    if (!parentStudio) return withCinemaMigration(advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue(repairedPlayer, input))));
+    if (!parentStudio) return withCinemaMigration(advanceStreamingOpportunityMarket(initializeHistoricalMarketPacing(initializeHistoricalCatalogue(repairedPlayer, input))), options);
 
     const reconciledRoster = mergeParentStudioTalentRosters(
         parentStudio.id,
@@ -1470,5 +1554,5 @@ const migrateSave = (input: Partial<Player> | Player, options: { fromScreen?: bo
                 }
                 : business
         )),
-    }, input))));
+    }, input))), options);
 };

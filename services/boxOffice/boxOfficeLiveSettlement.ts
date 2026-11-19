@@ -60,7 +60,10 @@ const sum = (ns: number[]) => ns.reduce((a, b) => { const n = a + b; if (!Number
     throw new RangeError('Cinema money overflow'); return n; }, 0);
 const amount = (n: number) => { if (!Number.isSafeInteger(n) || n < 0)
     throw new RangeError('Invalid cinema receipt money'); return n; };
-const receiptSignature = (r: CinemaWeekResult) => serializeCinemaFacts({ week: r.absoluteWeek, epoch: r.live?.clockEpoch, tuning: r.tuningVersion, fingerprint: r.inputFingerprint,
+/* Week-speed Phase 2, C5(a) (receipt v2): version 2 receipts are signed without the input fingerprint (the kernel's
+   diagnostic hash of the whole week input, ~70 ms a week to make). This build reads them (2a); the private week path
+   writes them from 2b. Version 1 is unchanged. */
+const receiptSignature = (r: CinemaWeekResult, receiptVersion: 1 | 2 = 1) => serializeCinemaFacts({ week: r.absoluteWeek, epoch: r.live?.clockEpoch, tuning: r.tuningVersion, ...(receiptVersion === 2 ? {} : { fingerprint: r.inputFingerprint }),
     titles: [...r.titles].sort((a, b) => a.titleId.localeCompare(b.titleId)).map(({ countries, ...t }) => t), costs: [...new Set(r.costEvents.map(c => c.titleId))].sort().map(id => ({ titleId: id, total: sum(r.costEvents.filter(c => c.titleId === id).map(c => c.amountCents)) })) });
 /** One atomic candidate mutation. Caller persists it through existing verified save generations. */
 const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, readInput: () => CinemaWeekInput, reuseDetachedWeekCandidate = false, unexposedFreshResult = false, consumePrivateMarket = false): CinemaCommitResult => {
@@ -72,7 +75,8 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
     const signature = receiptSignature(result);
     const old = previous.weeks.find(w => w.clockEpoch === previous.clockEpoch && w.absoluteWeek === result.absoluteWeek);
     if (old) {
-        if (old.receiptSignature !== signature)
+        // a version 2 receipt (written from 2b) is compared the way it was signed: without the input fingerprint
+        if (old.receiptSignature !== (old.receiptVersion === 2 ? receiptSignature(result, 2) : signature))
             throw new Error('Cinema committed receipt conflict');
         return { player, applied: false, receipt: old };
     }
@@ -286,7 +290,23 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
     // diagnostic getter and public proposals can escape, so their independent
     // copy remains mandatory even when settlement reused the weekly candidate.
     const market = consumePrivateMarket ? result.nextState : structuredClone(result.nextState);
-    state.market = compactCinemaMarketState(market, new Set(Object.values(state.titles).filter(t => !t.closed).map(t => t.titleId)));
+    const keepTitleIds = new Set(Object.values(state.titles).filter(t => !t.closed).map(t => t.titleId));
+    /* Week-speed Phase 2, C5(b) (2026-11-17): the week's simulation has just compacted this market (boxOfficeMarket.ts)
+       and sorted its titles and runs. When every title and run it holds is still kept, compacting it again retires
+       nothing, and compaction of an already compacted market gives the same market (each cohort's rows are already
+       capped and in the final order, and both sorts are stable). So it is used as it is. ~9-12 ms a week (M4).
+       Tools only: with globalThis.__AE_WEEK_MEMO_CHECK__ set, the skipped compaction is run anyway and compared. */
+    const nothingRetires = market.titles.every(title => keepTitleIds.has(title.titleId))
+        && market.runs.every(run => keepTitleIds.has(run.titleId));
+    if (nothingRetires && (globalThis as { __AE_WEEK_MEMO_CHECK__?: boolean }).__AE_WEEK_MEMO_CHECK__) {
+        const memoGlobals = globalThis as { __AE_WEEK_MEMO_CHANGES__?: Array<{ name: string; role: string; path: string }>; __AE_WEEK_MEMO_HITS__?: Record<string, number> };
+        memoGlobals.__AE_WEEK_MEMO_HITS__ = { ...(memoGlobals.__AE_WEEK_MEMO_HITS__ || {}), settlementCompactionSkipped: (memoGlobals.__AE_WEEK_MEMO_HITS__?.settlementCompactionSkipped || 0) + 1 };
+        if (JSON.stringify(compactCinemaMarketState(market, keepTitleIds)) !== JSON.stringify(market)) {
+            if (!memoGlobals.__AE_WEEK_MEMO_CHANGES__) memoGlobals.__AE_WEEK_MEMO_CHANGES__ = [];
+            memoGlobals.__AE_WEEK_MEMO_CHANGES__.push({ name: 'settlementCompaction', role: 'skip', path: '$' });
+        }
+    }
+    state.market = nothingRetires ? market : compactCinemaMarketState(market, keepTitleIds);
     // Lag round (2026-11-09): 12 weekly receipts, not 52. The chart reads this week and last week,
     // and a repeated commit only meets the latest; every title's lifetime totals live in state.titles.
     state.weeks = [...state.weeks, receipt].slice(-CINEMA_RECEIPT_WEEKS_KEPT);

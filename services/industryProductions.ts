@@ -269,6 +269,18 @@ export const upsertIndustryProduction = (
     }).sort(([left], [right]) => left.localeCompare(right)));
 };
 
+/* Week-speed Phase 2, N3 (2026-11-17): a registry this function built by replacing one record of a registry whose keys
+   were in sorted order has those same keys in that same order, so it is sorted too. Remembering that, with its key
+   count (a registry that gained or lost a key in place is checked again), skips the order check below on the next
+   upsert into it: one localeCompare per key of a ~1,900-record registry, ~48 upserts a week.
+   Tools only: with globalThis.__AE_WEEK_MEMO_CHECK__ set, a remembered answer is checked against the full check, and
+   a wrong one is listed in globalThis.__AE_WEEK_MEMO_CHANGES__. */
+const registriesKnownSorted = new WeakMap<object, number>();
+const keysInSortedOrder = (keys: readonly string[]): boolean => {
+    for (let index = 1; index < keys.length; index += 1) if (keys[index - 1].localeCompare(keys[index]) > 0) return false;
+    return true;
+};
+
 /**
  * Fast update for registries that have already crossed the save/runtime
  * normalization boundary. The changed record is still normalized in full;
@@ -287,9 +299,21 @@ export const upsertCanonicalIndustryProduction = (
        entry per record and added every record again. Any other registry still takes the rebuild. */
     if (registry && Object.prototype.hasOwnProperty.call(registry, normalizedProduction.id)) {
         const keys = Object.keys(registry);
-        let ordered = true;
-        for (let index = 1; index < keys.length && ordered; index += 1) ordered = keys[index - 1].localeCompare(keys[index]) <= 0;
-        if (ordered) return { ...registry, [normalizedProduction.id]: normalizedProduction };
+        const remembered = registriesKnownSorted.get(registry) === keys.length;
+        const ordered = remembered || keysInSortedOrder(keys);
+        if (remembered && (globalThis as { __AE_WEEK_MEMO_CHECK__?: boolean }).__AE_WEEK_MEMO_CHECK__) {
+            const memoGlobals = globalThis as { __AE_WEEK_MEMO_CHANGES__?: Array<{ name: string; role: string; path: string }>; __AE_WEEK_MEMO_HITS__?: Record<string, number> };
+            memoGlobals.__AE_WEEK_MEMO_HITS__ = { ...(memoGlobals.__AE_WEEK_MEMO_HITS__ || {}), registryOrderRemembered: (memoGlobals.__AE_WEEK_MEMO_HITS__?.registryOrderRemembered || 0) + 1 };
+            if (!keysInSortedOrder(keys)) {
+                if (!memoGlobals.__AE_WEEK_MEMO_CHANGES__) memoGlobals.__AE_WEEK_MEMO_CHANGES__ = [];
+                memoGlobals.__AE_WEEK_MEMO_CHANGES__.push({ name: 'upsertCanonicalIndustryProduction', role: 'sorted-flag', path: '$' });
+            }
+        }
+        if (ordered) {
+            const next = { ...registry, [normalizedProduction.id]: normalizedProduction };
+            registriesKnownSorted.set(next, keys.length);
+            return next;
+        }
     }
     return Object.fromEntries(Object.entries({
         ...(registry || {}),

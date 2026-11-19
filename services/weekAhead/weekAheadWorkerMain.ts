@@ -5,6 +5,7 @@ import { restoreNpcDatabase, runWeekAhead, WeekAheadCancelled, type NpcDatabaseS
 import type { WeekAheadStageRequest, WeekAheadToMain, WeekAheadToWorker, WeekAheadWriteRequest } from './weekAheadProtocol';
 import { adoptIssuedManifest } from '../saveIntegrity';
 import { getVerifiedLiveSave, promoteStagedGameData, saveVerifiedGameData, setVerifiedLiveSave, stageVerifiedGameData } from '../storage';
+import { exportSaveWriteRecord, importSaveWriteRecord } from '../saveWriteLimits';
 import type { StagedSaveGeneration } from '../saveGenerations';
 import { diffCareer, packCareerPatches, type PackedCareerPatches } from './careerPatch';
 
@@ -106,37 +107,45 @@ export const startWeekAheadWorker = (
         const started = performance.now();
         const staging = stagings.get(id);
         stagings.delete(id);
+        // Phase 1 (2026-11-17): this slot's learned write limit, as the main thread knows it.
+        importSaveWriteRecord(write.key, write.writeRecord);
         void (async () => {
             const stage = staging ? await staging.catch(() => null) : null;
             if (stage && stage.key === write.key) {
                 try {
                     const committed = await promoteStagedGameData(write.key, stage.staged);
                     return { committed, promoted: true };
-                } catch { /* something was written since: write it the usual way below */ }
+                } catch { /* not promoted: written below, but only on the live copy captured at the tap */ }
             }
+            /* Phase 1 (2026-11-17), strict: the week is written only on top of the live copy captured at the tap
+               (write.live, same digest and head token). If anything was written since, or no live copy was
+               verified, nothing is written here and the main thread writes the week itself. */
+            if (!write.live) throw new Error('Week Ahead write refused: no verified live copy at the tap');
             setVerifiedLiveSave(write.key, write.live);
             await saveVerifiedGameData(write.key, result.player, result.manifest, {
                 retainPrevious: result.retainPrevious,
                 needsRecoveryCheckpoint: result.needsRecoveryCheckpoint,
+                requireLive: write.live,
             });
             return { committed: getVerifiedLiveSave(write.key), promoted: false };
         })().then(({ committed, promoted }) => {
-            post({ kind: 'written', id, ok: true, committed, promoted, ms: Math.round(performance.now() - started) });
+            post({ kind: 'written', id, ok: true, committed, promoted, ms: Math.round(performance.now() - started), writeRecord: exportSaveWriteRecord(write.key) });
         }, error => {
-            post({ kind: 'written', id, ok: false, message: error instanceof Error ? `${error.name}: ${error.message}` : String(error), ms: Math.round(performance.now() - started) });
+            post({ kind: 'written', id, ok: false, message: error instanceof Error ? `${error.name}: ${error.message}` : String(error), ms: Math.round(performance.now() - started), writeRecord: exportSaveWriteRecord(write.key) });
         });
     };
     /** Writes the prepared week ahead, not live, so tapping only has to switch the head. */
     const stageAhead = (id: number, result: WeekAheadResult, stage: WeekAheadStageRequest | undefined) => {
         if (!stage || !stage.live || !result.retainPrevious) return;
         const started = performance.now();
+        importSaveWriteRecord(stage.key, stage.writeRecord);
         const staging = stageVerifiedGameData(stage.key, result.player, result.manifest, stage.live, {
             needsRecoveryCheckpoint: result.needsRecoveryCheckpoint,
         }).then(staged => {
-            post({ kind: 'staged', id, ok: true, ms: Math.round(performance.now() - started) });
+            post({ kind: 'staged', id, ok: true, ms: Math.round(performance.now() - started), key: stage.key, writeRecord: exportSaveWriteRecord(stage.key) });
             return { key: stage.key, staged };
         }, error => {
-            post({ kind: 'staged', id, ok: false, ms: Math.round(performance.now() - started), message: error instanceof Error ? error.message : String(error) });
+            post({ kind: 'staged', id, ok: false, ms: Math.round(performance.now() - started), message: error instanceof Error ? error.message : String(error), key: stage.key, writeRecord: exportSaveWriteRecord(stage.key) });
             return null;
         });
         stagings.set(id, staging);

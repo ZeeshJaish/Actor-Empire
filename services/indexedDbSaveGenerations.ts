@@ -1,7 +1,8 @@
 import type {Player} from '../types';
 import type {SaveGenerationStore, SaveGenerationKeys, StoredSaveGeneration, WriteVerifiedGenerationInput, StageVerifiedGenerationInput, StagedSaveGeneration, PromoteStagedGenerationInput} from './saveGenerations';
 import {verifySaveIntegrity, type SaveIntegrityManifest} from './saveIntegrity';
-import {waitForIndexedDbTransaction} from './indexedDbResilience';
+import {waitForIndexedDbTransaction,watchIndexedDbTransaction} from './indexedDbResilience';
+import {learnSaveWrite,saveSizeUnits,saveWriteLimitMs} from './saveWriteLimits';
 import {packSavePlayer, materializeSaveRecord, createImmutableSaveRecordReadBatch, SavePayloadCorruptionError} from './savePayloadBlocks';
 import {packPlayerCinemaCellsForStorage} from './boxOffice/boxOfficeCellStorage';
 
@@ -146,14 +147,34 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
         for(const value of raw)result.push(await materializeOrInvalid(value));
         return result;
     };
-    const mutate=async(operation:string,start:(store:IDBObjectStore)=>void,timeoutMs?:number)=>{
+    const mutate=async(operation:string,start:(store:IDBObjectStore)=>void,timeoutMs?:number,onHandOver?:()=>void)=>{
         const db=await openDB();try{
             const tx=db.transaction(name,'readwrite');
-            // Attach handlers before any user data can throw or abort.
-            const completion=waitForIndexedDbTransaction(tx,{operation,...(timeoutMs?{timeoutMs}:{})});
-            try{start(tx.objectStore(name));}catch{tx.abort();}
-            await completion;
+            if(!onHandOver){
+                // Attach handlers before any user data can throw or abort.
+                const completion=waitForIndexedDbTransaction(tx,{operation,...(timeoutMs?{timeoutMs}:{})});
+                try{start(tx.objectStore(name));}catch{tx.abort();}
+                await completion;
+                return;
+            }
+            /* Phase 1 (2026-11-17), week-speed plan item 3: the limit counts from when IndexedDB starts this
+               transaction (the answer to its first, tiny request), not from when it was queued behind another write
+               (the Week Ahead worker's, another slot's). Handlers are attached before anything can throw or abort. */
+            const watched=watchIndexedDbTransaction(tx,{operation,handOver:true,...(timeoutMs?{timeoutMs}:{})});
+            try{
+                const store=tx.objectStore(name);
+                const probe=store.count('__actor_save_transaction_lifetime__');
+                probe.onsuccess=()=>{watched.handedOver();onHandOver();try{start(store);}catch{tx.abort();}};
+            }catch{tx.abort();}
+            await watched.completion;
         }finally{db.close();}
+    };
+    /** Phase 1 (2026-11-17): after a timeout whose outcome is unknown, the copy the head now calls newest. */
+    const readNewestCommitted=async(keys:SaveGenerationKeys):Promise<{digest:string;token:string|null}|null>=>{
+        const [rawHead,rawIntegrity]=await readRaw([keys.current+HEAD_SUFFIX,keys.integrity]);
+        const head=isHead(rawHead)?rawHead as SaveHead:null;
+        const digest=head?.newest==='PREVIOUS'?head.digests?.PREVIOUS:digestOf(rawIntegrity);
+        return digest?{digest,token:head?.token??null}:null;
     };
     const promote=(keys:SaveGenerationKeys[],retainPrevious=true,expected:Record<string,string>={})=>{
         forget(keys.map(k=>k.current));
@@ -210,6 +231,9 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
        slot holds this prepared week instead of the week before; a later save simply writes over it. */
     const stageVerifiedGeneration=async({keys,generation:next,expectedCandidateDigest,live}:StageVerifiedGenerationInput):Promise<StagedSaveGeneration>=>{
         const headKey=keys.current+HEAD_SUFFIX;let staged:StagedSaveGeneration|null=null;
+        /* Phase 1 (2026-11-17), plan item 3: staging writes a whole generation, so it gets the slot's learned limit
+           (in the Week Ahead worker, the record the main thread handed over), counted from the hand-over. */
+        const units=saveSizeUnits(next.player),limit=saveWriteLimitMs(keys.current,units);let handOverAt=0;
         await mutate('stage verified save generation',store=>{
             readSnapshot(store,[headKey,keys.integrity],rawHead=>{
                 const head=isHead(rawHead[0])?rawHead[0] as SaveHead:null;
@@ -236,8 +260,12 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
                     });
                 });
             });
+        },limit,()=>{handOverAt=Date.now();}).catch(error=>{
+            if(String((error as {code?:unknown})?.code)==='TIMEOUT')learnSaveWrite(keys.current,{timedOut:true,limitMs:limit,units});
+            throw error;
         });
         if(!staged)throw Error('Staged generation was not written');
+        learnSaveWrite(keys.current,{ms:Date.now()-handOverAt,units,limitMs:limit});
         return staged;
     };
     /** Makes a staged generation live by rewriting only the head, if nothing was written since it was staged. */
@@ -263,20 +291,14 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
        with a big career always needs longer, so the save was cancelled and the week failed every time ("Retry week"
        for ever; export → import helped for a few weeks because the import writes a smaller save). The limit now
        follows this phone: three times its last save plus 4 s, at least 12 s and at most 90 s, and a save that runs out
-       of time doubles the next one's limit (12 → 24 → 48 → 90 s), so a retry can finish. Kept on the device. */
-    const writeLimitMs=()=>{
-        let learned=0;
-        try{learned=Number(globalThis.localStorage?.getItem('ae.saveWriteLimitMs'))||0;}catch{learned=0;}
-        return Math.min(90_000,Math.max(12_000,learned));
-    };
-    const learnWriteLimit=(nextMs:number)=>{
-        try{globalThis.localStorage?.setItem('ae.saveWriteLimitMs',String(Math.round(Math.min(90_000,Math.max(12_000,nextMs)))));}catch{/* private mode */}
-    };
-    const writeVerifiedGeneration=async({keys,generation:next,retainPrevious,expectedCandidateDigest}:WriteVerifiedGenerationInput)=>{
-        const headKey=keys.current+HEAD_SUFFIX;let committed:{digest:string;token:string|null}|null=null;
-        const writeStarted=Date.now();
-        const limit=writeLimitMs();
-        await mutate('write and verify atomic save generation',store=>{
+       of time doubles the next one's limit (12 → 24 → 48 → 90 s), so a retry can finish. Kept on the device.
+       Phase 1 of the week-speed plan (2026-11-17), item 3: kept per slot and scaled by the save's size
+       (services/saveWriteLimits.ts), counted from when IndexedDB starts the write, and a timeout whose outcome the
+       device never reported is checked against the head before the caller is told it failed. */
+    const writeVerifiedGeneration=async({keys,generation:next,retainPrevious,expectedCandidateDigest,requireLive,alsoPut}:WriteVerifiedGenerationInput)=>{
+        const headKey=keys.current+HEAD_SUFFIX;let committed:{digest:string;token:string|null}|null=null;let refused=false;
+        const units=saveSizeUnits(next.player),limit=saveWriteLimitMs(keys.current,units);let handOverAt=0;
+        try{await mutate('write and verify atomic save generation',store=>{
             /** Writes the new generation into one slot, reads it back, checks it, then flips the head. */
             const writeSlot=(target:SlotName,head:SaveHead|null,kept:{slot:SlotName;digest:string}|null)=>{
                 if(target==='CURRENT'){store.put(stored(next.player),keys.current);store.put(next.manifest,keys.integrity);}
@@ -293,6 +315,8 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
                         if(digestOf(manifest)!==expectedCandidateDigest)throw Error('Stored current no longer matches the requested generation');
                         return ()=>{
                             store.delete(keys.candidate);
+                            // Phase 1 (2026-11-17): small records committed with this save (a slot's first format marker).
+                            for(const extra of alsoPut??[])store.put(extra.value,extra.key);
                             if(target==='CURRENT'&&(!head||head.newest==='CURRENT')&&!kept){
                                 // Nothing flips: the old layout stays exactly as it was.
                                 if(head)store.delete(headKey);
@@ -311,6 +335,11 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
                 const head=isHead(rawHead[0])?rawHead[0] as SaveHead:null;
                 const liveSlot:SlotName=head?.newest==='PREVIOUS'?'PREVIOUS':'CURRENT';
                 const otherSlot:SlotName=liveSlot==='CURRENT'?'PREVIOUS':'CURRENT';
+                if(requireLive){
+                    // Phase 1 (2026-11-17): Week Ahead's tap-time write lands only on the live copy captured at the tap.
+                    const liveNow=liveSlot==='CURRENT'?digestOf(rawHead[1]):head?.digests?.PREVIOUS;
+                    if(!liveNow||liveNow!==requireLive.digest||(head?.token??null)!==requireLive.token){refused=true;store.transaction.abort();return;}
+                }
                 if(!retainPrevious){writeSlot(liveSlot,head,null);return;}
                 const liveDigest=liveSlot==='CURRENT'?digestOf(rawHead[1]):head?.digests?.PREVIOUS;
                 const known=verifiedLive.get(keys.current);
@@ -328,11 +357,19 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
                     });
                 });
             });
-        },limit).catch(error=>{
-            if(String((error as {code?:unknown})?.code)==='TIMEOUT')learnWriteLimit(limit*2);
+        },limit,()=>{handOverAt=Date.now();}).catch(error=>{
+            if(String((error as {code?:unknown})?.code)==='TIMEOUT')learnSaveWrite(keys.current,{timedOut:true,limitMs:limit,units});
             throw error;
-        });
-        learnWriteLimit(Math.max(12_000,(Date.now()-writeStarted)*3+4_000));
+        });}catch(error){
+            if(refused)throw Error('Week Ahead write refused: the save changed since the tap');
+            // Phase 1 (2026-11-17): the device reported neither the abort nor the commit. Did this write land?
+            if((error as {outcomeUnknown?:unknown})?.outcomeUnknown){
+                const newest=await readNewestCommitted(keys).catch(()=>null);
+                if(newest&&newest.digest===expectedCandidateDigest){verifiedLive.set(keys.current,newest);return;}
+            }
+            throw error;
+        }
+        learnSaveWrite(keys.current,{ms:Date.now()-handOverAt,units,limitMs:limit});
         if(committed)verifiedLive.set(keys.current,committed);
     };
     return {

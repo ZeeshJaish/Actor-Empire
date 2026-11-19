@@ -1,5 +1,6 @@
 /** Physical representation only. Gameplay/export always receive a complete Player. */
 import {expandPlayerCinemaCellsFromStorage} from './boxOffice/boxOfficeCellStorage';
+import { resolveSaveFaceTable } from './saveFaceTable';
 const KIND = 'ACTOR_EMPIRE_PLAYER_BLOCKS';
 const TAG = '$actorSaveValue';
 const BLOCK_MIN_CHARS = 64 * 1024;
@@ -170,9 +171,12 @@ export const unpackSavePlayer=(value:unknown):Promise<unknown>=>unpack(value,new
 
 /* 19 Nov 2026 (debt plan v2): a stored player may pack the cinema's audience cells that hold nothing but awareness
    (boxOffice/boxOfficeCellStorage.ts). They are rebuilt here, before any copy is checked or handed to the game;
-   a packed form that cannot be rebuilt is a damaged payload, like a bad block. */
+   a packed form that cannot be rebuilt is a damaged payload, like a bad block.
+   Week-speed Phase 2a (2026-11-17): a stored player may also carry 2b's face table (services/saveFaceTable.ts); its
+   pictures are put back here first, before anything verifies or uses the save. Without a table nothing changes. */
 const expandStored = (value:unknown):unknown => {
-    try{return expandPlayerCinemaCellsFromStorage(value);}
+    const withFaces = resolveSaveFaceTable(value);
+    try{return expandPlayerCinemaCellsFromStorage(withFaces);}
     catch(error){throw new SavePayloadCorruptionError(error instanceof Error?error.message:'Unreadable cinema cells');}
 };
 const materialize = async (record:unknown,blocks:ReadBlocks):Promise<any> => {

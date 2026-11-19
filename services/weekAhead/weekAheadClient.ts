@@ -1,9 +1,15 @@
 import type { Player } from '../../types';
 import { NPC_DATABASE } from '../npcLogic';
-import { getGenderedAvatar, getHandedOutPortraits } from '../npcAvatar';
+import { getGenderedAvatar, getPortraitsForWorker } from '../npcAvatar';
 import type { WeekAheadResult } from './weekAheadEngine';
 import { applyCareerPatches, unpackCareerPatches } from './careerPatch';
 import type { WeekAheadStageRequest, WeekAheadToMain, WeekAheadToWorker, WeekAheadVerifiedLive } from './weekAheadProtocol';
+import { exportSaveWriteRecord, persistSaveWriteRecord } from '../saveWriteLimits';
+
+/** Phase 1 (2026-11-17), plan item 3: the worker gets the slot's learned write limit (it has no localStorage). */
+const withWriteRecord = (stage: WeekAheadStageRequest | null): WeekAheadStageRequest | undefined => (
+    stage ? { ...stage, writeRecord: exportSaveWriteRecord(stage.key) } : undefined
+);
 
 /* Week Ahead, the main thread's side (2026-11-12). It keeps the worker one week ahead of the career on screen:
    - every change of the career (after a short quiet moment) is sent to the worker, which drops the week it was
@@ -56,6 +62,9 @@ export interface WeekAheadClient {
     /** The player is on the Home screen (where Age Up Week is) or not. */
     setOnHome(onHome: boolean): void;
     readonly state: () => { ready: boolean; unusable: string | null; preparing: boolean; prepared: boolean };
+    /** Phase 1 (2026-11-17), telemetry: the worker's busy time and the time spent on weeks thrown away since the
+     *  last call (then reset). */
+    drainEngineStats(): { busyMs: number; discardedMs: number };
 }
 
 type Reply = Extract<WeekAheadToMain, { kind: 'result' } | { kind: 'failed' }>;
@@ -73,6 +82,14 @@ const onlyCarriedFieldsDiffer = (left: Player, right: Player): boolean => {
     return true;
 };
 
+/** Phase 1 (2026-11-17), plan item 7: is a Week Ahead worker preparing a week right now (holding a second copy of
+ *  the career and working on it)? The cinema forecast waits for it on phones with 4 GB or less. */
+const preparingChecks = new Set<() => boolean>();
+export const isWeekAheadPreparing = (): boolean => {
+    for (const check of preparingChecks) if (check()) return true;
+    return false;
+};
+
 export const createWeekAheadClient = (
     createWorker: () => Worker,
     report: (event: string, detail?: Record<string, unknown>) => void = () => {},
@@ -86,7 +103,13 @@ export const createWeekAheadClient = (
     let seq = 0;
     /** The career object on screen that the worker's newest request belongs to, and the main thread's NPC entries
      *  as that request saw them (a screen that replaces an NPC since makes the prepared week stale). */
-    let current: { id: number; basis: Player; done: boolean; npcRefs: unknown[]; settled: boolean } | null = null;
+    let current: { id: number; basis: Player; done: boolean; npcRefs: unknown[]; settled: boolean; startedAt: number } | null = null;
+    let engineBusyMs = 0;
+    let engineDiscardedMs = 0;
+    const preparingCheck = () => Boolean(worker && current && !current.done);
+    preparingChecks.add(preparingCheck);
+    /** A week still being prepared is replaced or dropped: its time so far was spent for nothing. */
+    const discardCurrent = () => { if (current && !current.done) engineDiscardedMs += Math.max(0, Date.now() - current.startedAt); };
     let hidden = false;
     let onHome = !policy.homeOnly;
     /** The worker may work now: the app is on screen, and on Home when the policy asks for that. */
@@ -104,7 +127,7 @@ export const createWeekAheadClient = (
     };
     /** Stop a week still being prepared (it would be thrown away); a prepared one stays for the tap. */
     const stopPreparing = () => {
-        if (current && !current.done) { post({ kind: 'drop' }); current = null; }
+        if (current && !current.done) { discardCurrent(); post({ kind: 'drop' }); current = null; }
     };
     const npcListUnchangedSince = (refs: unknown[]): boolean => {
         const list = NPC_DATABASE as unknown[];
@@ -142,8 +165,9 @@ export const createWeekAheadClient = (
         if (sendTimer) { clearTimeout(sendTimer); sendTimer = null; }
         clearSettle();
         const id = ++seq;
-        if (!post({ kind: 'speculate', id, player, npcs: NPC_DATABASE as unknown[], stage: stageTarget() ?? undefined })) { current = null; return false; }
-        current = { id, basis: player, done: false, npcRefs: (NPC_DATABASE as unknown[]).slice(), settled: false };
+        discardCurrent();
+        if (!post({ kind: 'speculate', id, player, npcs: NPC_DATABASE as unknown[], stage: withWriteRecord(stageTarget()) })) { current = null; return false; }
+        current = { id, basis: player, done: false, npcRefs: (NPC_DATABASE as unknown[]).slice(), settled: false, startedAt: Date.now() };
         return true;
     };
 
@@ -171,6 +195,7 @@ export const createWeekAheadClient = (
                     break;
                 }
                 case 'done':
+                    engineBusyMs += Math.max(0, Number(message.ms) || 0);
                     report('week_ahead_prepared', { ms: message.ms, ...message.timings });
                     if (current?.id === message.id) {
                         current.done = true;
@@ -178,6 +203,8 @@ export const createWeekAheadClient = (
                     }
                     break;
                 case 'staged':
+                    // Phase 1 (2026-11-17): what the worker learned about this slot's writes is kept here.
+                    if (message.key) persistSaveWriteRecord(message.key, message.writeRecord);
                     report(message.ok ? 'week_ahead_staged' : 'week_ahead_stage_skipped', { ms: message.ms, ...(message.message ? { message: message.message } : {}) });
                     break;
                 case 'written': {
@@ -199,7 +226,8 @@ export const createWeekAheadClient = (
         worker.onerror = event => { event.preventDefault?.(); giveUp(`worker error: ${event.message || 'unknown'}`); };
         worker.onmessageerror = () => giveUp('a message could not be read');
         // Portraits first: the worker loads the game code only after it has them (see weekAhead.worker.ts).
-        if (!post({ kind: 'init', portraits: getHandedOutPortraits(), npcs: NPC_DATABASE as unknown[] })) giveUp('init could not be sent');
+        // Phase 1 (2026-11-17): the load-time faces and the NPC list's faces, not every face of the session.
+        if (!post({ kind: 'init', portraits: getPortraitsForWorker(NPC_DATABASE as unknown[]), npcs: NPC_DATABASE as unknown[] })) giveUp('init could not be sent');
     }
 
     /** Back on screen or on Home: the career on screen is sent at once if nothing is prepared for it; a prepared
@@ -227,14 +255,18 @@ export const createWeekAheadClient = (
             if (!ready || unusable || !worker) return null;
             const started = Date.now();
             clearSettle();
+            /* Phase 1 of the week-speed plan (2026-11-17): nothing prepared for this exact career means the main thread
+               plays the week at once. Starting a fresh background week at the tap and waiting for it made players
+               wait up to 90 s (field waits of 23, 42 and 48 s). */
             if (!current || !onlyCarriedFieldsDiffer(current.basis, player) || !npcListUnchangedSince(current.npcRefs)) {
-                if (!send(player)) return null;
+                return null;
             }
             const { id, basis } = current!;
             let written: Promise<WeekAheadWriteOutcome> | null = null;
             if (write) {
                 written = new Promise<WeekAheadWriteOutcome>(resolve => {
                     writes.set(id, outcome => {
+                    if (outcome) persistSaveWriteRecord(write.key, outcome.writeRecord);
                         if (outcome && outcome.ok === true) resolve({ ok: true, committed: outcome.committed, ms: outcome.ms, promoted: outcome.promoted });
                         else if (outcome && outcome.ok === false) resolve({ ok: false, message: outcome.message, ms: outcome.ms });
                         else resolve({ ok: false, message: 'Week Ahead stopped before the write was confirmed', ms: 0 });
@@ -242,10 +274,14 @@ export const createWeekAheadClient = (
                 });
             }
             const reply = await new Promise<Reply | null>(resolve => {
-                // Too slow: the worker stops this week (it is never written later behind the main thread's back).
-                const timer = setTimeout(() => { replies.delete(id); post({ kind: 'drop' }); resolve(null); }, timeoutMs);
+                /* Too slow. Phase 1 (2026-11-17), fencing: the worker is stopped, not just told to drop the week. A worker
+                   that had already finished could still write its week after the main thread's own week (its
+                   fallback write reads the changed live copy and writes anyway). A stopped worker writes nothing, and its
+                   copy of the career is freed before the main thread plays the week. Week Ahead stays off until this career
+                   is opened again (a new client is made then). */
+                const timer = setTimeout(() => { replies.delete(id); giveUp('take_timeout'); resolve(null); }, timeoutMs);
                 replies.set(id, value => { clearTimeout(timer); resolve(value); });
-                const sent = post({ kind: 'take', id, write: write ? { ...write, totalPlayTimeMs: player.totalPlayTimeMs } : undefined });
+                const sent = post({ kind: 'take', id, write: write ? { ...write, totalPlayTimeMs: player.totalPlayTimeMs, writeRecord: exportSaveWriteRecord(write.key) } : undefined });
                 if (!sent) { replies.delete(id); clearTimeout(timer); resolve(null); }
             });
             if (!reply || reply.kind !== 'result') {
@@ -286,7 +322,7 @@ export const createWeekAheadClient = (
             clearSettle();
             const id = ++seq;
             // The next week starts at once from the week just taken (no copy sent); it settles like any other.
-            if (post({ kind: 'continue', id, stage: stageTarget() ?? undefined })) current = { id, basis: onScreen, done: false, npcRefs: (NPC_DATABASE as unknown[]).slice(), settled: false };
+            if (post({ kind: 'continue', id, stage: withWriteRecord(stageTarget()) })) current = { id, basis: onScreen, done: false, npcRefs: (NPC_DATABASE as unknown[]).slice(), settled: false, startedAt: Date.now() };
             else current = null;
         },
         abandon() {
@@ -324,8 +360,14 @@ export const createWeekAheadClient = (
             worker = null;
             current = null;
             unusable = unusable || 'disposed';
+            preparingChecks.delete(preparingCheck);
         },
         state: () => ({ ready, unusable, preparing: Boolean(current && !current.done), prepared: Boolean(current?.done) }),
+        drainEngineStats: () => {
+            const stats = { busyMs: Math.round(engineBusyMs), discardedMs: Math.round(engineDiscardedMs) };
+            engineBusyMs = 0; engineDiscardedMs = 0;
+            return stats;
+        },
     };
 };
 

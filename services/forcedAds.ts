@@ -9,6 +9,7 @@
    - never over a decision popup, in debt or a crisis, in the Store, or soon
      after a real purchase; a new career sees none before week 24. */
 import { isInterstitialReady, preloadInterstitial, showPreloadedInterstitial } from './adLogic';
+import { notePageAd } from './pageStateBreadcrumb';
 
 export type ForcedAdMoment =
     | 'WEEK'
@@ -164,7 +165,10 @@ export const showForcedAd = async (moment: ForcedAdMoment, overrides: Partial<Fo
     remembered.weeksSinceForced = 0;
     remembered.lastAdAt = Date.now();
     saveMemory();
-    const shown = await showPreloadedInterstitial(moment);
+    notePageAd(true);
+    let shown = false;
+    try { shown = await showPreloadedInterstitial(moment); }
+    finally { notePageAd(false); }
     noteAdClosed();
     return shown;
 };

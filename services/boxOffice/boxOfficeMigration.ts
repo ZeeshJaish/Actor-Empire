@@ -49,7 +49,7 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
         ||['lastBookedWeek','lastShows','lastAdmissions','bookingCentsPerShow'].some(k=>r[k]!==undefined&&!integer(r[k])))return ['CINEMA_RUN_CORRUPT'];
     const receiptIds=new Set<string>();
     for(const w of state.weeks){
-        if(!object(w)||!nonempty(w.id)||!integer(w.absoluteWeek)||!integer(w.clockEpoch)||!nonempty(w.inputFingerprint)||!nonempty(w.receiptSignature)||!Array.isArray(w.titles)||receiptIds.has(w.id as string))return ['CINEMA_WEEK_RECEIPT_CORRUPT'];
+        if(!object(w)||!nonempty(w.id)||!integer(w.absoluteWeek)||!integer(w.clockEpoch)||!(w.receiptVersion===2?w.inputFingerprint==='':nonempty(w.inputFingerprint))||(w.receiptVersion!==undefined&&w.receiptVersion!==2)||!nonempty(w.receiptSignature)||!Array.isArray(w.titles)||receiptIds.has(w.id as string))return ['CINEMA_WEEK_RECEIPT_CORRUPT'];
         receiptIds.add(w.id as string);const ids=new Set<string>();
         for(const t of w.titles){
             if(!object(t)||!nonempty(t.titleId)||!nonempty(t.ownerId)||!['PLAYER_STUDIO','ACCEPTED_ROLE','NPC_STUDIO'].includes(String(t.ownerRoute))||typeof t.closed!=='boolean'||ids.has(t.titleId as string))return ['CINEMA_WEEK_TITLE_CORRUPT'];
@@ -74,6 +74,20 @@ export const inspectCinemaSavedState = (state:unknown):string[] => {
         if(value.grossCents!==(value.producerReceiptsCents as number)+(value.exhibitorReceiptsCents as number)+(value.distributionDeductionsCents as number))return ['CINEMA_RECEIPT_CONSERVATION'];
     }
     return [];
+};
+/* Week-speed Phase 2, C5(h) (2026-11-17): a screen's update inspected the cinema state twice per tap (the save
+   migration's first check and migrateCinemaState's), each a full walk of the market (~8 ms M4 on a late career). A
+   caller that knows the state is settled (it came out of a migration or a week, and a screen update that did not touch
+   it passes that very object along; services/saveMigration.ts, #256) gets the codes found the first time: the
+   inspection reads only that object, and settled objects are never changed in place. Every caller gets its own copy. */
+const settledCinemaInspections = new WeakMap<object, readonly string[]>();
+export const inspectSettledCinemaSavedState = (state: object): string[] => {
+    let codes = settledCinemaInspections.get(state);
+    if (!codes) {
+        codes = inspectCinemaSavedState(state);
+        settledCinemaInspections.set(state, codes);
+    }
+    return [...codes];
 };
 export const makeCinemaSettledTitle = (titleId:string,ownerId:string,basis:CinemaSettledTitle['basis'],activationWeek:number,legacyGross=0,legacyReceipts?:number):CinemaSettledTitle => ({
     titleId,ownerId,basis,activationWeek,legacyGrossCents:cents(legacyGross),legacyProducerReceiptsCents:legacyReceipts===undefined?null:cents(legacyReceipts),
@@ -109,10 +123,11 @@ const restoreTrackedReleaseProjections=(player:Player):Player=>{
 };
 
 /** Pure migration. Historical money/contracts stay byte-for-byte facts; estimated attendance pays zero. */
-export const migrateCinemaState = (player:Player,absoluteWeek:number):CinemaMigrationResult => {
+export const migrateCinemaState = (player:Player,absoluteWeek:number,options:{settledCinemaState?:boolean}={}):CinemaMigrationResult => {
     const rejected=(code:string):CinemaMigrationResult=>({player,status:'REJECTED',diagnostics:[{code}]});
     if(!integer(absoluteWeek))return rejected('CINEMA_CLOCK_CORRUPT');
-    const errors=inspectCinemaSavedState(player.world?.cinemaMarket);if(errors.length)return {player,status:'REJECTED',diagnostics:errors.map(code=>({code}))};
+    const cinemaMarket=player.world?.cinemaMarket;
+    const errors=options.settledCinemaState&&cinemaMarket&&typeof cinemaMarket==='object'?inspectSettledCinemaSavedState(cinemaMarket):inspectCinemaSavedState(cinemaMarket);if(errors.length)return {player,status:'REJECTED',diagnostics:errors.map(code=>({code}))};
     if(player.world?.cinemaMarket?.schemaVersion===1){
         const state=player.world.cinemaMarket;
         const restored=restoreTrackedReleaseProjections(player);

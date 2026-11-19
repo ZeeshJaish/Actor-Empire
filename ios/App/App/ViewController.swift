@@ -8,12 +8,15 @@ class ViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         bridge?.registerPluginType(PurchasesPlugin.self)
         bridge?.registerPluginType(TrackingPermissionPlugin.self)
+        // Phase 1 (2026-11-17): a background task around saves, and device info (AeNativeSupportPlugin.swift).
+        bridge?.registerPluginType(AeNativeSupportPlugin.self)
         // Week Ahead (2026-11-13): iOS does not report navigator.deviceMemory, so the game reads the phone's RAM
         // (GiB) from here to decide whether the background week fits (App.tsx deviceAffordsWeekAhead). This runs
         // in loadView, before Capacitor loads the page, so the value is there from the first frame.
         let memoryGiB = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
         let memoryScript = WKUserScript(
-            source: "window.__aeDeviceMemoryGB = \(String(format: "%.2f", memoryGiB));",
+            // Phase 1 (2026-11-17): the model identifier too, for kill reports (App.tsx getDevicePhoneModel).
+            source: "window.__aeDeviceMemoryGB = \(String(format: "%.2f", memoryGiB)); window.__aeDeviceModel = \"\(AeNativeSupportPlugin.modelIdentifier())\";",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )

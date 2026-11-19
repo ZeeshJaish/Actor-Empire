@@ -411,6 +411,9 @@ export interface CinemaCommittedWeek {
     /** Exact compact receipt equality, independently of the kernel's diagnostic hash. */
     receiptSignature: string;
     titles: CinemaCommittedTitle[];
+    /** Week-speed Phase 2 (C5(a), receipt v2; reader from 2a, writer from 2b): 2 means the receipt carries no input
+     *  fingerprint (inputFingerprint is '') and its receiptSignature was made without one. Absent means version 1. */
+    receiptVersion?: 2;
 }
 export interface CinemaSavedState {
     bookingContracts?:Record<string,'REVENUE_SHARE'|'LEGACY_SHOW_FEES'>;

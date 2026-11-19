@@ -27,12 +27,12 @@ type MemoTable = {
 };
 
 type WatchedObject = { name: string; role: 'input' | 'result'; value: object; json: string };
-type WeekMemoScope = { tables: Map<string, MemoTable>; watched: WatchedObject[] | null };
+type WeekMemoScope = { tables: Map<string, MemoTable>; functions: Map<string, Map<string, unknown>>; watched: WatchedObject[] | null };
 
 type MemoGlobals = { __AE_WEEK_MEMO_CHECK__?: boolean; __AE_WEEK_MEMO_CHANGES__?: Array<{ name: string; role: string; path: string }> };
 const memoGlobals = globalThis as MemoGlobals;
 
-const newScope = (): WeekMemoScope => ({ tables: new Map(), watched: memoGlobals.__AE_WEEK_MEMO_CHECK__ ? [] : null });
+const newScope = (): WeekMemoScope => ({ tables: new Map(), functions: new Map(), watched: memoGlobals.__AE_WEEK_MEMO_CHECK__ ? [] : null });
 
 const firstDifference = (before: unknown, after: unknown, path: string, depth: number): string => {
     if (depth > 6 || before === null || after === null || typeof before !== 'object' || typeof after !== 'object') return path;
@@ -131,6 +131,44 @@ export const pauseWeekMemo = async <T>(waitFor: () => Promise<T>): Promise<T> =>
         activeScope = scope;
     }
 };
+
+/** Week-speed Phase 2 (2026-11-17): a pure function of several objects (by identity) and primitives (by value),
+    remembered inside one scope. No argument is handed back as is (unlike memoizeWeekNormalizer): a hit returns the
+    result built for the same arguments. It relies on none of the argument objects and none of the results being
+    changed in place while the scope is open. Check mode (tools only) computes every hit again and compares the two
+    as JSON; a difference is listed in __AE_WEEK_MEMO_CHANGES__ with role 'hit'. */
+export const memoizeWeekFunction = <Args extends unknown[], Result>(name: string, compute: (...args: Args) => Result): ((...args: Args) => Result) => (
+    (...args: Args): Result => {
+        const scope = activeScope;
+        if (!scope) return compute(...args);
+        let table = scope.functions.get(name);
+        if (!table) {
+            table = new Map();
+            scope.functions.set(name, table);
+        }
+        const key = keyOfOtherArguments(args);
+        if (table.has(key)) {
+            const remembered = table.get(key) as Result;
+            if (scope.watched) {
+                const fresh = compute(...args);
+                let same = false;
+                try { same = JSON.stringify(fresh) === JSON.stringify(remembered); } catch { same = false; }
+                if (!same) {
+                    const changes = memoGlobals.__AE_WEEK_MEMO_CHANGES__ || (memoGlobals.__AE_WEEK_MEMO_CHANGES__ = []);
+                    let path = '$';
+                    try { path = firstDifference(JSON.parse(JSON.stringify(remembered)), JSON.parse(JSON.stringify(fresh)), '$', 0); } catch { /* not comparable */ }
+                    changes.push({ name, role: 'hit', path });
+                }
+                const hits = (globalThis as { __AE_WEEK_MEMO_HITS__?: Record<string, number> });
+                hits.__AE_WEEK_MEMO_HITS__ = { ...(hits.__AE_WEEK_MEMO_HITS__ || {}), [name]: (hits.__AE_WEEK_MEMO_HITS__?.[name] || 0) + 1 };
+            }
+            return remembered;
+        }
+        const result = compute(...args);
+        table.set(key, result);
+        return result;
+    }
+);
 
 /** Wraps a normalizer whose first argument is the object it normalizes. Outside a scope it is the plain function. */
 export const memoizeWeekNormalizer = <Fn extends (input: any, ...rest: any[]) => any>(name: string, normalize: Fn): Fn => {

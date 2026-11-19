@@ -94,7 +94,8 @@ const oldWorldStates = [
 } : null);
 const {userCareerRecords:_v5Records,...issuedProtected}=manifest.protected;
 const oldProtected = { ...issuedProtected, worldEconomy: legacyHash(oldWorldStates) };
-const { digest: _currentDigest, createdAt: _createdAt, digestSchemaVersion: _oldSchema, ...oldDigestSource } = manifest;
+// Phase 2a: a manifest issued now also names its writer's app version; a manifest from before audience choice never did.
+const { digest: _currentDigest, createdAt: _createdAt, digestSchemaVersion: _oldSchema, appVersion: _writerVersion, ...oldDigestSource } = manifest;
 const oldManifest = { ...oldDigestSource, createdAt: manifest.createdAt, protected: oldProtected,
     digest: legacyHash({ ...oldDigestSource, protected: oldProtected }) };
 assert.equal(verifySaveIntegrity(fixture, oldManifest).ok, true,
@@ -121,7 +122,7 @@ const {
     historicalCatalogue: _oldCatalogue,
     ...preExpansionProtected
 } = expandedManifest.protected;
-const { digest: _expandedDigest, createdAt: _expandedAt, digestSchemaVersion: _expandedSchema, ...preExpansionCore } = expandedManifest;
+const { digest: _expandedDigest, createdAt: _expandedAt, digestSchemaVersion: _expandedSchema, appVersion: _expandedWriter, ...preExpansionCore } = expandedManifest;
 const shippedV1Protected = { ...preExpansionProtected, worldEconomy: legacyHash(oldWorldStates) };
 const shippedV1Manifest = {
     ...preExpansionCore,
@@ -138,7 +139,7 @@ assert.equal(verifySaveIntegrity(tamperedPreExpansion, shippedV1Manifest).ok, fa
 
 // The rollout that introduced those fields also signed them as unversioned v1.
 // Its saves must stay valid alongside the older v1 projection.
-const { digest: _rolloutDigest, createdAt: _rolloutAt, digestSchemaVersion: _rolloutSchema, ...rolloutCurrentCore } = expandedManifest;
+const { digest: _rolloutDigest, createdAt: _rolloutAt, digestSchemaVersion: _rolloutSchema, appVersion: _rolloutWriter, ...rolloutCurrentCore } = expandedManifest;
 const {userCareerRecords:_rolloutV5,...rolloutProtected}=expandedManifest.protected;
 const rolloutCore={...rolloutCurrentCore,protected:rolloutProtected};
 const rolloutV1Manifest = {
@@ -174,7 +175,7 @@ const pinnedV2Player = {
     ownedStreamingPlatform: { id: 'stream-one', name: 'Empire+', lifecycle: 'ACTIVE', treasuryCash: 500, catalogLicenses: [] },
 } as unknown as Player;
 const pinnedCurrentManifest = createSaveIntegrityManifest(pinnedV2Player, 'AUTOSAVE', 456);
-const {digest:_currentPinnedDigest,createdAt:_currentPinnedAt,...pinnedCurrentCore}=pinnedCurrentManifest;
+const {digest:_currentPinnedDigest,createdAt:_currentPinnedAt,appVersion:_currentPinnedWriter,...pinnedCurrentCore}=pinnedCurrentManifest;
 const {userCareerRecords:_pinnedV5,...pinnedOldProtected}=pinnedCurrentCore.protected;
 const pinnedV2Core={...pinnedCurrentCore,digestSchemaVersion:2,protected:pinnedOldProtected};
 const pinnedV2Manifest={...pinnedV2Core,createdAt:456,digest:legacyHash(pinnedV2Core)};

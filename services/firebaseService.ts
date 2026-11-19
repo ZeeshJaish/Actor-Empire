@@ -1,3 +1,4 @@
+import { describeSessionSwitches, keepNoSwitches, keepSwitchDocument } from './remoteSwitches';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAnalytics } from '@capacitor-firebase/analytics';
 import { FirebaseCrashlytics } from '@capacitor-firebase/crashlytics';
@@ -1030,7 +1031,8 @@ export const setCrashContext = (player?: Player | null, context: Record<string, 
     player_week: player?.currentWeek,
     player_money: player?.money,
     player_fame: player?.stats?.fame,
-    player_health: player?.stats?.health,
+    // Phase 1 (2026-11-17), plan item 8: the switches on in this session (this key replaced player_health).
+    switches: describeSessionSwitches(),
     pending_events: player?.pendingEvents?.length || 0,
     commitments: player?.commitments?.length || 0,
     ...getCompactTraceParams(),
@@ -1260,6 +1262,12 @@ export const recoverInterruptedWeekProcessingTrace = (
 let nonFatalSink: ((error: unknown, label: string, context: Record<string, unknown>) => void) | null = null;
 export const setNonFatalSink = (sink: typeof nonFatalSink): void => { nonFatalSink = sink; };
 
+/** A stable small number per non-fatal label (the iOS error code, the Android frame's line). */
+const nonFatalLabelCode = (label: string): number => {
+  let hash = 5381;
+  for (let index = 0; index < label.length; index++) hash = ((hash * 33) ^ label.charCodeAt(index)) >>> 0;
+  return 1000 + (hash % 900000);
+};
 export const recordNonFatal = (
   error: unknown,
   label: string,
@@ -1276,12 +1284,15 @@ export const recordNonFatal = (
   }));
   addBreadcrumb(`nonfatal:${label}`, { message, ...safeContext });
   Object.entries(safeContext).forEach(([key, value]) => setCrashKey(key, value));
+  /* Phase 1 (2026-11-17): one Crashlytics issue per label. Every non-fatal used to share one domain (iOS) or one
+     plain JavaScriptException (Android), so all of them merged into a single issue. iOS now gets a domain and code
+     per label; Android a one-frame stack per label (the plugin ignores domain and code there). */
+  const labelName = sanitizeName(label, 'nonfatal');
+  const labelCode = nonFatalLabelCode(labelName);
   void runSafely(`nonfatal:${label}`, () =>
-    FirebaseCrashlytics.recordException({
-      message: `${label}: ${message}`.slice(0, 900),
-      domain: 'ActorEmpire',
-      keysAndValues,
-    })
+    FirebaseCrashlytics.recordException(Capacitor.getPlatform() === 'android'
+      ? { message: `${label}: ${message}`.slice(0, 900), stacktrace: [{ functionName: labelName, fileName: 'ActorEmpire.nonfatal', lineNumber: labelCode }], keysAndValues }
+      : { message: `${label}: ${message}`.slice(0, 900), domain: `ActorEmpire.${labelName}`, code: labelCode, keysAndValues })
   );
 };
 
@@ -1460,6 +1471,23 @@ const toFirestoreFields = (report: Record<string, unknown>) => Object.fromEntrie
     .filter(([key]) => Boolean(key))
     .map(([key, value]) => [sanitizeName(key, 'field'), toFirestoreValue(value)])
 );
+
+/** Phase 1 (2026-11-17), plan item 8: reads config/switches for the NEXT launch (services/remoteSwitches.ts).
+ *  A missing document resets the device to the defaults; a refused read (no read rule yet) keeps what it had. */
+export const fetchRemoteSwitchesForNextLaunch = async () => {
+  if (!Capacitor.isNativePlatform()) return;
+  const auth = await getFreshAnonymousAuth();
+  if (!auth?.idToken) return;
+  const endpoint = `https://firestore.googleapis.com/v1/projects/${FIREBASE_WEB_CONFIG.projectId}/databases/(default)/documents/config/switches`;
+  const response = await withTimeout(
+    fetch(endpoint, { headers: { Authorization: `Bearer ${auth.idToken}` } }),
+    AUTH_BOOTSTRAP_TIMEOUT_MS,
+    'Firestore switches read'
+  );
+  if (response.status === 404) { keepNoSwitches(); return; }
+  if (!response.ok) return;
+  keepSwitchDocument(await response.json());
+};
 
 const submitIssueReportToFirestore = async (report: Record<string, unknown>) => {
   if (!Capacitor.isNativePlatform()) return;
@@ -1642,6 +1670,8 @@ export const installGlobalTelemetryHandlers = () => {
   });
 };
 
+/* Phase 1 (2026-11-17): Firebase Performance keeps at most 5 attributes per trace; stop-time attributes use what is left. */
+const traceStartAttributeCounts = new Map<string, number>();
 export const startPerformanceTrace = (traceName: string, attributes: Record<string, unknown> = {}) => {
   if (!isNativeTelemetry()) return;
   const safeTraceName = sanitizeName(traceName, 'game_trace');
@@ -1650,11 +1680,13 @@ export const startPerformanceTrace = (traceName: string, attributes: Record<stri
     return;
   }
 
+  const startAttributes = Object.entries(sanitizeParams(attributes)).slice(0, 5);
+  traceStartAttributeCounts.set(safeTraceName, startAttributes.length);
   const startPromise = (async () => {
     try {
       await FirebasePerformance.startTrace({ traceName: safeTraceName });
       await Promise.all(
-        Object.entries(sanitizeParams(attributes)).slice(0, 5).map(([attribute, value]) =>
+        startAttributes.map(([attribute, value]) =>
           FirebasePerformance.putAttribute({
             traceName: safeTraceName,
             attribute: sanitizeName(attribute, 'attribute'),
@@ -1676,7 +1708,9 @@ export const startPerformanceTrace = (traceName: string, attributes: Record<stri
 
 export const stopPerformanceTrace = (
   traceName: string,
-  metrics: Record<string, number> = {}
+  metrics: Record<string, number> = {},
+  /** Phase 1 (2026-11-17): attributes only known at the end (path, forced_ad), set through putAttribute before the stop. */
+  attributes: Record<string, unknown> = {},
 ) => {
   if (!isNativeTelemetry()) return;
   const safeTraceName = sanitizeName(traceName, 'game_trace');
@@ -1695,6 +1729,16 @@ export const stopPerformanceTrace = (
     const didStart = await startPromise;
     try {
       if (!didStart) return;
+      const room = Math.max(0, 5 - (traceStartAttributeCounts.get(safeTraceName) ?? 0));
+      await Promise.all(
+        Object.entries(sanitizeParams(attributes)).slice(0, room).map(([attribute, value]) =>
+          FirebasePerformance.putAttribute({
+            traceName: safeTraceName,
+            attribute: sanitizeName(attribute, 'attribute'),
+            value: String(value).slice(0, 40),
+          })
+        )
+      );
       await Promise.all(
         Object.entries(metrics)
           .filter(([, value]) => Number.isFinite(value))
@@ -1711,6 +1755,12 @@ export const stopPerformanceTrace = (
     } finally {
       activeTraceStarts.delete(safeTraceName);
       stoppingTraceNames.delete(safeTraceName);
+      traceStartAttributeCounts.delete(safeTraceName);
     }
   });
+};
+/** Phase 1 (2026-11-17): whether a trace is running (started and not yet stopping). */
+export const isPerformanceTraceActive = (traceName: string): boolean => {
+  const safeTraceName = sanitizeName(traceName, 'game_trace');
+  return activeTraceStarts.has(safeTraceName) && !stoppingTraceNames.has(safeTraceName);
 };

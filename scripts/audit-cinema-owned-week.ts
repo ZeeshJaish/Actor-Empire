@@ -27,5 +27,21 @@ const settledCandidate = Reflect.apply(processAndCommitCinemaWeek, undefined,
 assert.ok(Object.hasOwn((settledCandidate.player ?? settledCandidate).world.cinemaMarket.externalProducerBalancesCents || {}, 'missing-owner'),
     'B2: the missing producer\'s receipts land in the external ledger');
 assert.deepEqual(broken.player, durable, 'Settling a detached candidate preserves the entire durable prior player');
+/* Phase 1 of the week-speed plan (2026-11-17), its Phase H item 9: the late-failure test, restored. B2 turned the old
+   injected fault (a missing producer) into a settled week, so nothing tested a failure late in the settlement any more.
+   The titles settle in id order (new-npc, offered, owned): 'owned' now asks for a signed actor share far above its
+   receipts, so it throws after 'offered' has already settled on the reused detached candidate. */
+const late = mixedCinemaFixture();
+const lateRelease = late.player.activeReleases.find(r => r.id === 'owned')!;
+lateRelease.budget = 0;
+lateRelease.royaltyPercentage = 1e7;
+const lateDurable = structuredClone(late.player), lateCandidate = clonePlayerForWeekProcessing(late.player);
+const offeredBefore = structuredClone(lateCandidate.activeReleases.find(r => r.id === 'offered')!.weeklyGross);
+assert.throws(() => Reflect.apply(processAndCommitCinemaWeek, undefined, [lateCandidate, late.week, undefined, { reuseDetachedWeekCandidate: true }]),
+    /Signed actor\/backend shares exceed current collected receipts/, 'The injected late fault stops the settlement');
+assert.notDeepEqual(lateCandidate.activeReleases.find(r => r.id === 'offered')!.weeklyGross, offeredBefore,
+    'The fault comes late: an earlier title had already settled on the reused detached candidate');
+assert.deepEqual(late.player, lateDurable, 'A late settlement failure leaves the entire durable prior player untouched');
+const lateFailurePreservesPrior = true; // printed only after the three asserts above
 // The integration cases above separately verify committed JSON replay pays once.
-console.log(JSON.stringify({ ownedWeekChecks: 9, exactPlayerAndResult: true, lateFailurePreservesPrior: true, coldArchiveReadsBeforeObservation: coldArchiveReads - 1 }));
+console.log(JSON.stringify({ ownedWeekChecks: 12, exactPlayerAndResult: true, lateFailurePreservesPrior, coldArchiveReadsBeforeObservation: coldArchiveReads - 1 }));

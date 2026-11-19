@@ -5,6 +5,7 @@ import { compactIndustryIntelligenceState } from './industryIntelligence/industr
 import { getAbsoluteWeek } from './legacyLogic';
 import { readNormalizedPlatformAiIntelligence } from './platformAi/platformAiState';
 import { readNormalizedStudioAiIntelligence } from './studioAi/studioAiState';
+import { APP_DISPLAY_VERSION } from './appVersion';
 
 export const SAVE_INTEGRITY_FORMAT_VERSION = 1;
 // This versions the digest projection, not the IndexedDB generation envelope.
@@ -70,6 +71,10 @@ export interface SaveIntegrityManifest {
     createdAt: number;
     protected: SaveProtectedState;
     digest: string;
+    /** Week-speed Phase 2a (2026-11-17): the app version that wrote this copy, for the recovery list (a version we flag
+     *  as buggy offers the copy from before it). Absent on copies written before 2a. Not part of the digest, and older
+     *  builds ignore it (their manifest check reads formatVersion and digest only). */
+    appVersion?: string;
 }
 
 export type SaveIntegrityResult =
@@ -554,14 +559,20 @@ const manifestWithProtectedState = (
     };
 };
 
+/* Week-speed Phase 2a (2026-11-17): the writer's app version goes on a manifest only where one is ISSUED, never in
+   manifestWithProtectedState. verifySaveIntegrity rebuilds a manifest with that function and, for schemas 2-4,
+   hashes the rebuilt object minus digest and createdAt, so anything added there would change the digest of every
+   older signed save (the full audits caught exactly that). */
+const withWriterVersion = (manifest: SaveIntegrityManifest): SaveIntegrityManifest => ({ ...manifest, appVersion: APP_DISPLAY_VERSION });
+
 export const createSaveIntegrityManifest = (
     player: Player,
     reason: SaveIntegrityReason,
     createdAt = Date.now(),
     needsRecoveryCheckpoint = false,
-): SaveIntegrityManifest => rememberIssuedManifest(player, manifestWithProtectedState(
+): SaveIntegrityManifest => rememberIssuedManifest(player, withWriterVersion(manifestWithProtectedState(
     player, reason, createdAt, needsRecoveryCheckpoint, createProtectedState(player),
-));
+)));
 
 const compareFingerprint = (
     label: string,
@@ -638,7 +649,7 @@ export const createCheckedSaveIntegrityManifest = (
     if ('violations' in comparison) {
         throw new Error(`Save compaction rejected: ${comparison.violations.join('; ')}`);
     }
-    return { comparison, manifest: rememberIssuedManifest(after, manifestWithProtectedState(after, reason, createdAt, needsRecoveryCheckpoint, prepared)) };
+    return { comparison, manifest: rememberIssuedManifest(after, withWriterVersion(manifestWithProtectedState(after, reason, createdAt, needsRecoveryCheckpoint, prepared))) };
 };
 
 export const verifySaveIntegrity = (

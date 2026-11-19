@@ -14,6 +14,11 @@ export interface SessionBreadcrumb {
   week?: string;
   lastSaveMs?: number;
   heapMb?: number;
+  /** Phase 1 (2026-11-17): Week Ahead's state and the open slot, so a kill while it ran keeps it off. */
+  weekAhead?: 'on' | 'off';
+  slot?: number;
+  /** Phase 1 (2026-11-17): the game's stored data in MB when the career opened (navigator.storage.estimate). */
+  storageMb?: number;
 }
 
 const read = (): SessionBreadcrumb | null => {
@@ -43,6 +48,13 @@ export const takeUncleanPreviousSession = (): SessionBreadcrumb | null => {
 export const noteSessionLive = (patch: Partial<Omit<SessionBreadcrumb, 'live' | 'at'>> = {}) => {
   const current = read();
   write({ ...(current || {}), ...patch, heapMb: heapMb() ?? patch.heapMb ?? current?.heapMb, live: true, at: Date.now() });
+};
+
+/** Phase 1 (2026-11-17): adds details to the marker without changing whether the session counts as live. */
+export const noteSessionDetail = (patch: Partial<Pick<SessionBreadcrumb, 'weekAhead' | 'slot' | 'storageMb'>>) => {
+  const current = read();
+  if (!current) return;
+  write({ ...current, ...patch });
 };
 
 export const noteSessionClean = () => {

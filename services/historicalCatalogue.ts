@@ -4,6 +4,7 @@ import type {
 } from '../types';
 import { createDeterministicId, createDeterministicRng, hashDeterministicSeed } from './deterministicRandom';
 import { getAbsoluteWeek } from './legacyLogic';
+import { memoizeWeekFunction } from './weekMemo';
 
 const TARGET_RELEASED_TITLES = 2_000;
 const GENRES: Genre[] = [
@@ -144,7 +145,7 @@ const savedTitle = (
     };
 };
 
-const collectSavedReleasedTitles = (player: Player): Map<string, HistoricalCatalogueTitle> => {
+const buildSavedReleasedTitles = (player: Player): Map<string, HistoricalCatalogueTitle> => {
     const now = getAbsoluteWeek(player.age, player.currentWeek);
     const titles = new Map<string, HistoricalCatalogueTitle>();
     const add = (source: Record<string, any>, kind: Parameters<typeof savedTitle>[2]): void => {
@@ -194,6 +195,27 @@ const collectSavedReleasedTitles = (player: Player): Map<string, HistoricalCatal
     });
     return titles;
 };
+
+/* Week-speed Phase 2a, C5(f) (2026-11-18): the saved released titles were rebuilt from the whole career on every call,
+   about 8 times a game week (the AI catalogue's historical index, title routes, the viewing seed, the weekly chart,
+   licence pools, Originals studios): ~32 ms M4 a late week. Inside a week's memo scope (weekMemo.ts) they are built
+   once per set of the parts the builder reads, each passed in by identity: the player's age and week (by value),
+   world.projects, activeReleases, pastProjects, flags.legacyStudioProjects, businesses, world.industryProductions and
+   world.studios (names). The builder and savedTitle read nothing else of the player. Outside a scope (screens),
+   nothing changes. A hit hands every caller the same title objects in a new Map; no caller changes them.
+   Check mode (tools only) builds every hit again and compares the two as JSON (entries, so the Map is compared). */
+const savedReleasedTitleEntries = memoizeWeekFunction('savedReleasedTitles', (
+    age: number, currentWeek: number, projects: unknown, activeReleases: unknown, pastProjects: unknown,
+    legacyStudioProjects: unknown, businesses: unknown, industryProductions: unknown, studios: unknown,
+): Array<[string, HistoricalCatalogueTitle]> => [...buildSavedReleasedTitles({
+    age, currentWeek, activeReleases, pastProjects, businesses,
+    flags: { legacyStudioProjects },
+    world: { projects, industryProductions, studios },
+} as unknown as Player).entries()]);
+const collectSavedReleasedTitles = (player: Player): Map<string, HistoricalCatalogueTitle> => new Map(savedReleasedTitleEntries(
+    player.age, player.currentWeek, player.world.projects, player.activeReleases, player.pastProjects,
+    player.flags?.legacyStudioProjects, player.businesses, player.world.industryProductions, player.world.studios,
+));
 
 const FICTIONAL_REGIONAL_PRODUCERS: HistoricalCatalogueProducer[] = [
     { id: 'HIST_INDIA', name: 'Monsoon Lantern Films', archetype: 'REGIONAL', languageId: 'hindi', regionId: 'SOUTH_ASIA', weight: 3, kind: 'FICTIONAL_REGIONAL' },

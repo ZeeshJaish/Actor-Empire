@@ -81,7 +81,7 @@ test('cinema audience and receipt checkpoints are protected by save integrity',(
 });
 test('issued digest schema 2 still verifies its exact pre-cinema projection',()=>{
  const p=migrateCinemaState(fixture(),1000).player,latest=createSaveIntegrityManifest(p,'MIGRATION',123);
- const {digest:_digest,createdAt:_createdAt,...core}=latest;const protectedV2={...core.protected};delete protectedV2.cinemaState;
+ const {digest:_digest,createdAt:_createdAt,appVersion:_writerVersion,...core}=latest;const protectedV2={...core.protected};delete protectedV2.cinemaState;
  const oldCore={...core,digestSchemaVersion:2,protected:protectedV2};const old={...oldCore,createdAt:123,digest:cinemaLegacyIntegrityHash(oldCore)};
  assert.ok(verifySaveIntegrity(p,old).ok);const changed=structuredClone(p);changed.money++;assert.equal(verifySaveIntegrity(changed,old).ok,false);
 });

@@ -4,7 +4,7 @@ import { cinemaStreamingLanguageReady } from './boxOfficeStreamingAudience';
 import type { Player, ProjectDetails, StreamingBiddingPlatformInput } from '../../types';
 import { getAbsoluteWeek } from '../legacyLogic';
 import { STUDIO_AI_LEDGER_LIMIT } from '../studioAi/studioAiState';
-import { getForbesStreamingCompanies } from '../streamingPlatformEcosystem';
+import { getForbesStreamingCompany } from '../streamingPlatformEcosystem';
 import { getWorldStreamingBuyerCommercialOffer } from '../worldEconomy/worldStreamingOffers';
 import { registerProductionStreamingRightsContract } from '../streamingRightsCore';
 import { buildStreamingBiddingRightsLot, resolveStreamingRightsCompatibility } from '../streamingRightsCompatibility';
@@ -16,7 +16,7 @@ import { createDeterministicRng } from '../deterministicRandom';
 /** Read-only buyer value. Existing contracts and their payment history are never repriced. */
 export const quoteCinemaRightsForBuyer = (player: Player, project: ProjectDetails, titleId: string, buyerId: string, startsAtAbsoluteWeek?: number, durationWeeks = 52, offeredCountryIds?: readonly string[], exclusivity: import('../../types').StreamingLicenseExclusivity = 'EXCLUSIVE', windowType: import('../../types').StreamingRightsWindowType = 'FIRST_WINDOW'): CinemaRightsQuote => {
     const now = getAbsoluteWeek(player.age, player.currentWeek), starts = Math.max(now, startsAtAbsoluteWeek ?? now);
-    const prepared = prepareCinemaAudienceWorld(player, now), company = getForbesStreamingCompanies(prepared).find(c => c.id === buyerId);
+    const prepared = prepareCinemaAudienceWorld(player, now), company = getForbesStreamingCompany(prepared, buyerId);
     const offer = getWorldStreamingBuyerCommercialOffer(prepared, buyerId, now);
     const paid = prepared.world.cinemaMarket?.titles[titleId];
     const exact = offeredCountryIds ? resolveStreamingRightsCompatibility({ world: prepared.world, sourceProjectId: titleId, sellerPartyId: project.studioId, buyerPlatformId: buyerId,

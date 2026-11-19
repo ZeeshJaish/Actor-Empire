@@ -1,0 +1,169 @@
+/**
+ * Week-speed plan Phase 1 (2026-11-17), item 8: switches for the risky parts of a release, set from Firebase.
+ *
+ * - The switches live in one Firestore document, config/switches, read once per launch through the REST client the
+ *   game already has (no new dependency). Each field is a switch: { on: bool, percent?: 0-100, ram?: [classes],
+ *   minVersion?: 'x.y.z', maxVersion?: 'x.y.z' }.
+ * - What a launch reads is kept on the device and used from the NEXT launch: a switch never changes a running
+ *   game. A launch with nothing kept (first launch, no network, no document, no read rule) uses the defaults below,
+ *   which are the build as it was tested: every switch on.
+ * - percent rolls a switch out to that share of installs: a stable hash of the install id and the switch name.
+ *   ram limits it to phone memory classes (lt3, 3_4, 4_6, 6_8, 8p, unknown).
+ * - Each launch sets one Crashlytics key, `switches`, naming the switches that are on, so ANRs and crashes can be
+ *   split by what was on (it takes the place of the old player_health key).
+ *
+ * Nothing changes until Zeesh deploys the read rule (firestore.rules: config/{doc}) and creates the document.
+ */
+export type SwitchName = 'weekAhead' | 'hideSaveSkip' | 'openSaveSkip' | 'androidTrimFilter' | 'forecastWorkerCopy';
+
+/** Short names for the Crashlytics key (it holds at most 1 KB). */
+const SHORT: Record<SwitchName, string> = {
+    weekAhead: 'wa', hideSaveSkip: 'hide', openSaveSkip: 'open', androidTrimFilter: 'trim', forecastWorkerCopy: 'fc',
+};
+export const SWITCH_NAMES = Object.keys(SHORT) as SwitchName[];
+const DEFAULTS: Record<SwitchName, boolean> = {
+    weekAhead: true, hideSaveSkip: true, openSaveSkip: true, androidTrimFilter: true, forecastWorkerCopy: true,
+};
+
+export type SwitchRule = { on: boolean; percent?: number; ram?: string[]; minVersion?: string; maxVersion?: string };
+export type SwitchDocument = Partial<Record<SwitchName, SwitchRule>>;
+type Kept = { fetchedAt: number; rules: SwitchDocument; recoverFromVersions?: string[] };
+
+const KEPT_KEY = 'ae.switches.v1';
+const INSTALL_KEY = 'ae.installId.v1';
+
+const store = (): Storage | null => {
+    try { return globalThis.localStorage ?? null; } catch { return null; }
+};
+
+/** A stable id for this install (made once), for the percent rollouts. */
+export const getInstallId = (): string => {
+    const local = store();
+    try {
+        const held = local?.getItem(INSTALL_KEY);
+        if (held) return held;
+        const made = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+        local?.setItem(INSTALL_KEY, made);
+        return made;
+    } catch { return 'no-storage'; }
+};
+
+const bucketOf = (text: string): number => {
+    let hash = 5381;
+    for (let index = 0; index < text.length; index++) hash = ((hash * 33) ^ text.charCodeAt(index)) >>> 0;
+    return hash % 100;
+};
+
+const versionParts = (version: string): number[] => version.split('.').map(part => Number.parseInt(part, 10) || 0);
+const compareVersions = (left: string, right: string): number => {
+    const a = versionParts(left), b = versionParts(right);
+    for (let index = 0; index < Math.max(a.length, b.length); index++) {
+        const diff = (a[index] || 0) - (b[index] || 0);
+        if (diff) return diff;
+    }
+    return 0;
+};
+
+/** One switch from its rule, for this install, phone and version. */
+export const resolveSwitch = (
+    name: SwitchName,
+    rule: SwitchRule | undefined,
+    device: { installId: string; ramClass: string; version: string },
+): boolean => {
+    if (!rule || typeof rule.on !== 'boolean') return DEFAULTS[name];
+    if (rule.minVersion && compareVersions(device.version, rule.minVersion) < 0) return DEFAULTS[name];
+    if (rule.maxVersion && compareVersions(device.version, rule.maxVersion) > 0) return DEFAULTS[name];
+    if (Array.isArray(rule.ram) && rule.ram.length && !rule.ram.includes(device.ramClass)) return DEFAULTS[name];
+    const percent = typeof rule.percent === 'number' && Number.isFinite(rule.percent) ? Math.max(0, Math.min(100, rule.percent)) : 100;
+    if (bucketOf(`${device.installId}:${name}`) >= percent) return DEFAULTS[name];
+    return rule.on;
+};
+
+/** Firestore's REST document → plain switch rules (fields it does not know are ignored). */
+export const parseSwitchDocument = (document: unknown): SwitchDocument => {
+    const valueOf = (value: any): unknown => {
+        if (!value || typeof value !== 'object') return undefined;
+        if ('booleanValue' in value) return Boolean(value.booleanValue);
+        if ('integerValue' in value) return Number(value.integerValue);
+        if ('doubleValue' in value) return Number(value.doubleValue);
+        if ('stringValue' in value) return String(value.stringValue);
+        if ('arrayValue' in value) return (value.arrayValue?.values || []).map(valueOf);
+        if ('mapValue' in value) return Object.fromEntries(Object.entries(value.mapValue?.fields || {}).map(([k, v]) => [k, valueOf(v)]));
+        return undefined;
+    };
+    const fields = (document as { fields?: Record<string, unknown> })?.fields || {};
+    const rules: SwitchDocument = {};
+    for (const name of SWITCH_NAMES) {
+        const raw = valueOf(fields[name]) as Record<string, unknown> | undefined;
+        if (!raw || typeof raw !== 'object' || typeof raw.on !== 'boolean') continue;
+        rules[name] = {
+            on: raw.on,
+            ...(typeof raw.percent === 'number' ? { percent: raw.percent } : {}),
+            ...(Array.isArray(raw.ram) ? { ram: raw.ram.map(String) } : {}),
+            ...(typeof raw.minVersion === 'string' ? { minVersion: raw.minVersion } : {}),
+            ...(typeof raw.maxVersion === 'string' ? { maxVersion: raw.maxVersion } : {}),
+        };
+    }
+    return rules;
+};
+
+/** Week-speed Phase 2a (2026-11-17), the recovery list's second case (D15): app versions flagged as buggy, from the
+ *  document's `recoverFromVersions` field (an array of 'x.y.z' strings, at most 10). A career that played on one of
+ *  them is offered, once, its copy from before that version (services/recoveryList.ts). Like every switch it is used
+ *  from the next launch; with no document the list is empty and the recovery list opens only for a save that fails. */
+export const parseRecoveryVersions = (document: unknown): string[] => {
+    const raw = (document as { fields?: Record<string, any> })?.fields?.recoverFromVersions;
+    const values = raw?.arrayValue?.values;
+    if (!Array.isArray(values)) return [];
+    return [...new Set(values
+        .map((value: any) => (typeof value?.stringValue === 'string' ? value.stringValue.trim() : ''))
+        .filter((version: string) => /^\d{1,3}(\.\d{1,4}){1,3}$/.test(version)))]
+        .slice(0, 10);
+};
+
+const readKept = (): Kept | null => {
+    try {
+        const parsed = JSON.parse(store()?.getItem(KEPT_KEY) || 'null');
+        return parsed && typeof parsed === 'object' && parsed.rules && typeof parsed.rules === 'object' ? parsed as Kept : null;
+    } catch { return null; }
+};
+
+let session: Record<SwitchName, boolean> | null = null;
+
+/** This launch's switches: worked out once, from what the previous launch kept, then fixed for the session. */
+export const startSessionSwitches = (device: { ramClass: string; version: string }): Record<SwitchName, boolean> => {
+    if (session) return session;
+    const kept = readKept();
+    const installId = getInstallId();
+    session = Object.fromEntries(SWITCH_NAMES.map(name => [name, resolveSwitch(name, kept?.rules[name], { installId, ...device })])) as Record<SwitchName, boolean>;
+    return session;
+};
+
+let sessionRecoveryVersions: string[] | null = null;
+/** Phase 2a: this session's flagged versions (what the previous launch kept), fixed for the session. */
+export const getRecoveryFlaggedVersions = (): string[] => {
+    if (!sessionRecoveryVersions) {
+        const kept = readKept()?.recoverFromVersions;
+        sessionRecoveryVersions = Array.isArray(kept) ? kept.filter(version => typeof version === 'string') : [];
+    }
+    return sessionRecoveryVersions;
+};
+
+/** A switch for this session (the tested default until startSessionSwitches has run). */
+export const isSwitchOn = (name: SwitchName): boolean => (session ? session[name] : DEFAULTS[name]);
+
+/** The Crashlytics value: the switches that are on, short names, comma-separated. */
+export const describeSessionSwitches = (): string => SWITCH_NAMES.filter(isSwitchOn).map(name => SHORT[name]).join(',');
+
+/** Keeps a fetched document for the next launch. */
+export const keepSwitchDocument = (document: unknown, now = Date.now()) => {
+    try { store()?.setItem(KEPT_KEY, JSON.stringify({ fetchedAt: now, rules: parseSwitchDocument(document), recoverFromVersions: parseRecoveryVersions(document) } satisfies Kept)); }
+    catch { /* private mode: the next launch uses the defaults */ }
+};
+/** A launch that found no document (404) keeps "no rules", so the next launch is back on the defaults. */
+export const keepNoSwitches = (now = Date.now()) => {
+    try { store()?.setItem(KEPT_KEY, JSON.stringify({ fetchedAt: now, rules: {} } satisfies Kept)); } catch { /* private mode */ }
+};
+
+/** Test-only: forget this session's switches. */
+export const resetSessionSwitchesForTest = () => { session = null; sessionRecoveryVersions = null; };

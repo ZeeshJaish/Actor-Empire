@@ -18,6 +18,7 @@ import {
     streamingPlanOfferAppeal,
 } from '../streamingPlanOffer';
 import { normalizeStreamingPlatformEcosystem } from '../streamingPlatformEcosystem';
+import { memoizeWeekFunction } from '../weekMemo';
 import {
     effectiveMonthlyStreamingPlanPrice,
     streamingAnnualBillingShare,
@@ -617,13 +618,27 @@ const rivalTechEdge = (growth: StreamingRivalTechGrowth): Partial<WorldStreaming
 
 /** #117: the rivals' offers alone, with the kind of rival each is (the player's offer reads the catalogue, which the
     value news does not need) */
-export const getWorldStreamingRivalOffers = (player: Player, absoluteWeek: number): Array<{ kind: StreamingEcosystemOperator['kind']; offer: WorldStreamingPlatformOffer }> => {
-    const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
-    const ecosystem = normalizeStreamingPlatformEcosystem(player.world.streamingPlatformEcosystem, week);
+/* Week-speed Phase 2, C5(c) (2026-11-17): the rivals' offers read only the ecosystem (normalized for the week), the
+   rival platforms (player.world.platforms) and two fields of the player's own service (acquiredPlatformIds and
+   rivalTechFromWeek, in createAiOffer). The week built them in every world-streaming stage (competition, audience
+   choice, customers, viewing, cinema alternatives) from the same three objects, ~23 ms M4 a week on a late career, so
+   inside the week memo's scope they are remembered by those objects and the week (services/weekMemo.ts). */
+const rivalOffersFor = memoizeWeekFunction('worldStreamingRivalOffers', (
+    ecosystemInput: Player['world']['streamingPlatformEcosystem'],
+    platforms: Player['world']['platforms'],
+    ownedStreamingPlatform: Player['ownedStreamingPlatform'],
+    week: number,
+): Array<{ kind: StreamingEcosystemOperator['kind']; offer: WorldStreamingPlatformOffer }> => {
+    const reader = { ownedStreamingPlatform, world: { platforms } } as unknown as Player;
+    const ecosystem = normalizeStreamingPlatformEcosystem(ecosystemInput, week);
     return Object.values(ecosystem.operators).flatMap(operator => {
-        const offer = createAiOffer(player, operator, week);
+        const offer = createAiOffer(reader, operator, week);
         return offer ? [{ kind: operator.kind, offer }] : [];
     });
+});
+export const getWorldStreamingRivalOffers = (player: Player, absoluteWeek: number): Array<{ kind: StreamingEcosystemOperator['kind']; offer: WorldStreamingPlatformOffer }> => {
+    const week = Math.max(0, Math.round(Number(absoluteWeek) || 0));
+    return rivalOffersFor(player.world.streamingPlatformEcosystem, player.world.platforms, player.ownedStreamingPlatform, week);
 };
 
 export const getWorldStreamingOffers = (player: Player, absoluteWeek: number, preparedContext?: StreamingCatalogueReadContext): WorldStreamingOfferRegistry => {

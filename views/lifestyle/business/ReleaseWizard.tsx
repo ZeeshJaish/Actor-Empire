@@ -37,7 +37,7 @@ import { resolveStreamingPlatformBrandById } from '../../../services/streamingPl
 import { getPlatformAiSpendingRestrictions } from '../../../services/platformAi/platformAiFinancing';
 import { buildStreamingBiddingRightsLot } from '../../../services/streamingRightsCompatibility';
 import { getCanonicalScheduledRivals } from '../../../services/industryWorld/publicIndustryProjection';
-import { getForbesStreamingCompanies } from '../../../services/streamingPlatformEcosystem';
+import { getForbesStreamingCompanies, getForbesStreamingCompany } from '../../../services/streamingPlatformEcosystem';
 import { buildReleaseStreamingBidderMarket } from '../../../services/releaseStreamingAuction';
 import { markQuietPlayerUpdate } from '../../../services/quietPlayerUpdates';
 import { getReleaseWizardEntryStep } from '../../../services/releasePlanningCommitment';
@@ -532,7 +532,7 @@ export const ReleaseWizard: React.FC<ReleaseWizardProps> = ({ player, studio, pr
     const lockedPremierePlatform = lockedPremierePlatformId
         ? PLATFORMS.find(platform => platform.id === lockedPremierePlatformId)
             || (() => {
-                const company = getForbesStreamingCompanies(player).find(item => item.id === lockedPremierePlatformId);
+                const company = getForbesStreamingCompany(player, lockedPremierePlatformId);
                 return company ? { id: company.id as PlatformId, name: company.name } : null;
             })()
         : null;

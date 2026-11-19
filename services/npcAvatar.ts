@@ -22,6 +22,26 @@ export const setGeneratedAvatarProvider = (provider: GeneratedAvatarProvider | n
 const handedOutPortraits = new Map<string, string>();
 /** The main thread's portraits by cache key, for the Week Ahead worker. */
 export const getHandedOutPortraits = (): Array<[string, string]> => [...handedOutPortraits];
+/* Week-speed plan Phase 1 (2026-11-17), item 1: the table above grows for the whole session (every face any screen
+   showed) and was copied whole into the worker. The worker needs the faces its own copy of the game code draws while
+   it loads (handed out before the app marked its load done) and the faces of the people in the NPC list it is sent.
+   Any other face it meets during a week it asks for (the 'need-portraits' round trip), so the results are the same
+   (the wa-equiv gate). */
+let loadPortraitKeys: Set<string> | null = null;
+/** Called once the app has loaded: the faces handed out until now are the ones the game code draws as it loads. */
+export const markPortraitLoadDone = (): void => { if (!loadPortraitKeys) loadPortraitKeys = new Set(handedOutPortraits.keys()); };
+/** The portraits the Week Ahead worker gets at start: the load-time faces and the faces of these people. */
+export const getPortraitsForWorker = (people: readonly unknown[]): Array<[string, string]> => {
+    if (!loadPortraitKeys) return [...handedOutPortraits];
+    const faces = new Set<string>();
+    for (const person of people) {
+        const avatar = (person as { avatar?: unknown } | null)?.avatar;
+        if (typeof avatar === 'string') faces.add(avatar);
+    }
+    const kept: Array<[string, string]> = [];
+    for (const [key, portrait] of handedOutPortraits) if (loadPortraitKeys.has(key) || faces.has(portrait)) kept.push([key, portrait]);
+    return kept;
+};
 
 export const clearGeneratedAvatarCache = (): void => { avatarCache.clear(); };
 export const getGeneratedAvatarCacheSize = (): number => avatarCache.size;

@@ -110,6 +110,80 @@ const hasOnlyFiniteNonNegativeNumbers = (value: unknown): boolean => {
     return true;
 };
 
+/* Week-speed Phase 2a (2026-11-18): readViewingState's royalty-receipt clause and its number walk, in one pass over the
+   receipts. The state a week builds carries every royalty receipt of the week (late career: 171,073 rows, 51 MB; the
+   save rolls them up), and the platform economy checks that state once a week. The unique-id Set, the row checks and
+   the number walk (Object.values per row) each went over every row: ~59 ms M4 a late week.
+   The answer is the same for every input, not only for states the week builds: the same checks in the same order, the
+   same Set of ids, Set.has for includes (both SameValueZero), and each row's own values walked as Object.values walks
+   them (own enumerable string keys). If any row is not an object, or is an array (null, a primitive, a hole), the
+   whole clause goes back to the expression it replaced, which also keeps that expression's exceptions.
+   Tools only: with globalThis.__AE_WEEK_MEMO_CHECK__ set, the expression it replaced runs too and any different answer
+   is listed in globalThis.__AE_WEEK_MEMO_CHANGES__. */
+const ROYALTY_RECEIPT_SOURCE_KINDS: ReadonlySet<unknown> = new Set(['SUBSCRIPTION','ADVERTISING','RENTAL','PURCHASE','SPONSORSHIP','ANCILLARY']);
+const ROYALTY_RECEIPT_KINDS: ReadonlySet<unknown> = new Set(['SUBSCRIPTION','NON_STORE']);
+const ownProperty = Object.prototype.hasOwnProperty;
+type ViewingRoyaltyReceipts = NonNullable<WorldStreamingViewingState['royaltyReceipts']>;
+/** The clause as it was before 2a: true when the receipts make the state invalid. */
+const royaltyReceiptClauseFailsAsBefore = (rows: ViewingRoyaltyReceipts): boolean => (
+    new Set(rows.map(row=>row.receiptId)).size!==rows.length
+    || rows.some(row=>(row.sourceKind !== undefined && !['SUBSCRIPTION','ADVERTISING','RENTAL','PURCHASE','SPONSORSHIP','ANCILLARY'].includes(row.sourceKind)) || !row.receiptId || !row.platformId || !row.countryId || !row.projectId
+        || !Number.isSafeInteger(row.grossReceipts) || row.grossReceipts<=0
+        || !['SUBSCRIPTION','NON_STORE'].includes(row.kind))
+);
+/** hasOnlyFiniteNonNegativeNumbers(row) for a row that is an object and not an array, without an Object.values array. */
+const rowHasOnlyFiniteNonNegativeNumbers = (row: Record<string, unknown>): boolean => {
+    for (const key in row) {
+        if (!ownProperty.call(row, key)) continue;
+        const value = row[key];
+        if (typeof value === 'number') {
+            if (!(Number.isFinite(value) && value >= 0)) return false;
+        } else if (value !== null && typeof value === 'object' && !hasOnlyFiniteNonNegativeNumbers(value)) return false;
+    }
+    return true;
+};
+/** numbersOk is read only when invalid is false. */
+type RoyaltyReceiptScan = { invalid: boolean; numbersOk: boolean };
+/** null: some row is not a non-array object, so the caller uses the clause as it was. */
+const scanRoyaltyReceipts = (rows: readonly unknown[]): RoyaltyReceiptScan | null => {
+    const count = rows.length;
+    for (let index = 0; index < count; index += 1) {
+        const row = rows[index];
+        if (row === null || typeof row !== 'object' || Array.isArray(row)) return null;
+    }
+    const ids = new Set<unknown>();
+    for (let index = 0; index < count; index += 1) ids.add((rows[index] as Record<string, unknown>).receiptId);
+    if (ids.size !== count) return { invalid: true, numbersOk: false };
+    let numbersOk = true;
+    for (let index = 0; index < count; index += 1) {
+        const row = rows[index] as Record<string, unknown>;
+        if ((row.sourceKind !== undefined && !ROYALTY_RECEIPT_SOURCE_KINDS.has(row.sourceKind)) || !row.receiptId || !row.platformId || !row.countryId || !row.projectId
+            || !Number.isSafeInteger(row.grossReceipts) || (row.grossReceipts as number) <= 0
+            || !ROYALTY_RECEIPT_KINDS.has(row.kind)) return { invalid: true, numbersOk: false };
+        if (numbersOk && !rowHasOnlyFiniteNonNegativeNumbers(row)) numbersOk = false;
+    }
+    return { invalid: false, numbersOk };
+};
+/** hasOnlyFiniteNonNegativeNumbers(state) with the receipts' part already known. */
+const stateHasOnlyFiniteNonNegativeNumbers = (state: WorldStreamingViewingState, receiptNumbersOk: boolean): boolean => {
+    if (Array.isArray(state)) return hasOnlyFiniteNonNegativeNumbers(state);
+    const record = state as unknown as Record<string, unknown>;
+    for (const key in record) {
+        if (!ownProperty.call(record, key)) continue;
+        if (key === 'royaltyReceipts') { if (!receiptNumbersOk) return false; continue; }
+        if (!hasOnlyFiniteNonNegativeNumbers(record[key])) return false;
+    }
+    return true;
+};
+const noteViewingReceiptCheck = (sameAnswer: boolean, part: string) => {
+    const memoGlobals = globalThis as { __AE_WEEK_MEMO_CHANGES__?: Array<{ name: string; role: string; path: string }>; __AE_WEEK_MEMO_HITS__?: Record<string, number> };
+    memoGlobals.__AE_WEEK_MEMO_HITS__ = { ...(memoGlobals.__AE_WEEK_MEMO_HITS__ || {}), viewingReceiptsOnePass: (memoGlobals.__AE_WEEK_MEMO_HITS__?.viewingReceiptsOnePass || 0) + 1 };
+    if (!sameAnswer) {
+        if (!memoGlobals.__AE_WEEK_MEMO_CHANGES__) memoGlobals.__AE_WEEK_MEMO_CHANGES__ = [];
+        memoGlobals.__AE_WEEK_MEMO_CHANGES__.push({ name: 'readViewingState', role: 'receipts-one-pass', path: part });
+    }
+};
+
 /* #256: a state is only ever replaced whole, so one read as valid this week need not be read again: this runs on every update from a screen */
 const readAsValidAtWeek = new WeakMap<object, number>();
 const isValidViewingState = (input: WorldStreamingViewingState | undefined, absoluteWeek: number): boolean => {
@@ -119,6 +193,20 @@ const isValidViewingState = (input: WorldStreamingViewingState | undefined, abso
     return valid;
 };
 const readViewingState = (input: WorldStreamingViewingState | undefined, absoluteWeek: number): boolean => {
+    /* 2a: set when the receipt clause ran its one-pass scan (scanRoyaltyReceipts above) */
+    let receiptNumbersOk: boolean | undefined;
+    const receiptClauseFails = (rows: unknown): boolean => {
+        if (!Array.isArray(rows)) return true;
+        const scan = scanRoyaltyReceipts(rows);
+        if (scan === null) return royaltyReceiptClauseFailsAsBefore(rows as ViewingRoyaltyReceipts);
+        if ((globalThis as { __AE_WEEK_MEMO_CHECK__?: boolean }).__AE_WEEK_MEMO_CHECK__) {
+            noteViewingReceiptCheck(royaltyReceiptClauseFailsAsBefore(rows as ViewingRoyaltyReceipts) === scan.invalid, 'clause');
+            if (!scan.invalid) noteViewingReceiptCheck(hasOnlyFiniteNonNegativeNumbers(rows) === scan.numbersOk, 'numbers');
+        }
+        if (scan.invalid) return true;
+        receiptNumbersOk = scan.numbersOk;
+        return false;
+    };
     if (!input
         || input.schemaVersion !== WORLD_STREAMING_VIEWING_SCHEMA_VERSION
         || input.lastProcessedAbsoluteWeek !== absoluteWeek
@@ -127,11 +215,7 @@ const readViewingState = (input: WorldStreamingViewingState | undefined, absolut
         || !input.countries
         || !input.platforms
         || !Array.isArray(input.snapshots)
-        || (input.royaltyReceipts !== undefined && (!Array.isArray(input.royaltyReceipts)
-            || new Set(input.royaltyReceipts.map(row=>row.receiptId)).size!==input.royaltyReceipts.length
-            || input.royaltyReceipts.some(row=>(row.sourceKind !== undefined && !['SUBSCRIPTION','ADVERTISING','RENTAL','PURCHASE','SPONSORSHIP','ANCILLARY'].includes(row.sourceKind)) || !row.receiptId || !row.platformId || !row.countryId || !row.projectId
-                || !Number.isSafeInteger(row.grossReceipts) || row.grossReceipts<=0
-                || !['SUBSCRIPTION','NON_STORE'].includes(row.kind))))
+        || (input.royaltyReceipts !== undefined && receiptClauseFails(input.royaltyReceipts))
         || (input.royaltySourceReceipts !== undefined && (!Array.isArray(input.royaltySourceReceipts)
             || input.royaltySourceReceipts.some(row=>!row.platformId || !row.countryId
                 || !Number.isSafeInteger(row.grossReceipts) || row.grossReceipts<=0
@@ -157,7 +241,9 @@ const readViewingState = (input: WorldStreamingViewingState | undefined, absolut
                 || !Number.isSafeInteger(row.households) || row.households <= 0
                 || row.purchasedAtAbsoluteWeek !== absoluteWeek)))
         || input.snapshots.length > MAX_SNAPSHOTS
-        || !hasOnlyFiniteNonNegativeNumbers(input)) return false;
+        || !(receiptNumbersOk === undefined
+            ? hasOnlyFiniteNonNegativeNumbers(input)
+            : stateHasOnlyFiniteNonNegativeNumbers(input, receiptNumbersOk))) return false;
     return Object.values(input.platforms).every(platform => (
         Array.isArray(platform.titlePerformance)
         && platform.titlePerformance.every(title => {

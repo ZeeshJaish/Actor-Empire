@@ -1,6 +1,7 @@
 import type { Player } from '../../types';
 import type { WeekAheadPortraitRequest, WeekAheadResult } from './weekAheadEngine';
 import type { PackedCareerPatches } from './careerPatch';
+import type { SaveWriteRecord } from '../saveWriteLimits';
 
 /* Week Ahead messages (2026-11-12). Ids rise on the main thread; only the newest one is worked on. */
 export type WeekAheadToWorker =
@@ -23,13 +24,20 @@ export type WeekAheadToWorker =
 
 export interface WeekAheadVerifiedLive { digest: string; token: string | null }
 /** Write the prepared week ahead (not live) into this slot's older copy, on top of this verified live copy. */
-export interface WeekAheadStageRequest { key: string; live: WeekAheadVerifiedLive }
+export interface WeekAheadStageRequest {
+    key: string;
+    live: WeekAheadVerifiedLive;
+    /** Phase 1 (2026-11-17): the slot's learned write limit record (workers have no localStorage). */
+    writeRecord?: SaveWriteRecord | null;
+}
 export interface WeekAheadWriteRequest {
     key: string;
     /** What the main thread verified about the live copy this session (null: the worker reads and checks it). */
     live: WeekAheadVerifiedLive | null;
     /** The play time on screen, when it moved on after the week was prepared. */
     totalPlayTimeMs?: number;
+    /** Phase 1 (2026-11-17): the slot's learned write limit record (workers have no localStorage). */
+    writeRecord?: SaveWriteRecord | null;
 }
 
 export type WeekAheadFailure = 'REPLACED' | 'ERROR' | 'UNKNOWN' | 'NO_TAKEN_WEEK' | 'NOT_READY';
@@ -39,11 +47,12 @@ export type WeekAheadToMain =
     | { kind: 'unusable'; reason: string }
     | { kind: 'need-portraits'; requestId: number; requests: WeekAheadPortraitRequest[] }
     | { kind: 'done'; id: number; ms: number; timings: WeekAheadResult['timings'] }
-    | { kind: 'staged'; id: number; ok: boolean; ms: number; message?: string }
+    /** writeRecord (Phase 1, 2026-11-17): the slot's write limit record after this write, for the main thread to keep. */
+    | { kind: 'staged'; id: number; ok: boolean; ms: number; message?: string; key?: string; writeRecord?: SaveWriteRecord | null }
     /** The week. Its player is sent as patches to the career the request was made from when possible. */
     | { kind: 'result'; id: number; result: Omit<WeekAheadResult, 'player'> & { player?: Player }; playerPatches?: PackedCareerPatches }
-    | { kind: 'written'; id: number; ok: true; committed: WeekAheadVerifiedLive | null; ms: number; promoted: boolean }
-    | { kind: 'written'; id: number; ok: false; message: string; ms: number }
+    | { kind: 'written'; id: number; ok: true; committed: WeekAheadVerifiedLive | null; ms: number; promoted: boolean; writeRecord?: SaveWriteRecord | null }
+    | { kind: 'written'; id: number; ok: false; message: string; ms: number; writeRecord?: SaveWriteRecord | null }
     | { kind: 'failed'; id: number; reason: WeekAheadFailure; message?: string };
 
 /** A portrait the main thread has not drawn yet: this prefix plus getGenderedAvatar's cache key. */

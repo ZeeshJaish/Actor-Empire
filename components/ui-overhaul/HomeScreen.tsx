@@ -321,12 +321,19 @@ const CSS = `
 .ae-wk.is-past{background:linear-gradient(180deg,var(--gold),var(--gold-deep));opacity:.8;}
 .ae-wk.is-mark{height:19px;background:rgba(255,255,255,.17);}
 .ae-wk.is-now{
-  height:24px;border-radius:3px;opacity:1;
+  position:relative;height:24px;border-radius:3px;opacity:1;
   background:linear-gradient(180deg,#fff0c4,var(--gold-hi) 45%,var(--gold));
-  box-shadow:0 0 12px var(--acc-2),0 0 26px var(--acc-dim);
-  animation:ae-wkin .5s cubic-bezier(.2,.9,.2,1) both,ae-now 2.4s ease-in-out infinite .6s;
+  box-shadow:0 0 12px var(--acc-2),0 0 24px var(--acc-dim);
+  animation:ae-wkin .5s cubic-bezier(.2,.9,.2,1) both;
 }
-@keyframes ae-now{0%,100%{box-shadow:0 0 12px var(--acc-2),0 0 24px var(--acc-dim);}50%{box-shadow:0 0 18px var(--acc-2),0 0 40px var(--acc-dim);}}
+/* Phase 1 (2026-11-17), idle CPU: the glow pulses by fading a second, larger glow in and out (opacity runs on the
+   compositor). Animating box-shadow repainted the bar every frame for as long as Home sat open. */
+.ae-wk.is-now::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  box-shadow:0 0 18px var(--acc-2),0 0 40px var(--acc-dim);
+  opacity:0;will-change:opacity;animation:ae-now 2.4s ease-in-out infinite .6s;
+}
+@keyframes ae-now{0%,100%{opacity:0;}50%{opacity:1;}}
 
 /* ---------- resources ---------- */
 .ae-res{display:flex;gap:14px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line-2);}
@@ -428,11 +435,13 @@ const CSS = `
 }
 .ae-cta>*{position:relative;z-index:1;}
 .ae-cta::after{
-  content:"";position:absolute;top:-30%;bottom:-30%;left:-55%;width:28%;transform:skewX(-16deg);
+  content:"";position:absolute;top:-30%;bottom:-30%;left:-55%;width:28%;transform:translateX(0) skewX(-16deg);
   background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0));
-  animation:ae-sheen 5.5s ease-in-out infinite;
+  will-change:transform;animation:ae-sheen 5.5s ease-in-out infinite;
 }
-@keyframes ae-sheen{0%{left:-55%;}16%{left:135%;}100%{left:135%;}}
+/* Phase 1 (2026-11-17), idle CPU: the same sweep, from -55% to 135% of the button, now as a transform (190% of the
+   button is 678.57% of this 28%-wide sheen). Animating left re-laid-out the page every frame while Home sat open. */
+@keyframes ae-sheen{0%{transform:translateX(0) skewX(-16deg);}16%,100%{transform:translateX(678.57%) skewX(-16deg);}}
 .ae-cta:active{transform:translateY(2px) scale(.994);box-shadow:0 8px 22px -14px rgba(248,168,16,.65);}
 .ae-next{
   font-size:10.5px;font-weight:800;letter-spacing:.08em;

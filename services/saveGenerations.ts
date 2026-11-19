@@ -7,6 +7,8 @@ import {
     verifySaveIntegrity,
     wasManifestIssuedFor,
 } from './saveIntegrity';
+import { APP_DISPLAY_VERSION } from './appVersion';
+import { NewerSaveFormatError, createSlotFormatMarker, isSlotFormatMarker, slotFormatKey, thisBuildCanOpen, type SlotFormatMarker } from './saveFormatGuard';
 
 export interface SaveGenerationKeys {
     current: string;
@@ -35,6 +37,11 @@ export interface WriteVerifiedGenerationInput {
     generation: StoredSaveGeneration;
     retainPrevious: boolean;
     expectedCandidateDigest: string;
+    /** Phase 1 (2026-11-17), Week Ahead's tap-time write: written only on top of this exact live copy (same digest,
+     *  same head token); if anything was written since, nothing is written and the write fails. */
+    requireLive?: { digest: string; token: string | null };
+    /** Phase 1 (2026-11-17): small records written in the same transaction (a slot's first format marker). */
+    alsoPut?: Array<{ key: string; value: unknown }>;
 }
 
 /** Week Ahead (2026-11-12): a generation written ahead into the older slot, not live yet. */
@@ -106,10 +113,24 @@ export interface StagedSaveBatch {
 
 export type VerifiedGameLoad =
     | { status: 'MISSING'; player: null; previous: null; violations: string[] }
-    | { status: 'CURRENT'; player: Player; previous: null; violations: string[]; needsRecoveryCheckpoint: boolean }
+    | {
+        status: 'CURRENT'; player: Player; previous: null; violations: string[]; needsRecoveryCheckpoint: boolean;
+        /** Phase 1 (2026-11-17): when this copy was saved (its manifest), for the purchase ledger. */
+        savedAt: number | null;
+        /** Phase 1 (2026-11-17): the head record was not recognised; which copy was loaded instead. */
+        headFallback?: 'CURRENT' | 'PREVIOUS_NEWER';
+        /** Phase 2a (2026-11-17): the app version that wrote this copy (null before 2a), for the recovery list. */
+        appVersion: string | null;
+    }
     | { status: 'LEGACY_UNVERIFIED'; player: Player; previous: null; violations: string[] }
-    | { status: 'RECOVERY_AVAILABLE'; player: null; previous: Player; violations: string[] }
-    | { status: 'UNRECOVERABLE'; player: null; previous: null; violations: string[] };
+    | {
+        status: 'RECOVERY_AVAILABLE'; player: null; previous: Player; violations: string[];
+        /** Phase 2a (2026-11-17): the backup copy's save time and writer, for the recovery list. */
+        previousSavedAt?: number | null; previousAppVersion?: string | null;
+    }
+    | { status: 'UNRECOVERABLE'; player: null; previous: null; violations: string[] }
+    /** Phase 1 (2026-11-17), the format guard: a newer version wrote this slot in a format this build cannot read. */
+    | { status: 'NEWER_FORMAT'; player: null; previous: null; violations: string[] };
 
 export const getSaveGenerationKeys = (currentKey: string): SaveGenerationKeys => ({
     current: currentKey,
@@ -120,6 +141,38 @@ export const getSaveGenerationKeys = (currentKey: string): SaveGenerationKeys =>
 });
 
 const databaseNpcIds = new Set(NPC_DATABASE.map(npc => npc.id));
+
+/* Phase 1 (2026-11-17), the format guard (services/saveFormatGuard.ts). A slot's marker is read once per store and
+   key (no newer build can write while this one runs) and written once, with the slot's first save by this build. */
+const slotMarkers = new WeakMap<SaveGenerationStore, Map<string, SlotFormatMarker | null>>();
+const slotMarkerCache = (store: SaveGenerationStore) => {
+    let cache = slotMarkers.get(store);
+    if (!cache) { cache = new Map(); slotMarkers.set(store, cache); }
+    return cache;
+};
+export const readSlotFormatMarker = async (store: SaveGenerationStore, currentKey: string): Promise<SlotFormatMarker | null> => {
+    const cache = slotMarkerCache(store);
+    if (cache.has(currentKey)) return cache.get(currentKey) ?? null;
+    const raw = await store.read(slotFormatKey(currentKey));
+    const marker = isSlotFormatMarker(raw) ? raw : null;
+    cache.set(currentKey, marker);
+    return marker;
+};
+/** Throws NewerSaveFormatError when a newer version owns this slot; otherwise returns its marker (null: none yet). */
+const guardSlotWrite = async (store: SaveGenerationStore, currentKey: string): Promise<SlotFormatMarker | null> => {
+    const marker = await readSlotFormatMarker(store, currentKey);
+    if (!thisBuildCanOpen(marker)) throw new NewerSaveFormatError(currentKey);
+    return marker;
+};
+/** After a slot's first write by this build: its marker (a failed marker write is tried again with the next save). */
+const markSlotFormat = async (store: SaveGenerationStore, currentKey: string, marker: SlotFormatMarker | null): Promise<void> => {
+    if (marker) return;
+    const next = createSlotFormatMarker(APP_DISPLAY_VERSION);
+    try {
+        await store.write(slotFormatKey(currentKey), next);
+        slotMarkerCache(store).set(currentKey, next);
+    } catch { /* optional now: written with the next save */ }
+};
 
 const saveQueues = new WeakMap<SaveGenerationStore, Map<string, Promise<void>>>();
 
@@ -153,6 +206,7 @@ export const stageVerifiedGameData = async (
     live: { digest: string; token: string | null },
     options: { needsRecoveryCheckpoint?: boolean } = {},
 ): Promise<StagedSaveGeneration> => runExclusiveSave(store, currentKey, async () => {
+    await guardSlotWrite(store, currentKey);
     if (!store.stageVerifiedGeneration) throw new Error('This save store cannot stage a generation.');
     if (!wasManifestIssuedFor(player, manifest)) {
         const initialVerification = verifySaveIntegrity(player, manifest);
@@ -172,8 +226,11 @@ export const promoteStagedGameData = async (
     currentKey: string,
     staged: StagedSaveGeneration,
 ): Promise<{ digest: string; token: string }> => runExclusiveSave(store, currentKey, async () => {
+    const marker = await guardSlotWrite(store, currentKey);
     if (!store.promoteStagedGeneration) throw new Error('This save store cannot promote a staged generation.');
-    return store.promoteStagedGeneration({ keys: getSaveGenerationKeys(currentKey), staged });
+    const committed = await store.promoteStagedGeneration({ keys: getSaveGenerationKeys(currentKey), staged });
+    await markSlotFormat(store, currentKey, marker);
+    return committed;
 });
 
 /** Week Ahead (2026-11-12): work on this key's save done elsewhere (the worker writes the week) waits its turn
@@ -216,13 +273,20 @@ const verifyGeneration = (value: unknown) => {
         : { ok: true as const, generation: value };
 };
 
+/** Phase 1 (2026-11-17): the same test as the A/B store's own head check (indexedDbSaveGenerations.ts isHead). */
+const isRecognisedHead = (value: unknown): boolean => Boolean(value && typeof value === 'object'
+    && (value as { kind?: unknown }).kind === 'ACTOR_EMPIRE_SAVE_HEAD' && (value as { formatVersion?: unknown }).formatVersion === 1
+    && ((value as { newest?: unknown }).newest === 'CURRENT' || (value as { newest?: unknown }).newest === 'PREVIOUS'));
+const weekIndexOf = (player: Player): number => (Number(player.age) || 0) * 100 + (Number(player.currentWeek) || 0);
+
 export const saveVerifiedGameData = async (
     store: SaveGenerationStore,
     currentKey: string,
     player: Player,
     manifest: SaveIntegrityManifest,
-    options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean } = {},
+    options: { retainPrevious?: boolean; needsRecoveryCheckpoint?: boolean; requireLive?: { digest: string; token: string | null } } = {},
 ): Promise<void> => runExclusiveSave(store, currentKey, async () => {
+    const formatMarker = await guardSlotWrite(store, currentKey);
     // Lag round (2026-11-09): a manifest just issued for this exact object needs no second hash
     // here; the copy actually stored is read back and verified before it can become current.
     if (!wasManifestIssuedFor(player, manifest)) {
@@ -240,14 +304,20 @@ export const saveVerifiedGameData = async (
         needsRecoveryCheckpoint: options.needsRecoveryCheckpoint === true,
     };
     if (store.writeVerifiedGeneration) {
+        // A slot's first save by this build carries its format marker in the same transaction.
+        const newMarker = formatMarker ? null : createSlotFormatMarker(APP_DISPLAY_VERSION);
         await store.writeVerifiedGeneration({
             keys,
             generation: candidate,
             retainPrevious: options.retainPrevious !== false,
             expectedCandidateDigest: manifest.digest,
+            ...(options.requireLive ? { requireLive: options.requireLive } : {}),
+            ...(newMarker ? { alsoPut: [{ key: slotFormatKey(currentKey), value: newMarker }] } : {}),
         });
+        if (newMarker) slotMarkerCache(store).set(currentKey, newMarker);
         return;
     }
+    if (options.requireLive) throw new Error('This save store cannot check the live copy before writing.');
     await store.write(keys.candidate, candidate);
     const readBack = verifyGeneration(await store.read(keys.candidate));
     if (!readBack.ok) {
@@ -261,12 +331,17 @@ export const saveVerifiedGameData = async (
         retainPrevious: options.retainPrevious !== false,
         expectedCandidateDigest: manifest.digest,
     });
+    await markSlotFormat(store, currentKey, formatMarker);
 });
 
 export const loadVerifiedGameData = async (
     store: SaveGenerationStore,
     currentKey: string,
 ): Promise<VerifiedGameLoad> => {
+    const formatMarker = await readSlotFormatMarker(store, currentKey);
+    if (!thisBuildCanOpen(formatMarker)) {
+        return { status: 'NEWER_FORMAT', player: null, previous: null, violations: ['saved by a newer version of the game'] };
+    }
     const keys = getSaveGenerationKeys(currentKey);
     const [current, manifest] = store.readMany
         ? await store.readMany([keys.current, keys.integrity])
@@ -274,19 +349,37 @@ export const loadVerifiedGameData = async (
     if (current === null || current === undefined) {
         const previous = verifyGeneration(await store.read(keys.previous));
         return previous.ok
-            ? { status: 'RECOVERY_AVAILABLE', player: null, previous: previous.generation.player, violations: ['current save is missing'] }
+            ? { status: 'RECOVERY_AVAILABLE', player: null, previous: previous.generation.player, violations: ['current save is missing'], ...describePreviousCopy(previous.generation) }
             : { status: 'MISSING', player: null, previous: null, violations: [] };
     }
     if (!isPlayer(current)) {
         const previous = verifyGeneration(await store.read(keys.previous));
         return previous.ok
-            ? { status: 'RECOVERY_AVAILABLE', player: null, previous: previous.generation.player, violations: ['current save structure is invalid'] }
+            ? { status: 'RECOVERY_AVAILABLE', player: null, previous: previous.generation.player, violations: ['current save structure is invalid'], ...describePreviousCopy(previous.generation) }
             : { status: 'UNRECOVERABLE', player: null, previous: null, violations: ['current save structure is invalid'] };
     }
     if (!isManifest(manifest)) {
         return { status: 'LEGACY_UNVERIFIED', player: current, previous: null, violations: [] };
     }
     const currentVerification = verifySaveIntegrity(current, manifest);
+    /* Phase 1 (2026-11-17), plan item 4: a head record that is there but not recognised used to fall back to the
+       CURRENT slot without a word, even when the other copy was the newer week. Now the newer verified copy is
+       loaded (the older one stays as the backup) and the caller is told, so it records a non-fatal. */
+    let headFallback: 'CURRENT' | 'PREVIOUS_NEWER' | undefined;
+    if (!('violations' in currentVerification)) {
+        const rawHead = await store.read(`${currentKey}__head`);
+        if (rawHead !== null && rawHead !== undefined && !isRecognisedHead(rawHead)) {
+            headFallback = 'CURRENT';
+            const other = verifyGeneration(await store.read(keys.previous));
+            if (other.ok && weekIndexOf(other.generation.player) > weekIndexOf(current)) {
+                try {
+                    await recoverPreviousGameData(store, currentKey);
+                    const recovered = await loadVerifiedGameData(store, currentKey);
+                    if (recovered.status === 'CURRENT') return { ...recovered, headFallback: 'PREVIOUS_NEWER' };
+                } catch { /* the newer copy could not be made live: the CURRENT copy opens, as before */ }
+            }
+        }
+    }
     if (!('violations' in currentVerification)) {
         store.rememberVerifiedCurrent?.(currentKey, manifest.digest);
         let player = restoreContractActorProfiles(current);
@@ -305,6 +398,9 @@ export const loadVerifiedGameData = async (
             previous: null,
             violations: [],
             needsRecoveryCheckpoint: manifest.needsRecoveryCheckpoint === true,
+            savedAt: Number.isFinite(Number(manifest.createdAt)) ? Number(manifest.createdAt) : null,
+            ...(headFallback ? { headFallback } : {}),
+            appVersion: typeof manifest.appVersion === 'string' ? manifest.appVersion : null,
         };
     }
     const previous = verifyGeneration(await store.read(keys.previous));
@@ -314,6 +410,7 @@ export const loadVerifiedGameData = async (
             player: null,
             previous: previous.generation.player,
             violations: currentVerification.violations,
+            ...describePreviousCopy(previous.generation),
         };
     }
     return {
@@ -322,6 +419,23 @@ export const loadVerifiedGameData = async (
         previous: null,
         violations: currentVerification.violations,
     };
+};
+
+/** Phase 2a (2026-11-17): a verified backup copy's save time and writer, for the recovery list. */
+const describePreviousCopy = (generation: StoredSaveGeneration): { previousSavedAt: number | null; previousAppVersion: string | null } => ({
+    previousSavedAt: Number.isFinite(Number(generation.manifest.createdAt)) ? Number(generation.manifest.createdAt) : null,
+    previousAppVersion: typeof generation.manifest.appVersion === 'string' ? generation.manifest.appVersion : null,
+});
+
+/** Phase 2a (2026-11-17): the verified backup copy with its save time and writer (read only), or null. */
+export const peekVerifiedPreviousCopy = async (
+    store: SaveGenerationStore,
+    currentKey: string,
+): Promise<{ player: Player; savedAt: number | null; appVersion: string | null } | null> => {
+    const previous = verifyGeneration(await store.read(getSaveGenerationKeys(currentKey).previous));
+    if (!previous.ok) return null;
+    const described = describePreviousCopy(previous.generation);
+    return { player: previous.generation.player, savedAt: described.previousSavedAt, appVersion: described.previousAppVersion };
 };
 
 /** Read-only recovery preview. A valid current signature can still precede an incompatible migration. */
@@ -337,10 +451,12 @@ export const recoverPreviousGameData = async (
     store: SaveGenerationStore,
     currentKey: string,
 ): Promise<Player> => runExclusiveSave(store, currentKey, async () => {
+    const formatMarker = await guardSlotWrite(store, currentKey);
     const keys = getSaveGenerationKeys(currentKey);
     const previous = verifyGeneration(await store.read(keys.previous));
     if (!previous.ok) throw new Error(`Previous generation is not recoverable: ${previous.violations.join('; ')}`);
     await store.recoverGeneration({ keys });
+    await markSlotFormat(store, currentKey, formatMarker);
     const recovered = await loadVerifiedGameData(store, currentKey);
     if (recovered.status !== 'CURRENT') throw new Error('Recovered generation failed post-promotion verification.');
     return recovered.player;
@@ -353,6 +469,8 @@ export const stageVerifiedGameDataBatch = async (
     if (entries.length === 0) throw new Error('Cannot stage an empty save batch.');
     const uniqueKeys = new Set(entries.map(entry => entry.currentKey));
     if (uniqueKeys.size !== entries.length) throw new Error('Save batch contains duplicate public keys.');
+    // Phase 1 (2026-11-17), the format guard: an import never replaces a slot a newer version owns.
+    for (const entry of entries) await guardSlotWrite(store, entry.currentKey);
     const stagedKeys: SaveGenerationKeys[] = [];
     try {
         for (const entry of entries) {
@@ -388,13 +506,19 @@ export const promoteStagedGameDataBatch = async (
     batch: StagedSaveBatch,
 ): Promise<void> => {
     if (batch.keys.length === 0) throw new Error('Cannot promote an empty save batch.');
+    const markers = await Promise.all(batch.keys.map(keys => guardSlotWrite(store, keys.current)));
     await store.promoteGenerationBatch({ keys: batch.keys, expectedCandidateDigests: batch.expectedCandidateDigests });
+    await Promise.all(batch.keys.map((keys, index) => markSlotFormat(store, keys.current, markers[index])));
 };
 
 export const deleteSaveGenerationFamily = async (
     store: SaveGenerationStore,
     currentKey: string,
 ): Promise<void> => {
+    await guardSlotWrite(store, currentKey);
     const keys = getSaveGenerationKeys(currentKey);
     await Promise.all(Object.values(keys).map(key => store.remove(key)));
+    // Phase 1 (2026-11-17): the marker goes with the slot, so startup never lists a deleted slot.
+    await store.remove(slotFormatKey(currentKey));
+    slotMarkerCache(store).set(currentKey, null);
 };
