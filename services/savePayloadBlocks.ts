@@ -1,4 +1,5 @@
 /** Physical representation only. Gameplay/export always receive a complete Player. */
+import {expandPlayerCinemaCellsFromStorage} from './boxOffice/boxOfficeCellStorage';
 const KIND = 'ACTOR_EMPIRE_PLAYER_BLOCKS';
 const TAG = '$actorSaveValue';
 const BLOCK_MIN_CHARS = 64 * 1024;
@@ -167,12 +168,19 @@ const unpack = async (value:unknown,blocks:ReadBlocks):Promise<unknown> => {
 };
 export const unpackSavePlayer=(value:unknown):Promise<unknown>=>unpack(value,new Map());
 
+/* 19 Nov 2026 (debt plan v2): a stored player may pack the cinema's audience cells that hold nothing but awareness
+   (boxOffice/boxOfficeCellStorage.ts). They are rebuilt here, before any copy is checked or handed to the game;
+   a packed form that cannot be rebuilt is a damaged payload, like a bad block. */
+const expandStored = (value:unknown):unknown => {
+    try{return expandPlayerCinemaCellsFromStorage(value);}
+    catch(error){throw new SavePayloadCorruptionError(error instanceof Error?error.message:'Unreadable cinema cells');}
+};
 const materialize = async (record:unknown,blocks:ReadBlocks):Promise<any> => {
-    if(isBlockPlayer(record))return unpack(record,blocks);
+    if(isBlockPlayer(record))return expandStored(await unpack(record,blocks));
     if(record&&typeof record==='object'&&(record as any).kind==='ACTOR_EMPIRE_SAVE_GENERATION'){
-        return {...record,player:await unpack((record as any).player,blocks)};
+        return {...record,player:expandStored(await unpack((record as any).player,blocks))};
     }
-    return record;
+    return expandStored(record);
 };
 export const materializeSaveRecord=(record:unknown):Promise<any>=>materialize(record,new Map());
 /** Private verification callers only: do not mutate/hand out decoded values

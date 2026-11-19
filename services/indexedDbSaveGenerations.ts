@@ -3,6 +3,7 @@ import type {SaveGenerationStore, SaveGenerationKeys, StoredSaveGeneration, Writ
 import {verifySaveIntegrity, type SaveIntegrityManifest} from './saveIntegrity';
 import {waitForIndexedDbTransaction} from './indexedDbResilience';
 import {packSavePlayer, materializeSaveRecord, createImmutableSaveRecordReadBatch, SavePayloadCorruptionError} from './savePayloadBlocks';
+import {packPlayerCinemaCellsForStorage} from './boxOffice/boxOfficeCellStorage';
 
 /* Lag round (2026-11-09): A/B save copies.
 
@@ -71,7 +72,10 @@ const readSnapshot=(store:IDBObjectStore,keys:readonly string[],done:(values:any
         const request=store.get(keys[index]);request.onsuccess=()=>{values[index]=request.result??null;if(--pending===0)done(values);};
     }
 };
-const generation=(player:unknown,manifest:unknown,needsRecoveryCheckpoint=false):unknown=>({kind:'ACTOR_EMPIRE_SAVE_GENERATION',formatVersion:1,player,manifest,needsRecoveryCheckpoint});
+/* 19 Nov 2026 (debt plan v2): every player this layer stores packs the cinema's audience cells that hold nothing
+   but awareness (boxOffice/boxOfficeCellStorage.ts); materializeSaveRecord rebuilds them before any copy is read or checked. */
+const stored=(player:unknown):unknown=>packPlayerCinemaCellsForStorage(player);
+const generation=(player:unknown,manifest:unknown,needsRecoveryCheckpoint=false):unknown=>({kind:'ACTOR_EMPIRE_SAVE_GENERATION',formatVersion:1,player:stored(player),manifest,needsRecoveryCheckpoint});
 const valid=(player:unknown,manifest:unknown):boolean=>{
     if(!player||typeof player!=='object'||typeof (player as Player).id!=='string'||typeof (player as Player).name!=='string'||!manifest)return false;
     try{return verifySaveIntegrity(player as Player,manifest as SaveIntegrityManifest).ok;}catch{return false;}
@@ -186,7 +190,7 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
                                 }else{
                                     // Old layout. A live PREVIOUS copy is already where the backup belongs.
                                     if(item.keep&&item.liveSlot==='CURRENT')store.put(generation(item.live,item.manifest),item.keys.previous);
-                                    store.put(item.candidate.player,item.keys.current);
+                                    store.put(stored(item.candidate.player),item.keys.current);
                                     store.put(item.candidate.manifest,item.keys.integrity);
                                     store.delete(headKey);
                                 }
@@ -214,7 +218,7 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
                 const liveDigest=liveSlot==='CURRENT'?digestOf(rawHead[1]):head?.digests?.PREVIOUS;
                 // Only on top of the live copy the caller's session verified, with nothing written since.
                 if(!liveDigest||liveDigest!==live.digest||(head?.token??null)!==live.token){store.transaction.abort();return;}
-                if(otherSlot==='CURRENT'){store.put(next.player,keys.current);store.put(next.manifest,keys.integrity);}
+                if(otherSlot==='CURRENT'){store.put(stored(next.player),keys.current);store.put(next.manifest,keys.integrity);}
                 else store.put(generation(next.player,next.manifest,next.needsRecoveryCheckpoint===true),keys.previous);
                 readSnapshot(store,otherSlot==='CURRENT'?[keys.current,keys.integrity]:[keys.previous],raw=>{
                     prepareInTransaction(store,async()=>{
@@ -275,7 +279,7 @@ export const createIndexedDbSaveGenerationStore=(openDB:()=>Promise<IDBDatabase>
         await mutate('write and verify atomic save generation',store=>{
             /** Writes the new generation into one slot, reads it back, checks it, then flips the head. */
             const writeSlot=(target:SlotName,head:SaveHead|null,kept:{slot:SlotName;digest:string}|null)=>{
-                if(target==='CURRENT'){store.put(next.player,keys.current);store.put(next.manifest,keys.integrity);}
+                if(target==='CURRENT'){store.put(stored(next.player),keys.current);store.put(next.manifest,keys.integrity);}
                 else store.put(generation(next.player,next.manifest,next.needsRecoveryCheckpoint===true),keys.previous);
                 // These reads see the actual serialized writes inside this same
                 // transaction. Any failure aborts the slot, header and backup together;
