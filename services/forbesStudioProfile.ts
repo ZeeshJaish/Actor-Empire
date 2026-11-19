@@ -1,3 +1,4 @@
+import { getRivalBooksDebtDollars } from './studioBank';
 import { getListedCompanyValuation } from './stockValuation';
 import type { Business, IndustryProject, NpcVentureState, Universe, Player } from '../types';
 
@@ -214,15 +215,14 @@ export const buildForbesStudioProfile = (input: ForbesStudioProfileInput): Forbe
     const capital = playerBusiness
         ? Math.max(0, playerBusiness.balance || 0)
         : Math.max(0, venture?.cashReserve ?? studio.cashReserve ?? 0) * 1_000_000;
-    const debtRatio = 0.08 + ((hash % 19) / 100);
+    /* 18 Nov 2026 (rival studio debt plan v2): a studio's debt is what its books say: its Bank loans plus any balance it
+       borrowed before it had a Bank. The old fallback, 8–26% of its value, gave every studio a debt it never took on,
+       and with the old runaway valuations it reached trillions. A studio without books has no known debt. */
     const debt = listed ? listed.debt ?? 0 : studio.isPlayerOwned
         ? 0
         : venture
             ? Math.max(0, -venture.cashReserve) * 1_000_000
-            : studio.ai?.finance
-                /* #184: the studio's real debt, as the valuation engine reads it */
-                ? Math.max(0, studio.ai.finance.debtPrincipalMillions || 0) * 1_000_000
-                : Math.round(valuation * debtRatio);
+            : getRivalBooksDebtDollars(studio as any);
     const ventureProfit = venture?.history.reduce((sum, entry) => sum + (entry.profit || 0), 0);
     const playerProfit = playerBusiness?.history.reduce((sum, entry) => sum + (entry.profit || 0), 0);
     const estimatedMargin = 0.035 + ((hash % 9) / 100);

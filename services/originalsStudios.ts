@@ -1,3 +1,4 @@
+import { getRivalBooksDebtDollars } from './rivalBooks';
 import type { Player } from '../types';
 import { formatGenreLabel } from './genreCatalog';
 import { getHistoricalCatalogueTitles } from './historicalCatalogue';
@@ -203,7 +204,8 @@ export const getOriginalsStudios = (player: Player): OriginalsStudioCard[] => {
             hotStreak: momentum >= 65 || Number(studio.recentHits || 0) >= 2,
             runwayWeeks,
             openSlots: Math.max(0, productionSlots - Math.max(committed, activeWork)),
-            financiallyStrong: runwayWeeks >= 104 && Number(ai.finance?.debtPrincipalMillions || 0) < Number(studio.cashReserve || 0),
+            /* 18 Nov 2026: its books debt (Bank loans plus any older balance), in millions */
+            financiallyStrong: runwayWeeks >= 104 && getRivalBooksDebtDollars(studio as any) / 1_000_000 < Number(studio.cashReserve || 0),
         }];
     }).sort((a, b) => b.reputation - a.reputation || a.name.localeCompare(b.name));
 };

@@ -84,7 +84,7 @@ check('capital spam cannot evict a real operating loss and improve the credit qu
     assert(p.finance.history.length <= 240);
 });
 
-check('acquisition principal paydown remains capital while real interest remains operating expense', () => {
+check('acquisition principal paydown remains capital, and the owing studio pays the interest from its own treasury', () => {
     const p = player();
     const studio = createBusiness('Anushka Acquisition', 'PRODUCTION_HOUSE', 'MAJOR_STUDIO', { quality: 'PREMIUM', pricing: 'MARKET', marketing: 'MEDIUM' }, 'FILM', 1, 35);
     p.businesses = [studio];
@@ -94,7 +94,9 @@ check('acquisition principal paydown remains capital while real interest remains
     assert.equal(getAverageWeeklyCashFlow(paid.player).expenses, 0);
     const serviced = processAcquisitionDebtService(paid.player);
     assert(serviced.servicedAmount > 0);
-    assert.equal(getAverageWeeklyCashFlow(serviced.player).expenses, serviced.servicedAmount / 26);
+    /* 18 Nov 2026 (debt plan v2): the loan belongs to the studio, so its interest leaves the studio's treasury, not the owner's books */
+    assert.equal(getAverageWeeklyCashFlow(serviced.player).expenses, 0);
+    assert.equal(serviced.player.businesses[0].balance, paid.player.businesses[0].balance - serviced.servicedAmount);
 });
 
 

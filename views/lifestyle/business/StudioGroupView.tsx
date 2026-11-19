@@ -322,7 +322,7 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                                 </div>
                             </div>
                             <p className="mt-2 text-[7px] font-bold leading-relaxed text-zinc-500">
-                                Parent value uses only the stake you own in each subsidiary, then subtracts acquisition debt. Combined Studios shows 100% of controlled operations, including outside shareholders.
+                                Parent value uses only the stake you own in each subsidiary, then subtracts your share of each studio's loans. Combined Studios shows 100% of controlled operations, including outside shareholders.
                             </p>
                         </div>
                     ) : null}

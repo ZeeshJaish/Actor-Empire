@@ -1,8 +1,9 @@
 import { moveCinemaNpcCash } from '../boxOffice/boxOfficeSettlement';
+import { applyForStudioLoan, wasRefusedByBankLately } from './studioAiBank';
 import type { IndustryProductionCommitment, NPCStudioState, StudioAiProductionMilestone } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import { appendStudioAiProductionKey, STUDIO_AI_PRODUCTION_PROBLEM_LIMIT } from './studioAiProductionState';
-import { STUDIO_AI_LEDGER_LIMIT } from './studioAiState';
+import { STUDIO_AI_EVENT_LIMIT, STUDIO_AI_LEDGER_LIMIT } from './studioAiState';
 
 const money = (value: number): number => Math.round((value + Number.EPSILON * 100) * 1000) / 1000;
 
@@ -36,11 +37,22 @@ export interface ApplyStudioAiProductionMilestoneResult {
     production: IndustryProductionCommitment;
 }
 
-export const applyStudioAiProductionMilestone = (input: ApplyStudioAiProductionMilestoneInput): ApplyStudioAiProductionMilestoneResult => {
+export const applyStudioAiProductionMilestone = (rawInput: ApplyStudioAiProductionMilestoneInput): ApplyStudioAiProductionMilestoneResult => {
+    let input = rawInput;
     const execution = input.production.studioAiExecution;
     if (!execution || input.production.source !== 'STUDIO_INDEPENDENT' || input.studio.ai?.controller !== 'AI'
         || execution.paidMilestoneIds?.includes(input.milestone)) return { studio: input.studio, production: input.production };
     const milestone = getStudioAiProductionMilestones(input.production.budgetMillions).find(row => row.id === input.milestone)!;
+    /* 18 Nov 2026 (rival studio debt plan v2): short of cash for a production bill, the studio asks the Bank for the gap
+       (plus a quarter of running costs) before it pauses the film. A refusal is kept as an event (and may be news).
+       After a refusal it waits 4 weeks before asking again for production money (the Bank's answer does not change
+       week to week); the film stays on hold meanwhile. */
+    if (input.studio.cashReserve + 0.0001 < milestone.amountMillions && !wasRefusedByBankLately(input.studio, input.absoluteWeek, 'PRODUCTION')) {
+        const application = applyForStudioLoan(input.studio, milestone.amountMillions - Math.max(0, input.studio.cashReserve), input.absoluteWeek, 'PRODUCTION', input.production.title);
+        input = application.approved
+            ? { ...input, studio: application.studio }
+            : { ...input, studio: { ...input.studio, ai: { ...input.studio.ai!, events: [...input.studio.ai!.events, application.event].slice(-STUDIO_AI_EVENT_LIMIT) } } };
+    }
     if (input.studio.cashReserve + 0.0001 < milestone.amountMillions) {
         const problemId = createDeterministicId('studio_ai_financing_hold', input.production.id, input.milestone);
         const problems = execution.problems.some(problem => problem.id === problemId) ? execution.problems : [...execution.problems, {

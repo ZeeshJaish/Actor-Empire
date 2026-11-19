@@ -15,11 +15,14 @@ const player = {
 const world = {
     projects: [],
     studios: {
+        /* 18 Nov 2026 (debt plan v2): a studio's condition follows its real money, so this one really loses money each
+           week (its catalogue earns less than its overhead) with no cash left. At reputation 31 it broke even and still
+           had Bank credit, which is not distress. */
         SIGNAL_STUDIO: {
             id: 'SIGNAL_STUDIO',
             name: 'Signal House',
             valuation: 0.08,
-            reputation: 31,
+            reputation: 5,
             cashReserve: 0.01,
             recentHits: 0,
             archetype: 'EMERGENT',

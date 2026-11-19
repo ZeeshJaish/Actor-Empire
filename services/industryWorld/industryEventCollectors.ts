@@ -4,10 +4,13 @@ import type {
     IndustryEventImportance,
     IndustryEventType,
     IndustryProductionCommitment,
+    NPCStudioState,
     PlatformAiDecisionRecord,
     StreamingEcosystemEvent,
+    StudioAiBankEvent,
     WorldState,
 } from '../../types';
+import { valueWorldStudio } from '../valuation/studioValuation';
 import { fillCopy, pickCopy, pickFreshCopy, sentenceStart, type CopyVars } from './mediaCopyVariety';
 import { createIndustryEventFact } from './industryEventLedger';
 
@@ -99,8 +102,111 @@ const studioStatusType = (summary: string, status?: string): IndustryEventType =
     return 'COMPANY_DISTRESS';
 };
 
-const collectStudioFacts = (before: WorldState, after: WorldState, absoluteWeek: number): IndustryEventFact[] => (
-    Object.values(after.studios || {}).flatMap(studio => {
+/* 18 Nov 2026 (rival studio debt plan v2): a studio's dealings with the Bank are industry news, written through the
+   same facts and copy variety as every other studio story.
+   - Zeesh asked for these stories: a loan taken, a bank saying no, a loan paid, and the comeback on borrowed money.
+     A default is told too.
+   - Notable only: a loan taken or paid off of at least 5% of the studio's equity value, or any refusal, default or
+     comeback.
+   - At most 2 a week across the industry, the most serious first.
+   - A comeback replaces that week's generic "recovered" story for the studio, and a default its generic "restructured"
+     one. */
+const LOAN_STORIES_PER_WEEK = 2;
+const LOAN_NOTABLE_SHARE_OF_EQUITY = 0.05;
+/** "DreamWorks Pictures' loan", "Warner Bros.' loan", "Lionsgate's loan" */
+const possessive = (name: string) => (/s\.?$/i.test(name.trim()) ? `${name.trim()}'` : `${name.trim()}'s`);
+const LOAN_PRIORITY: Record<StudioAiBankEvent['kind'], number> = { DEFAULTED: 5, COMEBACK: 4, REJECTED: 3, TAKEN: 2, PAID_OFF: 1, MISSED: 0 };
+const LOAN_TAKEN_BILLS: StudioEventFamily = {
+    headlines: ['{company} borrows {amount} from {lender}', '{company} takes a {amount} loan', '{lender} lends {company} {amount}', '{company} turns to {lender} for {amount}', 'A {amount} loan for {company}'],
+    details: ['{company} is borrowing to pay its bills until its next releases pay out.', '{company} has drawn {amount} of bank credit from {lender} to cover its running costs.', 'The loan from {lender} keeps {company} going until money comes in from its films.'],
+};
+const LOAN_TAKEN_PRODUCTION: StudioEventFamily = {
+    headlines: ['{company} borrows {amount} to finish {title}', '{lender} funds the rest of {title}', '{company} takes a {amount} loan for {title}', 'A {amount} loan keeps {title} rolling', '{company} turns to {lender} to finish {title}'],
+    details: ['{lender} is lending {company} {amount} to keep {title} in production.', '{company} is betting that {title} earns back the {amount} it borrowed.', 'The {amount} loan from {lender} pays for the rest of the {title} shoot.'],
+};
+const LOAN_REJECTED_BILLS: StudioEventFamily = {
+    headlines: ['{lender} turns down {company}', 'No new credit for {company}', "{lender} says no to {companyPossessive} {amount} request", 'The bank door closes on {company}', '{company} is refused a {amount} loan'],
+    details: ['Without new credit, {company} has to pay its bills from what it earns.', '{lender} declined to lend {company} {amount}. Its bills are now a problem.', '{company} asked {lender} for {amount} and was refused.'],
+};
+const LOAN_REJECTED_PRODUCTION: StudioEventFamily = {
+    headlines: ['{lender} says no: {title} goes on hold', '{title} stalls after {company} is refused a loan', 'No loan, no shoot: {title} is paused', "{lender} turns down {companyPossessive} {amount} request for {title}", '{title} is on ice after a refused loan'],
+    details: ['{company} asked for {amount} to keep {title} going and was refused. The production is paused until the money is found.', '{title} is on hold after {lender} declined to lend {company} {amount}.', 'Without the {amount} loan, {company} cannot pay for the rest of {title} for now.'],
+};
+const LOAN_PAID_OFF: StudioEventFamily = {
+    headlines: ['{company} clears its {amount} loan', '{company} makes its last loan payment', '{company} is out of debt with {lender}', 'Last payment in: {company} clears its loan', '{company} pays off {lender}'],
+    details: ['{company} has finished paying back the {amount} it borrowed from {lender}.', 'The {amount} loan from {lender} is paid in full.', '{company} owes {lender} nothing now.'],
+};
+const LOAN_PAID_OFF_EARLY: StudioEventFamily = {
+    headlines: ['{company} pays off its {amount} loan early', 'Ahead of schedule, {company} clears its loan', '{company} pays {lender} back early', 'Strong results let {company} clear its debt early', '{company} is debt-free early'],
+    details: ["{companyPossessive} results let it pay back the {amount} it borrowed from {lender} ahead of schedule.", '{company} has cleared its {amount} loan with {lender} early.', "The money from its films paid off {companyPossessive} {amount} loan before it was due."],
+};
+const LOAN_DEFAULTED: StudioEventFamily = {
+    headlines: ['{company} defaults on its loan', "{lender} calls in {companyPossessive} loan", '{company} misses one payment too many', 'Default at {company}', '{company} can no longer pay {lender}'],
+    details: ["After three missed payments, {lender} has called in {companyPossessive} loan. A restructuring is next.", '{company} has defaulted on {amount} owed to {lender} and is cutting back to survive.', "{lender} marked {companyPossessive} loan in default after three missed payments."],
+};
+const LOAN_COMEBACK: StudioEventFamily = {
+    headlines: ['{company} is back', '{company} completes its comeback', 'From borrowed money to solid ground: {company}', '{company} pulls through', 'Comeback for {company}'],
+    details: ['{company} borrowed from {lender} through a hard stretch and is on solid ground again.', 'The loans kept {company} going, and its results have now caught up.', 'After leaning on {lender}, {company} is healthy again.'],
+};
+const loanAmount = (dollars: number) => {
+    const abs = Math.abs(dollars);
+    if (abs >= 1e12) return `$${(dollars / 1e12).toFixed(1)}T`;
+    if (abs >= 1e9) return `$${(dollars / 1e9).toFixed(1)}B`;
+    if (abs >= 1e6) return `$${Math.round(dollars / 1e6)}M`;
+    return `$${Math.round(dollars / 1e3)}K`;
+};
+const loanStory = (bank: StudioAiBankEvent): { family: StudioEventFamily; type: IndustryEventType; importance: 'HIGH' | 'MEDIUM' } => {
+    const production = bank.reason === 'PRODUCTION' && Boolean(bank.projectTitle);
+    if (bank.kind === 'TAKEN') return { family: production ? LOAN_TAKEN_PRODUCTION : LOAN_TAKEN_BILLS, type: 'COMPANY_FUNDED', importance: 'MEDIUM' };
+    if (bank.kind === 'REJECTED') return { family: production ? LOAN_REJECTED_PRODUCTION : LOAN_REJECTED_BILLS, type: 'COMPANY_DISTRESS', importance: 'MEDIUM' };
+    if (bank.kind === 'PAID_OFF') return { family: bank.early ? LOAN_PAID_OFF_EARLY : LOAN_PAID_OFF, type: 'COMPANY_RECOVERED', importance: 'MEDIUM' };
+    if (bank.kind === 'DEFAULTED') return { family: LOAN_DEFAULTED, type: 'COMPANY_DISTRESS', importance: 'HIGH' };
+    return { family: LOAN_COMEBACK, type: 'COMPANY_RECOVERED', importance: 'HIGH' };
+};
+const studioEquityDollars = (studio: NPCStudioState, absoluteWeek: number) => {
+    try {
+        const equity = valueWorldStudio(studio, absoluteWeek).equityValue;
+        if (Number.isFinite(equity) && equity > 0) return equity;
+    } catch { /* the appraisal below */ }
+    return Math.max(1, Number(studio.valuation) || 0) * 1e9;
+};
+
+const collectStudioLoanFacts = (before: WorldState, after: WorldState, absoluteWeek: number) => {
+    const candidates: Array<{ studio: NPCStudioState; eventId: string; bank: StudioAiBankEvent; score: number }> = [];
+    Object.values(after.studios || {}).forEach(studio => {
+        const known = ids(before.studios?.[studio.id]?.ai?.events);
+        (studio.ai?.events || []).forEach(event => {
+            if (event.type !== 'BANK' || !event.bank || known.has(event.id) || event.absoluteWeek !== absoluteWeek || event.bank.kind === 'MISSED') return;
+            /* a paused film asks again every few weeks: only the first refusal in 12 weeks is a story */
+            if (event.bank.kind === 'REJECTED' && (studio.ai?.events || []).some(other => other.type === 'BANK' && other.bank?.kind === 'REJECTED'
+                && other.absoluteWeek < absoluteWeek && other.absoluteWeek >= absoluteWeek - 12)) return;
+            const always = event.bank.kind === 'REJECTED' || event.bank.kind === 'DEFAULTED' || event.bank.kind === 'COMEBACK';
+            if (!always && event.bank.amountDollars < studioEquityDollars(studio, absoluteWeek) * LOAN_NOTABLE_SHARE_OF_EQUITY) return;
+            candidates.push({ studio, eventId: event.id, bank: event.bank, score: LOAN_PRIORITY[event.bank.kind] * 1e15 + event.bank.amountDollars });
+        });
+    });
+    return candidates.sort((a, b) => b.score - a.score || a.eventId.localeCompare(b.eventId)).slice(0, LOAN_STORIES_PER_WEEK);
+};
+
+const collectStudioFacts = (before: WorldState, after: WorldState, absoluteWeek: number): IndustryEventFact[] => {
+    const loans = collectStudioLoanFacts(before, after, absoluteWeek);
+    const told = new Set(loans.filter(item => item.bank.kind === 'COMEBACK' || item.bank.kind === 'DEFAULTED').map(item => item.studio.id));
+    const loanFacts = loans.map(({ studio, eventId, bank }) => {
+        const story = loanStory(bank);
+        const copy = studioEventCopy(story.family, `${studio.id}:${eventId}`, { company: studio.name, companyPossessive: possessive(studio.name), amount: loanAmount(bank.amountDollars), lender: bank.lenderName, title: bank.projectTitle });
+        return createIndustryEventFact({
+            idempotencyKey: `studio-bank:${studio.id}:${eventId}`,
+            absoluteWeek,
+            type: story.type,
+            importance: story.importance,
+            companyId: studio.id,
+            companyName: studio.name,
+            headline: copy.headline,
+            detail: copy.detail,
+            evidence: [{ kind: 'COMPANY', id: studio.id }],
+        });
+    });
+    const statusFacts = Object.values(after.studios || {}).flatMap(studio => {
         const known = ids(before.studios?.[studio.id]?.ai?.events);
         return (studio.ai?.events || []).flatMap(event => {
             if (known.has(event.id) || event.absoluteWeek !== absoluteWeek) return [];
@@ -108,6 +214,8 @@ const collectStudioFacts = (before: WorldState, after: WorldState, absoluteWeek:
             const type = event.type === 'OWNERSHIP_CHANGED'
                 ? 'COMPANY_ACQUIRED'
                 : studioStatusType(event.summary, studio.ai?.status);
+            /* the comeback or default story already tells this studio's week */
+            if (told.has(studio.id) && (type === 'COMPANY_RECOVERED' || type === 'COMPANY_RESTRUCTURED' || type === 'COMPANY_DISTRESS')) return [];
             return [createIndustryEventFact({
                 idempotencyKey: `studio-event:${studio.id}:${event.id}`,
                 absoluteWeek,
@@ -122,8 +230,9 @@ const collectStudioFacts = (before: WorldState, after: WorldState, absoluteWeek:
                 evidence: [{ kind: 'COMPANY', id: studio.id }],
             })];
         });
-    })
-);
+    });
+    return [...statusFacts, ...loanFacts];
+};
 
 /* 2026-11-09 (Zeesh: "ek hi title baar baar repeat ho raha hai, bas naam aur subject alag hai"): each studio film
    event is written one of several ways, picked by the event's own key, so a story never changes once written.

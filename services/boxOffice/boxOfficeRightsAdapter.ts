@@ -3,6 +3,7 @@ import { getPlatformAiSpendingRestrictions } from '../platformAi/platformAiFinan
 import { cinemaStreamingLanguageReady } from './boxOfficeStreamingAudience';
 import type { Player, ProjectDetails, StreamingBiddingPlatformInput } from '../../types';
 import { getAbsoluteWeek } from '../legacyLogic';
+import { STUDIO_AI_LEDGER_LIMIT } from '../studioAi/studioAiState';
 import { getForbesStreamingCompanies } from '../streamingPlatformEcosystem';
 import { getWorldStreamingBuyerCommercialOffer } from '../worldEconomy/worldStreamingOffers';
 import { registerProductionStreamingRightsContract } from '../streamingRightsCore';
@@ -112,8 +113,21 @@ export const settleQuotedCinemaStreamingSale = (player: Player, project: Project
         next.world.streamingPlatformEcosystem = { ...ecosystem!, operators: { ...ecosystem!.operators, [input.buyerPlatformId]: { ...operator, cashMillions: (Math.round(operator.cashMillions * 1e8) - amount) / 1e8 } } };
     }
     const producer = next.world.studios?.[input.sellerStudioId];
-    if (producer)
-        next.world.studios = { ...next.world.studios, [input.sellerStudioId]: { ...producer, cashReserve: (Math.round(producer.cashReserve * 1e8) + amount) / 1e8 } };
+    if (producer) {
+        /* 18 Nov 2026 (debt plan v2): the sale is booked in the studio's own ledger. It used to reach its cash with no
+           entry (about $5B over 7 years in one world), so its books, its value and what the Bank would lend it all saw
+           less income than it really had. */
+        const cashReserve = (Math.round(producer.cashReserve * 1e8) + amount) / 1e8;
+        const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
+        next.world.studios = { ...next.world.studios, [input.sellerStudioId]: { ...producer, cashReserve, ...(producer.ai ? { ai: { ...producer.ai, ledger: [...producer.ai.ledger, {
+            id: `studio_ai_rights_sale:${registration.contract.id}`,
+            absoluteWeek,
+            category: 'RIGHTS_INCOME' as const,
+            amountMillions: amount / 1e8,
+            balanceAfterMillions: cashReserve,
+            description: `${project.title || input.sourceProjectId}: streaming rights sold to ${input.buyerPlatformId}`,
+        }].slice(-STUDIO_AI_LEDGER_LIMIT) } } : {}) } };
+    }
     else if (next.world.cinemaMarket) {
         const state = next.world.cinemaMarket, balances = { ...(state.externalProducerBalancesCents || {}) };
         balances[input.sellerStudioId] = (balances[input.sellerStudioId] || 0) + amount;

@@ -27,7 +27,8 @@ let p=withdrawn.player;
 check('actual $500M withdrawal preserves wealth and borrowing capacity',()=>{assert.equal(p.money,700_000_000);assert.equal(getEstimatedNetWorth(p),beforeWealth);assert.equal(getAbsoluteBorrowingCeiling(p),beforeLimit);assert.deepEqual(getAverageWeeklyCashFlow(p),getAverageWeeklyCashFlow(initial));assert.equal(issuePersonalLoan(p,500_000_000,52).success,false);});
 const issued=issuePersonalLoan(p,50_000_000,52);assert.ok(issued.success,issued.reason);const loanId=issued.loan!.id;const rate=issued.loan!.annualInterestRate;p=issued.player;
 check('valid loan credits cash once and retains matching debt',()=>{assert.equal(p.money,750_000_000);assert.equal(p.finance.loans[0].principal,50_000_000);assert.equal(getEstimatedNetWorth(p)-getOutstandingLoanBalance(p),beforeWealth);assert.equal(getAverageWeeklyCashFlow(p).income,0);});
-const profile=buildForbesStudioProfile({studio:{id:'FlowTarget',name:'FlowTarget',valuation:.05,cashReserve:18,reputation:70,recentHits:0,archetype:'PRESTIGE'},rank:1,worldProjects:[],universes:{}});
+/* 18 Nov 2026 (debt plan v2): a studio's debt comes from its books, so the target carries a real $3M loan on them (no formula debt any more) */
+const profile=buildForbesStudioProfile({studio:{id:'FlowTarget',name:'FlowTarget',valuation:.05,cashReserve:18,reputation:70,recentHits:0,archetype:'PRESTIGE',ai:{finance:{debtPrincipalMillions:3}}} as any,rank:1,worldProjects:[],universes:{}});
 const offered=submitOpeningOffer({player:p,profile,offerType:'AGGRESSIVE',offerAmount:55_000_000,funding:{source:'PERSONAL'}});assert.ok(offered.success,offered.reason);
 p={...offered.player,currentWeek:24};p=resolveStudioAcquisitionResponses(p);assert.equal(getAcquisitionCase(p,profile.id)?.status,'ACCEPTED');
 const closed=completeAcquisitionTransaction({player:p,profile});assert.ok(closed.success,closed.reason);p=closed.player;const target=p.businesses.find(b=>b.id===profile.id)!;

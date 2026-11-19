@@ -167,13 +167,15 @@ const valuation = getStudioGroupValuation(player);
 assert(getStudioOwnershipPercent(player, subsidiary) === 52, 'A stock-controlled subsidiary must retain the player’s actual ownership percentage.');
 assert(valuation.hqOperatingValue === 900_000_000, 'HQ operations should remain a standalone value.');
 assert(valuation.parentHoldingsValue === 208_000_000, 'Parent holdings should include only 52% of the controlled subsidiary.');
-assert(valuation.acquisitionDebt === 50_000_000, 'Parent equity should recognize outstanding acquisition debt.');
-assert(valuation.parentCompanyValue === 1_058_000_000, 'Parent value should equal HQ operations plus owned stakes minus acquisition debt.');
+/* 18 Nov 2026 (debt plan v2): the $50M loan is the subsidiary's own and is paid from its treasury, so the parent carries
+   its 52% share of it */
+assert(valuation.acquisitionDebt === 26_000_000, 'Parent equity should carry its 52% share of the subsidiary\'s own loan.');
+assert(valuation.parentCompanyValue === 1_082_000_000, 'Parent value should equal HQ operations plus owned stakes minus the owned share of studio loans.');
 assert(valuation.groupOperatingValue === 1_300_000_000, 'Combined operations should show 100% of controlled studio operations.');
 assert(valuation.minorityInterest === 192_000_000, 'The unowned 48% should be identified as minority interest.');
 assert(
-    Math.abs(valuation.ownerWeeklyResult - (10_000_000 + 10_400_000 - 96_000)) < 1,
-    'Owner weekly result should be ownership-weighted and subtract acquisition interest.',
+    Math.abs(valuation.ownerWeeklyResult - (10_000_000 + 10_400_000 - 96_000 * 0.52)) < 1,
+    'Owner weekly result should be ownership-weighted, loan payments included.',
 );
 
 const weakerPlayer: Player = {

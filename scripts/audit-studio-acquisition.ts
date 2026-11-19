@@ -75,6 +75,9 @@ const player: any = {
     businesses: [productionStudio],
     flags: {},
     logs: [],
+    /* 18 Nov 2026 (debt plan v2): diligence reads the target's books. It has $6M of bills it has not paid (cash below
+       zero between its weekly books), and its $12M debt above. */
+    world: { studios: { TARGET_STUDIO: { id: 'TARGET_STUDIO', name: 'Target Pictures', valuation: 0.1, cashReserve: -6, reputation: 62, recentHits: 2, archetype: 'PRESTIGE' } } },
 };
 
 assert(getAcquisitionEligibility(profile).canApproach, 'Open-to-offers studios should be approachable.');
@@ -113,7 +116,8 @@ const firstDiligence = runDueDiligence({
 });
 assert(firstDiligence.success, 'Affordable personal diligence should succeed.');
 assert(firstDiligence.player.money === player.money - 250_000, 'Personal diligence should deduct its fee immediately.');
-assert(Boolean(firstDiligence.report?.hiddenLiabilities), 'Diligence should reveal hidden liabilities.');
+assert(firstDiligence.report?.hiddenLiabilities === 6_000_000, 'Diligence should reveal the bills the studio has not paid (its cash below zero), not a share of its value.');
+assert(firstDiligence.report?.verifiedDebt === 12_000_000, 'Diligence should verify the debt on the studio\'s books exactly.');
 assert(getAcquisitionCase(firstDiligence.player, profile.id)?.diligence?.status === 'COMPLETE', 'The completed report should persist in the acquisition case.');
 assert(
     firstDiligence.player.news.some((item: any) => item.headline.includes('advisors begin diligence')),

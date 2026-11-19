@@ -22,6 +22,8 @@ export interface ProcessIndustryIntelligenceShadowCompanyInput {
     context: IndustryIntelligenceContext;
     state: IndustryIntelligenceState;
     globalRecentFingerprints?: IndustryContentFingerprint[];
+    /** 18 Nov 2026 (rival learning): a production studio's track record by kind of title (studioAiLearning.ts) */
+    trackRecordPoints?: (candidate: IndustryContentFingerprint) => number;
 }
 
 export interface ProcessIndustryIntelligenceShadowCompanyResult {
@@ -86,6 +88,7 @@ export const processIndustryIntelligenceShadowCompany = (
             state: proposedState,
             proposal,
             globalRecentFingerprints: input.globalRecentFingerprints || [],
+            ...(input.trackRecordPoints ? { trackRecordPoints: input.trackRecordPoints } : {}),
         });
         if (!contentSelection.selectedFingerprint) return contentSelection.state;
         return {

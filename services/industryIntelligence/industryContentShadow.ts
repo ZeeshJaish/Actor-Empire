@@ -16,6 +16,8 @@ export interface ProcessIndustryContentShadowSelectionInput {
     state: IndustryIntelligenceState;
     proposal: IndustryIntelligenceProposal;
     globalRecentFingerprints: IndustryContentFingerprint[];
+    /** 18 Nov 2026 (rival learning): a production studio's track record by kind of title */
+    trackRecordPoints?: (candidate: IndustryContentFingerprint) => number;
 }
 
 export interface ProcessIndustryContentShadowSelectionResult {
@@ -49,6 +51,7 @@ export const processIndustryContentShadowSelection = (
         globalRecent: input.globalRecentFingerprints.filter(item => item.ownerCompanyId !== input.state.companyId),
         currentAbsoluteWeek: input.context.absoluteWeek,
         franchiseFatigue: input.context.condition.franchiseFatigue,
+        ...(input.trackRecordPoints ? { trackRecordPoints: input.trackRecordPoints } : {}),
     });
     if (!selected) {
         return {

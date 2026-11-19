@@ -6,6 +6,7 @@ import { processStudioAiFinanceWeek } from './studioAiFinance';
 import { adaptStudioIntelligenceContext } from '../industryIntelligence/studioIntelligenceAdapter';
 import { processIndustryIntelligenceShadowCompany } from '../industryIntelligence/industryIntelligenceCoordinator';
 import { collectIndustryContentGlobalRecent } from '../industryIntelligence/industryContentShadow';
+import { createStudioTrackRecordReader, studioAiTrackRecordPoints } from './studioAiLearning';
 import {
     compareIndustryShadowDecision,
     observeStudioAuthoritativeDecision,
@@ -88,10 +89,14 @@ export const processStudioAiWeek = (
         if (isStudioIntelligenceDue(controlled.ai?.intelligence, absoluteWeek)) {
             try {
                 const context = adaptStudioIntelligenceContext({ ...player, world: nextWorld }, controlled, absoluteWeek);
+                /* 18 Nov 2026 (rival learning): ideas are also ranked by how that kind of title has paid the studio */
+                const trackRecord = createStudioTrackRecordReader(nextWorld, controlled, absoluteWeek);
                 const shadow = processIndustryIntelligenceShadowCompany({
                     context,
                     state: controlled.ai!.intelligence!,
                     globalRecentFingerprints: collectIndustryContentGlobalRecent(nextWorld, controlled.id),
+                    trackRecordPoints: candidate => studioAiTrackRecordPoints(trackRecord(candidate.format,
+                        (candidate.budgetSuitability.idealLowMillions + candidate.budgetSuitability.idealHighMillions) / 2)),
                 });
                 if (shadow.changed) controlled = {
                     ...controlled,

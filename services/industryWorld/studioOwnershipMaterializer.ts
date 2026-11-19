@@ -1,3 +1,4 @@
+import { getRivalBooksDebtDollars } from '../rivalBooks';
 import { getListedCompanyValuation } from '../stockValuation';
 import type {
     Business,
@@ -222,7 +223,8 @@ export const materializeStudioOwnership = (
             valuation: handoffValuation,
             brandHealth: clamp(studio.reputation),
             investorConfidence: clamp(studio.reputation - (studio.ai.status === 'DISTRESSED' ? 18 : 0)),
-            riskLevel: clamp(studio.ai.finance.debtPrincipalMillions / Math.max(1, studio.cashReserve) * 20, 5, 95),
+            /* 18 Nov 2026: its books debt (Bank loans plus any older balance), in millions */
+            riskLevel: clamp(getRivalBooksDebtDollars(studio) / 1_000_000 / Math.max(1, studio.cashReserve) * 20, 5, 95),
         },
         studioState: {
             ...business.studioState,

@@ -86,7 +86,8 @@ const second = run();
 assert.deepEqual(second.world.studios, first.world.studios, '400-year B1 simulation must be deterministic');
 
 for (const studio of Object.values(first.world.studios || {})) {
-    assert.ok(Number.isFinite(studio.cashReserve) && studio.cashReserve >= 0, `${studio.id} cash must remain finite`);
+    /* 18 Nov 2026 (debt plan v2): cash below zero is an unpaid bill the studio still owes (it is no longer reset to zero) */
+    assert.ok(Number.isFinite(studio.cashReserve), `${studio.id} cash must remain finite`);
     assert.ok(Number.isFinite(studio.valuation) && studio.valuation > 0, `${studio.id} valuation must remain finite`);
     assert.ok(Number.isFinite(studio.ai?.finance.debtPrincipalMillions), `${studio.id} debt must remain finite`);
     assert.ok(Number.isFinite(studio.ai?.finance.runwayWeeks), `${studio.id} runway must remain finite`);

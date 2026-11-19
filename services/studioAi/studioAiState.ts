@@ -9,6 +9,8 @@ import {
     type StudioAiEventRecord,
     type StudioAiLedgerEntry,
     type StudioAiRuntimeState,
+    type PlayerLoan,
+    type StudioBankCreditHistory,
 } from '../../types';
 import { createDeterministicId } from '../deterministicRandom';
 import {
@@ -17,6 +19,7 @@ import {
 } from '../industryIntelligence/industryIntelligenceState';
 import { getStudioAiProfileSeed } from './studioAiProfiles';
 import { isStudioAiSlateActive, normalizeStudioAiSlateState } from './studioAiSlateState';
+import { normalizeStudioAiLessons } from './studioAiLearning';
 
 export const STUDIO_AI_SCHEMA_VERSION = STUDIO_AI_RUNTIME_SCHEMA_VERSION;
 export const STUDIO_AI_LEDGER_LIMIT = 160;
@@ -82,6 +85,36 @@ const normalizeDecisions = (value: unknown): StudioAiDecisionRecord[] => (Array.
     .filter((item): item is StudioAiDecisionRecord => Boolean(item && typeof item.id === 'string' && typeof item.type === 'string'))
     .slice(-STUDIO_AI_DECISION_LIMIT);
 
+const finiteOr = (value: unknown, fallback = 0) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+/* loans keep their Bank terms; a paid loan is dropped once it is a year old, so the record stays small */
+const normalizeStudioBankLoans = (value: unknown): PlayerLoan[] => (Array.isArray(value) ? value : [])
+    .filter((loan: any) => loan && typeof loan.id === 'string')
+    .map((loan: any): PlayerLoan => ({
+        id: loan.id,
+        lenderName: String(loan.lenderName || 'Citywide Credit'),
+        principal: Math.max(0, finiteOr(loan.principal)),
+        originalPrincipal: Math.max(0, finiteOr(loan.originalPrincipal, finiteOr(loan.principal))),
+        annualInterestRate: Math.max(0, Math.min(0.5, finiteOr(loan.annualInterestRate, 0.12))),
+        weeklyPayment: Math.max(0, finiteOr(loan.weeklyPayment)),
+        termWeeks: Math.max(1, Math.round(finiteOr(loan.termWeeks, 104))),
+        weeksRemaining: Math.max(0, Math.round(finiteOr(loan.weeksRemaining))),
+        takenWeek: Math.round(finiteOr(loan.takenWeek)),
+        takenYear: Math.round(finiteOr(loan.takenYear)),
+        takenAbsoluteWeek: Math.round(finiteOr(loan.takenAbsoluteWeek)),
+        missedPayments: Math.max(0, Math.round(finiteOr(loan.missedPayments))),
+        successfulPayments: Math.max(0, Math.round(finiteOr(loan.successfulPayments))),
+        status: loan.status === 'PAID' || loan.status === 'DEFAULTED' ? loan.status : 'ACTIVE',
+    }))
+    .slice(-12);
+const normalizeStudioBankCredit = (value: any): StudioBankCreditHistory => ({
+    successfulPayments: Math.max(0, Math.round(finiteOr(value?.successfulPayments))),
+    missedPayments: Math.max(0, Math.round(finiteOr(value?.missedPayments))),
+    defaults: Math.max(0, Math.round(finiteOr(value?.defaults))),
+    totalBorrowed: Math.max(0, finiteOr(value?.totalBorrowed)),
+    totalRepaid: Math.max(0, finiteOr(value?.totalRepaid)),
+    ...(typeof value?.lastLoanAbsoluteWeek === 'number' ? { lastLoanAbsoluteWeek: value.lastLoanAbsoluteWeek } : {}),
+});
+
 export interface NormalizeStudioAiContext {
     absoluteWeek: number;
     controller?: StudioAiController;
@@ -119,6 +152,10 @@ export const normalizeStudioAiState = (
         restructuringStartedAtAbsoluteWeek: raw?.finance?.restructuringStartedAtAbsoluteWeek === null || raw?.finance?.restructuringStartedAtAbsoluteWeek === undefined
             ? null
             : whole(raw.finance.restructuringStartedAtAbsoluteWeek),
+        /* 18 Nov 2026: the studio's Bank loans and its record with the Bank (studioAiBank.ts) */
+        /* kept exactly when present (even empty), so normalizing a processed studio changes nothing */
+        ...(Array.isArray(raw?.finance?.loans) ? { loans: normalizeStudioBankLoans(raw!.finance!.loans) } : {}),
+        ...(raw?.finance?.credit ? { credit: normalizeStudioBankCredit(raw.finance.credit) } : {}),
     };
     const competence: StudioAiCompetence = Object.fromEntries(
         Object.entries(seed.competence).map(([key, fallback]) => [key, bounded(raw?.competence?.[key as keyof StudioAiCompetence], fallback)]),
@@ -174,6 +211,8 @@ export const normalizeStudioAiState = (
             : whole(raw.lastProcessedAbsoluteWeek),
         intelligence: readNormalizedStudioAiIntelligence(studio, context),
         slate,
+        /* 18 Nov 2026 (rival learning): its finished cinema runs, forecast against what came back; kept only when present */
+        ...(Array.isArray(raw?.lessons) ? { lessons: normalizeStudioAiLessons(raw!.lessons) } : {}),
     };
 };
 
@@ -182,7 +221,9 @@ export const attachNormalizedStudioAiState = (
     context: NormalizeStudioAiContext,
 ): NPCStudioState => ({
     ...studio,
-    cashReserve: nonNegative(studio.cashReserve),
+    /* 18 Nov 2026 (debt plan v2): cash below zero is a bill the studio still owes. It is kept, not reset to zero,
+       which used to forgive it every week. */
+    cashReserve: finite(studio.cashReserve, 0),
     valuation: nonNegative(studio.valuation, 0.01),
     reputation: Math.max(0, Math.min(100, finite(studio.reputation, 50))),
     ai: normalizeStudioAiState(studio, context),

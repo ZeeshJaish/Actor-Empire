@@ -28,21 +28,37 @@ export const studioAiCinemaRegions = (mode:StudioAiReleaseMode,fingerprint?:Indu
     return [regionByMarket[fingerprint?.priorityMarket||'']||languageRegion[fingerprint?.originalLanguage||'']||'NORTH_AMERICA'];
 };
 
+export interface StudioAiRankedCinemaCountry { id: string; eligible: number; score: number }
+const WIDE_RELEASE_MODES = new Set<StudioAiReleaseMode>(['WIDE_THEATRICAL','EVENT_THEATRICAL','THEATRICAL_THEN_STREAMING']);
+
 /** A cheap release-planning estimate, never a replacement for paid weekly demand.
  * No translation is assumed. Priority is a preference only within language-compatible markets.
  * Sparse legacy worlds use registry access assumptions; no population/save state is rewritten.
+ * Speed (18 Nov 2026): the countries are ranked once, and a plan that tries several budgets ranks once for all of
+ * them (studioAiCinemaInvestment.ts). Each country's competing cinema titles are counted in one pass over the
+ * titles instead of one pass per country; a wide release takes every compatible country and needs no ranking.
+ * The countries chosen are exactly the same.
  */
-export const studioAiCinemaCountries = (mode:StudioAiReleaseMode,fingerprint?:IndustryContentFingerprint,
-    world?:WorldState,campaignDollars=0):string[] => {
+export const rankStudioAiCinemaCountries = (mode:StudioAiReleaseMode,fingerprint?:IndustryContentFingerprint,
+    world?:WorldState):StudioAiRankedCinemaCountry[] => {
     const language=normalizeStreamingLanguageId(fingerprint?.originalLanguage || 'english');
     const regions=studioAiCinemaRegions(mode,fingerprint);
+    const compatible=WORLD_COUNTRY_DEFINITIONS.filter(c=>regions.includes(c.regionId)
+        &&c.languages.some(l=>normalizeStreamingLanguageId(l)===language));
+    if(WIDE_RELEASE_MODES.has(mode))return compatible.map(c=>({id:c.id,eligible:0,score:0}));
     const priority=fingerprint?.priorityMarket;
     const preferred=(id:string,region:string)=>priority==='GLOBAL'||priority===region
         ||priority==='INDIA'&&id==='IN'||priority==='EAST_ASIA'&&['JP','KR','CN','TW'].includes(id)
         ||priority==='LATIN_AMERICA'&&(region==='SOUTH_AMERICA'||id==='MX')
         ||priority==='MIDDLE_EAST'&&['AE','SA','QA','KW','BH','OM','JO','LB'].includes(id);
-    const ranked=WORLD_COUNTRY_DEFINITIONS.filter(c=>regions.includes(c.regionId)
-        &&c.languages.some(l=>normalizeStreamingLanguageId(l)===language)).map(c=>{
+    /* titles still in cinemas, counted once per country they play in: by their countries, or else by their regions */
+    const byCountry=new Map<string,number>(),byRegion=new Map<string,number>();
+    for(const p of world?.projects || []){
+        if(p.mediaType==='SERIES'||p.releaseStrategy!=='THEATRICAL'||p.cinema?.settlementBasis!=='UNSETTLED_WEEKLY'||world?.cinemaMarket?.titles[p.id]?.closed)continue;
+        if(p.releaseCountryIds){for(const id of new Set(p.releaseCountryIds))byCountry.set(id,(byCountry.get(id)||0)+1);}
+        else if(p.releaseRegionIds){for(const region of new Set(p.releaseRegionIds))byRegion.set(region,(byRegion.get(region)||0)+1);}
+    }
+    return compatible.map(c=>{
         const pop=world?.worldPopulation?.countries[c.id],aud=world?.worldAudienceEconomy?.countries[c.id];
         const participants=world?.worldAudienceParticipation?.countries[c.id];
         const reachable=participants?participants.cohorts.reduce((n,p)=>n+p.cinemaOnlyHouseholds+p.dualParticipantHouseholds,0)*2
@@ -52,16 +68,22 @@ export const studioAiCinemaCountries = (mode:StudioAiReleaseMode,fingerprint?:In
         const languageFit=normalizeStreamingLanguageId(c.languages[0])===language?1:.35;
         const eligible=reachable*languageFit;
         const purchasing=Math.max(.1,(pop?.macro.purchasingPowerIndex ?? ({ADVANCED:95,DEVELOPED:65,EMERGING:35,LOW:15}[c.developmentProfile]))/100);
-        const competition=(world?.projects || []).filter(p=>p.mediaType!=='SERIES'&&p.releaseStrategy==='THEATRICAL'
-            &&p.cinema?.settlementBasis==='UNSETTLED_WEEKLY'&&!world?.cinemaMarket?.titles[p.id]?.closed
-            &&(p.releaseCountryIds?.includes(c.id)||!p.releaseCountryIds&&p.releaseRegionIds?.includes(c.regionId))).length;
+        const competition=(byCountry.get(c.id)||0)+(byRegion.get(c.regionId)||0);
         return {id:c.id,eligible,score:eligible*purchasing*(preferred(c.id,c.regionId)?1.2:1)/(1+competition*.12)};
     }).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
+};
+
+/** The countries a campaign of this size reaches, from a ranking made by rankStudioAiCinemaCountries. */
+export const selectStudioAiCinemaCountries = (ranked:readonly StudioAiRankedCinemaCountry[],mode:StudioAiReleaseMode,campaignDollars=0):string[] => {
     if(!ranked.length)return [];
-    if(['WIDE_THEATRICAL','EVENT_THEATRICAL','THEATRICAL_THEN_STREAMING'].includes(mode))return ranked.map(c=>c.id).sort();
+    if(WIDE_RELEASE_MODES.has(mode))return ranked.map(c=>c.id).sort();
     // Concentrate a limited campaign rather than dilute it over an entire continent.
     const targetPeople=Math.max(1,campaignDollars*30*2),selected:string[]=[];
     let people=0;
     for(const c of ranked){selected.push(c.id);people+=c.eligible;if(people>=targetPeople)break;}
     return selected.sort();
 };
+
+export const studioAiCinemaCountries = (mode:StudioAiReleaseMode,fingerprint?:IndustryContentFingerprint,
+    world?:WorldState,campaignDollars=0):string[] =>
+    selectStudioAiCinemaCountries(rankStudioAiCinemaCountries(mode,fingerprint,world),mode,campaignDollars);

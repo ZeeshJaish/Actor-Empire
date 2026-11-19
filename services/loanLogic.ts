@@ -60,31 +60,74 @@ export const getAverageWeeklyCashFlow = (player: Player, lookbackWeeks = 26) => 
     };
 };
 
-export const getCreditScore = (player: Player): number => {
-    const netWorth = getEstimatedNetWorth(player);
-    const outstandingDebt = getOutstandingLoanBalance(player);
-    const weeklyDebt = getWeeklyDebtBurden(player);
-    const cashFlow = getAverageWeeklyCashFlow(player);
-    const credit = player.finance?.credit;
+/* 18 Nov 2026: the Bank's rules read a borrower profile, so the player and a company (a rival studio, or a studio the
+   player owns) borrow under the same rules. The game keeps one loan market (see the BANK_SYSTEM_ONLY note in
+   streamingFinancing.ts), and this is it. The player's profile is built exactly as before, so every number the player
+   sees is unchanged (qa/2026-11-18-studio-debt, bank parity check). */
+export interface BorrowerCreditHistory {
+    successfulPayments: number;
+    missedPayments: number;
+    defaults: number;
+    totalBorrowed: number;
+    lastLoanAbsoluteWeek?: number;
+}
 
-    const debtRatio = outstandingDebt > 0 ? outstandingDebt / Math.max(1, netWorth) : 0;
-    const burdenRatio = weeklyDebt > 0 ? weeklyDebt / Math.max(25000, cashFlow.income) : 0;
-    const profitabilityRatio = clamp(cashFlow.freeCashFlow / 200000, -1, 2);
+export interface BorrowerProfile {
+    netWorth: number;
+    outstandingDebt: number;
+    weeklyDebtBurden: number;
+    cashFlow: { income: number; expenses: number; freeCashFlow: number };
+    reputation: number;
+    fame: number;
+    businessCount: number;
+    activeLoans: number;
+    credit: BorrowerCreditHistory;
+    absoluteWeek: number;
+}
+
+export const getPlayerBorrowerProfile = (player: Player): BorrowerProfile => {
+    const credit = player.finance?.credit;
+    return {
+        netWorth: getEstimatedNetWorth(player),
+        outstandingDebt: getOutstandingLoanBalance(player),
+        weeklyDebtBurden: getWeeklyDebtBurden(player),
+        cashFlow: getAverageWeeklyCashFlow(player),
+        reputation: player.stats.reputation,
+        fame: player.stats.fame,
+        businessCount: player.businesses?.length || 0,
+        activeLoans: (player.finance?.loans || []).filter(loan => loan.status === 'ACTIVE').length,
+        credit: {
+            successfulPayments: credit?.successfulPayments || 0,
+            missedPayments: credit?.missedPayments || 0,
+            defaults: credit?.defaults || 0,
+            totalBorrowed: credit?.totalBorrowed || 0,
+            lastLoanAbsoluteWeek: credit?.lastLoanAbsoluteWeek,
+        },
+        absoluteWeek: getAbsoluteWeek(player.age, player.currentWeek),
+    };
+};
+
+export const getBorrowerCreditScore = (profile: BorrowerProfile): number => {
+    const debtRatio = profile.outstandingDebt > 0 ? profile.outstandingDebt / Math.max(1, profile.netWorth) : 0;
+    const burdenRatio = profile.weeklyDebtBurden > 0 ? profile.weeklyDebtBurden / Math.max(25000, profile.cashFlow.income) : 0;
+    const profitabilityRatio = clamp(profile.cashFlow.freeCashFlow / 200000, -1, 2);
 
     let score = 520;
-    score += clamp(player.stats.reputation * 1.2, 0, 110);
-    score += clamp(player.stats.fame * 0.45, 0, 50);
-    score += clamp(Math.log10(Math.max(1000, netWorth)) * 42 - 120, 0, 120);
+    score += clamp(profile.reputation * 1.2, 0, 110);
+    score += clamp(profile.fame * 0.45, 0, 50);
+    score += clamp(Math.log10(Math.max(1000, profile.netWorth)) * 42 - 120, 0, 120);
     score += clamp(profitabilityRatio * 65, -40, 90);
-    score += clamp((player.businesses?.length || 0) * 10, 0, 40);
-    score += clamp((credit?.successfulPayments || 0) * 4, 0, 70);
-    score -= clamp((credit?.missedPayments || 0) * 24, 0, 180);
-    score -= clamp((credit?.defaults || 0) * 120, 0, 240);
+    score += clamp(profile.businessCount * 10, 0, 40);
+    score += clamp(profile.credit.successfulPayments * 4, 0, 70);
+    score -= clamp(profile.credit.missedPayments * 24, 0, 180);
+    score -= clamp(profile.credit.defaults * 120, 0, 240);
     score -= clamp(debtRatio * 520, 0, 260);
     score -= clamp(burdenRatio * 210, 0, 220);
 
     return Math.round(clamp(score, 300, 850));
 };
+
+export const getCreditScore = (player: Player): number => getBorrowerCreditScore(getPlayerBorrowerProfile(player));
 
 export const getCreditTier = (score: number): 'Elite' | 'Strong' | 'Fair' | 'Risky' | 'Distressed' => {
     if (score >= 790) return 'Elite';
@@ -94,63 +137,60 @@ export const getCreditTier = (score: number): 'Elite' | 'Strong' | 'Fair' | 'Ris
     return 'Distressed';
 };
 
-export const getSafeBorrowingCapacity = (player: Player): number => {
-    const netWorth = getEstimatedNetWorth(player);
-    const outstandingDebt = getOutstandingLoanBalance(player);
-    const cashFlow = getAverageWeeklyCashFlow(player);
-    const score = getCreditScore(player);
+/** The Bank's two lenders: Premier Capital for Elite credit, Citywide Credit for everyone else. */
+export const getBankLenderName = (score: number): string => (getCreditTier(score) === 'Elite' ? 'Premier Capital' : 'Citywide Credit');
+
+export const getBorrowerSafeCapacity = (profile: BorrowerProfile): number => {
+    const score = getBorrowerCreditScore(profile);
     const creditMultiplier = clamp((score - 300) / 550, 0, 1);
 
-    const incomeDriven = Math.max(150000, Math.max(0, cashFlow.freeCashFlow) * (32 + creditMultiplier * 26));
-    const wealthDriven = Math.max(0, netWorth * (0.025 + creditMultiplier * 0.055));
-    const fameDriven = (player.stats.fame * 18000) + (player.stats.reputation * 12000);
-    const businessDriven = (player.businesses?.length || 0) * 350000;
+    const incomeDriven = Math.max(150000, Math.max(0, profile.cashFlow.freeCashFlow) * (32 + creditMultiplier * 26));
+    const wealthDriven = Math.max(0, profile.netWorth * (0.025 + creditMultiplier * 0.055));
+    const fameDriven = (profile.fame * 18000) + (profile.reputation * 12000);
+    const businessDriven = profile.businessCount * 350000;
 
     const grossCapacity = incomeDriven + wealthDriven + fameDriven + businessDriven;
-    const absoluteCap = Math.max(500000, (netWorth * 0.16) + (Math.max(0, cashFlow.income) * 42));
-    const debtPenalty = outstandingDebt * 1.1;
+    const absoluteCap = Math.max(500000, (profile.netWorth * 0.16) + (Math.max(0, profile.cashFlow.income) * 42));
+    const debtPenalty = profile.outstandingDebt * 1.1;
 
     return Math.max(0, Math.floor(Math.min(grossCapacity, absoluteCap) - debtPenalty));
 };
 
-export const getAbsoluteBorrowingCeiling = (player: Player): number => {
-    const safeCapacity = getSafeBorrowingCapacity(player);
-    const netWorth = getEstimatedNetWorth(player);
-    const score = getCreditScore(player);
+export const getSafeBorrowingCapacity = (player: Player): number => getBorrowerSafeCapacity(getPlayerBorrowerProfile(player));
+
+export const getBorrowerBorrowingCeiling = (profile: BorrowerProfile): number => {
+    const safeCapacity = getBorrowerSafeCapacity(profile);
+    const score = getBorrowerCreditScore(profile);
     const floor = score >= 640 ? 500000 : score >= 560 ? 200000 : 0;
-    return Math.max(floor, Math.floor(Math.min(safeCapacity * 1.45, netWorth * 0.22 + safeCapacity * 0.35)));
+    return Math.max(floor, Math.floor(Math.min(safeCapacity * 1.45, profile.netWorth * 0.22 + safeCapacity * 0.35)));
 };
 
-const getRecentBorrowPressure = (player: Player) => {
-    const lastLoanAbsoluteWeek = player.finance?.credit?.lastLoanAbsoluteWeek;
+export const getAbsoluteBorrowingCeiling = (player: Player): number => getBorrowerBorrowingCeiling(getPlayerBorrowerProfile(player));
+
+const getRecentBorrowPressure = (profile: BorrowerProfile) => {
+    const lastLoanAbsoluteWeek = profile.credit.lastLoanAbsoluteWeek;
     if (typeof lastLoanAbsoluteWeek !== 'number') return 0;
-    const currentAbsoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
-    const weeksSinceLastLoan = currentAbsoluteWeek - lastLoanAbsoluteWeek;
+    const weeksSinceLastLoan = profile.absoluteWeek - lastLoanAbsoluteWeek;
     if (weeksSinceLastLoan <= 4) return 1;
     if (weeksSinceLastLoan <= 8) return 0.6;
     if (weeksSinceLastLoan <= 16) return 0.25;
     return 0;
 };
 
-const getRepeatDebtPressure = (player: Player) => {
-    const activeLoans = (player.finance?.loans || []).filter(loan => loan.status === 'ACTIVE').length;
-    const defaults = player.finance?.credit?.defaults || 0;
-    const missedPayments = player.finance?.credit?.missedPayments || 0;
-    return {
-        activeLoans,
-        repeatPressure: activeLoans > 1 ? (activeLoans - 1) * 0.18 : 0,
-        distressPressure: defaults * 0.25 + Math.min(0.18, missedPayments * 0.03)
-    };
-};
+const getRepeatDebtPressure = (profile: BorrowerProfile) => ({
+    activeLoans: profile.activeLoans,
+    repeatPressure: profile.activeLoans > 1 ? (profile.activeLoans - 1) * 0.18 : 0,
+    distressPressure: profile.credit.defaults * 0.25 + Math.min(0.18, profile.credit.missedPayments * 0.03),
+});
 
-export const getLoanAnnualRate = (player: Player, requestedAmount: number, termWeeks: number): number => {
-    const score = getCreditScore(player);
-    const safeCapacity = Math.max(1, getSafeBorrowingCapacity(player));
+export const getBorrowerLoanAnnualRate = (profile: BorrowerProfile, requestedAmount: number, termWeeks: number): number => {
+    const score = getBorrowerCreditScore(profile);
+    const safeCapacity = Math.max(1, getBorrowerSafeCapacity(profile));
     const stressRatio = requestedAmount / safeCapacity;
     const termPenalty = termWeeks >= 104 ? 1.6 : termWeeks >= 52 ? 0.9 : termWeeks >= 26 ? 0.25 : 0;
-    const recentBorrowPressure = getRecentBorrowPressure(player);
-    const { activeLoans, repeatPressure, distressPressure } = getRepeatDebtPressure(player);
-    const isFirstLoan = activeLoans === 0 && (player.finance?.credit?.totalBorrowed || 0) === 0;
+    const recentBorrowPressure = getRecentBorrowPressure(profile);
+    const { activeLoans, repeatPressure, distressPressure } = getRepeatDebtPressure(profile);
+    const isFirstLoan = activeLoans === 0 && profile.credit.totalBorrowed === 0;
 
     let rate = 0.24;
     rate -= clamp((score - 300) / 550, 0, 1) * 0.15;
@@ -164,6 +204,10 @@ export const getLoanAnnualRate = (player: Player, requestedAmount: number, termW
     return Number(clamp(rate, 0.055, 0.31).toFixed(4));
 };
 
+export const getLoanAnnualRate = (player: Player, requestedAmount: number, termWeeks: number): number => (
+    getBorrowerLoanAnnualRate(getPlayerBorrowerProfile(player), requestedAmount, termWeeks)
+);
+
 export const calculateWeeklyLoanPayment = (amount: number, annualRate: number, termWeeks: number): number => {
     const principal = Math.max(0, Math.floor(amount));
     const weeks = Math.max(1, Math.floor(termWeeks));
@@ -175,17 +219,17 @@ export const calculateWeeklyLoanPayment = (amount: number, annualRate: number, t
     return Math.ceil((principal * weeklyRate * factor) / (factor - 1));
 };
 
-export const getLoanApprovalOdds = (player: Player, requestedAmount: number, termWeeks: number): number => {
-    const safeCapacity = Math.max(1, getSafeBorrowingCapacity(player));
-    const absoluteCap = getAbsoluteBorrowingCeiling(player);
+export const getBorrowerLoanApprovalOdds = (profile: BorrowerProfile, requestedAmount: number, termWeeks: number): number => {
+    const safeCapacity = Math.max(1, getBorrowerSafeCapacity(profile));
+    const absoluteCap = getBorrowerBorrowingCeiling(profile);
     if (requestedAmount > absoluteCap) return 0;
 
-    const score = getCreditScore(player);
-    const burdenRatio = getWeeklyDebtBurden(player) / Math.max(25000, getAverageWeeklyCashFlow(player).income);
+    const score = getBorrowerCreditScore(profile);
+    const burdenRatio = profile.weeklyDebtBurden / Math.max(25000, profile.cashFlow.income);
     const requestedRatio = requestedAmount / safeCapacity;
-    const recentBorrowPressure = getRecentBorrowPressure(player);
-    const { activeLoans, repeatPressure, distressPressure } = getRepeatDebtPressure(player);
-    const isFirstLoan = activeLoans === 0 && (player.finance?.credit?.totalBorrowed || 0) === 0;
+    const recentBorrowPressure = getRecentBorrowPressure(profile);
+    const { activeLoans, repeatPressure, distressPressure } = getRepeatDebtPressure(profile);
+    const isFirstLoan = activeLoans === 0 && profile.credit.totalBorrowed === 0;
 
     let odds = 0.4 + clamp((score - 520) / 420, -0.2, 0.45);
     odds -= clamp((requestedRatio - 0.85) * 0.55, 0, 0.6);
@@ -199,6 +243,10 @@ export const getLoanApprovalOdds = (player: Player, requestedAmount: number, ter
 
     return clamp(odds, 0, 0.98);
 };
+
+export const getLoanApprovalOdds = (player: Player, requestedAmount: number, termWeeks: number): number => (
+    getBorrowerLoanApprovalOdds(getPlayerBorrowerProfile(player), requestedAmount, termWeeks)
+);
 
 export const getLoanDecisionLabel = (odds: number): string => {
     if (odds >= 0.85) return 'Very Likely';
@@ -215,7 +263,7 @@ export const createPlayerLoan = (player: Player, requestedAmount: number, termWe
 
     return {
         id: `loan_${absoluteWeek}_${Date.now()}`,
-        lenderName: getCreditTier(getCreditScore(player)) === 'Elite' ? 'Premier Capital' : 'Citywide Credit',
+        lenderName: getBankLenderName(getCreditScore(player)),
         principal: Math.floor(requestedAmount),
         originalPrincipal: Math.floor(requestedAmount),
         annualInterestRate,

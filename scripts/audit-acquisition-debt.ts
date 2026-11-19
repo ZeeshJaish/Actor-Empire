@@ -93,8 +93,14 @@ assert(summary.entries[0].source === 'STOCK_CONTROL_TRANSFER', 'Zero-price stock
 
 const serviced = processAcquisitionDebtService(synced);
 assert(serviced.servicedAmount === summary.weeklyInterestDue, 'Weekly debt service should pay the interest due when cash is available.');
-assert(serviced.player.money === synced.money - serviced.servicedAmount, 'Debt service should deduct cash exactly once.');
-assert(serviced.player.finance.history.some(tx => tx.description === 'Acquisition Debt Interest'), 'Debt service should add a finance transaction.');
+/* 18 Nov 2026 (debt plan v2): the studio that owes the loan pays it from its treasury, once; the owner's cash is untouched */
+assert(serviced.player.money === synced.money, 'Debt service should not touch the owner\'s personal cash.');
+assert(
+    (serviced.player.businesses.find(studio => studio.id === 'WARNER_BROS')?.balance || 0)
+        === (synced.businesses.find(studio => studio.id === 'WARNER_BROS')?.balance || 0) - serviced.servicedAmount,
+    'Debt service should come out of the owing studio\'s treasury exactly once.',
+);
+assert(serviced.player.logs.some(log => /studios paid/i.test(log.message)), 'Debt service should leave a readable log.');
 
 const servicedAgain = processAcquisitionDebtService(serviced.player);
 assert(servicedAgain.servicedAmount === 0, 'Processing the same week should not charge acquisition debt twice.');
@@ -250,8 +256,10 @@ const mergedSummary = getAcquisitionDebtSummary(mergedDebtPlayer);
 assert(mergedSummary.entries.length === 1, 'Full-merged studio debt should stay active because HQ absorbed the liability.');
 assert(mergedSummary.totalRemainingPrincipal === 16_000_000_000, 'Full-merged studio debt should still reflect acquired liabilities.');
 
+/* a studio whose treasury cannot cover its loan payment misses it (the owner's own cash does not step in by itself) */
 const missed = processAcquisitionDebtService({
-    ...makePlayer(1_000),
+    ...makePlayer(500_000_000),
+    businesses: makePlayer().businesses.map(studio => studio.id === 'WARNER_BROS' ? { ...studio, balance: 1_000 } : studio),
     currentWeek: 123,
 });
 assert(missed.unpaidAmount > 0, 'Insufficient cash should create unpaid interest.');

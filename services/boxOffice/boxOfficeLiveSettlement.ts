@@ -8,6 +8,7 @@ import { appendIndustryEventFacts, createIndustryEventFact } from '../industryWo
 import { clonePlayerForWeekProcessing } from '../gameLoopClone';
 import { creditSignedActorBackend, settleTalentReceipt } from '../talentCareer';
 import { applyStudioProjectOutcome } from '../studioEcosystem';
+import { recordStudioAiReleaseLesson, studioAiBudgetTier } from '../studioAi/studioAiLearning';
 import { calculateInvestorPayout } from '../projectInvestors';
 import { calculateWeeklySoundtrackRevenue, getMusicArtistCatalog, mergeSoundtrackRevenueBreakdowns } from '../musicIndustry';
 import { buildCinemaWeekInput, buildUnexposedOwnedCinemaWeekInput, findCinemaBusiness, serializeCinemaFacts } from './boxOfficeWeek';
@@ -256,6 +257,15 @@ const commitCinemaWeekWithInput = (player: Player, result: CinemaWeekResult, rea
                 const cash = next.world.studios[project.studioId].cashReserve;
                 next.world = applyStudioProjectOutcome(next.world, project, { productionSpendMillions: oldResult.productionSpendMillions, marketingSpendMillions: oldResult.marketingSpendMillions, studioReceiptsMillions: financial.producerReceiptsCents / 1e8, netResultMillions: netMillions, cashAlreadySettled: true, outcome }).world;
                 next.world.studios![project.studioId].cashReserve = cash;
+                /* 18 Nov 2026 (rival learning): the studio remembers the run: what it cost, what paid admissions brought back
+                   to it (producer receipts) and what its cinema forecast had said (studioAiLearning.ts) */
+                const receiptsMillions = financial.producerReceiptsCents / 1e8;
+                next.world.studios![project.studioId] = recordStudioAiReleaseLesson(next.world.studios![project.studioId], {
+                    productionId: production.id, absoluteWeek: result.absoluteWeek,
+                    format: production.studioAiExecution.fingerprintSnapshot?.format || 'MOVIE',
+                    budgetTier: studioAiBudgetTier(oldResult.productionSpendMillions),
+                    costMillions: Math.max(0, receiptsMillions - netMillions), receiptsMillions,
+                    marketForecastReceiptsMillions: production.studioAiExecution.underwriting?.marketForecastReceiptsMillions, outcome });
             }
         }
         const { countries: _countries, ...compactRow } = row;

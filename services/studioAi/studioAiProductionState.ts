@@ -11,6 +11,7 @@ import type {
     StudioAiReleaseMode,
 } from '../../types';
 import { normalizeIndustryContentFingerprint } from '../industryIntelligence/industryIntelligenceState';
+import { normalizeStudioAiUnderwriting } from './studioAiLearning';
 
 export const STUDIO_AI_PRODUCTION_SCHEMA_VERSION = 1 as const;
 export const STUDIO_AI_PRODUCTION_KEY_LIMIT = 64;
@@ -162,6 +163,7 @@ export const normalizeStudioAiProductionRecord = (
         ...(raw.holdStartedAtAbsoluteWeek === undefined ? {} : { holdStartedAtAbsoluteWeek: nullableWeek(raw.holdStartedAtAbsoluteWeek, maxAbsoluteWeek) }),
         ...(raw.nextReviewAbsoluteWeek === undefined ? {} : { nextReviewAbsoluteWeek: nullableWeek(raw.nextReviewAbsoluteWeek, Number.MAX_SAFE_INTEGER) }),
         lastProgressedAbsoluteWeek: Math.min(maxAbsoluteWeek, whole(raw.lastProgressedAbsoluteWeek)),
+        ...(raw.underwriting ? { underwriting: normalizeStudioAiUnderwriting(raw.underwriting) } : {}),
     };
 };
 

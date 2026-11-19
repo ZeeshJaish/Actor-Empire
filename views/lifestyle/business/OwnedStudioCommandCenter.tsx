@@ -27,7 +27,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import type { Business, Player, StudioOperatingMandate, SubsidiaryDecision, SubsidiaryProjectProposal } from '../../../types';
-import { getAcquisitionDebtSummary, payDownAcquisitionDebt } from '../../../services/acquisitionDebt';
+import { getAcquisitionDebtPressureForStudio, getAcquisitionDebtSummary, getAcquisitionDebtWeeklyDue, payDownAcquisitionDebt } from '../../../services/acquisitionDebt';
 import { ACQUISITION_COMMITMENTS, getAcquisitionCase } from '../../../services/studioAcquisition';
 import {
     getMandateOptionLabel,
@@ -394,9 +394,9 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
     // Closing liabilities are historical deal context. Only a live ledger entry
     // is an amount the player still owes and should affect this finance view.
     const debt = studioDebtEntry?.remainingPrincipal || 0;
-    const studioWeeklyInterest = studioDebtEntry
-        ? Math.round(studioDebtEntry.remainingPrincipal * studioDebtEntry.annualInterestRate / 52 / 1_000) * 1_000
-        : 0;
+    /* 18 Nov 2026 (debt plan v2): the studio pays its own loan from its treasury; this is what it pays this week */
+    const studioWeeklyInterest = studioDebtEntry ? getAcquisitionDebtWeeklyDue(studioDebtEntry) : 0;
+    const studioDebtPressure = studioDebtEntry ? getAcquisitionDebtPressureForStudio(player, studio.id) : 0;
     const weeklyResult = studio.stats.weeklyProfit || 0;
     const signedCommitments = ACQUISITION_COMMITMENTS.filter(commitment => acquisitionCase?.offer?.commitments?.includes(commitment.id));
     const parentStudio = getStudioGroup(player).parentStudio;
@@ -1364,39 +1364,39 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                             <CommandSection eyebrow="Balance Sheet" title="Acquisition Debt" icon={<Landmark size={19} />}>
                                 <div className="rounded-[18px] border-2 border-[#203044] bg-[#07111c] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                                     <div className="grid grid-cols-3 overflow-hidden rounded-[15px] border border-sky-300/15 bg-black/35">
-                                        <div className="border-r border-sky-300/10 p-3">
-                                            <div className="text-[10px] font-black uppercase text-zinc-600">Remaining</div>
+                                        <div className="min-w-0 border-r border-sky-300/10 p-2 min-[360px]:p-3">
+                                            <div className="text-[9px] font-black uppercase text-zinc-600 min-[360px]:text-[10px]">Remaining</div>
                                             <div className={`mt-1 font-mono text-[12px] font-black ${debt > 0 ? 'text-sky-200' : 'text-zinc-500'}`}>{formatMoney(debt)}</div>
                                         </div>
-                                        <div className="border-r border-sky-300/10 p-3">
-                                            <div className="text-[10px] font-black uppercase text-zinc-600">Weekly Interest</div>
+                                        <div className="min-w-0 border-r border-sky-300/10 p-2 min-[360px]:p-3">
+                                            <div className="text-[9px] font-black uppercase text-zinc-600 min-[360px]:text-[10px]">Weekly Payment</div>
                                             <div className={`mt-1 font-mono text-[12px] font-black ${studioWeeklyInterest > 0 ? 'text-amber-200' : 'text-zinc-500'}`}>{formatMoney(studioWeeklyInterest)}</div>
                                         </div>
-                                        <div className="p-3">
-                                            <div className="text-[10px] font-black uppercase text-zinc-600">Pressure</div>
-                                            <div className={`mt-1 font-mono text-[12px] font-black ${debtSummary.pressureScore >= 65 ? 'text-rose-300' : debtSummary.pressureScore >= 35 ? 'text-amber-200' : 'text-emerald-300'}`}>
-                                                {debtSummary.pressureScore}%
+                                        <div className="min-w-0 p-2 min-[360px]:p-3">
+                                            <div className="text-[9px] font-black uppercase text-zinc-600 min-[360px]:text-[10px]">Pressure</div>
+                                            <div className={`mt-1 font-mono text-[12px] font-black ${studioDebtPressure >= 65 ? 'text-rose-300' : studioDebtPressure >= 35 ? 'text-amber-200' : 'text-emerald-300'}`}>
+                                                {studioDebtPressure}%
                                             </div>
                                         </div>
                                     </div>
                                     <div className="mt-3 rounded-[14px] border border-sky-300/10 bg-black/30 p-3">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div>
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div className="min-w-0 flex-1 basis-48">
                                                 <div className="text-[10px] font-black uppercase text-sky-300">Debt Terms</div>
                                                 <div className="mt-1 text-[11px] font-bold text-zinc-500">
                                                     {studioDebtEntry
-                                                        ? `${(studioDebtEntry.annualInterestRate * 100).toFixed(1)}% annual rate · ${studioDebtEntry.source === 'STOCK_CONTROL_TRANSFER' ? 'Inherited through stock control' : 'Deal financing'}`
+                                                        ? `${(studioDebtEntry.annualInterestRate * 100).toFixed(1)}% a year · ${studioDebtEntry.lenderName || (studioDebtEntry.source === 'STOCK_CONTROL_TRANSFER' ? 'Inherited through stock control' : 'Deal financing')} · paid from ${studio.name}${/s\.?$/i.test(studio.name) ? "'" : "'s"} treasury${studioDebtEntry.status === 'DEFAULTED' ? ' · in default' : ''}`
                                                         : 'Acquisition debt cleared for this studio.'}
                                                 </div>
                                             </div>
                                             <div className="shrink-0 rounded-full border border-sky-300/20 bg-sky-300/[0.07] px-2.5 py-1 text-[10px] font-black uppercase text-sky-200">
-                                                {debtSummary.nextServiceLabel}
+                                                {studioDebtEntry?.status === 'DEFAULTED' ? 'In default' : debtSummary.nextServiceLabel}
                                             </div>
                                         </div>
                                         <div className="mt-3 h-2 overflow-hidden rounded-full bg-black">
                                             <div
-                                                className={`h-full rounded-full ${debtSummary.pressureScore >= 65 ? 'bg-rose-300' : debtSummary.pressureScore >= 35 ? 'bg-amber-300' : 'bg-emerald-300'}`}
-                                                style={{ width: `${Math.max(4, Math.min(100, debtSummary.pressureScore))}%` }}
+                                                className={`h-full rounded-full ${studioDebtPressure >= 65 ? 'bg-rose-300' : studioDebtPressure >= 35 ? 'bg-amber-300' : 'bg-emerald-300'}`}
+                                                style={{ width: `${Math.max(4, Math.min(100, studioDebtPressure))}%` }}
                                             />
                                         </div>
                                     </div>

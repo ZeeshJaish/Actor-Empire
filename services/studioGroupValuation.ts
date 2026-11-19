@@ -1,5 +1,5 @@
 import type { Business, Player, Stock } from '../types';
-import { getAcquisitionDebtSummary } from './acquisitionDebt';
+import { getAcquisitionDebtSummary, getAcquisitionDebtWeeklyDue } from './acquisitionDebt';
 import { getStudioGroup } from './studioGroup';
 import { getStudioOwnershipPercent } from './studioOwnership';
 import { getStudioStandaloneEquityValue } from './studioEquityCash';
@@ -85,11 +85,21 @@ export const getStudioGroupValuation = (player: Player): StudioGroupValuation =>
         Math.max(0, hqOperatingValue - hqAttributableValue),
     );
     const acquisitionDebtSummary = getAcquisitionDebtSummary(player);
-    const acquisitionDebt = acquisitionDebtSummary.totalRemainingPrincipal;
+    /* 18 Nov 2026 (rival studio debt plan v2): a loan belongs to the studio that owes it and is paid from its treasury,
+       so the owner carries it in proportion to the stake they hold in that studio (a merged studio's loan sits with the
+       studio it merged into). */
+    const shareOf = (studioId: string) => {
+        const owing = (player.businesses || []).find(business => business.type === 'PRODUCTION_HOUSE' && business.id === studioId);
+        const payerId = owing?.studioState?.mergedIntoStudioId || studioId;
+        const payer = (player.businesses || []).find(business => business.type === 'PRODUCTION_HOUSE' && business.id === payerId) || owing;
+        return payer ? getStudioOwnershipPercent(player, payer) / 100 : 1;
+    };
+    const acquisitionDebt = acquisitionDebtSummary.entries.reduce((sum, entry) => sum + entry.remainingPrincipal * shareOf(entry.studioId), 0);
+    const ownerDebtPayments = acquisitionDebtSummary.entries.reduce((sum, entry) => sum + getAcquisitionDebtWeeklyDue(entry) * shareOf(entry.studioId), 0);
     const groupWeeklyResult = hqWeeklyResult + holdings.reduce((sum, holding) => sum + holding.weeklyResult, 0);
     const ownerWeeklyResult = (hqWeeklyResult * hqOwnershipShare)
         + holdings.reduce((sum, holding) => sum + holding.attributableWeeklyResult, 0)
-        - acquisitionDebtSummary.weeklyInterestDue;
+        - ownerDebtPayments;
 
     return {
         hqOperatingValue,

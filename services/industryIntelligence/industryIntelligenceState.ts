@@ -99,7 +99,7 @@ const normalizeBudget = (value: unknown): IndustryContentFingerprint['budgetSuit
     return { minimumMillions, idealLowMillions, idealHighMillions, ambitiousMaximumMillions };
 };
 
-export const normalizeIndustryContentFingerprint = (raw: unknown): IndustryContentFingerprint | null => {
+const normalizeIndustryContentFingerprintFresh = (raw: unknown): IndustryContentFingerprint | null => {
     const item = record(raw);
     if (typeof item.id !== 'string' || !item.id.trim() || typeof item.ownerCompanyId !== 'string' || !isCompanyKind(item.ownerCompanyKind)) return null;
     if (!FORMATS.has(item.format as IndustryContentFormat) || !SOURCE_INTENTS.has(item.sourceIntent as IndustryContentSourceIntent)) return null;
@@ -125,6 +125,11 @@ export const normalizeIndustryContentFingerprint = (raw: unknown): IndustryConte
         canonicalUniverseId: typeof item.canonicalUniverseId === 'string' ? item.canonicalUniverseId : undefined,
     };
 };
+/* Speed (18 Nov 2026, with the rival studio debt work): a production's saved fingerprint is normalized every time its
+   production record is (each update of the production registry), so the same snapshot is rebuilt many times a week.
+   Inside one week or one save preparation the first result is handed back (services/weekMemo.ts), the same rule as
+   Step 1's normalizers; outside a scope it runs as before. */
+export const normalizeIndustryContentFingerprint = memoizeWeekNormalizer('normalizeIndustryContentFingerprint', normalizeIndustryContentFingerprintFresh);
 
 export const compactIndustryContentFingerprints = (
     fingerprints: IndustryContentFingerprint[],
@@ -167,7 +172,7 @@ const normalizeIndustryContentStateFresh = (raw: unknown): IndustryContentIntell
     const source = record(raw);
     return {
         selectedFingerprints: compactIndustryContentFingerprints(
-            (Array.isArray(source.selectedFingerprints) ? source.selectedFingerprints : []).map(normalizeIndustryContentFingerprint)
+            (Array.isArray(source.selectedFingerprints) ? source.selectedFingerprints : []).map(item => normalizeIndustryContentFingerprint(item))
                 .filter((item): item is IndustryContentFingerprint => item !== null),
         ),
         universeBlueprints: (Array.isArray(source.universeBlueprints) ? source.universeBlueprints : []).map(normalizeBlueprint)

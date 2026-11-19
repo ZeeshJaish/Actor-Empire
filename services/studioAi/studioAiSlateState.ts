@@ -4,6 +4,7 @@ import type {
     StudioAiSlateState,
     StudioAiSlateStatus,
 } from '../../types';
+import { normalizeStudioAiUnderwriting } from './studioAiLearning';
 
 export const STUDIO_AI_SLATE_SCHEMA_VERSION = 1 as const;
 export const STUDIO_AI_SLATE_COMMITMENT_LIMIT = 24;
@@ -85,6 +86,7 @@ const normalizeCommitment = (value: unknown): StudioAiSlateCommitment | null => 
         legacyReleaseConsumedAtAbsoluteWeek: raw.legacyReleaseConsumedAtAbsoluteWeek === undefined
             ? undefined
             : whole(raw.legacyReleaseConsumedAtAbsoluteWeek),
+        ...(raw.underwriting ? { underwriting: normalizeStudioAiUnderwriting(raw.underwriting) } : {}),
     };
 };
 

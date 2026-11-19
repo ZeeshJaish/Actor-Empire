@@ -1,5 +1,6 @@
 import type { Player, Stock, NPCStudioState } from '../types';
 import { getStockOutstandingShares, normalizeStockPrice, getInitialStockForStudio, getStockMarketCapCeiling } from './stockLogic';
+import { getRivalLoanDebtDollars } from './rivalBooks';
 
 const ledgerDollars = (millions: unknown): number | undefined => {
     if (typeof millions !== 'number' || !Number.isFinite(millions) || millions < 0) return undefined;
@@ -21,7 +22,9 @@ export const getListedCompanyValuation = (player: Pick<Player, 'world'>, stock: 
     const rawCash = studio?.cashReserve;
     const shortfall = typeof rawCash === 'number' && Number.isFinite(rawCash) && rawCash < 0 ? ledgerDollars(-rawCash) : 0;
     const cash = shortfall ? 0 : ledgerDollars(rawCash);
-    const ledgerDebt = ledgerDollars(studio?.ai?.finance?.debtPrincipalMillions);
+    /* 18 Nov 2026: its books debt is its Bank loans plus any balance borrowed before it had a Bank */
+    const legacyDebt = ledgerDollars(studio?.ai?.finance?.debtPrincipalMillions);
+    const ledgerDebt = legacyDebt !== undefined ? legacyDebt + getRivalLoanDebtDollars(studio) : undefined;
     const debt = ledgerDebt !== undefined && shortfall !== undefined ? ledgerDebt + shortfall : undefined;
     const enterprise = cash !== undefined && debt !== undefined ? equityMarketCap + debt - cash : undefined;
     const enterpriseValue = enterprise !== undefined && Number.isSafeInteger(Math.round(enterprise * 100))

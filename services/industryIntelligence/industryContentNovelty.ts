@@ -5,6 +5,9 @@ export interface IndustryContentNoveltyContext {
     globalRecent: IndustryContentFingerprint[];
     currentAbsoluteWeek: number;
     franchiseFatigue: number;
+    /** 18 Nov 2026 (rival learning): points from the company's track record with this kind of title (studioAiLearning.ts);
+     *  absent for companies that keep none, which then rank by novelty alone as before */
+    trackRecordPoints?: (candidate: IndustryContentFingerprint) => number;
 }
 
 export type IndustryContentNoveltyReason = 'EXACT_DUPLICATE' | 'NEAR_DUPLICATE' | 'MARKET_SATURATION' | 'CONTINUITY_FATIGUE';
@@ -60,10 +63,12 @@ export const selectIndustryContentCandidate = (
     candidates: IndustryContentFingerprint[],
     context: IndustryContentNoveltyContext,
 ): IndustryContentFingerprint | null => {
+    /* an idea ranks by how fresh it is and, for a company that keeps a track record, by how that kind of title has
+       paid; the stored noveltyScore stays the freshness alone */
     const ranked = candidates.flatMap(candidate => {
         const novelty = scoreIndustryContentNovelty(candidate, context);
-        return novelty.eligible ? [{ candidate, novelty }] : [];
-    }).sort((left, right) => right.novelty.score - left.novelty.score || left.candidate.id.localeCompare(right.candidate.id));
+        return novelty.eligible ? [{ candidate, novelty, rank: novelty.score + (context.trackRecordPoints?.(candidate) || 0) }] : [];
+    }).sort((left, right) => right.rank - left.rank || left.candidate.id.localeCompare(right.candidate.id));
     const selected = ranked[0];
     return selected ? { ...selected.candidate, noveltyScore: selected.novelty.score } : null;
 };

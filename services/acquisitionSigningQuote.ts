@@ -1,3 +1,4 @@
+import { getRivalUnpaidBillsDollars } from './studioBank';
 import { getListedCompanyValuation } from './stockValuation';
 import type { Player } from '../types';
 import type { ForbesStudioProfile } from './forbesStudioProfile';
@@ -57,7 +58,9 @@ export const buildAcquisitionSigningQuote = ({ player, profile }: { player: Play
         additionalPrice: readiness.eligible ? 0 : amount,
         funding: readiness.eligible ? { source: 'PERSONAL' as const } : acquisitionCase?.offer?.funding || { source: 'PERSONAL' as const },
         verifiedDebt: minorityOnly ? 0 : currentDebt ?? ((report?.verifiedDebt ?? Math.round(Math.max(0, listed?.debt ?? profile.debt) * 100) / 100) + cashShortfall),
-        hiddenLiabilities: minorityOnly ? 0 : report?.hiddenLiabilities ?? roundMoney(Math.max(0, profile.valuation) * (publicCompany ? 0 : 0.035)),
+        /* 18 Nov 2026 (rival studio debt plan v2): a private studio's unpaid bills from its books (cash below zero), not
+           3.5% of its value; a venture's books debt already is its unpaid cash */
+        hiddenLiabilities: minorityOnly ? 0 : report?.hiddenLiabilities ?? (publicCompany || studio?.isNpcVenture ? 0 : roundMoney(getRivalUnpaidBillsDollars(studio))),
         expectedAnnualIncome: minorityOnly ? Math.round(Math.max(0, profile.profitability) * (acquisitionCase?.offer?.minorityPercent || 25) / 100)
             : report?.expectedAnnualIncome ?? (publicCompany ? Math.round(Math.max(0, profile.profitability) * 100) / 100 : roundMoney(Math.max(0, profile.profitability, profile.valuation * 0.02))),
         ownershipPercent: readiness.ownershipPercent,

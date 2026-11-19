@@ -1,3 +1,4 @@
+import { getRivalUnpaidBillsDollars } from './studioBank';
 import { settleStockCash } from './stockSettlement';
 import { getRecordedStockBasis } from './stockCashOwnership';
 import type { Business, BusinessStaff, GameLanguage, NewsItem, Player, XPost } from '../types';
@@ -12,7 +13,7 @@ import {
 import { isStreamingPlatformStudio } from './studioClassification';
 import { getRegulatorAcquisitionControls, getRegulatorAdjustedDiligenceFee } from './regulatorPressure';
 import { getPlayerLanguage, t } from './i18n';
-import { syncAcquisitionDebtLedger } from './acquisitionDebt';
+import { moveSignedRivalLoansToLedger, syncAcquisitionDebtLedger } from './acquisitionDebt';
 import {
     buildPortfolioOwnedRights,
     buildStudioAcquisitionPortfolio,
@@ -778,18 +779,19 @@ export const getFundingOptions = ({
 };
 
 const buildDiligenceReport = (
-    player: Pick<Player, 'id'>,
+    player: Pick<Player, 'id'> & Partial<Pick<Player, 'world'>>,
     profile: AcquisitionProfile,
 ): AcquisitionDiligenceReport => {
     const hash = stableHash(`${player.id}:${profile.id}:diligence`);
-    const debtFactor = 0.88 + ((hash % 29) / 100);
-    const riskFactor = 0.025 + (((hash >>> 5) % 14) / 100);
-    const distressMultiplier = profile.acquisitionState === 'DISTRESSED' || profile.acquisitionState === 'AUCTION_EXPECTED'
-        ? 1.7
-        : 1;
+    /* 18 Nov 2026 (rival studio debt plan v2): diligence reads the studio's books.
+       - The debt is the studio's own debt, not a guess of 88–116% around it.
+       - The liabilities are the bills it has not paid (cash below zero). They are no longer a share of its value, which
+         put a loan on every studio and grew with the old runaway valuations into trillions.
+       - A venture's books debt already is its unpaid cash, so it is not counted twice. */
     const publicCompany = profile.acquisitionState === 'PUBLICLY_TRADED';
-    const verifiedDebt = publicCompany ? Math.round(Math.max(0, profile.debt) * 100) / 100 : roundMoney(Math.max(0, profile.debt * debtFactor));
-    const hiddenLiabilities = publicCompany ? 0 : roundMoney(profile.valuation * riskFactor * distressMultiplier);
+    const books = player.world?.studios?.[profile.id];
+    const verifiedDebt = publicCompany ? Math.round(Math.max(0, profile.debt) * 100) / 100 : roundMoney(Math.max(0, profile.debt));
+    const hiddenLiabilities = publicCompany || books?.isNpcVenture ? 0 : roundMoney(getRivalUnpaidBillsDollars(books));
     const expectedAnnualIncome = publicCompany ? Math.round(Math.max(0, profile.profitability) * 100) / 100 : roundMoney(Math.max(
         profile.profitability * (0.92 + (((hash >>> 10) % 19) / 100)),
         profile.valuation * 0.015,
@@ -853,9 +855,12 @@ const getFinalAcquisitionPrice = getAcquisitionContractPrice;
 const getSigningLiabilities = (
     acquisitionCase: AcquisitionCase,
     profile: AcquisitionProfile,
+    player?: Partial<Pick<Player, 'world'>>,
 ) => ({
     verifiedDebt: acquisitionCase.diligence?.report.verifiedDebt ?? Math.max(0, profile.debt || 0),
-    hiddenLiabilities: acquisitionCase.diligence?.report.hiddenLiabilities ?? roundMoney(Math.max(0, profile.valuation || 0) * 0.035),
+    /* 18 Nov 2026: the bills the studio has not paid, from its books (no longer 3.5% of its value) */
+    hiddenLiabilities: acquisitionCase.diligence?.report.hiddenLiabilities
+        ?? (player?.world?.studios?.[profile.id]?.isNpcVenture ? 0 : roundMoney(getRivalUnpaidBillsDollars(player?.world?.studios?.[profile.id]))),
     expectedAnnualIncome: acquisitionCase.diligence?.report.expectedAnnualIncome ?? roundMoney(Math.max(
         profile.profitability || 0,
         Math.max(0, profile.valuation || 0) * 0.02,
@@ -1795,7 +1800,7 @@ export const completeStudioAcquisition = ({
     if (!fundingOption) return { success: false, player, acquisitionCase, reason: 'FUNDING_SOURCE_UNAVAILABLE' };
     if (!fundingOption.affordable) return { success: false, player, acquisitionCase, reason: 'INSUFFICIENT_FUNDS' };
 
-    const liabilities = getSigningLiabilities(acquisitionCase, profile);
+    const liabilities = getSigningLiabilities(acquisitionCase, profile, player);
     const closing: NonNullable<AcquisitionCase['closing']> = {
         finalPrice,
         acquiredBusinessId: profile.id,
@@ -2300,7 +2305,7 @@ export const completeAcquisitionTransaction = ({
     // This keeps future deals on the normal debt path while legacy migrations
     // can safely preserve their historical balances.
     if (!result.success) return result;
-    const playerWithDebt = syncAcquisitionDebtLedger(result.player, 'SIGNED');
+    const playerWithDebt = moveSignedRivalLoansToLedger(syncAcquisitionDebtLedger(result.player, 'SIGNED'), profile.id);
     if (!result.acquiredBusiness || !playerWithDebt.world?.studios?.[result.acquiredBusiness.id]?.ai) {
         return { ...result, player: playerWithDebt };
     }

@@ -17,7 +17,10 @@ const required = [
     [gameLoop, 'processAcquisitionDebtService(nextPlayer)', 'game loop weekly service call'],
     [worldReactions, 'getAcquisitionDebtSummary', 'world reaction ledger pressure read'],
     [commandCenter, 'Acquisition Debt', 'finance tab debt section label'],
-    [commandCenter, 'Weekly Interest', 'weekly interest UI label'],
+    /* 18 Nov 2026 (debt plan v2): the studio pays its loan from its own treasury on the Bank's terms, so the card shows
+       the week's payment (interest, plus principal on Bank terms) and who pays it */
+    [commandCenter, 'Weekly Payment', 'weekly payment UI label'],
+    [commandCenter, 'treasury', 'the card says which treasury pays the loan'],
     [commandCenter, 'Pay Down', 'pay-down UI label'],
     [commandCenter, 'payDownAcquisitionDebt', 'command center uses real debt paydown logic'],
     [commandCenter, 'const debt = studioDebtEntry?.remainingPrincipal || 0;', 'settled historical liabilities are not shown as active debt'],

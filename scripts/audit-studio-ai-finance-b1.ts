@@ -30,8 +30,12 @@ assert.deepEqual(playerWeek, playerControlled, 'the NPC engine must never operat
 
 let failing = attachNormalizedStudioAiState({ ...base, cashReserve: 0.15, recentHits: 0 }, { absoluteWeek: 999 });
 const firstShortfallWeek = processStudioAiFinanceWeek(failing, 1_000, { operatingRevenueMillions: 0 });
-assert.ok(firstShortfallWeek.ai!.finance.debtPrincipalMillions > 0, 'unpaid operating cost must become explicit debt instead of invisible money');
-assert.ok(firstShortfallWeek.ai!.ledger.some(entry => entry.category === 'SHORTFALL_BORROWING'), 'shortfall debt must be visible in the ledger');
+/* 18 Nov 2026 (debt plan v2): an unpaid bill is a Bank loan when the Bank says yes (booked as SHORTFALL_BORROWING),
+   or stays as cash below zero with the Bank's refusal on record. Never invisible money. */
+const shortfallLoans = (firstShortfallWeek.ai!.finance.loans || []).filter(loan => loan.status === 'ACTIVE' && loan.principal > 0);
+const refused = firstShortfallWeek.ai!.events.some(event => event.type === 'BANK' && event.bank?.kind === 'REJECTED');
+assert.ok(shortfallLoans.length > 0 || (refused && firstShortfallWeek.cashReserve < 0), 'unpaid operating cost must become explicit debt instead of invisible money');
+assert.ok(shortfallLoans.length === 0 || firstShortfallWeek.ai!.ledger.some(entry => entry.category === 'SHORTFALL_BORROWING'), 'shortfall debt must be visible in the ledger');
 assert.equal(firstShortfallWeek.ai!.ledger.at(-1)?.balanceAfterMillions, firstShortfallWeek.cashReserve, 'ledger closing balance must reconcile to canonical cash');
 for (let absoluteWeek = 1_000; absoluteWeek < 1_030; absoluteWeek += 1) {
     failing = processStudioAiFinanceWeek(failing, absoluteWeek, { operatingRevenueMillions: 0 });

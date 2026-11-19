@@ -9652,6 +9652,8 @@ export interface StudioAiProductionRecord {
     holdStartedAtAbsoluteWeek?: number | null;
     nextReviewAbsoluteWeek?: number | null;
     lastProgressedAbsoluteWeek: number;
+    /** 18 Nov 2026 (rival learning): the cinema forecast it was greenlit on */
+    underwriting?: StudioAiUnderwriting;
 }
 
 export interface IndustryProductionCommitment {
@@ -10815,6 +10817,19 @@ export interface StudioAiFinanceState {
     runwayWeeks: number;
     consecutiveLossWeeks: number;
     restructuringStartedAtAbsoluteWeek: number | null;
+    /** 18 Nov 2026: the studio's loans from the Bank (loanLogic.ts), in dollars, the same shape as the player's. */
+    loans?: PlayerLoan[];
+    /** 18 Nov 2026: the studio's record with the Bank (same fields as the player's credit history). */
+    credit?: StudioBankCreditHistory;
+}
+
+export interface StudioBankCreditHistory {
+    successfulPayments: number;
+    missedPayments: number;
+    defaults: number;
+    totalBorrowed: number;
+    totalRepaid?: number;
+    lastLoanAbsoluteWeek?: number;
 }
 
 export interface StudioAiCapacityState {
@@ -10862,6 +10877,37 @@ export interface StudioAiSlateCommitment {
     greenlitAtAbsoluteWeek?: number;
     scores?: StudioAiSlateScores;
     legacyReleaseConsumedAtAbsoluteWeek?: number;
+    /** 18 Nov 2026 (rival learning): the studio's cinema forecast for the greenlit budget */
+    underwriting?: StudioAiUnderwriting;
+}
+
+/** 18 Nov 2026 (rival learning): what the studio's market forecast said a movie would bring back from paid cinema
+ *  admissions (producer receipts, no streaming), for the budget it greenlit. */
+export interface StudioAiUnderwriting {
+    absoluteWeek: number;
+    productionMillions: number;
+    campaignMillions: number;
+    /** the market model's own figure, before the studio's experience is applied */
+    marketForecastReceiptsMillions: number;
+    /** what the studio expected after its experience (equal to the market figure when it had none) */
+    expectedReceiptsMillions: number;
+}
+
+/** 18 Nov 2026 (rival learning): one finished release the studio remembers: what it cost, what came back and, for a
+ *  movie planned on the cinema forecast, what that forecast said. */
+export interface StudioAiReleaseLesson {
+    productionId: string;
+    /** the week its result was known: the cinema run closed, or the release settled */
+    absoluteWeek: number;
+    format: IndustryContentFormat;
+    budgetTier: BudgetTier;
+    /** production, campaign, talent backend and cinema booking: everything it paid to make and release it */
+    costMillions: number;
+    /** what the release brought back to the studio (producer receipts, or a signed streaming deal's guarantee) */
+    receiptsMillions: number;
+    /** the cinema forecast it was greenlit on; only on a movie that had one */
+    marketForecastReceiptsMillions?: number;
+    outcome: 'HIT' | 'SOLID' | 'FLOP';
 }
 
 export interface StudioAiSlateState {
@@ -10887,8 +10933,19 @@ export interface StudioAiLedgerEntry {
 export interface StudioAiEventRecord {
     id: string;
     absoluteWeek: number;
-    type: 'MIGRATED' | 'STATUS_CHANGED' | 'OWNERSHIP_CHANGED' | 'VENTURE_SYNCED';
+    type: 'MIGRATED' | 'STATUS_CHANGED' | 'OWNERSHIP_CHANGED' | 'VENTURE_SYNCED' | 'BANK';
     summary: string;
+    /** 18 Nov 2026: what happened at the Bank (a loan taken, turned down, paid off, missed, defaulted, or a comeback). */
+    bank?: StudioAiBankEvent;
+}
+
+export interface StudioAiBankEvent {
+    kind: 'TAKEN' | 'REJECTED' | 'PAID_OFF' | 'MISSED' | 'DEFAULTED' | 'COMEBACK';
+    amountDollars: number;
+    lenderName: string;
+    reason?: 'BILLS' | 'PRODUCTION';
+    projectTitle?: string;
+    early?: boolean;
 }
 
 export interface StudioAiDecisionRecord {
@@ -10920,6 +10977,8 @@ export interface StudioAiRuntimeState {
     intelligence?: IndustryIntelligenceState;
     /** B5 compact private development and greenlight slate. */
     slate?: StudioAiSlateState;
+    /** 18 Nov 2026 (rival learning): its most recent finished cinema runs, forecast against what came back */
+    lessons?: StudioAiReleaseLesson[];
 }
 
 export type NpcVentureArchetype = 'PRESTIGE_LABEL' | 'COMMERCIAL_STUDIO' | 'GENRE_HOUSE' | 'CREATOR_MEDIA' | 'AWARDS_BOUTIQUE';

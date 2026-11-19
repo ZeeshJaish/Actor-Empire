@@ -1,3 +1,4 @@
+import { getRivalBooksDebtDollars } from '../rivalBooks';
 import type { NPCStudioState, Player } from '../../types';
 import { resolveStudioAiController } from '../studioAi/studioAiControl';
 import { normalizeStudioAiState } from '../studioAi/studioAiState';
@@ -35,7 +36,9 @@ export const adaptStudioIntelligenceContext = (
     const committedSlots = ai.capacity.committedDevelopmentSlots + ai.capacity.committedProductionSlots;
     const capacityPressure = clampIndustryScore(committedSlots / totalSlots * 100);
     const runwayWeeks = Math.max(0, finiteIndustryNumber(ai.finance.runwayWeeks));
-    const debtCoverage = ai.finance.debtPrincipalMillions / Math.max(1, studio.cashReserve + ai.finance.debtPrincipalMillions);
+    /* 18 Nov 2026: the studio's books debt (its Bank loans plus any older balance), in millions */
+    const booksDebtMillions = getRivalBooksDebtDollars(studio) / 1_000_000;
+    const debtCoverage = booksDebtMillions / Math.max(1, studio.cashReserve + booksDebtMillions);
     const financialPressure = clampIndustryScore(
         (runwayWeeks < 52 ? (52 - runwayWeeks) * 1.35 : 0)
         + debtCoverage * 42
@@ -80,7 +83,7 @@ export const adaptStudioIntelligenceContext = (
         },
         condition: {
             cashMillions: Math.max(0, finiteIndustryNumber(studio.cashReserve)),
-            debtMillions: Math.max(0, finiteIndustryNumber(ai.finance.debtPrincipalMillions)),
+            debtMillions: Math.max(0, finiteIndustryNumber(booksDebtMillions)),
             runwayWeeks,
             capacityPressure,
             momentum: clampIndustryScore(intelligence.momentum),

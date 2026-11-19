@@ -158,6 +158,8 @@ export const handoffStudioAiGreenlights = (
                 paidMilestoneIds: [],
                 processedKeys: appendStudioAiProductionKey([], handoffKey),
                 nextReviewAbsoluteWeek: input.absoluteWeek + 1,
+                /* 18 Nov 2026 (rival learning): the cinema forecast it was greenlit on */
+                ...(commitment.underwriting ? { underwriting: commitment.underwriting } : {}),
                 lastProgressedAbsoluteWeek: input.absoluteWeek,
             },
             createdAtAbsoluteWeek: input.absoluteWeek,

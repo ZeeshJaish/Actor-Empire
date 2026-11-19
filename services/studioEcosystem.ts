@@ -87,7 +87,8 @@ const normalizeStudioState = (studio: NPCStudioState): NPCStudioState => ({
     ...studio,
     valuation: Math.max(getLegacyStudioValuationFloor(studio.id), Number(studio.valuation) || 0),
     reputation: clamp(Number(studio.reputation) || 50),
-    cashReserve: clampMoneyMillions(Number(studio.cashReserve) || 0),
+    /* 18 Nov 2026 (debt plan v2): cash below zero is an unpaid bill and is kept (it used to be reset to zero) */
+    cashReserve: Number.isFinite(Number(studio.cashReserve)) ? Number(studio.cashReserve) : 0,
     recentHits: Math.max(0, Math.round(Number(studio.recentHits) || 0)),
     projectsReleased: Math.max(0, Math.round(Number(studio.projectsReleased) || 0)),
     hits: Math.max(0, Math.round(Number(studio.hits) || 0)),

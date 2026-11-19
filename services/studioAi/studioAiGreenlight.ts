@@ -1,9 +1,12 @@
+import { getStudioBankCushionMillions } from './studioAiBank';
+import { getStudioExperience, studioAiTrackRecordPoints } from './studioAiLearning';
 import type {
     IndustryContentFingerprint,
     IndustryIntelligenceProposal,
     NPCStudioState,
     StudioAiSlateCommitment,
     StudioAiSlateScores,
+    StudioAiUnderwriting,
     WorldState,
 } from '../../types';
 import { createDeterministicId, createDeterministicRng } from '../deterministicRandom';
@@ -61,13 +64,23 @@ export const reviewStudioSlateCommitment = (input: ReviewStudioSlateCommitmentIn
         + input.commitment.rewriteCount * 3
         + uncertainty,
     );
+    /* 18 Nov 2026 (rival learning): the meeting looks at how this kind of title (format and size) has paid the studio,
+       and at a quarter what it has seen at other studios (studioAiLearning.ts). A movie planned on the cinema forecast
+       takes its experience through that forecast instead (studioAiCinemaInvestment.ts), so it is not counted twice. */
+    const cinemaForecast = input.fingerprint.format === 'MOVIE'
+        && Boolean(input.world?.worldPopulation && input.world.worldAudienceEconomy && input.world.worldAudienceParticipation);
+    const trackRecordPoints = input.commitment.source === 'INDEPENDENT' && !cinemaForecast
+        ? studioAiTrackRecordPoints(getStudioExperience({ world: input.world, studio: input.studio, absoluteWeek: input.absoluteWeek,
+            format: input.fingerprint.format, budgetMillions: input.commitment.proposedBudgetMillions, measure: 'RETURN' }).factor)
+        : 0;
     const commercial = score(
         input.fingerprint.commercialIntent * 0.28
         + input.proposal.score.expectedUpside * 0.3
         + input.studio.reputation * 0.18
         + ai.competence.marketing * 0.18
         + strategyCommercial
-        + uncertainty * 0.55,
+        + uncertainty * 0.55
+        + trackRecordPoints,
     );
     const prestige = score(
         input.fingerprint.prestigeIntent * 0.34
@@ -93,7 +106,8 @@ export const reviewStudioSlateCommitment = (input: ReviewStudioSlateCommitmentIn
         + cashExposure * 0.28
         + runwayPressure
         + capacityRatio * 12
-        - ai.competence.finance * 0.12,
+        - ai.competence.finance * 0.12
+        - trackRecordPoints,
     );
     const strategicWeight = ai.profile.strategy === 'PRESTIGE' || ai.profile.strategy === 'CREATOR_LED'
         ? prestige
@@ -132,7 +146,17 @@ export const reviewStudioSlateCommitment = (input: ReviewStudioSlateCommitmentIn
     const availableCash = Math.max(0, input.studio.cashReserve - ai.finance.weeklyOperatingCostMillions * reserveWeeks - ai.finance.committedSpendMillions
         - pendingStudioCinemaCampaignMillions(input.world,input.studio.id));
     const campaignRate=input.world&&input.fingerprint.format==='MOVIE'?studioCinemaCampaignRate(input.fingerprint):0;
-    const affordableBudget = Math.min(input.proposal.affordabilityCeilingMillions, availableCash/(1+campaignRate));
+    /* 18 Nov 2026 (rival studio debt plan v2): a studio may fund part of a film with Bank credit. It counts the Bank's
+       money only as far as the Bank is likely to say yes (getStudioBankCushionMillions), and only a share of that by its
+       own temperament (appetite against discipline, up to 80%). The loan itself is asked for when a production bill
+       comes due, and the Bank can still say no. */
+    const borrowingWillingness = Math.max(0, Math.min(0.8, (ai.profile.budgetAppetite - ai.profile.financialDiscipline + 50) / 100));
+    /* the Bank's figure (a full valuation of the studio) is worked out only when it can change the decision: a
+       confident review that the studio's own cash cannot fund up to the proposal's ceiling */
+    const creditForSlate = borrowingWillingness > 0 && greenlightConfidence >= 58
+        && availableCash / (1 + campaignRate) < input.proposal.affordabilityCeilingMillions
+        ? getStudioBankCushionMillions(input.studio, input.absoluteWeek) * borrowingWillingness : 0;
+    const affordableBudget = Math.min(input.proposal.affordabilityCeilingMillions, (availableCash + creditForSlate)/(1+campaignRate));
     if (greenlightConfidence >= 58 && affordableBudget >= input.fingerprint.budgetSuitability.minimumMillions) {
         const riskStretch = (ai.profile.riskTolerance - 50) / 220;
         const confidenceStretch = (greenlightConfidence - 50) / 250;
@@ -142,6 +166,7 @@ export const reviewStudioSlateCommitment = (input: ReviewStudioSlateCommitmentIn
             Math.min(input.fingerprint.budgetSuitability.minimumMillions, affordableBudget),
             Math.min(input.fingerprint.budgetSuitability.ambitiousMaximumMillions, affordableBudget),
         ));
+        let underwriting: StudioAiUnderwriting | undefined;
         if(input.commitment.source==='INDEPENDENT'){
             const investment=planStudioCinemaInvestment({world:input.world,studio:input.studio,fingerprint:input.fingerprint,
                 absoluteWeek:input.absoluteWeek,targetMillions:greenlightBudgetMillions,minimumMillions:input.fingerprint.budgetSuitability.minimumMillions});
@@ -149,6 +174,10 @@ export const reviewStudioSlateCommitment = (input: ReviewStudioSlateCommitmentIn
                 if(investment.productionMillions<input.fingerprint.budgetSuitability.minimumMillions)
                     return {reviewed:true,reason:'REVIEWED',commitment:{...base,status:'TURNAROUND',nextReviewAbsoluteWeek:null}};
                 greenlightBudgetMillions=investment.productionMillions;
+                /* 18 Nov 2026 (rival learning): the forecast the film is greenlit on goes with it, so the studio can
+                   compare it with what really comes back when the cinema run closes (studioAiLearning.ts) */
+                underwriting={absoluteWeek:input.absoluteWeek,productionMillions:investment.productionMillions,campaignMillions:investment.campaignMillions,
+                    marketForecastReceiptsMillions:investment.marketForecastReceiptsMillions,expectedReceiptsMillions:investment.expectedProducerReceiptsMillions};
             }
         }
         return {
@@ -161,6 +190,7 @@ export const reviewStudioSlateCommitment = (input: ReviewStudioSlateCommitmentIn
                 greenlightBudgetMillions,
                 greenlitAtAbsoluteWeek: input.absoluteWeek,
                 nextReviewAbsoluteWeek: null,
+                ...(underwriting ? { underwriting } : {}),
             },
         };
     }

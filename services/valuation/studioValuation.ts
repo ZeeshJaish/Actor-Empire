@@ -7,6 +7,7 @@
  * slate, its cash and its debt. So a studio that keeps making flops, or borrows to survive, is worth less, and one on a
  * run of hits is worth more; the value no longer stands still.
  */
+import { getRivalBooksDebtDollars } from '../rivalBooks';
 import type { NPCStudioState, StudioAiLedgerCategory } from '../../types';
 import { valueCompany, type CompanyFundamentals, type CompanyValuation } from './valuationEngine';
 
@@ -66,7 +67,8 @@ export const worldStudioFundamentals = (studio: StudioValuationSource, absoluteW
         revenueRunRate: scale * (1 + growth),
         earningsTtm: scale * margin,
         cash: Math.max(0, number(studio.cashReserve)) * 1_000_000,
-        debt: number(studio.ai?.finance?.debtPrincipalMillions) * 1_000_000,
+        /* 18 Nov 2026: its Bank loans plus any balance borrowed before it had a Bank (services/rivalBooks.ts) */
+        debt: getRivalBooksDebtDollars(studio as any),
         libraryValue: standing * 0.55,
         technologyValue: 0,
         pipelineValue,

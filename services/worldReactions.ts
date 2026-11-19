@@ -34,33 +34,12 @@ const isMajorStudio = (business: Business) => (
     || (business.stats?.valuation || 0) >= 1_000_000_000
 );
 
-const getAcquisitionDebtPressure = (player: Pick<Player, 'flags' | 'businesses'>) => {
-    const ledger = Array.isArray(player.flags?.acquisitionDebtLedger) ? player.flags.acquisitionDebtLedger : [];
-    const activeLedgerDebt = ledger.reduce((sum: number, entry: any) => (
-        entry?.status !== 'PAID_OFF'
-            ? sum + Math.max(0, Number(entry?.remainingPrincipal || 0))
-            : sum
-    ), 0);
-    if (activeLedgerDebt > 0) {
-        return getAcquisitionDebtSummary(player as Player).pressureScore;
-    }
-
-    const cases = Array.isArray(player.flags?.studioAcquisitionCases)
-        ? player.flags.studioAcquisitionCases
-        : [];
-    const debtFromDeals = cases.reduce((sum: number, acquisitionCase: any) => (
-        acquisitionCase?.status === 'ACQUIRED'
-            ? sum
-                + Math.max(0, acquisitionCase.closing?.verifiedDebt || 0)
-                + Math.max(0, acquisitionCase.closing?.hiddenLiabilities || 0)
-            : sum
-    ), 0);
-    const balanceBase = Math.max(
-        1,
-        player.businesses.reduce((sum, business) => sum + Math.max(0, business.balance || 0), 0),
-    );
-    return clamp((debtFromDeals / balanceBase) * 8);
-};
+const getAcquisitionDebtPressure = (player: Pick<Player, 'flags' | 'businesses'>) => (
+    /* 18 Nov 2026 (rival studio debt plan v2): pressure comes only from loans still owed (the summary holds nothing
+       else). It used to fall back to the closing debt of every deal ever signed once nothing was owed, so paying
+       everything off kept the pressure on. */
+    getAcquisitionDebtSummary(player as Player).pressureScore
+);
 
 const getAverageInvestorConfidence = (studios: Business[]) => {
     if (!studios.length) return 0;

@@ -12,6 +12,7 @@ import { studioAiCinemaCountries, studioAiMarketingRate } from './studioAiCinema
 import { WORLD_COUNTRY_DEFINITIONS } from '../worldEconomy/worldCountryRegistry';
 import { normalizeStreamingLanguageId } from '../streamingLocalizationCapabilities';
 import { CINEMA_EXPOSURE_PROFILE } from '../boxOffice/boxOfficeProfiles';
+import { recordStudioAiReleaseLesson } from './studioAiLearning';
 
 const money = (value: number) => Math.round((value + Number.EPSILON * 100) * 1000) / 1000;
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -127,5 +128,13 @@ export const releaseStudioAiProduction = (input: ReleaseStudioAiProductionInput)
             }];
         })),
     };
+    /* 18 Nov 2026 (rival learning): a release settled here (not a weekly cinema run, which is remembered when it
+       closes) is remembered now: what it cost, what came back and how it did (studioAiLearning.ts) */
+    if(!weeklyCinema&&world.studios?.[settledStudio.id])world={...world,studios:{...world.studios,[settledStudio.id]:recordStudioAiReleaseLesson(world.studios[settledStudio.id],{
+        productionId:input.production.id,absoluteWeek:input.absoluteWeek,
+        format:fingerprint?.format||(input.production.projectType==='SERIES'?'SERIES':'MOVIE'),budgetTier:budgetTier(input.production.budgetMillions),
+        costMillions:money(input.production.budgetMillions+marketingSpendMillions+backendMillions),
+        /* a streaming release came back through its signed rights deal */
+        receiptsMillions:money(studioReceiptsMillions+(streamingContract?.minimumGuarantee||0)/1e6),outcome})}};
     return { world, studio: world.studios![settledStudio.id], production, project, changed: true };
 };
