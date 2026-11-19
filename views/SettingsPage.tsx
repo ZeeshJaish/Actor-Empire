@@ -8,7 +8,7 @@ import { getAdPrivacyOptionsRequired, openAdPrivacyOptions, subscribeAdPrivacyOp
 import { CHANGELOG_ENTRIES, getChangelogTypeLabel, getLatestChangelogEntry, type ChangelogEntry, type ChangelogUpdateType } from '../services/changelog';
 import { getPlayerLanguage, SUPPORTED_LANGUAGES, t } from '../services/i18n';
 import { buildActiveNewPlayerTutorialState, writeNewPlayerTutorialState } from '../services/newPlayerTutorial';
-import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
+import { isSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent, getIssueReportDelivery, onIssueReportDeliveryChanged, type IssueReportDelivery } from '../services/firebaseService';
 import { CountryFlagSvg } from '../components/studio-finance/components/FlagField';
 import { APP_STORE_ID, noteStoreReviewTrouble, openStoreReviewPage } from '../services/storeReview';
@@ -87,7 +87,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   const [pushStatus, setPushStatus] = useState(getFirebasePushStatus);
   const [isEnablingPush, setIsEnablingPush] = useState(false);
   const language = getPlayerLanguage(player);
-  const showSaveTransfer = isAndroidSaveTransferSurface();
+  const showSaveTransfer = isSaveTransferSurface();
   const selectedLanguageOption = SUPPORTED_LANGUAGES.find(option => option.id === language);
   const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
   const smoothModeEnabled = player.settings?.smoothMode === true;
@@ -662,7 +662,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
   if (mode === 'DATA_TRANSFER') {
     return (
       <div className="space-y-5 pb-24 pt-4">
-        {renderSubpageHeader('Android Migration', 'Save Transfer')}
+        {renderSubpageHeader('Backup & Move', 'Save Transfer')}
 
         <div className="glass-card rounded-3xl p-5 space-y-4">
           <div className="flex items-start gap-3">
@@ -672,7 +672,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
             <div className="min-w-0">
               <div className="font-black text-white">Signed save file</div>
               <p className="mt-1 text-sm leading-relaxed text-zinc-500">
-                Export from the Telegram build, then import the same file on the Play Store build. Edited or corrupted files are blocked before they touch the save slots.
+                Export makes one signed file with every career on this phone. Import it here or on another phone, iPhone or Android. Edited or damaged files are blocked before they touch your saves.
               </p>
             </div>
           </div>
@@ -1127,8 +1127,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
           <SettingsRow
             icon={Database}
             title="Save Transfer"
-            subtitle="Export or import signed Android save data"
-            value="Android"
+            subtitle="Back up your careers or move them to another phone"
             tone="community"
             onClick={() => setMode('DATA_TRANSFER')}
           />

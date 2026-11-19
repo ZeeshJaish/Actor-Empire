@@ -23,7 +23,7 @@ import type {
 import {
   CLOUD_PROVIDERS, OPEN_TIERS, cloudCap, cloudProviderServes, computeRacks, facilityCapitalCost,
   planComputePerRack, planReachFactor,
-  countryServiceCoverageValid, facilityWeeklyRent, fillRoom, fitsPlan, groupsFor, listingFor, planRacks, rackSpend, serviceForecast, takeListing,
+  countryServiceCoverageValid, facilityWeeklyRent, fillRoom, fitsPlan, groupsFor, isExistingRoomListing, listingFor, planRacks, rackSpend, serviceForecast, takeListing,
   tiersOf,
 } from './build';
 import { audiencePlaces } from '../../../services/worldPopulationClusters';
@@ -116,8 +116,9 @@ export const setupOf = (data: BuildData, draft: BuildDraft, regionId: string): R
 const isCloudListing = (listing: FacilityListing): boolean => (
   listing.facilityType === 'CLOUD_ALLOCATION' || (listing.tenures?.includes('CLOUD') ?? false)
 );
+// Crash fix (19 Nov 2026), item 1.11: a room the company already has is never taken again as a new one (build.ts).
 const isRentable = (listing: FacilityListing): boolean => (
-  !isCloudListing(listing) && listing.availability !== 'RESEARCH' && (listing.tenures ?? ['RENTED']).includes('RENTED')
+  !isCloudListing(listing) && !isExistingRoomListing(listing) && listing.availability !== 'RESEARCH' && (listing.tenures ?? ['RENTED']).includes('RENTED')
 );
 interface ListingIndex {
   buildings: Map<string, FacilityListing[]>;
@@ -133,7 +134,7 @@ const listingIndex = (listings: BuildData['listings']): ListingIndex => {
       const city = index.buildings.get(listing.cityId) ?? [];
       city.push(listing);
       index.buildings.set(listing.cityId, city);
-    } else if (isCloudListing(listing) && listing.availability !== 'RESEARCH' && !index.cloud.has(listing.cityId)) {
+    } else if (isCloudListing(listing) && !isExistingRoomListing(listing) && listing.availability !== 'RESEARCH' && !index.cloud.has(listing.cityId)) {
       index.cloud.set(listing.cityId, listing);
     }
   }

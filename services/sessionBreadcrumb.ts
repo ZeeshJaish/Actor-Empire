@@ -19,6 +19,8 @@ export interface SessionBreadcrumb {
   slot?: number;
   /** Phase 1 (2026-11-17): the game's stored data in MB when the career opened (navigator.storage.estimate). */
   storageMb?: number;
+  /** Crash fix (19 Nov 2026), FIX-PLAN item 1.8: this session started light (right after the phone closed the game). */
+  light?: boolean;
 }
 
 const read = (): SessionBreadcrumb | null => {
@@ -39,10 +41,27 @@ const heapMb = (): number | undefined => {
   return memory?.usedJSHeapSize ? Math.round(memory.usedJSHeapSize / 1_048_576) : undefined;
 };
 
-/** The previous session, if it ended while the game was open (a kill, not a close). Read once at start. */
+/** The previous session, if it ended while the game was open (a kill, not a close). Read once at start.
+ *  Crash fix (19 Nov 2026), FIX-PLAN item 1.7: index.html's boot script now starts this launch's marker before the
+ *  game's code loads (so a close while that code loads counts too, as BOOT), and keeps the previous session's
+ *  marker in window.__aePrevSession first; that copy is the previous session. Without the boot script (a test
+ *  page) the stored marker still is. */
 export const takeUncleanPreviousSession = (): SessionBreadcrumb | null => {
-  const previous = read();
+  const bootCopy = (globalThis as { __aePrevSession?: unknown }).__aePrevSession;
+  const previous = bootCopy === undefined ? read()
+    : bootCopy && typeof bootCopy === 'object' ? bootCopy as SessionBreadcrumb : null;
   return previous?.live ? previous : null;
+};
+
+/** Crash fix (19 Nov 2026), item 1.7: what the game is doing now (a screen or a start-up phase). A hidden page keeps
+ *  its marker closed: the phone may close a hidden app at any time, and that is not a death to report. */
+export const noteSessionPhase = (screen: string) => {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+    const current = read();
+    if (current) write({ ...current, screen });
+    return;
+  }
+  noteSessionLive({ screen });
 };
 
 export const noteSessionLive = (patch: Partial<Omit<SessionBreadcrumb, 'live' | 'at'>> = {}) => {
@@ -51,10 +70,16 @@ export const noteSessionLive = (patch: Partial<Omit<SessionBreadcrumb, 'live' | 
 };
 
 /** Phase 1 (2026-11-17): adds details to the marker without changing whether the session counts as live. */
-export const noteSessionDetail = (patch: Partial<Pick<SessionBreadcrumb, 'weekAhead' | 'slot' | 'storageMb'>>) => {
+export const noteSessionDetail = (patch: Partial<Pick<SessionBreadcrumb, 'weekAhead' | 'slot' | 'storageMb' | 'light'>>) => {
   const current = read();
   if (!current) return;
   write({ ...current, ...patch });
+};
+
+/** Crash fix (19 Nov 2026), FIX-PLAN item 1.7: a reload the game asks for says so first (index.html's boot script
+ *  reads it), so it is never mistaken for the web view restarting after the phone closed it. */
+export const markSelfReload = () => {
+  try { sessionStorage.setItem('ae.selfReload', '1'); } catch { /* optional */ }
 };
 
 export const noteSessionClean = () => {

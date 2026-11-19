@@ -10,6 +10,8 @@ class ViewController: CAPBridgeViewController {
         bridge?.registerPluginType(TrackingPermissionPlugin.self)
         // Phase 1 (2026-11-17): a background task around saves, and device info (AeNativeSupportPlugin.swift).
         bridge?.registerPluginType(AeNativeSupportPlugin.self)
+        // 19 Nov 2026: save export on iPhone, as on Android (AeSaveTransferPlugin.swift, services/saveTransfer.ts).
+        bridge?.registerPluginType(AeSaveTransferPlugin.self)
         // Week Ahead (2026-11-13): iOS does not report navigator.deviceMemory, so the game reads the phone's RAM
         // (GiB) from here to decide whether the background week fits (App.tsx deviceAffordsWeekAhead). This runs
         // in loadView, before Capacitor loads the page, so the value is there from the first frame.

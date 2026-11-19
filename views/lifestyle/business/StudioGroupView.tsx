@@ -246,7 +246,11 @@ export const StudioGroupView: React.FC<StudioGroupViewProps> = ({ player, onBack
                 />
                 <AnimatePresence>
                     {selectedStudio ? (
+                        /* Crash fix (19 Nov 2026), FIX-PLAN item 1.11: this dialog was opened here without the career, so
+                           choosing Full Merger read undefined.businesses and sent the game to Recovery Mode (1.0.29, Android
+                           report 18 Nov). tsc cannot see a missing prop: the project has no React types (@types/react). */
                         <OperatingModelDialog
+                            player={player}
                             studio={selectedStudio}
                             selectedModel={selectedModel}
                             onSelect={setSelectedModel}

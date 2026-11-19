@@ -6,6 +6,7 @@ import { installHorizontalRailDrag } from './ui-layout/railInteractions';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import { bootstrapFirebase, installGlobalTelemetryHandlers, recordNonFatal, trackGameEvent } from './services/firebaseService';
+import { markSelfReload } from './services/sessionBreadcrumb';
 
 installHorizontalRailDrag(document);
 
@@ -26,6 +27,7 @@ class RootRecoveryBoundary extends React.Component<{ children: React.ReactNode }
   }
 
   private retry = () => {
+    markSelfReload();
     window.location.reload();
   };
 
@@ -35,6 +37,7 @@ class RootRecoveryBoundary extends React.Component<{ children: React.ReactNode }
     } catch {
       // Reload still gives the player another clean boot attempt.
     }
+    markSelfReload();
     window.location.reload();
   };
 

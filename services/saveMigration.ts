@@ -1171,15 +1171,19 @@ export const migratePlayerSave = (input: Partial<Player> | Player, options: { fr
     return migration.player;
 };
 
+/** A career with takeover cases or debt-ledger entries: the debt repair can change real records on it. */
+const hasAcquisitionDebtRecords = (player: Player): boolean => (Array.isArray(player.flags?.studioAcquisitionCases) && player.flags.studioAcquisitionCases.length > 0)
+    || (Array.isArray(player.flags?.acquisitionDebtLedger) && player.flags.acquisitionDebtLedger.length > 0);
+
 /** The load repairs, run in this order after migrateSave. Each returns the very same object when it has nothing
  *  to repair. (The chain used to be written inline in migratePlayerSave; the order and the steps are unchanged.)
  *  - 2026-11-11: repairRunawayRivalEconomy bounds the old 1.0.25 rival economy that blocked weeks in 1.0.26 (first)
  *  - 2026-11-18 (debt plan v2): repairInheritedAcquisitionDebt corrects formula debt taken over on the old runaway
- *    values (second). It marks the career once with its repair version, so the first open after it is a repair.
+ *    values (second, now run on its own just before this list). It marks the career once with its repair version;
+ *    that counts as a repair only on a career with takeover cases or debt-ledger entries (crash fix, 19 Nov).
  *  - 2026-11-15 (B13): restoreDroppedOriginalCommissions gives back originals the old 40-item cap dropped
  *  - 2026-11-15 (B16): holdPrelaunchPurchasesForSlate keeps titles bought before launch on the shelves for the Slate */
-const LOAD_REPAIRS_AFTER_RIVAL_ECONOMY: ReadonlyArray<(player: Player) => Player> = [
-    player => repairInheritedAcquisitionDebt(player).player,
+const LOAD_REPAIRS_AFTER_DEBT: ReadonlyArray<(player: Player) => Player> = [
     healCopiedEpisodeRatings,
     advanceOriginalPitches,
     settleLegacySocialCounts,
@@ -1197,7 +1201,15 @@ export const migratePlayerSaveReportingRepairs = (
     const migrated = migrateSave(input, options);
     let current = repairRunawayRivalEconomy(migrated).player;
     let repaired = current !== migrated;
-    for (const repair of LOAD_REPAIRS_AFTER_RIVAL_ECONOMY) {
+    /* Crash fix (19 Nov 2026): the debt repair stamps every career once with its version. On a career with no
+       takeover cases and no debt ledger that stamp (and two empty lists) is all it adds, so it is not a repair: the
+       open saves nothing for it, and the next real save writes the stamp. Before, it forced a full save on the first
+       open of every career after the update, a memory peak right at the open. The pass is pure and idempotent, so a
+       session that ends before any save simply runs the same no-op pass on the next open. */
+    const debt = repairInheritedAcquisitionDebt(current);
+    if (debt.player !== current && (debt.corrected > 0 || debt.refunded > 0 || hasAcquisitionDebtRecords(current))) repaired = true;
+    current = debt.player;
+    for (const repair of LOAD_REPAIRS_AFTER_DEBT) {
         const next = repair(current);
         if (next !== current) repaired = true;
         current = next;

@@ -282,9 +282,14 @@ export default function RightsRoom({ player, studioId, onUpdatePlayer, onClose, 
     const view = useMemo(() => getRightsRoom(player, studioId), [player, studioId]);
     const [stack, setStack] = useState<Screen[]>([{ name: 'ROOM' }]);
     const [note, setNote] = useState('');
-    const screen = stack[stack.length - 1];
+    /* Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md item 1.11 (1.0.29 Android report: "reading
+       'name'" in this room, Recovery Mode). A screen that is leaving stays on screen for its 0.16 s exit with the Back
+       button of the moment it was drawn. A second tap on that Back popped the stack again from that stale count and
+       left it empty, so `screen` was undefined. Back now pops only while more than the room is on the stack, counted
+       on the newest stack, and the room is the floor. */
+    const screen = stack[stack.length - 1] ?? { name: 'ROOM' as const };
     const go = (next: Screen) => { setNote(''); setStack(current => [...current, next]); };
-    const back = () => { setNote(''); if (stack.length > 1) setStack(current => current.slice(0, -1)); else onClose(); };
+    const back = () => { setNote(''); if (stack.length > 1) setStack(current => (current.length > 1 ? current.slice(0, -1) : current)); else onClose(); };
     const [picked, setPicked] = useState<string[]>([]);
     const [durationWeeks, setDurationWeeks] = useState(104);
     const [exclusive, setExclusive] = useState(true);

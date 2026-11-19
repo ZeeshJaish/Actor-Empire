@@ -166,6 +166,10 @@
         .ae-boot-shell__label {
             margin: 0;
             color: #efe9e3;
+            /* crash fix (19 Nov 2026), FIX-PLAN item 2.3: the studio card's caption font and line
+               (styles/zedbury-intro.css), so the card takes over without a visible change */
+            font-family: 'Archivo', system-ui, sans-serif;
+            line-height: 12px;
             font-size: 10px;
             font-weight: 700;
             letter-spacing: .5em;
@@ -219,6 +223,34 @@
       </main>
     </div>
   <script>
+    /* Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md item 1.7. The game's "still open" marker
+       (services/sessionBreadcrumb.ts) starts here, before the game's code loads, so a phone that closes the game while
+       that code is still loading (the first logo) is counted too, as BOOT. The previous session's marker is kept for
+       the game to report (window.__aePrevSession). A hidden page is marked closed, because a phone may close a hidden
+       app at any time; once the game has drawn, its own handlers take over. Also kept: how this page was loaded (a
+       reload the game did not ask for is the iOS web view restarting after the phone closed it) and when.
+       A classic script on purpose: it runs even where the game's own code cannot. */
+    (function () {
+      var KEY = 'ae.lastSession.v1';
+      var mounted = function () { return document.documentElement.dataset.actorEmpireMounted === 'true'; };
+      try { var kept = localStorage.getItem(KEY); window.__aePrevSession = kept ? JSON.parse(kept) : null; } catch (error) { window.__aePrevSession = null; }
+      window.__aeBootAt = Date.now();
+      try {
+        var entry = performance.getEntriesByType ? performance.getEntriesByType('navigation')[0] : null;
+        window.__aeNavType = entry && entry.type ? String(entry.type) : (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
+      } catch (error) { window.__aeNavType = 'unknown'; }
+      try { window.__aeSelfReload = sessionStorage.getItem('ae.selfReload') === '1'; sessionStorage.removeItem('ae.selfReload'); } catch (error) { window.__aeSelfReload = false; }
+      // the game's own reloads say so first, so they are never mistaken for the web view restarting
+      window.__aeMarkSelfReload = function () { try { sessionStorage.setItem('ae.selfReload', '1'); } catch (error) { /* optional */ } };
+      var mark = function (live) {
+        try { localStorage.setItem(KEY, JSON.stringify({ live: live, at: Date.now(), screen: 'BOOT' })); } catch (error) { /* best effort */ }
+      };
+      mark(document.visibilityState !== 'hidden');
+      document.addEventListener('visibilitychange', function () { if (!mounted()) mark(document.visibilityState !== 'hidden'); });
+      window.addEventListener('pagehide', function () { if (!mounted()) mark(false); });
+    })();
+  </script>
+  <script>
     /* Start-up guard (black screen). Until the game draws its first screen, the boot shell above is all the player sees.
        When the game's code cannot start (an Android System WebView too old to read it, a failed load, an error before the
        first screen) or start-up runs very long, say so and offer Retry instead of a dark screen forever. A classic script
@@ -257,9 +289,9 @@
           actions.appendChild(button('Update WebView', 'ae-boot-shell__retry', function () {
             window.location.href = 'market://details?id=com.google.android.webview';
           }));
-          actions.appendChild(button('Retry', 'ae-boot-shell__restart', function () { window.location.reload(); }));
+          actions.appendChild(button('Retry', 'ae-boot-shell__restart', function () { if (window.__aeMarkSelfReload) window.__aeMarkSelfReload(); window.location.reload(); }));
         } else {
-          actions.appendChild(button('Retry', 'ae-boot-shell__retry', function () { window.location.reload(); }));
+          actions.appendChild(button('Retry', 'ae-boot-shell__retry', function () { if (window.__aeMarkSelfReload) window.__aeMarkSelfReload(); window.location.reload(); }));
         }
         shell.appendChild(message);
         shell.appendChild(actions);

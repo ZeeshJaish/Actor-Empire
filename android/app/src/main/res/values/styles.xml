@@ -13,6 +13,8 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Crash fix (19 Nov 2026), item 2.3: black, not the light theme's white, between the splash and the game. -->
+        <item name="android:windowBackground">@color/ae_launch_background</item>
     </style>
 
 

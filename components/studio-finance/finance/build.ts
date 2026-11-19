@@ -1565,8 +1565,17 @@ const isCloudListing = (listing: FacilityListing): boolean => (
   listing.facilityType === 'CLOUD_ALLOCATION' || (listing.tenures?.includes('CLOUD') ?? false)
 );
 
+/** Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md item 1.11: a listing drawn for a room the company
+    already has, whose own listing has left the market (`LEGACY:<room id>`, made by the Build wizard's
+    syntheticListing so that room can still be shown). It describes that room only: the market no longer offers it,
+    so it can never be taken as a new room. When the team plan or the placer took one, the Build wizard could not
+    price the new room and threw while drawing ("cannot resolve canonical facility listing LEGACY:FACILITY-ATL-03",
+    1.0.29 iOS report), which sent the whole game to Recovery Mode. */
+export const isExistingRoomListing = (listing: { id: string }): boolean => listing.id.startsWith('LEGACY:');
+
 const rentable = (listing: FacilityListing): boolean => (
   !isCloudListing(listing)
+  && !isExistingRoomListing(listing)
   && listing.availability !== 'RESEARCH'
   && (listing.tenures ?? ['RENTED']).includes('RENTED')
 );
@@ -1591,7 +1600,7 @@ export function buildingFor(data: BuildData, cityId: string, compute: number): F
 /** The city's cloud region, if it sells this much compute. */
 export function cloudFor(data: BuildData, cityId: string, compute: number): FacilityListing | undefined {
   return data.listings.find((listing) => (
-    listing.cityId === cityId && isCloudListing(listing) && listing.availability !== 'RESEARCH' && cloudCap(listing) >= compute
+    listing.cityId === cityId && isCloudListing(listing) && !isExistingRoomListing(listing) && listing.availability !== 'RESEARCH' && cloudCap(listing) >= compute
   ));
 }
 

@@ -1,6 +1,7 @@
 import {
   buildTotals,
   facilityRacks,
+  isExistingRoomListing,
   moneyPlan,
   serviceForecast,
   type BuildData,
@@ -121,7 +122,8 @@ const cityRegionId = (data: BuildData, city: City): string | null => (
 
 const usableListingsFor = (data: BuildData, cityId: string): FacilityListing[] => (
   data.listings
-    .filter(listing => listing.cityId === cityId && listing.availability !== 'RESEARCH')
+    // Crash fix (19 Nov 2026), item 1.11: the team never plans a new room on one the company already has (build.ts).
+    .filter(listing => listing.cityId === cityId && listing.availability !== 'RESEARCH' && !isExistingRoomListing(listing))
     .sort((a, b) => (
       a.rackPositions - b.rackPositions
       || Number(a.availability === 'LIMITED') - Number(b.availability === 'LIMITED')

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Clock3, Upload } from 'lucide-react';
 import { logoDataUri } from '../assets/logo';
 import type { ActState, SlotEntry } from './types';
-import { isAndroidSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
+import { isSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
 import '../styles/intro.css';
 
 interface Props {
@@ -59,7 +59,7 @@ export default function SaveSlotScreen({
   };
   const [isImportingSave, setIsImportingSave] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
-  const showSaveImport = isAndroidSaveTransferSurface() && !!onImportData;
+  const showSaveImport = isSaveTransferSurface() && !!onImportData;
 
   const handleImportSave = async () => {
     if (!onImportData || isImportingSave) return;

@@ -3,7 +3,7 @@
  *
  * - The switches live in one Firestore document, config/switches, read once per launch through the REST client the
  *   game already has (no new dependency). Each field is a switch: { on: bool, percent?: 0-100, ram?: [classes],
- *   minVersion?: 'x.y.z', maxVersion?: 'x.y.z' }.
+ *   minVersion?: 'x.y.z', maxVersion?: 'x.y.z', limits?: { key: number } } (limits since the 19 Nov crash fix).
  * - What a launch reads is kept on the device and used from the NEXT launch: a switch never changes a running
  *   game. A launch with nothing kept (first launch, no network, no document, no read rule) uses the defaults below,
  *   which are the build as it was tested: every switch on.
@@ -14,18 +14,28 @@
  *
  * Nothing changes until Zeesh deploys the read rule (firestore.rules: config/{doc}) and creates the document.
  */
-export type SwitchName = 'weekAhead' | 'hideSaveSkip' | 'openSaveSkip' | 'androidTrimFilter' | 'forecastWorkerCopy';
+export type SwitchName = 'weekAhead' | 'hideSaveSkip' | 'openSaveSkip' | 'androidTrimFilter' | 'forecastWorkerCopy'
+    /* Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md: launchPreload is item 2.1 (the start menu
+       reads a career only where it fits), launchLadder item 1.8 (the start-up guard and the light start),
+       adsAfterOpen item 2.2 (the ad SDK and its two full-screen ads start after a career has opened). */
+    | 'launchPreload' | 'launchLadder' | 'adsAfterOpen';
 
 /** Short names for the Crashlytics key (it holds at most 1 KB). */
 const SHORT: Record<SwitchName, string> = {
     weekAhead: 'wa', hideSaveSkip: 'hide', openSaveSkip: 'open', androidTrimFilter: 'trim', forecastWorkerCopy: 'fc',
+    launchPreload: 'lp', launchLadder: 'ld', adsAfterOpen: 'ad',
 };
 export const SWITCH_NAMES = Object.keys(SHORT) as SwitchName[];
 const DEFAULTS: Record<SwitchName, boolean> = {
     weekAhead: true, hideSaveSkip: true, openSaveSkip: true, androidTrimFilter: true, forecastWorkerCopy: true,
+    launchPreload: true, launchLadder: true, adsAfterOpen: true,
 };
 
-export type SwitchRule = { on: boolean; percent?: number; ram?: string[]; minVersion?: string; maxVersion?: string };
+/** limits (crash fix, 19 Nov 2026): numbers a switch reads, by key, used only where the rule applies to this
+ *  install (the same version, ram and percent conditions as `on`). launchPreload: the biggest career, in
+ *  saveSizeUnits, that a RAM class reads at start-up (0 never, a negative number no limit). weekAhead: 1 or 0 per
+ *  RAM class. A key the rule does not name keeps the build's own value. */
+export type SwitchRule = { on: boolean; percent?: number; ram?: string[]; minVersion?: string; maxVersion?: string; limits?: Record<string, number> };
 export type SwitchDocument = Partial<Record<SwitchName, SwitchRule>>;
 type Kept = { fetchedAt: number; rules: SwitchDocument; recoverFromVersions?: string[] };
 
@@ -64,19 +74,37 @@ const compareVersions = (left: string, right: string): number => {
     return 0;
 };
 
+type SwitchDevice = { installId: string; ramClass: string; version: string };
+
+/** Whether a rule applies to this install, phone and version (otherwise the switch keeps its default). */
+const ruleApplies = (name: SwitchName, rule: SwitchRule | undefined, device: SwitchDevice): rule is SwitchRule => {
+    if (!rule || typeof rule.on !== 'boolean') return false;
+    if (rule.minVersion && compareVersions(device.version, rule.minVersion) < 0) return false;
+    if (rule.maxVersion && compareVersions(device.version, rule.maxVersion) > 0) return false;
+    if (Array.isArray(rule.ram) && rule.ram.length && !rule.ram.includes(device.ramClass)) return false;
+    const percent = typeof rule.percent === 'number' && Number.isFinite(rule.percent) ? Math.max(0, Math.min(100, rule.percent)) : 100;
+    return bucketOf(`${device.installId}:${name}`) < percent;
+};
+
 /** One switch from its rule, for this install, phone and version. */
 export const resolveSwitch = (
     name: SwitchName,
     rule: SwitchRule | undefined,
-    device: { installId: string; ramClass: string; version: string },
-): boolean => {
-    if (!rule || typeof rule.on !== 'boolean') return DEFAULTS[name];
-    if (rule.minVersion && compareVersions(device.version, rule.minVersion) < 0) return DEFAULTS[name];
-    if (rule.maxVersion && compareVersions(device.version, rule.maxVersion) > 0) return DEFAULTS[name];
-    if (Array.isArray(rule.ram) && rule.ram.length && !rule.ram.includes(device.ramClass)) return DEFAULTS[name];
-    const percent = typeof rule.percent === 'number' && Number.isFinite(rule.percent) ? Math.max(0, Math.min(100, rule.percent)) : 100;
-    if (bucketOf(`${device.installId}:${name}`) >= percent) return DEFAULTS[name];
-    return rule.on;
+    device: SwitchDevice,
+): boolean => (ruleApplies(name, rule, device) ? rule.on : DEFAULTS[name]);
+
+/** A rule's limits for this install: only where the rule applies. */
+export const resolveSwitchLimits = (name: SwitchName, rule: SwitchRule | undefined, device: SwitchDevice): Record<string, number> => (
+    ruleApplies(name, rule, device) && rule.limits ? { ...rule.limits } : {}
+);
+
+/** A rule's limits from the document: finite numbers only, at most 16 keys. */
+const limitsOf = (raw: unknown): { limits?: Record<string, number> } => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const entries = Object.entries(raw as Record<string, unknown>)
+        .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]))
+        .slice(0, 16);
+    return entries.length ? { limits: Object.fromEntries(entries) } : {};
 };
 
 /** Firestore's REST document → plain switch rules (fields it does not know are ignored). */
@@ -102,6 +130,7 @@ export const parseSwitchDocument = (document: unknown): SwitchDocument => {
             ...(Array.isArray(raw.ram) ? { ram: raw.ram.map(String) } : {}),
             ...(typeof raw.minVersion === 'string' ? { minVersion: raw.minVersion } : {}),
             ...(typeof raw.maxVersion === 'string' ? { maxVersion: raw.maxVersion } : {}),
+            ...limitsOf(raw.limits),
         };
     }
     return rules;
@@ -129,6 +158,7 @@ const readKept = (): Kept | null => {
 };
 
 let session: Record<SwitchName, boolean> | null = null;
+let sessionLimits: Partial<Record<SwitchName, Record<string, number>>> = {};
 
 /** This launch's switches: worked out once, from what the previous launch kept, then fixed for the session. */
 export const startSessionSwitches = (device: { ramClass: string; version: string }): Record<SwitchName, boolean> => {
@@ -136,7 +166,14 @@ export const startSessionSwitches = (device: { ramClass: string; version: string
     const kept = readKept();
     const installId = getInstallId();
     session = Object.fromEntries(SWITCH_NAMES.map(name => [name, resolveSwitch(name, kept?.rules[name], { installId, ...device })])) as Record<SwitchName, boolean>;
+    sessionLimits = Object.fromEntries(SWITCH_NAMES.map(name => [name, resolveSwitchLimits(name, kept?.rules[name], { installId, ...device })]));
     return session;
+};
+
+/** One of a switch's numbers for this session (crash fix, 19 Nov 2026), or the build's own value. */
+export const getSwitchLimit = (name: SwitchName, key: string, fallback: number): number => {
+    const value = sessionLimits[name]?.[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 };
 
 let sessionRecoveryVersions: string[] | null = null;
@@ -166,4 +203,4 @@ export const keepNoSwitches = (now = Date.now()) => {
 };
 
 /** Test-only: forget this session's switches. */
-export const resetSessionSwitchesForTest = () => { session = null; sessionRecoveryVersions = null; };
+export const resetSessionSwitchesForTest = () => { session = null; sessionLimits = {}; sessionRecoveryVersions = null; };

@@ -367,12 +367,20 @@ const selectBaseFacility = (
   existing: OwnedStreamingFacility[],
   marketContext?: StreamingFacilityMarketContext,
   source: StreamingCanonicalBuildSource = 'CAREER',
+  known: OwnedStreamingFacility[] = [],
 ): OwnedStreamingFacility | null => {
   const current = existing.find(item => item.id === draftFacility.id);
   if (current) return current;
   const listing = getStreamingFacilityMarketplace(draftFacility.cityId, marketContext)
     .find(item => item.listingId === draftFacility.listingId);
   if (!listing) {
+    /* Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md item 1.11: a room the company already runs,
+       drawn with its own listing that has left the market (LEGACY:<its id>), that this selection does not hold (the
+       live network's rooms, or the desk's): it is that room, not a new one to rent. New rooms never take such a
+       listing any more (build.ts isExistingRoomListing); before, the team plan and the placer could, and this throw
+       during drawing sent the game to Recovery Mode. */
+    const sameRoom = known.find(item => item.id === draftFacility.id);
+    if (sameRoom) return sameRoom;
     if (source !== 'LAB') {
       throw new Error(`Career Build cannot resolve canonical facility listing ${draftFacility.listingId}.`);
     }
@@ -401,10 +409,12 @@ export const buildSelectionFromDraft = (
   absoluteWeek: number,
   marketContextByCityId: Record<string, StreamingFacilityMarketContext> = {},
   source: StreamingCanonicalBuildSource = 'CAREER',
+  /** Crash fix (19 Nov 2026): rooms the company runs that `base` may not hold (the live network's). */
+  knownFacilities: OwnedStreamingFacility[] = [],
 ): BuildSel => {
   const originalFacilities = facilitiesOf(base);
   const facilities = draft.facilities.flatMap(draftFacility => {
-    const baseFacility = selectBaseFacility(draftFacility, originalFacilities, marketContextByCityId[draftFacility.cityId], source);
+    const baseFacility = selectBaseFacility(draftFacility, originalFacilities, marketContextByCityId[draftFacility.cityId], source, knownFacilities);
     if (!baseFacility) return [];
     // A cloud listing names a point of presence and a standard-rate tier, not
     // a physical rack floor. Above-tier compute is still paid virtual capacity;
@@ -696,8 +706,8 @@ export const StreamingBuildWizardExperience: React.FC<StreamingBuildWizardExperi
   }), [baseFacilities, builtIds, sel]);
 
   const canonicalFor = useCallback((draft: BuildDraft) => (
-    buildSelectionFromDraft(draft, sel, absoluteWeek, marketContextByCityId, canonicalSource)
-  ), [absoluteWeek, canonicalSource, marketContextByCityId, sel]);
+    buildSelectionFromDraft(draft, sel, absoluteWeek, marketContextByCityId, canonicalSource, builtFacilities || [])
+  ), [absoluteWeek, builtFacilities, canonicalSource, marketContextByCityId, sel]);
 
   const data = useMemo<BuildData>(() => {
     const projectionCache = new WeakMap<BuildDraft, { selection: BuildSel; build: StreamingCanonicalBuildData }>();

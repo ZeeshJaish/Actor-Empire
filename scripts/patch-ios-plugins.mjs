@@ -2,7 +2,11 @@ import fs from 'node:fs';
 
 const configPath = new URL('../ios/App/App/capacitor.config.json', import.meta.url);
 const viewControllerPath = new URL('../ios/App/App/ViewController.swift', import.meta.url);
-const desiredPlugins = ['AdMobPlugin', 'PurchasesPlugin', 'TrackingPermissionPlugin'];
+/* 19 Nov 2026: Capacitor registers plugins from this list only (autoRegisterPlugins is on, so the ViewController's
+   registerPluginType calls do nothing). The game's own plugins must be named here: AeNativeSupportPlugin (Phase 1's
+   background task around saves, and device info) was missing, so it never ran on iPhone; AeSaveTransferPlugin is the
+   iPhone save export. */
+const desiredPlugins = ['AdMobPlugin', 'PurchasesPlugin', 'TrackingPermissionPlugin', 'AeNativeSupportPlugin', 'AeSaveTransferPlugin'];
 const desiredBridgeRegistrations = [
   'bridge?.registerPluginType(PurchasesPlugin.self)',
   'bridge?.registerPluginType(TrackingPermissionPlugin.self)'

@@ -1570,11 +1570,14 @@ export const submitPlayerIssueReport = (
   const issueId = createIssueId();
   const category = sanitizeName(payload.category || 'OTHER', 'issue');
   const details = String(payload.details || '').trim().slice(0, 500);
+  /* Crash fix (19 Nov 2026), FIX-PLAN item 1.10: the career's JSON size is measured once (it builds a string as
+     big as the save, 60-170 MB for the players most likely to report) and the same number goes in both places. */
+  const saveSize = estimateSaveSize(player);
   markTraceAction('player_issue_report_submit', {
     last_report_id: issueId,
     last_screen: payload.currentScreen || payload.currentPage || 'unknown',
     save_slot: getReportSaveSlot(player),
-    save_size: estimateSaveSize(player),
+    save_size: saveSize,
   });
   const runtimeContext = {
     user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 180) : 'unknown',
@@ -1590,7 +1593,7 @@ export const submitPlayerIssueReport = (
     detail_preview: details || 'no_details',
     detail_length: details.length,
     save_slot: getReportSaveSlot(player),
-    save_size: estimateSaveSize(player),
+    save_size: saveSize,
     ...getPlayerSnapshot(player),
     ...getProductionHouseSnapshot(player),
     recent_logs: getRecentLogSnapshot(player),

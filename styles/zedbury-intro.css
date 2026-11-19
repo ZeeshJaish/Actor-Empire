@@ -16,48 +16,36 @@
   --zb-red:#f23117;
   --zb-ink:#050505;
   --zb-paper:#efe9e3;
-  /* one size and one optical lift, shared by the mark and the caption so the
-     two stay locked to each other at any viewport */
+  /* one size, shared with the boot logo in index.html (.ae-boot-shell__mark) */
   --zb-size:min(70vw,326px);
-  --zb-lift:3vh;
 }
 
+/* Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md item 2.3 (decision 4): one steady logo. The card
+   takes over from index.html's boot logo, which shows the same mark while the game's code loads. It used to start
+   invisible (120 ms of black, then a 0.42 s fade-in) and 3vh higher, so every launch blinked between the two logos.
+   Now it draws exactly what the boot logo draws, in the same place: the same centred column (the mark, a 46px gap,
+   the caption on a 12px line), visible from its first frame. The hold and the fade-out are unchanged. */
 #act1.zb-act{
   background:var(--zb-ink);
   z-index:61;              /* above the host's grain/vignette: this ident is flat */
   overflow:hidden;
+  gap:46px;                /* .phase makes #act1 a centred column, like .ae-boot-shell */
 }
 
 .zb-box{
-  position:absolute;left:50%;top:calc(50% - var(--zb-lift));
   width:var(--zb-size);
-  transform:translate(-50%,-50%);
-  opacity:0;
 }
 .zb-art{width:100%;height:auto;display:block}
 
 .zb-caption{
-  position:absolute;left:50%;
-  /* clears the mark: half its height (the artwork is 1394/1500 as tall as it
-     is wide) plus a fixed gap, measured from the lifted centre */
-  top:calc(50% - var(--zb-lift) + var(--zb-size) * .465 + 46px);
-  transform:translateX(-50%);
   font-family:'Archivo',sans-serif;
   font-weight:700;
   font-size:10px;
+  line-height:12px;
   letter-spacing:.5em;text-indent:.5em;  /* indent balances the trailing track */
   text-transform:uppercase;
   color:var(--zb-paper);
   white-space:nowrap;
-  opacity:0;
-}
-
-/* in */
-#act1.on .zb-box{animation:zbFadeIn .42s ease .12s both}
-#act1.on .zb-caption{animation:zbFadeIn .42s ease .24s both}
-@keyframes zbFadeIn{
-  from{opacity:0}
-  to  {opacity:1}
 }
 
 /* and out — this is also the hand-over: the frame it leaves is black,

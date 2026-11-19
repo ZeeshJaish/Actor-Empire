@@ -14,6 +14,7 @@ import {
   type TransferMediaRecord,
 } from './mediaStorage';
 import type { Player } from '../types';
+import { hasWebCryptoSubtle, hmacSha256Fallback, sha256Fallback } from './sha256Fallback';
 
 const ARCHIVE_FORMAT = 'actor-empire-save-transfer';
 const ARCHIVE_FORMAT_VERSION = 1;
@@ -34,26 +35,27 @@ interface AndroidSaveTransferPlugin {
 }
 
 /* Perf plan (2026-11-08): a big career reaches the Android export file in pieces (see bridgeChunks).
-   A build whose native side cannot take pieces falls back to the single call. */
-const shareAndroidExport = async (filename: string, content: string) => {
+   A build whose native side cannot take pieces falls back to the single call.
+   19 Nov 2026: iPhone has the same calls (ios/.../AeSaveTransferPlugin.swift), so both phones export the same way. */
+const shareNativeExport = async (plugin: AndroidSaveTransferPlugin, filename: string, content: string) => {
   if (content.length <= BRIDGE_CHUNK_CHARS) {
-    await AndroidSaveTransfer.shareExport({ filename, content });
+    await plugin.shareExport({ filename, content });
     return;
   }
   let exportId: string | null = null;
   try {
-    exportId = (await AndroidSaveTransfer.beginExport({ filename })).id;
+    exportId = (await plugin.beginExport({ filename })).id;
   } catch {
-    await AndroidSaveTransfer.shareExport({ filename, content });
+    await plugin.shareExport({ filename, content });
     return;
   }
   try {
     for (const chunk of splitForBridge(content)) {
-      await AndroidSaveTransfer.appendExport({ id: exportId, chunk });
+      await plugin.appendExport({ id: exportId, chunk });
     }
-    await AndroidSaveTransfer.finishExport({ id: exportId, chars: content.length });
+    await plugin.finishExport({ id: exportId, chars: content.length });
   } catch (error) {
-    await AndroidSaveTransfer.cancelExport({ id: exportId }).catch(() => undefined);
+    await plugin.cancelExport({ id: exportId }).catch(() => undefined);
     throw error;
   }
 };
@@ -122,9 +124,21 @@ export interface SaveTransferImportOptions {
 }
 
 const AndroidSaveTransfer = registerPlugin<AndroidSaveTransferPlugin>('AndroidSaveTransfer');
+const IosSaveTransfer = registerPlugin<AndroidSaveTransferPlugin>('AeSaveTransfer');
 
-export const isAndroidSaveTransferSurface = () => (
+/** The phone's own export (a file and the system share sheet), or null where there is none (web, an older iOS app). */
+const nativeSaveTransfer = (): AndroidSaveTransferPlugin | null => {
+  if (!Capacitor.isNativePlatform()) return null;
+  const platform = Capacitor.getPlatform();
+  if (platform === 'android' && Capacitor.isPluginAvailable('AndroidSaveTransfer')) return AndroidSaveTransfer;
+  if (platform === 'ios' && Capacitor.isPluginAvailable('AeSaveTransfer')) return IosSaveTransfer;
+  return null;
+};
+
+/** 19 Nov 2026: save transfer (export and import) on Android, and on iPhone wherever the app has its export plugin. */
+export const isSaveTransferSurface = () => (
   Capacitor.getPlatform() === 'android'
+  || (Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('AeSaveTransfer'))
 );
 
 const textEncoder = new TextEncoder();
@@ -151,7 +165,13 @@ const stableStringify = (value: unknown): string => {
   return 'null';
 };
 
+/* 19 Nov 2026: Web Crypto only exists on a page the web view counts as secure; without it (an iPhone web view loaded
+   over plain http, for one) the same signature comes from services/sha256Fallback.ts. */
+const toArrayBuffer = (bytes: Uint8Array) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
 const signBody = async (body: SaveTransferBody) => {
+  const message = textEncoder.encode(stableStringify(body));
+  if (!hasWebCryptoSubtle()) return base64UrlEncode(toArrayBuffer(hmacSha256Fallback(textEncoder.encode(TRANSFER_SECRET), message)));
   const key = await crypto.subtle.importKey(
     'raw',
     textEncoder.encode(TRANSFER_SECRET),
@@ -159,12 +179,14 @@ const signBody = async (body: SaveTransferBody) => {
     false,
     ['sign']
   );
-  const signature = await crypto.subtle.sign('HMAC', key, textEncoder.encode(stableStringify(body)));
+  const signature = await crypto.subtle.sign('HMAC', key, message);
   return base64UrlEncode(signature);
 };
 
 const hashTransferValue = async (value: unknown) => {
-  const digest = await crypto.subtle.digest('SHA-256', textEncoder.encode(stableStringify(value)));
+  const bytes = textEncoder.encode(stableStringify(value));
+  if (!hasWebCryptoSubtle()) return base64UrlEncode(toArrayBuffer(sha256Fallback(bytes)));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
   return base64UrlEncode(digest);
 };
 
@@ -326,8 +348,9 @@ const downloadArchiveInBrowser = (filename: string, content: string) => {
 };
 
 const shareArchive = async (filename: string, content: string) => {
-  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('AndroidSaveTransfer')) {
-    await shareAndroidExport(filename, content);
+  const native = nativeSaveTransfer();
+  if (native) {
+    await shareNativeExport(native, filename, content);
     return;
   }
 
@@ -396,13 +419,36 @@ export const exportSignedSaveArchive = async (): Promise<SaveTransferResult> => 
 const pickArchiveFileText = () => new Promise<string>((resolve, reject) => {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.aesave,application/json,text/json';
+  /* iPhone greys out files whose type it does not know, and .aesave is the game's own: there the picker shows every
+     file, and the signature check below still refuses anything that is not a transfer file. */
+  if (Capacitor.getPlatform() !== 'ios') input.accept = '.aesave,application/json,text/json';
   input.style.position = 'fixed';
   input.style.left = '-9999px';
 
+  let changed = false;
+  let closeTimer: number | null = null;
+  /* 19 Nov 2026: the picker's 'cancel' event only exists from iOS 16.4 (the game runs from iOS 15). On older web views
+     closing the picker without a file sent nothing at all, so the import button stayed on "Importing" until a restart.
+     The picker covers the whole screen, so a touch on the page means it is closed: if no file came in by then (plus a
+     moment for a late change event), it was closed without one. */
+  const onPageTouch = () => {
+    if (changed || closeTimer !== null) return;
+    closeTimer = window.setTimeout(() => {
+      closeTimer = null;
+      if (changed || (input.files && input.files.length > 0)) return;
+      remove();
+      reject(new Error('No file selected.'));
+    }, 1500);
+  };
+  const remove = () => {
+    document.removeEventListener('pointerdown', onPageTouch, true);
+    if (closeTimer !== null) { window.clearTimeout(closeTimer); closeTimer = null; }
+    if (input.parentNode) input.parentNode.removeChild(input);
+  };
   input.onchange = async () => {
+    changed = true;
     const file = input.files?.[0];
-    document.body.removeChild(input);
+    remove();
     if (!file) {
       reject(new Error('No file selected.'));
       return;
@@ -413,9 +459,12 @@ const pickArchiveFileText = () => new Promise<string>((resolve, reject) => {
       reject(error);
     }
   };
+  // 19 Nov 2026: closing the picker without a file used to leave the import button on "Importing" until a restart
+  input.addEventListener('cancel', () => { remove(); reject(new Error('No file selected.')); });
 
   document.body.appendChild(input);
   input.click();
+  document.addEventListener('pointerdown', onPageTouch, true);
 });
 
 const normalizeArchiveText = (rawText: string) => rawText.replace(/^\uFEFF/, '').trim();

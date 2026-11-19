@@ -107,9 +107,18 @@ const readLogical=(store:IDBObjectStore,keys:readonly string[],done:(values:unkn
             if(suffix==='__integrity')return {kind:'wrapperManifest',keys:[base+'__previous',key]};
             return {kind:'pairAsGeneration',keys:[base,base+'__integrity',key]};
         });
-        const physical=[...new Set(plans.flatMap(plan=>plan.keys))];
+        /* Crash fix (19 Nov 2026): a wrapper plan's fallback (the CURRENT copy K, or its manifest) is read only when the
+           PREVIOUS record is not a generation record. Before, both full careers were deserialized on about half of all
+           loads (head PREVIOUS) and the older one was thrown away. Both reads run in this one readonly transaction, so
+           they see the same snapshot and every result is the same as before. */
+        const isWrapper=(plan:Plan)=>plan.kind==='wrapperPlayer'||plan.kind==='wrapperManifest';
+        const physical=[...new Set(plans.flatMap(plan=>isWrapper(plan)?[plan.keys[0]]:plan.keys))];
         readSnapshot(store,physical,values=>{
             const byKey=new Map(physical.map((key,index)=>[key,values[index]]));
+            const fallback=[...new Set(plans.filter(plan=>isWrapper(plan)&&!isGenerationRecord(byKey.get(plan.keys[0])))
+                .map(plan=>plan.keys[1]).filter(key=>!byKey.has(key)))];
+            readSnapshot(store,fallback,more=>{
+            fallback.forEach((key,index)=>byKey.set(key,more[index]));
             done(plans.map(plan=>{
                 const first=byKey.get(plan.keys[0]);
                 if(plan.kind==='plain')return first??null;
@@ -123,6 +132,7 @@ const readLogical=(store:IDBObjectStore,keys:readonly string[],done:(values:unkn
                 const player=first,manifest=byKey.get(plan.keys[1]);
                 return player==null?null:generation(player,manifest,Boolean((manifest as any)?.needsRecoveryCheckpoint));
             }),heads);
+            });
         });
     });
 };

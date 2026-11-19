@@ -86,6 +86,29 @@ const requestConsent = async (): Promise<boolean> => {
     }
 };
 
+/* Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md item 2.2 (switch adsAfterOpen): since 1.0.26 the ad
+   SDK started at every launch and loaded two full-screen ads at the same moment as the start menu's career read; on
+   Android their web views live in the game's own renderer, the process the phone closes. Now only Google's consent
+   (askAdConsent) runs at launch; the game calls initAds once a career has opened and settled. A rewarded tap before
+   that starts the SDK itself, as it always could. */
+let consentAsking: Promise<boolean> | null = null;
+/** Google's consent gate on its own. A refusal or an error is asked again by the next caller, as before. */
+export const askAdConsent = async (): Promise<boolean> => {
+    if (!isNativeAds()) return true;
+    if (consentAllowsAds) return true;
+    if (!consentAsking) {
+        consentAsking = requestConsent()
+            .then(allowed => { consentAllowsAds = allowed; return allowed; })
+            .finally(() => { consentAsking = null; });
+    }
+    return consentAsking;
+};
+
+/* Crash fix (19 Nov 2026), item 2.2: a No Ads owner never sees a forced break (forcedAds: NO_ADS), so the game never
+   loads an interstitial for one (it held an ad creative and its web view for the whole session). */
+let interstitialWanted = true;
+export const setInterstitialWanted = (wanted: boolean) => { interstitialWanted = wanted; };
+
 export const initAds = async () => {
     if (!isNativeAds()) {
         if (window.adConfig) {
@@ -106,7 +129,7 @@ export const initAds = async () => {
     }
 
     initializing = (async () => {
-        consentAllowsAds = await requestConsent();
+        await askAdConsent();
         if (!consentAllowsAds) {
             console.warn('AdMob not started: consent does not allow ad requests yet');
             return;
@@ -142,6 +165,7 @@ const SHOW_SAFETY_MS = 120_000;
 
 export const preloadInterstitial = () => {
     if (!isNativeAds() || !initialized || !consentAllowsAds || privacyOptionsOpen || !AdMob?.prepareInterstitial) return;
+    if (!interstitialWanted) return;
     if (interstitialState !== 'IDLE') return;
     if (Date.now() - lastLoadFailedAt < LOAD_RETRY_MS) return;
     interstitialState = 'LOADING';

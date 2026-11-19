@@ -15,12 +15,12 @@ interface Props {
 /**
  * ZEDBURY STUDIOS — the studio ident.
  *
- * Deliberately plain: the mark fades in, holds, and fades out — about a second
- * and a half, start to finish. No draw-on, no build, no camera move, no colour
+ * Deliberately plain: the mark holds, then fades out — about a second and a
+ * half, start to finish. No draw-on, no build, no camera move, no colour
  * field. A studio card, not a set piece.
  *
- *   0.12s  the mark fades up on black
- *   0.24s  the caption follows
+ *   0s     the mark and the caption, already on screen where index.html's boot
+ *          logo drew them (crash fix, 19 Nov 2026: no fade-in, so no blink)
  *   1.15s  Act I is dismissed and both fade out
  *
  * The fade-out is also the hand-over: the frame it leaves is black, which is

@@ -40,6 +40,7 @@ import { PressConferenceEvent } from './views/PressConferenceEvent';
 import { ActorEmpireIntroStyle } from './components/ActorEmpireIntro';
 import { StartupLoadingBar } from './components/StartupLoadingBar';
 import ZedburyStudiosIntro from './components/ZedburyStudiosIntro';
+import { ScreenErrorBoundary } from './components/ScreenErrorBoundary';
 import type { NewCareerData } from './components/types';
 import { processGameWeek } from './services/gameLoop';
 import { generateAuditions, generatePartTimeJobs, rewardGenreExperience } from './services/roleLogic';
@@ -49,7 +50,7 @@ import { createBusiness, normalizeStudioState } from './services/businessLogic';
 import { CheckCircle, Heart, ShieldAlert, AlertTriangle, PlayCircle, Skull, Briefcase, Baby, ChevronRight } from 'lucide-react';
 import { useGameActions } from './hooks/useGameActions';
 import { PROPERTY_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG, CLOTHING_CATALOG } from './services/lifestyleLogic';
-import { showAd, initAds, isAdOnScreen } from './services/adLogic';
+import { showAd, initAds, isAdOnScreen, askAdConsent, setInterstitialWanted } from './services/adLogic';
 import { careerStartFlag, forcedAdCareerWeek, isForcedAdTrouble, msSinceLastAd, noteAdClosed, noteForcedAdWeekPassed, noteRatingAsked, noteRealPurchase, setForcedAdContext, showForcedAd } from './services/forcedAds';
 import { rewardedCashAmount } from './services/rewardedCash';
 import { announceStreamingPlusUnlocked, setStreamingPlusOwnedNow } from './services/streamingPlusEvents';
@@ -86,8 +87,9 @@ import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
 import { markPortraitLoadDone } from './services/npcAvatar';
-import { readSaveWriteRecord } from './services/saveWriteLimits';
-import { getRecoveryFlaggedVersions, isSwitchOn, startSessionSwitches } from './services/remoteSwitches';
+import { forgetSaveWriteRecord, readSaveWriteRecord } from './services/saveWriteLimits';
+import { getRecoveryFlaggedVersions, getSwitchLimit, isSwitchOn, startSessionSwitches } from './services/remoteSwitches';
+import { getRamClass, rememberNativeMemoryGiB } from './services/deviceMemoryClass';
 import { findFlaggedVersionOffer, isRecoveryOfferAnswered, offerForFailedLoad, pointFromCopy, rememberRecoveryOfferAnswered, weeksLostByRestoring, type RecoveryPoint, type RecoveryReason } from './services/recoveryList';
 import { deliverDeveloperNotes } from './services/developerNotes';
 import { prepareExternalPlayerUpdateForUi, prepareProcessedWeekForUi, prepareTrustedMarketUpdateForUi } from './services/playerUiState';
@@ -98,7 +100,7 @@ import { checkpointNativeMemoryPressure } from './services/nativeMemoryCheckpoin
 import { getNativeDeviceInfo, withNativeBackgroundTask } from './services/nativeSupport';
 import { notePageHiddenOrMemory, notePageSaveStarted, notePageScreen, notePageWeekAhead, notePageWeekStage, type PageSaveKind } from './services/pageStateBreadcrumb';
 import { exportSaveSlotForSupport, exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
-import { noteSessionClean, noteSessionDetail, noteSessionLive, takeUncleanPreviousSession } from './services/sessionBreadcrumb';
+import { markSelfReload, noteSessionClean, noteSessionDetail, noteSessionLive, noteSessionPhase, takeUncleanPreviousSession } from './services/sessionBreadcrumb';
 import { createCopyOnTouch } from './services/copyOnTouch';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
 import { externalizeCustomPostersInPlayer, hasEmbeddedCustomPosters } from './services/customPosterMedia';
@@ -221,14 +223,16 @@ const WEEK_AHEAD_KILLED_KEY = 'actorEmpire.weekAhead.offAfterKill.';
    Week Ahead runs only where the device reports 4 GB of memory or more (navigator.deviceMemory: Android WebView,
    Chrome). The iOS WebView does not report it, so the iOS app writes the phone's RAM in GiB into
    window.__aeDeviceMemoryGB (ios/App/App/ViewController.swift). iOS closes a WebView that uses too much memory
-   sooner than Android does, so iPhones need 6 GB or more (a 6 GB iPhone reports about 5.4 GiB, a 4 GB one 3.7). */
-const WEEK_AHEAD_MIN_DEVICE_GB = 4;
-const WEEK_AHEAD_MIN_IOS_GIB = 5;
+   sooner than Android does, so iPhones need 6 GB or more (a 6 GB iPhone reports about 5.4 GiB, a 4 GB one 3.7).
+   Crash fix (19 Nov 2026), FIX-PLAN decision 7: by the phone's real memory class (services/deviceMemoryClass.ts),
+   because deviceMemory reads 4 on 4 GB and 6 GB Android phones alike. Week Ahead runs on 4_6 and up: 6 GB Android
+   phones and up, and on iPhones exactly as before (6 GB and up; no iPhone reports between 4 and 5 GiB). 4 GB Android
+   phones (3_4), which ran it in 1.0.28 and 1.0.29, stop until the kill reports show they can hold it; the weekAhead
+   switch's limits (1 or 0 by RAM class) can change that from Firebase. */
+const WEEK_AHEAD_BY_RAM_CLASS: Record<string, number> = { lt3: 0, '3_4': 0, '4_6': 1, '6_8': 1, '8p': 1, unknown: 0 };
 const deviceAffordsWeekAhead = (): boolean => {
-    const gb = Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory);
-    if (Number.isFinite(gb) && gb > 0) return gb >= WEEK_AHEAD_MIN_DEVICE_GB;
-    const iosGiB = Number((window as Window & { __aeDeviceMemoryGB?: number }).__aeDeviceMemoryGB);
-    return Number.isFinite(iosGiB) && iosGiB >= WEEK_AHEAD_MIN_IOS_GIB;
+    const ramClass = getRamClass();
+    return getSwitchLimit('weekAhead', ramClass, WEEK_AHEAD_BY_RAM_CLASS[ramClass] ?? 0) > 0;
 };
 /* After a memory warning from the system (iOS didReceiveMemoryWarning → 'actor-empire-memory-warning'), Week Ahead
    stays off until the app restarts: the worker's copy of the career is the first memory the game can give back. */
@@ -256,14 +260,8 @@ const getDevicePhoneModel = (): string => {
     const match = /Android [^;)]*;\s*([^;)]+?)(?:\s+Build\/|\))/.exec(typeof navigator !== 'undefined' ? navigator.userAgent || '' : '');
     return match ? match[1].trim().slice(0, 40) : 'unknown';
 };
-/** Phase 1 (2026-11-17), telemetry v2: the phone's memory class (Android WebView's deviceMemory, iOS's injected GiB). */
-const getRamClass = (): string => {
-    const ios = Number((window as Window & { __aeDeviceMemoryGB?: number }).__aeDeviceMemoryGB);
-    const android = Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory);
-    const gb = Number.isFinite(ios) && ios > 0 ? ios : Number.isFinite(android) && android > 0 ? android : NaN;
-    if (!Number.isFinite(gb)) return 'unknown';
-    return gb < 3 ? 'lt3' : gb < 4 ? '3_4' : gb < 6 ? '4_6' : gb < 8 ? '6_8' : '8p';
-};
+/* Phase 1 (2026-11-17), telemetry v2: the phone's memory class. Crash fix (19 Nov 2026), item 1.9: getRamClass now
+   comes from services/deviceMemoryClass.ts and reads the phone's real memory (the native total on Android). */
 /* Phase 1 (2026-11-17), plan item 8: this launch's switches, from what the previous launch read from Firebase. */
 startSessionSwitches({ ramClass: getRamClass(), version: APP_DISPLAY_VERSION });
 /** Phase 1 (2026-11-17), telemetry v2: the game's stored data (both copies of every slot) as a size class. */
@@ -354,6 +352,8 @@ const STARTUP_LOADING_LINE_KEYS = [
    read finishes behind it. */
 const STARTUP_LOADING_BAR_MS = Math.max(1400, STARTUP_LOADING_MIN_MS - STARTUP_STUDIO_BUMPER_MS - 260);
 const STARTUP_CAREER_EXTRA_WAIT_MS = 3000;
+/** Crash fix (19 Nov 2026), FIX-PLAN item 2.2: the ad SDK starts this long after a career is playing (then when idle). */
+const ADS_AFTER_OPEN_MS = 10_000;
 // Not an 'actorEmpire' key: save transfers copy those to other phones, and this belongs to this phone.
 const STARTUP_SLOT_PRELOAD_GUARD_KEY = 'aeStartupSlotPreloadGuardV1';
 
@@ -387,7 +387,11 @@ type StartupSlotPreload = {
   settled: boolean;
   result: StartupSlotPreloadResult | null;
   promise: Promise<StartupSlotPreloadResult>;
+  /** Crash fix (19 Nov 2026), item 1.8: 'open' once a tap uses the read career, 'dropped' once nothing will. */
+  holder?: 'open' | 'dropped';
 };
+/** What a dropped read leaves behind: nothing that holds a career. */
+const STARTUP_PRELOAD_DROPPED: StartupSlotPreloadResult = { kind: 'FAILED' };
 
 // The same save: any later save of that slot changes its saved time, so a stale read is never used.
 const getStartupSummaryKey = (summary: SaveSlotSummary | null | undefined) => (summary
@@ -406,7 +410,7 @@ const pickStartupPreloadSlot = (summaries: Record<number, SaveSlotSummary | null
   return best;
 };
 
-type StartupSlotPreloadGuard = { state?: 'running' | 'idle'; slot?: number; deadStarts?: number; skipOnce?: boolean };
+type StartupSlotPreloadGuard = { state?: 'running' | 'idle'; slot?: number; deadStarts?: number; skipOnce?: boolean; version?: string };
 const readStartupSlotPreloadGuard = (): StartupSlotPreloadGuard => {
   try {
     const raw = localStorage.getItem(STARTUP_SLOT_PRELOAD_GUARD_KEY);
@@ -417,16 +421,47 @@ const readStartupSlotPreloadGuard = (): StartupSlotPreloadGuard => {
 };
 const writeStartupSlotPreloadGuard = (guard: StartupSlotPreloadGuard) => {
   try {
-    localStorage.setItem(STARTUP_SLOT_PRELOAD_GUARD_KEY, JSON.stringify(guard));
+    // crash fix (19 Nov 2026): the guard names the app version that wrote it (older builds ignore the field)
+    localStorage.setItem(STARTUP_SLOT_PRELOAD_GUARD_KEY, JSON.stringify({ ...guard, version: APP_DISPLAY_VERSION }));
   } catch {
     // The guard is only a safety net for the next start.
   }
+};
+const guardDeadStarts = (guard: StartupSlotPreloadGuard) => Math.max(0, Math.round(Number(guard.deadStarts) || 0));
+/* Crash fix (19 Nov 2026), qa/2026-11-19-crash-scene/FIX-PLAN.md item 1.8 (switch launchLadder). In 1.0.26-1.0.29
+   the guard went back to idle as soon as the read settled, so a phone that died on the title screen or during the
+   tap, with the read career held next to the start menu, never counted a dead start and the next launch read it
+   again: about 3 start-menu closes per affected iPhone on 1.0.28. Now:
+   - the guard stays 'running' from the claim until the read career is used (the open that took it finished or
+     failed) or dropped (deleted, sent to the developer, imported over, a new career, a save of that slot, the page
+     hidden);
+   - hiding the page sets it idle, because a phone may close a hidden app at any time and that is not a dead start;
+     showing it again sets it back while the read or the open still runs;
+   - a new app version starts the count again.
+   With the switch off it works as in 1.0.26-1.0.29: running only while the read runs. */
+let startupGuardHeld = false;
+let startupGuardSettled = false;
+const startupLadderOn = () => isSwitchOn('launchLadder');
+/** Once per launch, before anything reads: a guard this version left 'running' means the last launch ended while
+ *  a read career was read, held on screen or opened. That is a dead start, and this launch skips the read. */
+const settleStartupSlotPreloadGuard = () => {
+  if (startupGuardSettled || !startupLadderOn()) return;
+  startupGuardSettled = true;
+  const guard = readStartupSlotPreloadGuard();
+  if (guard.version !== APP_DISPLAY_VERSION) {
+    if (guard.state !== undefined || guardDeadStarts(guard) > 0 || guard.skipOnce) writeStartupSlotPreloadGuard({ state: 'idle', deadStarts: 0 });
+    return;
+  }
+  if (guard.state !== 'running') return;
+  const deadStarts = guardDeadStarts(guard) + 1;
+  writeStartupSlotPreloadGuard({ state: 'idle', slot: guard.slot, deadStarts, skipOnce: true });
+  trackGameEvent('startup_slot_preload_skipped', { save_slot: guard.slot ?? 0, dead_starts: deadStarts });
 };
 // A start that ended during the read (the phone closed the game, or the player did) skips the next
 // read; a second one turns the read off on this phone for good. Continue then works as before.
 const claimStartupSlotPreload = (slot: number): boolean => {
   const guard = readStartupSlotPreloadGuard();
-  const deadStarts = Math.max(0, Math.round(Number(guard.deadStarts) || 0));
+  const deadStarts = guardDeadStarts(guard);
   if (guard.state === 'running') {
     writeStartupSlotPreloadGuard({ state: 'idle', slot: guard.slot, deadStarts: deadStarts + 1, skipOnce: true });
     trackGameEvent('startup_slot_preload_skipped', { save_slot: guard.slot ?? 0, dead_starts: deadStarts + 1 });
@@ -435,16 +470,69 @@ const claimStartupSlotPreload = (slot: number): boolean => {
   if (guard.skipOnce || deadStarts >= 2) return false;
   writeStartupSlotPreloadGuard({ state: 'running', slot, deadStarts });
   // no read without its safety net: a phone that could not store the mark gets no read
-  return readStartupSlotPreloadGuard().state === 'running';
+  startupGuardHeld = readStartupSlotPreloadGuard().state === 'running';
+  return startupGuardHeld;
 };
 
-// The read finished: keep the count of dead starts only.
+// The read career was used or dropped (with launchLadder off: the read finished). Keep the count of dead starts only.
 const releaseStartupSlotPreload = () => {
+  if (!startupGuardHeld) return;
+  startupGuardHeld = false;
   const guard = readStartupSlotPreloadGuard();
-  const deadStarts = Math.max(0, Math.round(Number(guard.deadStarts) || 0));
+  const deadStarts = guardDeadStarts(guard);
   if (guard.state === undefined && !deadStarts) return;
   writeStartupSlotPreloadGuard({ state: 'idle', deadStarts });
 };
+// Crash fix (19 Nov 2026), item 1.8: hidden, the guard is idle (a closed hidden app is not a dead start); shown, it
+// counts again while the read career is still being read, held or opened.
+const pauseStartupSlotPreloadGuard = () => {
+  if (!startupGuardHeld || !startupLadderOn()) return;
+  const guard = readStartupSlotPreloadGuard();
+  if (guard.state === 'running') writeStartupSlotPreloadGuard({ ...guard, state: 'idle' });
+};
+const resumeStartupSlotPreloadGuard = () => {
+  if (!startupGuardHeld || !startupLadderOn()) return;
+  const guard = readStartupSlotPreloadGuard();
+  if (guard.state !== 'running') writeStartupSlotPreloadGuard({ ...guard, state: 'running' });
+};
+/* Crash fix (19 Nov 2026), FIX-PLAN item 2.1 (switch launchPreload, decision 2): the start menu reads a career only
+   where it fits. 1.0.26-1.0.29 read and migrated the last career under the logo on every phone; with a big career
+   the start menu needed about 3x the memory of playing it (JS heap 353 MB against 84 MB with no career, Chromium at
+   CPU 4x), and that is where phones closed the game. Now the read runs only when the phone's real memory class
+   (services/deviceMemoryClass.ts) and the slot's last saved size (Phase 1's per-slot save record, in
+   saveSizeUnits) fit the table below. Everywhere else Continue reads the career on the tap behind the loading
+   screen, as in 1.0.25 and on the guard's skip path, so game results are the same either way.
+   - 8 GB phones and up (6_8, 8p): any size; they stay instant even for big careers (decision 2).
+   - 4 GB and 6 GB phones (3_4, 4_6, which hold every 4 GB and 6 GB iPhone): up to about 15 MB. Nine careers measured
+     on 19 Nov: about 950 units at 0.1 MB, 11,600-15,600 at 7-8 MB, 116,000 at 35 MB and 245,000-320,000 at
+     63-76 MB, so 32,000 units is about 15 MB.
+   - under 3 GB, or memory unknown: never.
+   A slot with no save record is not read: that is every slot on the first launch of 1.0.30, the heaviest launch
+   after an update. The switch's limits (units by class: 0 never, a negative number no limit) change the table from
+   Firebase; the switch off reads on every phone again, as before. */
+const STARTUP_PRELOAD_MAX_UNITS: Record<string, number> = { lt3: 0, '3_4': 32_000, '4_6': 32_000, '6_8': -1, '8p': -1, unknown: 0 };
+type StartupPreloadDecision = { read: boolean; why: 'fits' | 'switch_off' | 'hidden' | 'ram' | 'no_size' | 'size'; ramClass: string; units: number };
+const decideStartupPreload = (slot: number): StartupPreloadDecision => {
+  const ramClass = getRamClass();
+  const units = Math.round(Number(readSaveWriteRecord(`actorEmpireSave_${slot}`)?.units) || 0);
+  // a page loaded in the background (Android can recreate the game there) never reads a career
+  if (document.visibilityState === 'hidden') return { read: false, why: 'hidden', ramClass, units };
+  if (!isSwitchOn('launchPreload')) return { read: true, why: 'switch_off', ramClass, units };
+  const limit = getSwitchLimit('launchPreload', ramClass, STARTUP_PRELOAD_MAX_UNITS[ramClass] ?? 0);
+  if (limit === 0) return { read: false, why: 'ram', ramClass, units };
+  if (!(units > 0)) return { read: false, why: 'no_size', ramClass, units };
+  if (limit > 0 && units > limit) return { read: false, why: 'size', ramClass, units };
+  return { read: true, why: 'fits', ramClass, units };
+};
+/* Crash fix (19 Nov 2026), item 1.8 (switch launchLadder): a launch right after the phone closed the game (the
+   previous session of this version ended while open, less than 10 minutes ago, in any phase) does not read a
+   career at start-up even where it would fit. The phone has just run out of memory, and an automatic restart must
+   not repeat what came before. */
+const LIGHT_START_WINDOW_MS = 10 * 60_000;
+const isLightStartAfterDeath = (previous: { version?: string; at?: number } | null): boolean => (
+  !!previous && startupLadderOn() && previous.version === APP_DISPLAY_VERSION
+  && Date.now() - Number(previous.at || 0) < LIGHT_START_WINDOW_MS
+);
 // A career opened the normal way after a skipped read: the next start may read again.
 const clearStartupSlotPreloadSkip = () => {
   const guard = readStartupSlotPreloadGuard();
@@ -743,11 +831,14 @@ export class GameErrorBoundary extends React.Component<GameErrorBoundaryProps, G
 
     componentDidCatch(error: Error, info?: React.ErrorInfo) {
         console.error('Game render crash recovered by boundary:', error);
-        recordNonFatal(error, 'react_render_boundary_recovered');
+        /* Crash fix (19 Nov 2026), FIX-PLAN item 1.11: the error's own stack (where it was thrown) goes with the report
+           too. 1.0.29's reports carried React's component stack only, which names the screen but not the line. */
+        const thrownAt = String(error?.stack || '').trim();
+        recordNonFatal(error, 'react_render_boundary_recovered', { error_stack: thrownAt.replace(/\s+/g, ' ').slice(0, 480) });
         noteStoreReviewTrouble('recovery_mode');
         this.setState({
             errorMessage: String(error?.message || error || 'unknown').slice(0, 300),
-            errorStack: String(info?.componentStack || error?.stack || '').trim().slice(0, 900),
+            errorStack: [thrownAt.slice(0, 700), String(info?.componentStack || '').trim().slice(0, 700)].filter(Boolean).join('\n--\n'),
         });
     }
 
@@ -902,6 +993,8 @@ export const App: React.FC = () => {
           return false;
       }
   });
+  // Crash fix (19 Nov 2026), item 1.8: read before the mount effect marks this session live (isLightStartAfterDeath).
+  const [lightStartAfterDeath] = useState(() => isLightStartAfterDeath(takeUncleanPreviousSession()));
   const [startupStudioBumperElapsed, setStartupStudioBumperElapsed] = useState(false);
   const [startupStudioBumperExiting, setStartupStudioBumperExiting] = useState(false);
   const [startupMinimumElapsed, setStartupMinimumElapsed] = useState(false);
@@ -909,6 +1002,41 @@ export const App: React.FC = () => {
   const [startupSavesListed, setStartupSavesListed] = useState(false);
   const startupSlotPreloadRef = useRef<StartupSlotPreload | null>(null);
   const slotOpenInProgressRef = useRef(false);
+  const startupPreloadDecisionSentRef = useRef(false);
+  /* Crash fix (19 Nov 2026), FIX-PLAN item 1.7: the start menu's phase in the "still open" marker, so a phone that
+     closes the game there says when: loading (the logos and the bar), preload (reading a career), held (a read
+     career kept for Continue), title (the menu, nothing held) or open:<slot> (the tap, until the career plays). */
+  const gameStatusRef = useRef(gameStatus);
+  gameStatusRef.current = gameStatus;
+  const startupLoadingVisibleRef = useRef(true);
+  const openingSlotRef = useRef<number | null>(null);
+  const startPhaseRef = useRef('');
+  const refreshStartPhase = () => {
+      if (gameStatusRef.current !== 'START_MENU') { startPhaseRef.current = ''; return; }
+      const entry = startupSlotPreloadRef.current;
+      const phase = openingSlotRef.current ? `START_MENU:open:${openingSlotRef.current}`
+          : entry && !entry.settled ? 'START_MENU:preload'
+          : entry ? 'START_MENU:held'
+          : startupLoadingVisibleRef.current ? 'START_MENU:loading' : 'START_MENU:title';
+      if (phase === startPhaseRef.current) return;
+      startPhaseRef.current = phase;
+      noteSessionPhase(phase);
+      addBreadcrumb('startup:phase', { phase });
+  };
+  /* Crash fix (19 Nov 2026), item 1.8: the start menu lets go of its read career (deleted, imported over, sent to
+     the developer, a new career, a save of that slot, the page hidden). A read still running is let go when it
+     settles. Nothing is lost: a tap reads the career again. */
+  const dropStartupSlotPreload = () => {
+      const entry = startupSlotPreloadRef.current;
+      startupSlotPreloadRef.current = null;
+      if (!entry) return;
+      entry.holder = 'dropped';
+      if (!entry.settled) return;
+      entry.result = null;
+      entry.promise = Promise.resolve(STARTUP_PRELOAD_DROPPED);
+      releaseStartupSlotPreload();
+      refreshStartPhase();
+  };
 
   // UI States
   const [toastMessage, setToastMessage] = useState<{title: string, subtext: string, tone?: 'warning'} | null>(null);
@@ -931,6 +1059,7 @@ export const App: React.FC = () => {
   const latestChangelogEntry = getLatestChangelogEntry();
   const previousChangelogEntries = CHANGELOG_ENTRIES.filter(entry => entry.version !== latestChangelogEntry.version);
   const isStartupLoadingVisible = isInitializing || !startupMinimumElapsed || !startupCareerSettled;
+  startupLoadingVisibleRef.current = isStartupLoadingVisible;
   const isUiOverhaulSurface = gameStatus === 'PLAYING'
     && (
       activePage === Page.HOME
@@ -970,6 +1099,8 @@ export const App: React.FC = () => {
   /* 2026-11-12 (F9): a session that ended while the game was open (a memory kill) is reported once on
      the next start, with its last screen, save time and memory (services/sessionBreadcrumb.ts) */
   useEffect(() => {
+    // Crash fix (19 Nov 2026), item 1.9: learn the phone's real memory (kept for the next launches' gates).
+    void getNativeDeviceInfo().then(device => rememberNativeMemoryGiB(device?.totalMemGb));
     const previous = takeUncleanPreviousSession();
     // store ratings: count this start; a session that ended by itself holds the rating ask back
     noteStoreReviewSession();
@@ -982,6 +1113,11 @@ export const App: React.FC = () => {
         try { localStorage.setItem(WEEK_AHEAD_KILLED_KEY + killedSlot, APP_DISPLAY_VERSION); } catch { /* optional */ }
         addBreadcrumb('week_ahead:off_after_kill', { slot: killedSlot });
       }
+      /* Crash fix (19 Nov 2026), FIX-PLAN item 1.7: the slot's size (its last save, in saveSizeUnits), whether that
+         session had started light, and how this page was loaded (reload: the iOS web view restarted by itself). */
+      const killedUnits = killedSlot > 0 ? Math.round(Number(readSaveWriteRecord(`actorEmpireSave_${killedSlot}`)?.units) || -1) : -1;
+      const bootNav = (window as Window & { __aeNavType?: string; __aeSelfReload?: boolean });
+      const navLabel = bootNav.__aeSelfReload ? 'self' : String(bootNav.__aeNavType || 'unknown').slice(0, 12);
       // Phase 1 (2026-11-17): the native shells name the phone model and its memory (services/nativeSupport.ts).
       void getNativeDeviceInfo().then(device => recordNonFatal(new Error('The previous session ended while the game was open'), 'session_ended_unexpectedly', {
         last_screen: previous.screen || 'unknown',
@@ -992,30 +1128,76 @@ export const App: React.FC = () => {
         last_version: previous.version || 'unknown',
         /* Phase 1 (2026-11-17), for the Week Ahead gate: Week Ahead's state, the slot, the game's stored MB (both copies
            of every slot) and the phone model, as one key because the Crashlytics key budget is nearly full. */
-        ended_ctx: `wa=${previous.weekAhead || 'off'};slot=${killedSlot};store_mb=${previous.storageMb ?? -1};model=${device?.model || getDevicePhoneModel()};mem_gb=${device?.totalMemGb ?? -1}`,
+        ended_ctx: `wa=${previous.weekAhead || 'off'};slot=${killedSlot};store_mb=${previous.storageMb ?? -1};model=${device?.model || getDevicePhoneModel()};mem_gb=${device?.totalMemGb ?? -1};units=${killedUnits};light=${previous.light ? 1 : 0};nav=${navLabel};ram=${getRamClass()}`,
       }));
     }
-    noteSessionLive({ version: APP_DISPLAY_VERSION, weekAhead: 'off' });
-    /* Phase 1 (2026-11-17), plan item 8: read the switches for the next launch, once the game has settled. */
+    /* Crash fix (19 Nov 2026), item 1.7: a reload the game did not ask for is the web view starting again by itself
+       (on iOS, after the phone closed it); counted on its own, with what the marker said before. */
+    {
+      const bootNav = (window as Window & { __aeNavType?: string; __aeSelfReload?: boolean });
+      if (bootNav.__aeNavType === 'reload' && !bootNav.__aeSelfReload) {
+        trackGameEvent('webview_reloaded', { last_screen: String(previous?.screen || 'none').slice(0, 40), unclean: previous ? 1 : 0 });
+      }
+    }
+    noteSessionLive({ version: APP_DISPLAY_VERSION, weekAhead: 'off', light: lightStartAfterDeath });
+    // Crash fix (19 Nov 2026), item 1.7: a page started in the background (Android can) is not marked open until shown.
+    if (document.visibilityState === 'hidden') noteSessionClean();
+    /* Phase 1 (2026-11-17), plan item 8: read the switches for the next launch. Crash fix (19 Nov 2026), item 1.7:
+       2.5 s after start instead of 15 s, so a phone the game keeps closing within seconds still gets the switches
+       that would help it (the read is one small document, with its own time limit). */
     const switchesTimer = window.setTimeout(() => {
       void fetchRemoteSwitchesForNextLaunch().catch(error => addBreadcrumb('switches:read_failed', { message: String((error as Error)?.message || error).slice(0, 80) }));
-    }, 15_000);
+    }, 2_500);
     const onVisibility = () => {
       // Phase 1 (2026-11-17): the hide breadcrumb's line for this moment (services/pageStateBreadcrumb.ts).
       notePageHiddenOrMemory(document.visibilityState === 'hidden' ? 'hide' : 'show', { stage: weekProcessingLockRef.current ? activeWeekStageRef.current : undefined });
       if (document.visibilityState === 'hidden') noteSessionClean(); else noteSessionLive();
+      /* Crash fix (19 Nov 2026), item 1.8: hidden, the start-up guard rests and the start menu lets go of a read
+         career (a tap reads it again); a read still running is let go when it settles, if the page is still hidden. */
+      if (document.visibilityState === 'hidden') {
+        pauseStartupSlotPreloadGuard();
+        const held = startupSlotPreloadRef.current;
+        if (held?.settled && startupLadderOn()) dropStartupSlotPreload();
+      } else {
+        resumeStartupSlotPreloadGuard();
+      }
     };
-    window.addEventListener('pagehide', noteSessionClean);
+    /* Crash fix (19 Nov 2026), item 1.8: a page that is closed or reloaded on purpose (pagehide) is not a dead start
+       either, even where no visibilitychange came first. A phone killing the game sends neither. */
+    const onPageHide = () => { noteSessionClean(); pauseStartupSlotPreloadGuard(); };
+    window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.clearTimeout(switchesTimer);
-      window.removeEventListener('pagehide', noteSessionClean);
+      window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
   // Phase 1 (2026-11-17): the faces drawn so far are the game code's own (Week Ahead's worker gets these at start).
   useEffect(() => { markPortraitLoadDone(); }, []);
-  useEffect(() => { noteSessionLive({ screen: gameStatus }); }, [gameStatus]);
+  /* Crash fix (19 Nov 2026), item 1.7: the phase follows the loading screen; and once per launch, how long start-up
+     took (page start to the game's first draw, then to the menu), by RAM class. */
+  const firstDrawAtRef = useRef(Date.now());
+  const startupTimingSentRef = useRef(false);
+  useEffect(() => {
+    refreshStartPhase();
+    if (isStartupLoadingVisible || startupTimingSentRef.current || gameStatus !== 'START_MENU') return;
+    startupTimingSentRef.current = true;
+    const bootAt = Number((window as Window & { __aeBootAt?: number }).__aeBootAt) || 0;
+    trackGameEvent('startup_timing', {
+      boot_to_mount_ms: bootAt ? Math.max(0, firstDrawAtRef.current - bootAt) : -1,
+      mount_to_title_ms: Math.max(0, Date.now() - firstDrawAtRef.current),
+      ram_class: getRamClass(),
+      light: lightStartAfterDeath ? 1 : 0,
+    });
+  }, [isStartupLoadingVisible]);
+  useEffect(() => {
+    // Crash fix (19 Nov 2026), item 1.7: the start menu's phase, or the screen; a hidden page stays marked closed.
+    if (gameStatus === 'START_MENU') refreshStartPhase(); else noteSessionPhase(gameStatus);
+    // Crash fix (19 Nov 2026), item 1.8: leaving the start menu for a new career lets go of its read career (an open
+    // takes it before PLAYING, so only a career nobody will use is dropped here).
+    if (gameStatus !== 'START_MENU' && startupSlotPreloadRef.current) dropStartupSlotPreload();
+  }, [gameStatus]);
   /* Store ratings (services/storeReview.ts): a week's happy moment waits here for a calm Home screen (no popup, no
      ad, no week running), then the store's own popup is asked, unless the rules hold it back by then. */
   const pendingReviewMomentRef = useRef<{ moment: StoreReviewMoment; at: number } | null>(null);
@@ -1321,7 +1503,7 @@ export const App: React.FC = () => {
       }
       clearPlayTimeSideRecord(slot, playerToSave);
       setSaveSlotSummaries(prev => ({ ...prev, [slot]: createSaveSlotSummary(playerToSave) }));
-      if (startupSlotPreloadRef.current?.slot === slot) startupSlotPreloadRef.current = null;
+      if (startupSlotPreloadRef.current?.slot === slot) dropStartupSlotPreload();
       if (prepared.needsRecoveryCheckpoint) {
           setToastMessage({
               title: 'Backup Recommended',
@@ -1446,15 +1628,32 @@ export const App: React.FC = () => {
       if (isInitializing) return;
       setStartupSavesListed(true);
       if (startupCareerSettled || startupSlotPreloadRef.current) return;
-      if (safeBootRequested || gameStatus !== 'START_MENU') {
+      settleStartupSlotPreloadGuard();
+      /* Crash fix (19 Nov 2026), items 1.8 and 2.1: one line per launch says what the start menu did and why, by
+         RAM class and size (the switches' tables are tuned from these and the kill reports). */
+      const reportDecision = (decision: string, ramClass: string = getRamClass(), units = 0) => {
+          if (startupPreloadDecisionSentRef.current) return;
+          startupPreloadDecisionSentRef.current = true;
+          addBreadcrumb('startup:preload_decision', { decision, ram_class: ramClass, units });
+          trackGameEvent('startup_preload_decision', { decision, ram_class: ramClass, size_k: Math.round(units / 1000) });
+      };
+      if (safeBootRequested || lightStartAfterDeath || gameStatus !== 'START_MENU') {
+          if (lightStartAfterDeath && gameStatus === 'START_MENU') reportDecision('light');
           setStartupCareerSettled(true);
           return;
       }
       const candidate = pickStartupPreloadSlot(saveSlotSummaries);
-      if (!candidate || !claimStartupSlotPreload(candidate.slot)) {
+      if (!candidate) {
           setStartupCareerSettled(true);
           return;
       }
+      const decision = decideStartupPreload(candidate.slot);
+      if (!decision.read || !claimStartupSlotPreload(candidate.slot)) {
+          reportDecision(decision.read ? 'guard' : decision.why, decision.ramClass, decision.units);
+          setStartupCareerSettled(true);
+          return;
+      }
+      reportDecision(decision.why === 'switch_off' ? 'read_switch_off' : 'read', decision.ramClass, decision.units);
       const { slot, summary } = candidate;
       const entry: StartupSlotPreload = {
           slot,
@@ -1466,13 +1665,19 @@ export const App: React.FC = () => {
       entry.promise = (async (): Promise<StartupSlotPreloadResult> => {
           const verifiedLoad = await loadVerifiedGameData(`actorEmpireSave_${slot}`);
           if (verifiedLoad.status !== 'CURRENT') return { kind: 'VERIFIED', verifiedLoad };
+          /* Crash fix (19 Nov 2026): take the load's small facts now, so nothing refers to the loaded career after
+             the migration. Before, the record was read again after the poster check's await, which kept the loaded
+             career alive next to its migrated copy through that check. */
+          const { needsRecoveryCheckpoint, savedAt, headFallback, appVersion } = verifiedLoad;
           const migratedFromVersion = verifiedLoad.player.flags?.saveMigrationVersion;
           let repaired = false;
+          // Crash fix (19 Nov 2026), item 2.1: one frame for the ident and the bar between the read and the migration.
+          await new Promise(resolve => window.setTimeout(resolve, 0));
           const migrated = migratePlayerSave(verifiedLoad.player, { onRepair: () => { repaired = true; } });
           const diskWorkOnTap = migratedFromVersion !== migrated.flags?.saveMigrationVersion
               || repaired
               || await hasEmbeddedCustomPosters(migrated);
-          return { kind: 'MIGRATED', migrated, migratedFromVersion, needsRecoveryCheckpoint: verifiedLoad.needsRecoveryCheckpoint, diskWorkOnTap, savedAt: verifiedLoad.savedAt, headFallback: verifiedLoad.headFallback, repaired, appVersion: verifiedLoad.appVersion };
+          return { kind: 'MIGRATED', migrated, migratedFromVersion, needsRecoveryCheckpoint, diskWorkOnTap, savedAt, headFallback, repaired, appVersion };
       })()
           .catch((error): StartupSlotPreloadResult => {
               recordNonFatal(error, 'startup_slot_preload_failed', { save_slot: slot });
@@ -1480,12 +1685,24 @@ export const App: React.FC = () => {
           })
           .then(result => {
               entry.settled = true;
-              entry.result = result;
-              releaseStartupSlotPreload();
+              /* Crash fix (19 Nov 2026), item 1.8: the guard now stays on while the read career is held on the start
+                 menu or opened. It rests here only when nothing holds a career: the read failed, the career was
+                 dropped while it read, or the page is hidden (the career is let go; a tap reads it again). */
+              if (startupLadderOn() && !entry.holder && result.kind !== 'FAILED' && document.visibilityState === 'hidden') {
+                  if (startupSlotPreloadRef.current === entry) startupSlotPreloadRef.current = null;
+                  entry.holder = 'dropped';
+              }
+              const dropped = entry.holder === 'dropped';
+              entry.result = dropped ? null : result;
+              if (!startupLadderOn() || dropped || result.kind === 'FAILED') releaseStartupSlotPreload();
+              refreshStartPhase();
               setStartupCareerSettled(true);
-              return result;
+              return dropped ? STARTUP_PRELOAD_DROPPED : result;
           });
       startupSlotPreloadRef.current = entry;
+      // Crash fix (19 Nov 2026), item 1.7: a close from here on reports this slot (and its size) and the phase.
+      noteSessionDetail({ slot });
+      refreshStartPhase();
   }, [isInitializing, startupCareerSettled]);
 
   useEffect(() => {
@@ -1834,7 +2051,11 @@ export const App: React.FC = () => {
     const initializeNativeServices = async () => {
       try {
         await ensureTrackingPermission();
-        if (!cancelled) await initAds();
+        if (cancelled) return;
+        /* Crash fix (19 Nov 2026), FIX-PLAN item 2.2 (switch adsAfterOpen, decision 3): at launch only Google's
+           consent; the ad SDK and its ads start once a career has opened and settled (the effect below). */
+        if (isSwitchOn('adsAfterOpen')) await askAdConsent();
+        else await initAds();
       } catch (error) {
         recordNonFatal(error, 'native_services_init_failed');
       }
@@ -1844,6 +2065,39 @@ export const App: React.FC = () => {
       cancelled = true;
     };
   }, [isInitializing, safeBootRequested]);
+
+  /* Crash fix (19 Nov 2026), item 2.2: a No Ads owner (this career, or this phone's kept purchases) never has an
+     interstitial loaded; forced breaks never show to them anyway. */
+  const playerOwnsNoAds = gameStatus === 'PLAYING' && hasNoAds(player);
+  useEffect(() => {
+    setInterstitialWanted(!playerOwnsNoAds && !readStoredPremiumEntitlements().includes('no_ads'));
+  }, [playerOwnsNoAds]);
+
+  /* Crash fix (19 Nov 2026), item 2.2: the ad SDK starts, with its rewarded ad and (without No Ads) its interstitial,
+     at the first quiet moment at least 10 s after a career is playing, after the open's own work (its save or the
+     skip, the Android purchase check, Week Ahead's first send). A forced break due in those seconds is skipped once
+     as NOT_LOADED, so ad frequency is unchanged; a rewarded tap in that time starts the SDK itself and waits for its
+     ad, as a tap before a load always did. */
+  const adsStartedRef = useRef(false);
+  useEffect(() => {
+    if (safeBootRequested || adsStartedRef.current || gameStatus !== 'PLAYING' || isInitializing || !isSwitchOn('adsAfterOpen')) return;
+    let cancelled = false;
+    let idleHandle: number | null = null;
+    const start = () => {
+      if (cancelled || adsStartedRef.current) return;
+      adsStartedRef.current = true;
+      initAds().catch(error => recordNonFatal(error, 'native_services_init_failed'));
+    };
+    const timer = window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') idleHandle = window.requestIdleCallback(start, { timeout: 10_000 });
+      else start();
+    }, ADS_AFTER_OPEN_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleHandle);
+    };
+  }, [gameStatus, isInitializing, safeBootRequested]);
 
   useEffect(() => {
     markTraceAction('app_runtime_ready', { flow: 'app_lifecycle' });
@@ -2142,9 +2396,15 @@ export const App: React.FC = () => {
     const openTraceStarted = !isPerformanceTraceActive(openTrace);
     if (openTraceStarted) startPerformanceTrace(openTrace);
     openLostWeeksRef.current = null;
+    // Crash fix (19 Nov 2026), item 1.7: from the tap until the career plays, the marker says open:<slot>.
+    openingSlotRef.current = slot;
+    refreshStartPhase();
     try {
       await openSelectedSlot(slot);
     } finally {
+      openingSlotRef.current = null;
+      // after React has drawn what the open left (PLAYING, or the menu again)
+      window.setTimeout(refreshStartPhase, 0);
       slotOpenInProgressRef.current = false;
       if (openTraceStarted) {
         const lost = openLostWeeksRef.current;
@@ -2166,6 +2426,10 @@ export const App: React.FC = () => {
         const usablePreload = startupPreload && startupPreload.slot === slot && startupPreload.summaryKey === getStartupSummaryKey(saveSlotSummaries[slot])
             ? startupPreload
             : null;
+        /* Crash fix (19 Nov 2026), item 1.8: the start-up guard stays on until this open has used the read career, or
+           failed (the finally below), so a phone that dies during the tap counts a dead start. A read of another
+           career is dropped: it is waited for below and then let go before this career loads. */
+        if (startupPreload) startupPreload.holder = usablePreload ? 'open' : 'dropped';
         // Home opens at once only when the career is read and migrated and nothing on this tap needs
         // the disk; anything else covers the menu with the loading screen at once, as before.
         const readyResult = usablePreload?.settled ? usablePreload.result : null;
@@ -2174,8 +2438,11 @@ export const App: React.FC = () => {
         markTraceAction('selected_save_load_started', { flow: 'save_select', save_slot: slot });
         try {
             // a read of another career still running finishes first: two careers are never loaded at once
-            if (startupPreload && startupPreload !== usablePreload && !startupPreload.settled) {
-                await startupPreload.promise.catch(() => null);
+            if (startupPreload && startupPreload !== usablePreload) {
+                if (!startupPreload.settled) await startupPreload.promise.catch(() => null);
+                // Crash fix (19 Nov 2026): and nothing here keeps that career alive while this one loads.
+                startupPreload.result = null;
+                startupPreload.promise = Promise.resolve(STARTUP_PRELOAD_DROPPED);
             }
             const preloaded = usablePreload ? await usablePreload.promise : null;
             if (import.meta.env.DEV) console.info('[perf] slot open', { slot, preloaded: preloaded?.kind || 'none' });
@@ -2234,7 +2501,11 @@ export const App: React.FC = () => {
                save, because a save would replace that copy. */
             const flaggedVersions = storageKind === 'localstorage' ? [] : getRecoveryFlaggedVersions();
             const openedCareerId = String((preloaded?.kind === 'MIGRATED' ? preloaded.migrated.id : savedData?.id) || '');
-            if (flaggedVersions.length && openedAppVersion && openedCareerId) {
+            /* Crash fix (19 Nov 2026): the backup copy (a whole career; two are deserialized when the head is PREVIOUS)
+               is read only when an offer is possible: the opened copy's version is flagged and its offer is not answered.
+               findFlaggedVersionOffer offers nothing otherwise, so the outcome is the same. */
+            if (openedAppVersion && openedCareerId && flaggedVersions.includes(openedAppVersion)
+                && !isRecoveryOfferAnswered(slot, openedCareerId, openedAppVersion)) {
                 const backupCopy = await peekVerifiedPreviousCopy(storageKey).catch(() => null);
                 const offer = findFlaggedVersionOffer({
                     flagged: flaggedVersions,
@@ -2309,6 +2580,8 @@ export const App: React.FC = () => {
             }
             markTraceAction('selected_save_load_completed', { flow: 'save_select', save_slot: slot });
             clearStartupSlotPreloadSkip();
+            // Crash fix (19 Nov 2026), item 1.7: a close from here on reports this slot and its size.
+            noteSessionDetail({ slot });
         } catch (error) {
             if (isStockSaveRecoveryError(error)) {
                 const storageKey = saveSlotSummaries[slot]?.storageKey || `actorEmpireSave_${slot}`;
@@ -2343,6 +2616,15 @@ export const App: React.FC = () => {
             return;
         } finally {
             setIsInitializing(false);
+            if (startupPreload) releaseStartupSlotPreload();
+        }
+    } else if (startupPreload) {
+        // Crash fix (19 Nov 2026), item 1.8: this slot needs no read, so the start menu's read career is let go.
+        startupPreload.holder = 'dropped';
+        if (startupPreload.settled) {
+            startupPreload.result = null;
+            startupPreload.promise = Promise.resolve(STARTUP_PRELOAD_DROPPED);
+            releaseStartupSlotPreload();
         }
     }
     if (existingSave) {
@@ -2427,6 +2709,9 @@ export const App: React.FC = () => {
      open can reach the developer for repair */
   const handleSendSlotToDeveloper = async (slot: number) => {
     const storageKey = saveSlotSummaries[slot]?.storageKey || `actorEmpireSave_${slot}`;
+    /* Crash fix (19 Nov 2026), FIX-PLAN item 1.10: the export is itself a whole-career peak, for exactly the players
+       in trouble, so the start menu's read career is let go first (as Delete does). */
+    dropStartupSlotPreload();
     try {
       return await exportSaveSlotForSupport(storageKey, slot);
     } catch (error) {
@@ -2436,8 +2721,10 @@ export const App: React.FC = () => {
   };
 
   const handleDeleteSlot = async (slot: number) => {
-    startupSlotPreloadRef.current = null;
+    dropStartupSlotPreload();
     clearLastWeekShown(slot);
+    // Crash fix (19 Nov 2026): the slot's save record (its last save size) no longer describes anything in it.
+    forgetSaveWriteRecord(`actorEmpireSave_${slot}`);
     const summary = saveSlotSummaries[slot];
     const storageKey = summary?.storageKey || `actorEmpireSave_${slot}`;
     if (summary?.storageKind !== 'localstorage') {
@@ -2484,9 +2771,9 @@ export const App: React.FC = () => {
   };
 
   const handleImportGameData = async () => {
-    const confirmed = window.confirm('Importing a transfer file will replace the local Play Store saves on this device. Continue?');
+    const confirmed = window.confirm('Importing a transfer file replaces the careers on this phone. Continue?');
     if (!confirmed) return;
-    startupSlotPreloadRef.current = null;
+    dropStartupSlotPreload();
     // Phase 1 (2026-11-17): an imported career may be older than the weeks shown before; that is not a lost week.
     [1, 2, 3].forEach(clearLastWeekShown);
 
@@ -2497,13 +2784,16 @@ export const App: React.FC = () => {
           subtext: progress.message,
         }),
       });
+      // Crash fix (19 Nov 2026): the slots hold other careers now; their save records described the old ones.
+      [1, 2, 3].forEach(importedSlot => forgetSaveWriteRecord(`actorEmpireSave_${importedSlot}`));
       setToastMessage({
         title: result.carePackageGranted ? 'Save Imported + Care Package' : 'Save Imported',
         subtext: result.carePackageGranted
           ? `${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'} restored with ${result.mediaRecords || 0} media file${result.mediaRecords === 1 ? '' : 's'}. Added $${MIGRATION_CARE_PACKAGE_CASH.toLocaleString()} and ${MIGRATION_CARE_PACKAGE_ENERGY} bonus energy. Restarting now.`
           : `${result.saveSlots} save slot${result.saveSlots === 1 ? '' : 's'} restored with ${result.mediaRecords || 0} media file${result.mediaRecords === 1 ? '' : 's'}. Restarting now.`,
       });
-      window.setTimeout(() => window.location.reload(), 1200);
+      // crash fix (19 Nov 2026), item 1.7: the game's own reload, not the web view restarting
+      window.setTimeout(() => { markSelfReload(); window.location.reload(); }, 1200);
       return result;
     } catch (error) {
       recordNonFatal(error, 'save_transfer_import_failed', { save_slot: currentSlot });
@@ -2513,6 +2803,14 @@ export const App: React.FC = () => {
       });
       throw error;
     }
+  };
+
+  /* Crash fix (19 Nov 2026), FIX-PLAN item 1.11: a page that failed to draw was closed (ScreenErrorBoundary). The
+     career stays open and nothing was saved or lost by the error; the player is back on Home with a note. */
+  const handleScreenClosed = (_screen: string) => {
+    noteStoreReviewTrouble('recovery_mode');
+    setActivePage(Page.HOME);
+    setToastMessage({ title: 'Screen closed', subtext: 'Something went wrong on that screen, so it was closed. Your career is safe.', tone: 'warning' });
   };
 
   const handleRecoverToMenu = () => {
@@ -3967,7 +4265,12 @@ export const App: React.FC = () => {
           return p;
       });
       if (!hadStreamingPlus && entitlementProductIds.includes('streaming_plus')) announceStreamingPlusUnlocked();
-      if (entitlementProductIds.length) void syncPermanentPremiumEntitlementsToSavedSlots(entitlementProductIds);
+      /* Crash fix (19 Nov 2026), FIX-PLAN item 2.5 (decision 6): Android's quiet checks (4 s after every open, and Play's
+         purchase updates) no longer read and re-save every other career in the background: two whole careers loaded
+         and copied right after an open, every launch, for everyone who owns a permanent purchase. The purchase is
+         remembered on this phone (rememberPremiumEntitlements above), and every career gets it the next time it opens
+         (prepareLoadedPlayerSave). A Restore the player taps still updates the other careers at once, as before. */
+      if (entitlementProductIds.length && !quiet) void syncPermanentPremiumEntitlementsToSavedSlots(entitlementProductIds);
   };
 
   /* Phase 1 (2026-11-17), the purchase ledger: once after every career open (a recovery opens the career again), each
@@ -4067,7 +4370,9 @@ export const App: React.FC = () => {
   };
 
   const handleStartGameFromIntro = (data: NewCareerData, slot: number) => {
-    startupSlotPreloadRef.current = null;
+    dropStartupSlotPreload();
+    // Crash fix (19 Nov 2026): a new career in this slot; the old career's save record no longer applies.
+    forgetSaveWriteRecord(`actorEmpireSave_${slot}`);
       const name = data.stageName.trim() || 'Rising Star';
       const introGender = data.gender === 'Female' ? 'FEMALE' : data.gender === 'Non-Binary' ? 'NON_BINARY' : 'MALE';
       const rawHandle = data.handle.trim() || name.toLowerCase().replace(/\s+/g, '');
@@ -4942,6 +5247,9 @@ export const App: React.FC = () => {
         {gameStatus === 'PLAYING' && (
             <>
                 <div className={`ae-game-content ${isFullBleedMobileSurface ? 'ae-game-content--immersive flex-1 overflow-hidden p-0' : isUiOverhaulSurface ? `min-h-0 flex-1 overflow-hidden${activePage === Page.HOME ? ' ae-game-content--dock-gap' : ''}` : `flex-1 px-5 pt-5 overflow-y-auto custom-scrollbar ${player.money < 0 ? 'pt-8' : ''}`}`}>
+                    {/* Crash fix (19 Nov 2026), FIX-PLAN item 1.11: one page's drawing error closes that page (back to Home with
+                        a note) instead of the whole game's Recovery Mode; components/ScreenErrorBoundary.tsx. */}
+                    <ScreenErrorBoundary key={activePage} screen={Page[activePage] || String(activePage)} isHome={activePage === Page.HOME} onClosed={handleScreenClosed}>
                     {activePage === Page.HOME && (<HomePage player={player} onNextWeek={handleNextWeek} isProcessing={isProcessing} onUpdatePlayer={handleUpdatePlayer} setPage={setActivePage} onOpenProductionHouseCheat={import.meta.env.DEV ? () => { setLifestyleInitialView('PRODUCTION_GAME'); setActivePage(Page.LIFESTYLE); } : undefined} onOpenPlatformCommissionCheat={import.meta.env.DEV ? () => { setInitialMobileAppMode('MESSAGES'); setActivePage(Page.MOBILE); } : undefined} onOpenStudioAcquisitionCheat={import.meta.env.DEV ? (studioId) => { setInitialForbesStudioId(studioId); setActivePage(Page.MOBILE); } : undefined} onOpenBoxOfficeCheat={import.meta.env.DEV ? () => { setInitialMobileAppMode('BOXOFFICE'); setActivePage(Page.MOBILE); } : undefined} onQueueBabyNamingCheat={handleQueueBabyNamingCheat} onOpenDeathSummaryPreview={handleOpenDeathSummaryPreview} onShowWhatsNewCheat={handleShowWhatsNewCheat} onStreamingLaunchQa={handleStreamingLaunchQa} />)}
                     {activePage === Page.CAREER && (<CareerPage player={player} onQuitJob={handleQuitJob} onRehearse={handleRehearse} onOwnedProductionFocus={handleOwnedProductionFocus} />)}
                     {activePage === Page.IMPROVE && (<ImprovePage player={player} onTrain={()=>{}} onEnroll={(c)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, money: p.money- (c.upfrontCost||0), commitments: [...p.commitments, {...c, careerBalanceVersion: 1, id: `c_${Date.now()}`, weeksCompleted:0}] }; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onCancel={(id)=>handleGenericUpdate(p=>{ const previousCommitments = p.commitments; const next: Player = { ...p, energy: { ...p.energy }, flags: { ...p.flags }, commitments: p.commitments.filter(c=>c.id!==id)}; syncWeeklyEnergyForCommitments(next, previousCommitments); return next; })} onPerformAction={handleImproveAction} />)}
@@ -5456,6 +5764,7 @@ export const App: React.FC = () => {
                             onRestorePurchases={handleRestorePurchases}
                         />
                     )}
+                    </ScreenErrorBoundary>
                 </div>
                 {isBottomNavVisible && (
                     <BottomNav

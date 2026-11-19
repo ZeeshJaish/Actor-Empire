@@ -361,6 +361,10 @@ export const loadVerifiedGameData = async (
     if (!isManifest(manifest)) {
         return { status: 'LEGACY_UNVERIFIED', player: current, previous: null, violations: [] };
     }
+    /* Crash fix (19 Nov 2026), FIX-PLAN item 2.1: one frame between reading the copy and checking it, so the logo,
+       the loading bar and the loading screen keep moving during a big career's load. Nothing is read or written in
+       between: the check runs on the copy already read, and what it remembers is tied to the head seen by the read. */
+    await new Promise(resolve => setTimeout(resolve, 0));
     const currentVerification = verifySaveIntegrity(current, manifest);
     /* Phase 1 (2026-11-17), plan item 4: a head record that is there but not recognised used to fall back to the
        CURRENT slot without a word, even when the other copy was the newer week. Now the newer verified copy is

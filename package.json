@@ -369,6 +369,7 @@
     "audit:historical-catalogue-phase3-4": "esbuild scripts/audit-historical-catalogue-phase3-4.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-historical-catalogue-phase3-4.mjs && node /tmp/audit-historical-catalogue-phase3-4.mjs",
     "audit:historical-market-phase5-6": "esbuild scripts/audit-historical-market-phase5-6.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-historical-market-phase5-6.mjs && node /tmp/audit-historical-market-phase5-6.mjs",
     "audit:save-migration-ui": "node scripts/audit-save-migration-ui.mjs",
+    "audit:sha256-fallback": "esbuild scripts/audit-sha256-fallback.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-sha256-fallback.mjs --log-level=warning && node /tmp/audit-sha256-fallback.mjs",
     "audit:save-transfer": "esbuild scripts/audit-save-transfer.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-transfer.mjs && node /tmp/audit-save-transfer.mjs",
     "audit:greenlight-marketing-setup": "node scripts/audit-greenlight-marketing-setup.mjs",
     "audit:marketing-strategy": "esbuild scripts/audit-marketing-strategy.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-marketing-strategy.mjs && node /tmp/audit-marketing-strategy.mjs",

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Crash fix (19 Nov 2026), FIX-PLAN item 2.3: the window behind the web view, the same black as the splash and
+         the boot logo, so no white frame shows between them. -->
+    <color name="ae_launch_background">#050505</color>
+</resources>
