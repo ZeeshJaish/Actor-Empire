@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DollarSign } from 'lucide-react';
 import {
     type MarketingBudgetPreset,
     MARKETING_BUDGET_PRESETS,
     getMarketingBudgetForPreset,
 } from '../greenlightUtils';
+import { parseCampaignAmount } from '../release-strategy-transplant/CampaignStep';
 
 interface GreenlightMarketingBudgetSectionProps {
     marketingBudgetPreset: MarketingBudgetPreset;
@@ -17,6 +18,10 @@ interface GreenlightMarketingBudgetSectionProps {
     translate: (key: any) => string;
 }
 
+/* 20 Nov 2026 (player report, PB: "please here give custom type amount for campaigning"): with a reserve that can reach
+   hundreds of billions, the slider could not set a small amount. The reserved amount can be typed, as the Release
+   Wizard's channels can (9eca19ae): a plain number is millions (500 = $500M), and K, M, B or T may be added (2B). It stays
+   within the slider's range; text that is not an amount changes nothing. */
 export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudgetSectionProps> = ({
     marketingBudgetPreset,
     reservedMarketingBudget,
@@ -26,7 +31,18 @@ export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudge
     onReservedBudgetChange,
     formatMoney,
     translate,
-}) => (
+}) => {
+    const [draft, setDraft] = useState<string | null>(null);
+    const startTyping = () => setDraft(reservedMarketingBudget > 0 ? String(Number((reservedMarketingBudget / 1e6).toFixed(2))) : '');
+    const commit = () => {
+        if (draft === null) return;
+        const amount = draft.trim() === '' ? 0 : parseCampaignAmount(draft);
+        setDraft(null);
+        if (amount === null) return;
+        onPresetChange('CUSTOM');
+        onReservedBudgetChange(Math.min(maxMarketingBudget, Math.max(0, amount)));
+    };
+    return (
     <div className="bg-zinc-950/70 border border-amber-500/20 rounded-2xl p-5 space-y-5 shadow-[0_0_24px_rgba(245,158,11,0.08)]">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
@@ -37,7 +53,34 @@ export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudge
             </div>
             <div className="text-left sm:text-right">
                 <div className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-600">{translate('greenlight.marketing.reserved')}</div>
-                <div className="font-mono text-3xl font-black text-amber-300">{formatMoney(reservedMarketingBudget)}</div>
+                {draft !== null ? (
+                    <label className="mt-1 flex items-center gap-1 rounded-lg border border-amber-400/60 bg-black/60 px-2 py-1 font-mono text-2xl font-black text-amber-300 sm:justify-end">
+                        <span>$</span>
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            enterKeyHint="done"
+                            autoFocus
+                            data-reserve-input
+                            aria-label="Campaign reserve, in millions"
+                            placeholder="0"
+                            value={draft}
+                            onChange={event => setDraft(event.target.value)}
+                            onBlur={commit}
+                            onKeyDown={event => {
+                                if (event.key === 'Enter') { event.preventDefault(); commit(); }
+                                if (event.key === 'Escape') setDraft(null);
+                            }}
+                            className="w-28 bg-transparent text-right outline-none placeholder:text-zinc-600"
+                        />
+                        <span className="text-base text-amber-200/80">M</span>
+                    </label>
+                ) : (
+                    <button type="button" data-reserve-amount onClick={startTyping} className="font-mono text-3xl font-black text-amber-300 underline decoration-amber-300/30 decoration-dashed underline-offset-4">
+                        {formatMoney(reservedMarketingBudget)}
+                    </button>
+                )}
+                <div className="mt-1 text-[9px] font-bold uppercase tracking-widest text-zinc-600">Tap the amount to type it</div>
             </div>
         </div>
 
@@ -95,4 +138,5 @@ export const GreenlightMarketingBudgetSection: React.FC<GreenlightMarketingBudge
             </div>
         </div>
     </div>
-);
+    );
+};

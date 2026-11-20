@@ -29,6 +29,15 @@
       }
     },
     {
+      "identity" : "engine",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/webview-native-ui/engine.git",
+      "state" : {
+        "revision" : "9817d1ef0302b5a09a4aff5b6e67352293176a0f",
+        "version" : "1.0.11"
+      }
+    },
+    {
       "identity" : "firebase-ios-sdk",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/firebase-ios-sdk.git",
@@ -132,8 +141,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/googleads/swift-package-manager-google-mobile-ads.git",
       "state" : {
-        "revision" : "1239c23464503053c17d37ee5daa70de3455e9c8",
-        "version" : "12.14.0"
+        "revision" : "d1fa1f5c1dfe3b43d56c73f4de388ad3316618bc",
+        "version" : "13.11.0"
       }
     },
     {

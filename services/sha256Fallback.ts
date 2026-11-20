@@ -100,3 +100,27 @@ export const hmacSha256Fallback = (key: Uint8Array, message: Uint8Array): Uint8A
 export const hasWebCryptoSubtle = (): boolean => {
   try { return typeof crypto !== 'undefined' && !!crypto.subtle && typeof crypto.subtle.sign === 'function'; } catch { return false; }
 };
+
+/* 20 Nov 2026 (iPhone pass, Hotfix 4): streams for hashing data as it is walked, so a 64 MB save transfer is never
+   built into one more string and one more byte array just to be signed or checked (services/saveTransfer.ts). */
+export interface ByteHashStream {
+    update(data: Uint8Array): void;
+    digest(): Uint8Array;
+}
+
+export const createSha256Stream = (): ByteHashStream => {
+    const hash = new Sha256();
+    return { update: data => { hash.update(data); }, digest: () => hash.digest() };
+};
+
+export const createHmacSha256Stream = (key: Uint8Array): ByteHashStream => {
+    const block = new Uint8Array(64);
+    block.set(key.length > 64 ? sha256Fallback(key) : key);
+    const inner = new Uint8Array(64), outer = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) { inner[i] = block[i] ^ 0x36; outer[i] = block[i] ^ 0x5c; }
+    const innerHash = new Sha256().update(inner);
+    return {
+        update: data => { innerHash.update(data); },
+        digest: () => new Sha256().update(outer).update(innerHash.digest()).digest(),
+    };
+};

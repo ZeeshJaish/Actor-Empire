@@ -14,7 +14,7 @@ import {
   type TransferMediaRecord,
 } from './mediaStorage';
 import type { Player } from '../types';
-import { hasWebCryptoSubtle, hmacSha256Fallback, sha256Fallback } from './sha256Fallback';
+import { createHmacSha256Stream, createSha256Stream, type ByteHashStream } from './sha256Fallback';
 
 const ARCHIVE_FORMAT = 'actor-empire-save-transfer';
 const ARCHIVE_FORMAT_VERSION = 1;
@@ -37,23 +37,23 @@ interface AndroidSaveTransferPlugin {
 /* Perf plan (2026-11-08): a big career reaches the Android export file in pieces (see bridgeChunks).
    A build whose native side cannot take pieces falls back to the single call.
    19 Nov 2026: iPhone has the same calls (ios/.../AeSaveTransferPlugin.swift), so both phones export the same way. */
-const shareNativeExport = async (plugin: AndroidSaveTransferPlugin, filename: string, content: string) => {
+/* 20 Nov 2026: answers false when the player closed the share sheet without sending (iPhone knows; Android always
+   answers true, it cannot tell) */
+const shareNativeExport = async (plugin: AndroidSaveTransferPlugin, filename: string, content: string): Promise<boolean> => {
   if (content.length <= BRIDGE_CHUNK_CHARS) {
-    await plugin.shareExport({ filename, content });
-    return;
+    return (await plugin.shareExport({ filename, content }))?.shared !== false;
   }
   let exportId: string | null = null;
   try {
     exportId = (await plugin.beginExport({ filename })).id;
   } catch {
-    await plugin.shareExport({ filename, content });
-    return;
+    return (await plugin.shareExport({ filename, content }))?.shared !== false;
   }
   try {
     for (const chunk of splitForBridge(content)) {
       await plugin.appendExport({ id: exportId, chunk });
     }
-    await plugin.finishExport({ id: exportId, chars: content.length });
+    return (await plugin.finishExport({ id: exportId, chars: content.length }))?.shared !== false;
   } catch (error) {
     await plugin.cancelExport({ id: exportId }).catch(() => undefined);
     throw error;
@@ -169,26 +169,66 @@ const stableStringify = (value: unknown): string => {
    over plain http, for one) the same signature comes from services/sha256Fallback.ts. */
 const toArrayBuffer = (bytes: Uint8Array) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 
-const signBody = async (body: SaveTransferBody) => {
-  const message = textEncoder.encode(stableStringify(body));
-  if (!hasWebCryptoSubtle()) return base64UrlEncode(toArrayBuffer(hmacSha256Fallback(textEncoder.encode(TRANSFER_SECRET), message)));
-  const key = await crypto.subtle.importKey(
-    'raw',
-    textEncoder.encode(TRANSFER_SECRET),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, message);
-  return base64UrlEncode(signature);
+/* 20 Nov 2026 (iPhone pass, Hotfix 4: importing a 64 MB career sometimes took the web view down). Signing and checking
+   used to build the whole stable text of the career (another 64 MB string), then its bytes, then hash them. The same
+   text is now walked piece by piece and hashed as it goes, in chunks, so no second copy of the career exists: the
+   pieces are exactly stableStringify's, in the same order (sparse array holes stay empty, as Array.map and join leave
+   them), so every signature and fingerprint is byte-for-byte what it was (scripts/audit-save-transfer-stream.ts). */
+const STREAM_CHUNK_CHARS = 1 << 16;
+const writeStableValue = (value: unknown, write: (piece: string) => void): void => {
+  if (value === null) { write('null'); return; }
+  if (typeof value === 'string') { write(JSON.stringify(value)); return; }
+  if (typeof value === 'number') { write(Number.isFinite(value) ? String(value) : 'null'); return; }
+  if (typeof value === 'boolean') { write(value ? 'true' : 'false'); return; }
+  if (Array.isArray(value)) {
+    write('[');
+    for (let index = 0; index < value.length; index += 1) {
+      if (index > 0) write(',');
+      if (!(index in value)) continue;
+      const item = value[index];
+      writeStableValue(item === undefined ? null : item, write);
+    }
+    write(']');
+    return;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record).sort().filter(key => record[key] !== undefined && typeof record[key] !== 'function');
+    write('{');
+    keys.forEach((key, index) => {
+      if (index > 0) write(',');
+      write(JSON.stringify(key));
+      write(':');
+      writeStableValue(record[key], write);
+    });
+    write('}');
+    return;
+  }
+  write('null');
+};
+const hashStableValue = (value: unknown, stream: ByteHashStream): Uint8Array => {
+  let pending: string[] = [];
+  let pendingChars = 0;
+  const flush = () => {
+    if (!pendingChars) return;
+    stream.update(textEncoder.encode(pending.join('')));
+    pending = [];
+    pendingChars = 0;
+  };
+  writeStableValue(value, piece => {
+    pending.push(piece);
+    pendingChars += piece.length;
+    if (pendingChars >= STREAM_CHUNK_CHARS) flush();
+  });
+  flush();
+  return stream.digest();
 };
 
-const hashTransferValue = async (value: unknown) => {
-  const bytes = textEncoder.encode(stableStringify(value));
-  if (!hasWebCryptoSubtle()) return base64UrlEncode(toArrayBuffer(sha256Fallback(bytes)));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return base64UrlEncode(digest);
-};
+const signBody = async (body: SaveTransferBody) => (
+  base64UrlEncode(toArrayBuffer(hashStableValue(body, createHmacSha256Stream(textEncoder.encode(TRANSFER_SECRET)))))
+);
+
+const hashTransferValue = async (value: unknown) => base64UrlEncode(toArrayBuffer(hashStableValue(value, createSha256Stream())));
 
 const constantTimeEquals = (left: string, right: string) => {
   if (left.length !== right.length) return false;
@@ -347,24 +387,46 @@ const downloadArchiveInBrowser = (filename: string, content: string) => {
   URL.revokeObjectURL(url);
 };
 
-const shareArchive = async (filename: string, content: string) => {
-  const native = nativeSaveTransfer();
-  if (native) {
-    await shareNativeExport(native, filename, content);
-    return;
+/* 20 Nov 2026 (player report, victor, iPhone 1.0.29: Send to dev answered "The request is not allowed by the user agent
+   or the platform in the current context, possibly because the user denied permission"). The web share call works only
+   right after a tap, and reading and packing a big career takes seconds, so a browser refuses it (NotAllowedError).
+   The phones now use their own share sheet (above). Where the web share call is still used, a refused share keeps the
+   finished file and asks for one more tap (sharePreparedSaveFile), which shares it at once. */
+export const SHARE_NEEDS_TAP = 'SAVE_SHARE_NEEDS_TAP';
+let preparedShareFile: File | null = null;
+export const isShareNeedsTapError = (error: unknown): boolean => (error as { code?: string } | null)?.code === SHARE_NEEDS_TAP;
+
+const shareFileOnWeb = async (file: File): Promise<boolean> => {
+  try {
+    await navigator.share({ title: 'Actor Empire save file', text: 'Actor Empire save file', files: [file] });
+    preparedShareFile = null;
+    return true;
+  } catch (error) {
+    const name = (error as { name?: string } | null)?.name;
+    if (name === 'AbortError') { preparedShareFile = null; return false; }
+    if (name === 'NotAllowedError') {
+      preparedShareFile = file;
+      throw Object.assign(new Error('The save file is ready. Tap Share file to send it.'), { code: SHARE_NEEDS_TAP });
+    }
+    throw error;
   }
+};
+
+/** Shares the file a refused share kept. Call it straight from a tap, with nothing awaited before it. */
+export const sharePreparedSaveFile = (): Promise<boolean> => (
+  preparedShareFile ? shareFileOnWeb(preparedShareFile) : Promise.reject(new Error('That file is gone. Tap Send to dev again.'))
+);
+
+/** true: shared (or saved); false: the player closed the share sheet without sending */
+const shareArchive = async (filename: string, content: string): Promise<boolean> => {
+  const native = nativeSaveTransfer();
+  if (native) return shareNativeExport(native, filename, content);
 
   const file = new File([content], filename, { type: 'application/json' });
-  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
-    await navigator.share({
-      title: 'Actor Empire Save Transfer',
-      text: 'Actor Empire save transfer file',
-      files: [file],
-    });
-    return;
-  }
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) return shareFileOnWeb(file);
 
   downloadArchiveInBrowser(filename, content);
+  return true;
 };
 
 /* --- Send to developer (2026-11-12) ---------------------------------------------------------------
@@ -400,7 +462,8 @@ export const exportSaveSlotForSupport = async (storageKey: string, slotNumber: n
     exportedAt: new Date().toISOString(), player: raw,
   });
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  await shareArchive(`actor-empire-slot${slotNumber}-${stamp}.aesupport.txt`, content);
+  const shared = await shareArchive(`actor-empire-slot${slotNumber}-${stamp}.aesupport.txt`, content);
+  if (!shared) return { ok: false, message: 'The share sheet was closed, so nothing was sent. Tap Send to dev to try again.' };
   const megabytes = Math.max(0.1, Math.round(content.length / 104_857.6) / 10);
   return { ok: true, message: `Save file ready (${megabytes} MB). Send it to the developer on Discord or by email.` };
 };
@@ -467,7 +530,16 @@ const pickArchiveFileText = () => new Promise<string>((resolve, reject) => {
   document.addEventListener('pointerdown', onPageTouch, true);
 });
 
-const normalizeArchiveText = (rawText: string) => rawText.replace(/^\uFEFF/, '').trim();
+/* 20 Nov 2026: a 64 MB file without a byte-order mark or surrounding spaces (every file the game writes) is used as it
+   is, not copied again by replace and trim */
+const isTrimSpace = (code: number) => code === 0x20 || code === 0x0a || code === 0x0d || code === 0x09 || code === 0xfeff
+  || code === 0xa0 || code === 0x0b || code === 0x0c || code === 0x2028 || code === 0x2029 || code === 0x3000
+  || (code >= 0x2000 && code <= 0x200a) || code === 0x1680 || code === 0x202f || code === 0x205f;
+const normalizeArchiveText = (rawText: string) => (
+  rawText.length > 0 && !isTrimSpace(rawText.charCodeAt(0)) && !isTrimSpace(rawText.charCodeAt(rawText.length - 1))
+    ? rawText
+    : rawText.replace(/^\uFEFF/, '').trim()
+);
 
 const looksLikeLegacyRawSave = (value: unknown) => {
   const record = value as Record<string, unknown> | null;
@@ -509,8 +581,12 @@ const parseJsonTransfer = (rawText: string): unknown => {
   }
 };
 
-const parseArchive = async (rawText: string): Promise<SaveTransferArchive> => {
-  const archive = parseJsonTransfer(rawText) as SaveTransferArchive;
+/* 20 Nov 2026: the import hands the file's text in a holder and the text is let go as soon as it is parsed, so the
+   64 MB string is not kept alive through the signature check, the migration and the writes */
+const parseArchive = async (source: string | { text: string | null }): Promise<SaveTransferArchive> => {
+  const holder = typeof source === 'string' ? { text: source } : source;
+  const archive = parseJsonTransfer(holder.text || '') as SaveTransferArchive;
+  holder.text = null;
   if (looksLikeLegacyRawSave(archive)) {
     throw new Error('This looks like a raw save, not a signed transfer file. Open the old build, tap Export Game Data, then import the .aesave file here.');
   }
@@ -545,6 +621,7 @@ export interface PrepareSaveTransferImportContext {
 export const prepareSaveTransferImportEntries = async (
   entries: SaveTransferEntry[],
   context: PrepareSaveTransferImportContext,
+  options: { releaseSource?: boolean } = {},
 ): Promise<{ entries: VerifiedSaveBatchEntry[]; carePackageGranted: boolean }> => {
   let carePackageGranted = false;
   const sanitizedEntries: VerifiedSaveBatchEntry[] = [];
@@ -575,6 +652,8 @@ export const prepareSaveTransferImportEntries = async (
       player: prepared.player,
       manifest: prepared.manifest,
     });
+    /* 20 Nov 2026: the import lets go of each career's copy from the file once its prepared copy exists */
+    if (options.releaseSource) (entry as { value: unknown }).value = null;
     await yieldToMainThread();
   }
 
@@ -614,17 +693,17 @@ const restoreActorEmpireLocalStorage = async (entries: SaveTransferEntry[]) => {
 
 export const importSignedSaveArchiveFromFile = async (options?: SaveTransferImportOptions): Promise<SaveTransferResult> => {
   reportProgress(options, 'WAITING_FOR_FILE', 'Choose the Actor Empire .aesave transfer file.');
-  const rawText = await pickArchiveFileText();
+  const fileText = { text: await pickArchiveFileText() as string | null };
   reportProgress(options, 'READING', 'Reading transfer file...');
   await yieldToMainThread();
   reportProgress(options, 'VERIFYING', 'Verifying signed transfer file...');
-  const archive = await parseArchive(rawText);
+  const archive = await parseArchive(fileText);
   await yieldToMainThread();
   reportProgress(options, 'COMPACTING', 'Migrating and compacting save slots...');
   const importResult = await prepareSaveTransferImportEntries(archive.payload.indexedDb.entries, {
     archiveAppVersion: archive.appVersion,
     importedAt: new Date().toISOString(),
-  });
+  }, { releaseSource: true });
   const entries = importResult.entries;
   if (entries.length <= 0) {
     throw new Error('Transfer file does not contain any Actor Empire save slots.');
@@ -651,6 +730,9 @@ export const importSignedSaveArchiveFromFile = async (options?: SaveTransferImpo
 };
 
 export const __saveTransferTest = {
+  stableStringify,
+  signBody,
+  hashTransferValue,
   normalizeArchiveText,
   parseJsonTransfer,
   parseArchive,

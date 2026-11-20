@@ -1,7 +1,7 @@
 {
   "name": "pr-6.6.3",
   "private": true,
-  "version": "1.0.29",
+  "version": "1.0.30",
   "type": "module",
   "scripts": {
     "audit:fictional-names": "node scripts/run-fictional-name-audit.mjs",
@@ -370,6 +370,7 @@
     "audit:historical-market-phase5-6": "esbuild scripts/audit-historical-market-phase5-6.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-historical-market-phase5-6.mjs && node /tmp/audit-historical-market-phase5-6.mjs",
     "audit:save-migration-ui": "node scripts/audit-save-migration-ui.mjs",
     "audit:sha256-fallback": "esbuild scripts/audit-sha256-fallback.ts --bundle --platform=node --format=esm --outfile=/tmp/audit-sha256-fallback.mjs --log-level=warning && node /tmp/audit-sha256-fallback.mjs",
+    "audit:save-transfer-stream": "esbuild scripts/audit-save-transfer-stream.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-save-transfer-stream.mjs --log-level=error && node --max-old-space-size=4096 /tmp/audit-save-transfer-stream.mjs",
     "audit:save-transfer": "esbuild scripts/audit-save-transfer.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-save-transfer.mjs && node /tmp/audit-save-transfer.mjs",
     "audit:greenlight-marketing-setup": "node scripts/audit-greenlight-marketing-setup.mjs",
     "audit:marketing-strategy": "esbuild scripts/audit-marketing-strategy.ts --bundle --platform=node --format=esm --loader:.csv=text --outfile=/tmp/audit-marketing-strategy.mjs && node /tmp/audit-marketing-strategy.mjs",
@@ -399,6 +400,7 @@
     "audit:outside-original-engine": "esbuild scripts/audit-outside-original-engine.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-outside-original-engine.mjs && node /tmp/audit-outside-original-engine.mjs",
     "audit:original-issues": "esbuild scripts/audit-original-issues.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-original-issues.mjs && node /tmp/audit-original-issues.mjs",
     "audit:original-slate": "esbuild scripts/audit-original-slate.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-original-slate.mjs && node /tmp/audit-original-slate.mjs",
+    "audit:library-sort": "esbuild scripts/audit-library-sort.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.png=dataurl --loader:.jpg=dataurl --loader:.webp=dataurl --loader:.svg=dataurl --loader:.css=empty --outfile=/tmp/audit-library-sort.mjs --log-level=error && node /tmp/audit-library-sort.mjs",
     "audit:original-renewal": "esbuild scripts/audit-original-renewal.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-original-renewal.mjs && node /tmp/audit-original-renewal.mjs",
     "audit:original-awards": "esbuild scripts/audit-original-awards.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-original-awards.mjs && node /tmp/audit-original-awards.mjs",
     "audit:original-rivals": "esbuild scripts/audit-original-rivals.ts --bundle --platform=node --format=esm --loader:.csv=text --loader:.css=empty --outfile=/tmp/audit-original-rivals.mjs && node /tmp/audit-original-rivals.mjs",
@@ -824,7 +826,7 @@
     "audit:actor-reward-curves": "node scripts/run-actor-reward-curves.mjs"
   },
   "dependencies": {
-    "@capacitor-community/admob": "^8.0.0",
+    "@capacitor-community/admob": "^8.4.2",
     "@capacitor-firebase/analytics": "^8.2.0",
     "@capacitor-firebase/crashlytics": "^8.2.0",
     "@capacitor-firebase/messaging": "^8.2.0",

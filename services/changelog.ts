@@ -66,6 +66,64 @@ const patchEntry = (version: string, title = 'Patch & Stability'): ChangelogEntr
 );
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  /* 1.0.30 (2026-11-20): the crash fix (the game closing at the start menu on big careers), save backup and move on
+     iPhone, the first part of the faster week, and the 20 Nov player reports (Hotfix 4). Player-facing only. */
+  changelogEntry(
+    '1.0.30',
+    'Fewer Crashes, Smoother Play',
+    'PATCH',
+    'November 2026',
+    'Big careers no longer close the game at the start, you can back up and move careers on iPhone, and the game answers your taps faster.',
+    [
+      {
+        heading: 'Fewer crashes',
+        items: [
+          'Big careers no longer close the game at the start menu. The game opens your career only when your phone has room for it.',
+          'Fixed a crash right after launch on some iPhones (an ad library update).',
+          'A screen that runs into a problem now takes you Home instead of Recovery Mode.',
+          'The Production House no longer crashes when your studio is gone.',
+          'Fixed the Rights room, studio plan and listing screens that could open Recovery Mode.',
+          'The logo no longer blinks at launch, and a new screen shows your career while it opens.',
+        ],
+      },
+      {
+        heading: 'Your saves',
+        items: [
+          'iPhone: Settings → Backup & Move. Export your careers and import them on another iPhone or Android phone.',
+          'Send to dev now works on iPhone.',
+          'Big careers import with much less memory.',
+          'If the newest copy of a career is damaged, the game offers the copy before it.',
+          'Opening a career no longer saves it again right away.',
+        ],
+      },
+      {
+        heading: 'Faster play',
+        items: [
+          'Taps answer much faster while you play.',
+          'Weeks are a little faster. More speed is on the way.',
+        ],
+      },
+      {
+        heading: 'Studios and streaming',
+        items: [
+          'Next seasons get the right name ("Season 3", never "Season 2: Season 2"), and you can rename them before you order.',
+          'Library: Newest first and Oldest first now turn the list round.',
+          'Greenlight: tap the campaign reserve to type an amount.',
+          'The Content Market no longer shows deals that cannot be signed.',
+          'Rival studios borrow, repay and learn from their own releases. Takeover debt that grew too big in older versions is repaired, with a letter.',
+          'Posters, thumbnails and profile photos take any photo, including big phone photos.',
+          'Save slots: Delete and Send to dev sit in one even row.',
+        ],
+      },
+    ],
+    [
+      { icon: 'FIX', title: 'Fewer crashes', text: 'Big careers no longer close the game at the start.' },
+      { icon: 'GLOBE', title: 'Move your saves', text: 'Back up and move careers on iPhone too.' },
+      { icon: 'SPARKLES', title: 'Faster taps', text: 'The game answers your taps much faster.' },
+      { icon: 'STREAMING', title: 'Seasons named right', text: 'Rename the next season before you order it.' },
+    ],
+    'Thank you for every report. Keep them coming.',
+  ),
   /* 1.0.29 (2026-11-18): the third round of fixes from players' reports and the crash reports, plus a word that the faster
      week is being rebuilt (Zeesh: "week processing me kaam chal rha … would be needing a week"). Player-facing only; it
      repeats how streaming unlocks for players updating from an older version. */

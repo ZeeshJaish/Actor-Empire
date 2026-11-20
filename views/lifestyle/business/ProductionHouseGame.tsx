@@ -119,7 +119,17 @@ const getCommitmentCommissionSourceLabel = (
     return offer ? buildPlatformCommissionActiveCardPresentation(offer).sourceLabel : undefined;
 };
 
-export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialStreamingOriginal, onStreamingOriginalConsumed, onStreamingOriginalGreenlightComplete, onOpenOwnedStreamingDelivery, onOpenStreamingSlate, onSentToYourService, initialPlatformCommission, onPlatformCommissionConsumed }) => {
+/* 20 Nov 2026 (Recovery Mode "Minified React error #300", three iPhone reports on 1.0.29, each with no production house
+   left): this screen shows "Studio not available" by returning early when there is no studio, and some of its hooks come
+   after that return. A studio that went away while the screen was open (sold or lost) made React see fewer hooks than the
+   render before, and the screen failed into Recovery Mode. Whether the player has a studio now picks which instance of
+   the screen is drawn, so every instance always runs the same hooks. */
+export const ProductionHouseGame: React.FC<ProductionHouseGameProps> = props => {
+    const hasStudio = (props.player.businesses || []).some(business => business.type === 'PRODUCTION_HOUSE');
+    return <ProductionHouseGameScreen key={hasStudio ? 'studio' : 'no-studio'} {...props} />;
+};
+
+const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player, onBack, onUpdatePlayer, initialRightsMarketOpportunityId, onRightsMarketTargetConsumed, initialStudioContinuation, onStudioContinuationConsumed, initialStreamingOriginal, onStreamingOriginalConsumed, onStreamingOriginalGreenlightComplete, onOpenOwnedStreamingDelivery, onOpenStreamingSlate, onSentToYourService, initialPlatformCommission, onPlatformCommissionConsumed }) => {
     const [view, setView] = useState<StudioView>('DASHBOARD');
     const [rightsMarketTargetId, setRightsMarketTargetId] = useState<string | null>(null);
     const [selectedProjectDashboard, setSelectedProjectDashboard] = useState<any>(null);

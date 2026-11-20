@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Clock3, Upload } from 'lucide-react';
 import { logoDataUri } from '../assets/logo';
 import type { ActState, SlotEntry } from './types';
-import { isSaveTransferSurface, type SaveTransferResult } from '../services/saveTransfer';
+import { isSaveTransferSurface, isShareNeedsTapError, sharePreparedSaveFile, type SaveTransferResult } from '../services/saveTransfer';
 import '../styles/intro.css';
 
 interface Props {
@@ -44,18 +44,33 @@ export default function SaveSlotScreen({
   const [confirmDeleteSlot, setConfirmDeleteSlot] = useState<number | null>(null);
   const [sendingSlot, setSendingSlot] = useState<number | null>(null);
   const [sendNotice, setSendNotice] = useState<{ slot: number; text: string } | null>(null);
+  /* 20 Nov 2026: a share the phone refused (it came seconds after the tap) keeps the file; one tap on Share file sends it */
+  const [shareReadySlot, setShareReadySlot] = useState<number | null>(null);
   const handleSend = async (slotIndex: number) => {
     if (!onSendToDeveloper || sendingSlot !== null) return;
     setSendingSlot(slotIndex);
+    setShareReadySlot(null);
     setSendNotice({ slot: slotIndex, text: 'Preparing the save file…' });
     try {
       const result = await onSendToDeveloper(slotIndex);
       setSendNotice({ slot: slotIndex, text: (result && result.message) || 'Save file ready.' });
     } catch (error) {
+      if (isShareNeedsTapError(error)) setShareReadySlot(slotIndex);
       setSendNotice({ slot: slotIndex, text: error instanceof Error ? error.message : 'The save file could not be prepared.' });
     } finally {
       setSendingSlot(null);
     }
+  };
+  const handleSharePrepared = (slotIndex: number) => {
+    // straight from the tap: the share starts before anything is awaited
+    const sharing = sharePreparedSaveFile();
+    setShareReadySlot(null);
+    sharing
+      .then(shared => setSendNotice({ slot: slotIndex, text: shared ? 'Save file shared. Thank you!' : 'The share sheet was closed, so nothing was sent. Tap Send to dev to try again.' }))
+      .catch(error => {
+        if (isShareNeedsTapError(error)) setShareReadySlot(slotIndex);
+        setSendNotice({ slot: slotIndex, text: error instanceof Error ? error.message : 'The save file could not be shared.' });
+      });
   };
   const [isImportingSave, setIsImportingSave] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
@@ -118,35 +133,7 @@ export default function SaveSlotScreen({
                 <div className="slot-tags">
                   <span className="tag num">Slot {i + 1}</span>
                   <span className="tag live">Active</span>
-                  {onDeleteSlot && (
-                    <button
-                      type="button"
-                      className={'slot-delete' + (confirmDeleteSlot === i ? ' confirm' : '')}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (confirmDeleteSlot === i) {
-                          onDeleteSlot(i);
-                          setConfirmDeleteSlot(null);
-                        } else {
-                          setConfirmDeleteSlot(i);
-                        }
-                      }}
-                    >
-                      {confirmDeleteSlot === i ? 'Confirm' : 'Delete'}
-                    </button>
-                  )}
-                  {onSendToDeveloper && (
-                    <button
-                      type="button"
-                      className="slot-delete slot-send"
-                      disabled={sendingSlot !== null}
-                      onClick={(event) => { event.stopPropagation(); void handleSend(i); }}
-                    >
-                      {sendingSlot === i ? 'Preparing…' : 'Send to dev'}
-                    </button>
-                  )}
                 </div>
-                {sendNotice?.slot === i && <div className="slot-send-note" role="status" onClick={(event) => event.stopPropagation()}>{sendNotice.text}</div>}
                 <div className="slot-name">{slot.name}</div>
                 <div className="slot-stats">
                   {slot.isPendingSummary ? (
@@ -170,6 +157,40 @@ export default function SaveSlotScreen({
               <div className="slot-go">
                 <span className="play" />
               </div>
+              {/* 20 Nov 2026 (Zeesh: the slot card is not symmetric): Delete and Send to dev in one even row under the
+                  career, full width, instead of squeezed into the tag row where they broke into two and three lines */}
+              {(onDeleteSlot || onSendToDeveloper) && (
+                <div className="slot-manage">
+                  {onDeleteSlot && (
+                    <button
+                      type="button"
+                      className={'slot-delete' + (confirmDeleteSlot === i ? ' confirm' : '')}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (confirmDeleteSlot === i) {
+                          onDeleteSlot(i);
+                          setConfirmDeleteSlot(null);
+                        } else {
+                          setConfirmDeleteSlot(i);
+                        }
+                      }}
+                    >
+                      {confirmDeleteSlot === i ? 'Confirm' : 'Delete'}
+                    </button>
+                  )}
+                  {onSendToDeveloper && (
+                    <button
+                      type="button"
+                      className="slot-delete slot-send"
+                      disabled={sendingSlot !== null}
+                      onClick={(event) => { event.stopPropagation(); if (shareReadySlot === i) handleSharePrepared(i); else void handleSend(i); }}
+                    >
+                      {sendingSlot === i ? 'Preparing…' : shareReadySlot === i ? 'Share file' : 'Send to dev'}
+                    </button>
+                  )}
+                </div>
+              )}
+              {sendNotice?.slot === i && <div className="slot-send-note" role="status" onClick={(event) => event.stopPropagation()}>{sendNotice.text}</div>}
             </div>
           ) : (
             <div key={i} className="slot-card empty" onClick={() => onCreateNew?.(i)}>

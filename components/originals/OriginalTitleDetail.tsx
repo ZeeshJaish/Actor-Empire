@@ -1,12 +1,13 @@
 import { LICENCE_SHARE_OF_MAKING } from '../../services/originalsDeal';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Clapperboard, Film, Sparkles, Star, Tv, X, Zap, CalendarDays, Scissors, ImagePlus } from 'lucide-react';
+import { Check, Clapperboard, Film, Sparkles, Star, Tv, X, Zap, CalendarDays, Scissors, ImagePlus, PenLine } from 'lucide-react';
 import type { Player } from '../../types';
 import { buildProjectPosterIndex, setTitlePoster } from '../../services/projectPosterIndex';
 import { createCustomPosterBlobFromFile, saveCustomPosterMedia } from '../../services/customPosterMedia';
 import { getOriginalTitleDetail, ORIGINAL_JOURNEY_STEPS, ORIGINAL_NOTE_QUALITY, takeOriginalExtra, takeOriginalNote, type OriginalTitleDetail as Detail } from '../../services/originalsTitleDetail';
-import { endOriginal, extendOriginalLicence, getOriginalFutureView, renewOriginal, spinOffOriginal, type OriginalExtrasChoice } from '../../services/originalsRenewal';
+import { endOriginal, extendOriginalLicence, getOriginalFutureView, getOriginalInstallment, renewOriginal, spinOffOriginal, type OriginalExtrasChoice } from '../../services/originalsRenewal';
+import { WorkingTitleDialog } from '../../views/lifestyle/business/components/WorkingTitleDialog';
 import { BACKGROUND_CASTING_PACKAGES, findBackgroundCastingPackage, getBackgroundCastingPlanLabel } from '../../services/livingEnsemble';
 import { getOriginalOwnMaker, getOriginalSpinOffScript, prepareOriginalSpinOffScript } from '../../services/originalSpinOffScript';
 import type { OriginalCommissionMoment } from '../../services/originalsCommission';
@@ -99,6 +100,9 @@ export const OriginalTitleDetail: React.FC<{
     /* 2026-11-17: the next season's background extras. null keeps the last season's; a package changes them */
     const [extrasPick, setExtrasPick] = useState<OriginalExtrasChoice | null>(null);
     const [confirmEnd, setConfirmEnd] = useState(false);
+    /* 20 Nov 2026: the next season's or sequel's name, renamed on the order sheet (null: the suggested name) */
+    const [nextName, setNextName] = useState<string | null>(null);
+    const [naming, setNaming] = useState(false);
     const [moment, setMoment] = useState<{ title: string; data: OriginalCommissionMoment } | null>(null);
     const commissions = player.ownedStreamingPlatform?.originalCommissions;
     /* reads the studio's record and the week's chart once for each week or change, never on a tap */
@@ -129,7 +133,7 @@ export const OriginalTitleDetail: React.FC<{
     const next = future?.next;
     const stepEpisodes = (change: number) => setEpisodes(Math.max(4, Math.min(24, (episodes ?? detail.commission.episodes) + change)));
     const renew = () => {
-        const result = renewOriginal(player, commissionId, episodes ?? undefined, extrasPick ?? undefined);
+        const result = renewOriginal(player, commissionId, episodes ?? undefined, extrasPick ?? undefined, nextName ?? undefined);
         setNotice(result.message);
         if (!result.changed) return;
         onUpdatePlayer(result.player);
@@ -348,7 +352,7 @@ export const OriginalTitleDetail: React.FC<{
                             {detail.episodes.length > 0 && (
                                 <Card className="!px-3" >
                                     <div className="mb-2 flex items-baseline justify-between gap-2">
-                                        <Eyebrow>Season {detail.commission.seasonNumber || 1} episodes</Eyebrow>
+                                        <Eyebrow>Season {getOriginalInstallment(detail.commission)} episodes</Eyebrow>
                                         {detail.seasonName && <span className="min-w-0 truncate text-[9px] font-black uppercase tracking-[0.08em] text-violet-300">{detail.seasonName}</span>}
                                     </div>
                                     <div data-title-episodes>
@@ -428,7 +432,14 @@ export const OriginalTitleDetail: React.FC<{
                 <div className="absolute inset-0 z-20 flex items-end bg-black/70" onClick={() => setRenewing(false)}>
                     <div data-renew-sheet onClick={event => event.stopPropagation()} className="w-full rounded-t-3xl border-t border-rose-500/30 bg-[#12070a] p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
                         <Eyebrow className="!text-rose-300">{next.outside ? `${next.studioName} is asking` : 'Your studio can start'}</Eyebrow>
-                        <h2 className="mt-1 text-2xl font-black leading-tight text-white">{detail.title.replace(/:\s*Season \d+$/i, '')}: {next.label}</h2>
+                        {/* 20 Nov 2026 (player report: "Season 2: Season 2", "u can't edit the name"): the name it will have, renamed
+                            here the way Greenlight renames a working title */}
+                        <div className="mt-1 flex items-start justify-between gap-3">
+                            <h2 data-renew-title className="min-w-0 text-2xl font-black leading-tight text-white [overflow-wrap:anywhere]">{nextName ?? next.suggestedTitle}</h2>
+                            <button type="button" data-renew-rename onClick={() => setNaming(true)} aria-label="Rename it" className="mt-0.5 flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.06] px-2.5 text-[11px] font-black uppercase tracking-[0.06em] text-zinc-200">
+                                <PenLine size={13} aria-hidden="true" /> Rename
+                            </button>
+                        </div>
                         <p className="mt-1 text-[12px] font-semibold text-zinc-400">{next.hitWord}. It costs {next.rise}% more to make this time.{next.feeWhy ? ` ${next.feeWhy}` : ''}</p>
                         {detail.isSeries && (
                             <div className="mt-3 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -456,6 +467,20 @@ export const OriginalTitleDetail: React.FC<{
                         </div>
                     </div>
                 </div>
+            )}
+            {naming && next && (
+                <WorkingTitleDialog
+                    mode="RENAME"
+                    eyebrow={detail.isSeries ? `Season ${next.nextSeason}` : 'The sequel'}
+                    title={detail.isSeries ? 'Name this season' : 'Name the sequel'}
+                    description={`What the next ${detail.isSeries ? 'season' : 'film'} of ${detail.title} is called.`}
+                    initialTitle={nextName ?? next.suggestedTitle}
+                    confirmLabel="Use this name"
+                    helperText="You can change it here until you order it."
+                    infoText="Once it is ordered, the name locks so releases, news and records stay the same."
+                    onClose={() => setNaming(false)}
+                    onConfirm={title => { setNextName(title === next.suggestedTitle ? null : title); setNaming(false); }}
+                />
             )}
         </div>,
         document.body,

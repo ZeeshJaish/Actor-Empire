@@ -48,6 +48,18 @@ import { RoomSubtitle } from './RoomSubtitle';
 /* ============================================================
    MODEL
    ============================================================ */
+/* 20 Nov 2026: the Library's order (newest or oldest first). A title with no known week goes to the end either way;
+   titles that share a week follow the order they joined in, turned round with the rest. */
+export const compareLibraryOrder = (
+  a: { addedAt?: number; addedOrder?: number },
+  b: { addedAt?: number; addedOrder?: number },
+  order: 'NEWEST' | 'OLDEST',
+): number => {
+  if (a.addedAt === undefined || b.addedAt === undefined) return (a.addedAt === undefined ? 1 : 0) - (b.addedAt === undefined ? 1 : 0);
+  const joined = (a.addedAt - b.addedAt) || ((a.addedOrder ?? 0) - (b.addedOrder ?? 0));
+  return order === 'NEWEST' ? -joined : joined;
+};
+
 export interface RightsWindow {
   licensor: string;
   territory: string;
@@ -98,6 +110,8 @@ export interface CatalogueTitle {
   /** the absolute week it joined the catalogue: a licence's first signing (not a renewal), an Original's commission,
       a studio title's link (Zeesh, 2026-11-09: the Library shows it and sorts by it) */
   addedAt?: number;
+  /** 20 Nov 2026: the order titles joined in, for titles that share a week (the opening catalogue, a collection) */
+  addedOrder?: number;
 }
 
 /** One acquisition, for the Rights tab's week-by-week record of what was bought (Zeesh, 2026-11-09). */
@@ -328,11 +342,11 @@ export const ContentDesk: React.FC<{
     filter === 'ALL' ? true
       : filter === 'EXPIRING' ? t.rights?.endsInWeeks !== undefined && t.rights.endsInWeeks <= 6
         : t.kind === filter)
-    /* a title with no known week (an old save's trimmed record) goes to the end either way */
-    .sort((a, b) => {
-      if (a.addedAt === undefined || b.addedAt === undefined) return (a.addedAt === undefined ? 1 : 0) - (b.addedAt === undefined ? 1 : 0);
-      return librarySort === 'NEWEST' ? b.addedAt - a.addedAt : a.addedAt - b.addedAt;
-    }), [state.titles, filter, librarySort]);
+    /* a title with no known week (an old save's trimmed record) goes to the end either way.
+       20 Nov 2026 (player report, Partha: "newest first & older don't work"): titles that joined in the same week (the
+       whole opening catalogue, a collection bought at once) kept the same order both ways, so the button seemed dead.
+       Within a week they now follow the order they joined in, turned round with the rest. */
+    .sort((a, b) => compareLibraryOrder(a, b, librarySort)), [state.titles, filter, librarySort]);
 
   const counts = {
     titles: state.titles.length,

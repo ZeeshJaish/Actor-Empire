@@ -39,6 +39,7 @@ import { RedCarpetEvent } from './views/RedCarpetEvent';
 import { PressConferenceEvent } from './views/PressConferenceEvent';
 import { ActorEmpireIntroStyle } from './components/ActorEmpireIntro';
 import { StartupLoadingBar } from './components/StartupLoadingBar';
+import { CareerOpeningBar } from './components/CareerOpeningBar';
 import ZedburyStudiosIntro from './components/ZedburyStudiosIntro';
 import { ScreenErrorBoundary } from './components/ScreenErrorBoundary';
 import type { NewCareerData } from './components/types';
@@ -99,7 +100,7 @@ import { describeWeekProcessingFailure } from './services/weekProcessingRecovery
 import { checkpointNativeMemoryPressure } from './services/nativeMemoryCheckpoint';
 import { getNativeDeviceInfo, withNativeBackgroundTask } from './services/nativeSupport';
 import { notePageHiddenOrMemory, notePageSaveStarted, notePageScreen, notePageWeekAhead, notePageWeekStage, type PageSaveKind } from './services/pageStateBreadcrumb';
-import { exportSaveSlotForSupport, exportSignedSaveArchive, importSignedSaveArchiveFromFile } from './services/saveTransfer';
+import { exportSaveSlotForSupport, exportSignedSaveArchive, importSignedSaveArchiveFromFile, isShareNeedsTapError } from './services/saveTransfer';
 import { markSelfReload, noteSessionClean, noteSessionDetail, noteSessionLive, noteSessionPhase, takeUncleanPreviousSession } from './services/sessionBreadcrumb';
 import { createCopyOnTouch } from './services/copyOnTouch';
 import { grantMigrationCarePackageIfEligible, MIGRATION_CARE_PACKAGE_CASH, MIGRATION_CARE_PACKAGE_ENERGY } from './services/migrationCarePackage';
@@ -1010,6 +1011,8 @@ export const App: React.FC = () => {
   gameStatusRef.current = gameStatus;
   const startupLoadingVisibleRef = useRef(true);
   const openingSlotRef = useRef<number | null>(null);
+  /* 20 Nov 2026: the career being opened, shown on CareerOpeningScreen while the open covers the menu */
+  const [careerOpening, setCareerOpening] = useState<{ name: string; age: number; week: number; step: 0 | 1 | 2 } | null>(null);
   const startPhaseRef = useRef('');
   const refreshStartPhase = () => {
       if (gameStatusRef.current !== 'START_MENU') { startPhaseRef.current = ''; return; }
@@ -2403,6 +2406,7 @@ export const App: React.FC = () => {
       await openSelectedSlot(slot);
     } finally {
       openingSlotRef.current = null;
+      setCareerOpening(null);
       // after React has drawn what the open left (PLAYING, or the menu again)
       window.setTimeout(refreshStartPhase, 0);
       slotOpenInProgressRef.current = false;
@@ -2434,6 +2438,7 @@ export const App: React.FC = () => {
         // the disk; anything else covers the menu with the loading screen at once, as before.
         const readyResult = usablePreload?.settled ? usablePreload.result : null;
         const instantOpen = readyResult?.kind === 'MIGRATED' && !readyResult.diskWorkOnTap;
+        { const s = saveSlotSummaries[slot]; setCareerOpening({ name: s?.name || 'Saved Career', age: s?.age || 0, week: s?.week || 1, step: 0 }); }
         if (!instantOpen) setIsInitializing(true);
         markTraceAction('selected_save_load_started', { flow: 'save_select', save_slot: slot });
         try {
@@ -2464,6 +2469,7 @@ export const App: React.FC = () => {
                 if (preloaded.headFallback) recordNonFatal(new Error('The save head record was not recognised'), 'save_head_unrecognised', { save_slot: slot, loaded: preloaded.headFallback });
             } else {
                 const verifiedLoad = preloaded?.kind === 'VERIFIED' ? preloaded.verifiedLoad : await loadVerifiedGameData(storageKey);
+                setCareerOpening(c => c && { ...c, step: 1 });
                 if (verifiedLoad.status === 'RECOVERY_AVAILABLE') {
                     noteStoreReviewTrouble('save_recovery');
                     const offer = offerForFailedLoad(pointFromCopy({ player: verifiedLoad.previous, savedAt: verifiedLoad.previousSavedAt, appVersion: verifiedLoad.previousAppVersion }));
@@ -2536,6 +2542,7 @@ export const App: React.FC = () => {
             const source = storageKind === 'localstorage'
                 ? (storageKey === 'actorEmpireSave' ? 'legacy-single-localstorage' : 'legacy-localstorage')
                 : (storageKey === 'actorEmpireSave' ? 'legacy-indexeddb' : 'indexeddb-slot');
+            setCareerOpening(c => c && { ...c, step: 2 });
             const prepared = premigrated
                 ? await prepareLoadedPlayerSave(slot, premigrated.migrated, source, { player: premigrated.migrated, migratedFromVersion: premigrated.migratedFromVersion, repaired: premigrated.repaired })
                 : savedData ? await prepareLoadedPlayerSave(slot, savedData, source) : null;
@@ -2715,7 +2722,8 @@ export const App: React.FC = () => {
     try {
       return await exportSaveSlotForSupport(storageKey, slot);
     } catch (error) {
-      recordNonFatal(error, 'support_save_export_failed', { save_slot: slot });
+      // 20 Nov 2026: a share that only needs one more tap (the file is ready) is not a failure
+      if (!isShareNeedsTapError(error)) recordNonFatal(error, 'support_save_export_failed', { save_slot: slot });
       throw error;
     }
   };
@@ -4723,7 +4731,9 @@ export const App: React.FC = () => {
       return (
           <div className="relative h-screen overflow-hidden bg-[#050505] text-white">
               <ActorEmpireIntroStyle />
-              {showStudioBumper ? (
+              {careerOpening ? (
+                  <CareerOpeningBar step={careerOpening.step} name={careerOpening.name} age={careerOpening.age} week={careerOpening.week} translate={(key, vars) => tr(key as Parameters<typeof t>[1], vars)} />
+              ) : showStudioBumper ? (
                   <ZedburyStudiosIntro state={startupStudioBumperExiting ? 'on exit' : 'on'} />
               ) : (
                   <StartupLoadingBar

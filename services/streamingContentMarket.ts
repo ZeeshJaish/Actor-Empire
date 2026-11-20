@@ -1,6 +1,6 @@
 import { getStreamingOpeningLock } from './streamingOpeningLock';
 import { getStreamingTitlePlacement } from './streamingTitlePlacement';
-import {collectionPrivateDefaults} from './streamingCollectionPrivateOffers';
+import {collectionPrivateDefaults, validatePrivateTermsNumbers} from './streamingCollectionPrivateOffers';
 import {streamingBackendPercentForBuyer} from './streamingBackendPolicy';
 import type { Player, StreamingStarterCatalogPackageId } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -54,8 +54,18 @@ export const getContentMarketListings = (player: Player, includeReservedListingI
             windowType: terms.windowType, exclusivity: terms.exclusivity,
             excludeContractIds: o.sourceLicenseId ? [o.sourceLicenseId] : [],
         });
+        /* 20 Nov 2026 (audit streaming-catalogue-retention, found in the Hotfix 4 audit review): a rival's licence taken
+           over keeps its owner's share, and older licences pay owners 25-30% (or a share like 22.5%). Signing allows a
+           whole share up to 20%, so the market listed a deal that signing then refused ("Choose a supported duration and
+           an integer seller backend between 0% and 20%"). The listing now runs the same check and is left out when it
+           cannot be signed; nothing about signing or money changes. */
+        const unsignable = validatePrivateTermsNumbers(terms);
         const unavailableReason = source && source.startsAtAbsoluteWeek > week ? 'This title is not available yet.'
-            : !compatibility.available ? compatibility.summary : o.incompatibilityDetail;
+            : !compatibility.available ? compatibility.summary
+                : unsignable ? (o.sourceLicenseId
+                    ? `Its current owner takes ${o.inheritedLicensorRevenueShare}% of what it earns; a takeover can carry at most 20%.`
+                    : unsignable)
+                    : o.incompatibilityDetail;
         // The displayed contract snapshot is checked again on acceptance; no silently revised price/scope.
         const signature = JSON.stringify([o.id, terms, countryIds, source]);
         return { ...o, terms, countryIds, unavailableReason, signature, inheritedContract: source };

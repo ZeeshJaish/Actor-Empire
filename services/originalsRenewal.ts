@@ -12,6 +12,7 @@ import { isOutsideOriginal } from './outsideOriginals';
 import { createProductionCalendar } from './productionCalendar';
 import { spendPlayerEnergy } from './premiumLogic';
 import { getSeriesBaseTitle } from './seriesIdentity';
+import { getProjectTitleError, normalizeProjectTitle } from './projectNaming';
 import { getTitleRating } from './titleRating';
 import { buildBackgroundCastingPlan, carryBackgroundCastingPlan, type BackgroundCastingContext } from './livingEnsemble';
 
@@ -97,9 +98,46 @@ const rowOf = (player: Player, projectId: string): any => {
 };
 const commissionOf = (player: Player, commissionId: string) => player.ownedStreamingPlatform?.originalCommissions?.find(item => item.id === commissionId);
 
+/* 20 Nov 2026 (player report, Wassim: ordering the next season of "Vanishing Hour Season 2" offered "Vanishing Hour Season 2:
+   Season 2"). The season number came only from the stored number, which a title ordered from a "Season 2" script did not
+   have, and only names written "X: Season 2" lost their old number. Now:
+   - a series is in the season its stored number or its own title says, whichever is higher; a film's sequel number is its
+     stored number, or a last single digit 2-9 in its title ("Vanishing Hour 2");
+   - the next one is named from the show's first title without its season ("Name: Season N"; a film "Name N"), and the
+     player can rename it on the order sheet before ordering it, the way Greenlight's working title works. */
+const titleInstallment = (title: string, isSeries: boolean): number => {
+    if (isSeries) {
+        const season = /\bseason\s+(\d{1,3})\b/i.exec(title);
+        return season ? Number(season[1]) : 0;
+    }
+    const sequel = /\s([2-9])$/.exec(title.trim());
+    return sequel ? Number(sequel[1]) : 0;
+};
+
+export const getOriginalInstallment = (commission: Pick<OwnedStreamingOriginalCommission, 'seasonNumber' | 'title' | 'projectType'>): number => Math.max(
+    1,
+    Math.round(Number(commission.seasonNumber) || 1),
+    titleInstallment(String(commission.title || ''), commission.projectType === 'SERIES'),
+);
+
+const baseNameOf = (title: string, isSeries: boolean): string => {
+    const name = isSeries ? getSeriesBaseTitle(title) : title.trim().replace(/\s+[2-9]$/, '');
+    return name || title.trim();
+};
+
+/** The name the next season or sequel gets unless the player renames it: from the first title of the show. */
+export const getOriginalNextTitle = (player: Player, commission: OwnedStreamingOriginalCommission, nextNumber: number): string => {
+    const isSeries = commission.projectType === 'SERIES';
+    const first = commissionOf(player, commission.lineageId || commission.id) || commission;
+    const base = baseNameOf(String(first.title || commission.title || ''), isSeries);
+    return normalizeProjectTitle(isSeries ? `${base}: Season ${nextNumber}` : `${base} ${nextNumber}`);
+};
+
 export interface OriginalNextSeasonQuote {
     label: string;
     nextSeason: number;
+    /** 20 Nov 2026: what it is called unless the player renames it on the order sheet */
+    suggestedTitle: string;
     outside: boolean;
     studioName: string;
     rise: number;
@@ -152,7 +190,7 @@ const quoteNext = (player: Player, commission: OwnedStreamingOriginalCommission,
     const row = projectId ? rowOf(player, projectId) : null;
     if (!row || !projectId) return null;
     const isSeries = commission.projectType === 'SERIES';
-    const nextSeason = Math.max(1, commission.seasonNumber || 1) + 1;
+    const nextSeason = getOriginalInstallment(commission) + 1;
     const outside = isOutsideOriginal(row);
     const { hit, word } = hitOf(player, projectId);
     const rise = getSeasonPriceRise(nextSeason, hit);
@@ -174,6 +212,7 @@ const quoteNext = (player: Player, commission: OwnedStreamingOriginalCommission,
     return {
         label: isSeries ? `Season ${nextSeason}` : 'A sequel',
         nextSeason,
+        suggestedTitle: getOriginalNextTitle(player, commission, nextSeason),
         outside,
         studioName: commission.producerStudioName,
         rise,
@@ -356,7 +395,7 @@ const orderNext = (player: Player, commission: OwnedStreamingOriginalCommission,
     return { player: next, moment: { ...finalized.moment, post: { ...finalized.moment.post, text: said } }, commissionId };
 };
 
-export const renewOriginal = (player: Player, commissionId: string, episodes?: number, extrasChoice?: OriginalExtrasChoice): { player: Player; changed: boolean; message: string; moment?: OriginalCommissionMoment; title?: string; nextCommissionId?: string } => {
+export const renewOriginal = (player: Player, commissionId: string, episodes?: number, extrasChoice?: OriginalExtrasChoice, customTitle?: string): { player: Player; changed: boolean; message: string; moment?: OriginalCommissionMoment; title?: string; nextCommissionId?: string } => {
     const view = getOriginalFutureView(player, commissionId, episodes, extrasChoice);
     const commission = commissionOf(player, commissionId);
     if (!view || !commission) return { player, changed: false, message: 'That title is not on your record.' };
@@ -367,8 +406,11 @@ export const renewOriginal = (player: Player, commissionId: string, episodes?: n
     if (!quote) return { player, changed: false, message: 'It has not opened yet.' };
     if (!quote.canAfford) return { player, changed: false, message: `${money(quote.total)} is more than the treasury holds.` };
     if (!quote.hasEnergy) return { player, changed: false, message: `It takes ${quote.energy}⚡.` };
-    const base = getSeriesBaseTitle(commission.title);
-    const title = commission.projectType === 'SERIES' ? `${base}: Season ${quote.nextSeason}` : `${base.replace(/\s+\d+$/, '')} ${quote.nextSeason}`;
+    /* 20 Nov 2026: the player's own name for it (checked as Greenlight checks a working title), else the suggested one */
+    const typed = customTitle === undefined ? '' : normalizeProjectTitle(customTitle);
+    const titleError = customTitle === undefined ? null : getProjectTitleError(typed);
+    if (titleError) return { player, changed: false, message: titleError };
+    const title = typed || quote.suggestedTitle;
     const episodesNow = commission.projectType === 'SERIES' ? Math.max(1, episodes || commission.episodes) : 1;
     const ordered = orderNext(player, commission, {
         title, seed: `${commission.scriptId}:s${quote.nextSeason}`, making: quote.making, fee: quote.fee, feePercent: quote.feePercent, total: quote.total, deal: quote.deal,

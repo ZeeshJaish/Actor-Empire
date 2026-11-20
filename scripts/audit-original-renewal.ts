@@ -8,7 +8,7 @@ import { getStreamingContentAvailability } from '../services/streamingContentAva
 import { getOwnedStreamingProgramEntries } from '../services/streamingOriginals';
 import { resolveStreamingViewingProjectFacts } from '../services/worldEconomy/worldStreamingViewing';
 import {
-    endOriginal, extendOriginalLicence, getOriginalFutureView, getSeasonPriceRise, ORIGINAL_EVIDENCE_WEEKS, renewOriginal, spinOffOriginal,
+    endOriginal, extendOriginalLicence, getOriginalFutureView, getOriginalInstallment, getSeasonPriceRise, ORIGINAL_EVIDENCE_WEEKS, renewOriginal, spinOffOriginal,
 } from '../services/originalsRenewal';
 import { getOriginalTitleDetail } from '../services/originalsTitleDetail';
 import { getSeasonEffects, getStudioSeasonShares } from '../services/originalsEpisodeBudget';
@@ -211,6 +211,30 @@ const run = async () => {
     const reloaded = migratePlayerSave(JSON.parse(JSON.stringify(renewed.player)));
     assert.equal(of(reloaded).nextSeasonCommissionId, renewed.nextCommissionId);
     assert.equal(of(reloaded, renewed.nextCommissionId).parentCommissionId, COMMISSION);
+
+    /* 20 Nov 2026 (player report, Wassim): a show whose title already says "Season 2" but whose stored number is 1 (it
+       was ordered from a "Season 2" script) is in season 2: the next one is season 3, named from the show's first title,
+       and the player may rename it the way Greenlight renames a working title. */
+    const named = company(8.4, { title: 'Harrow Lane Season 2', seasonNumber: 1 });
+    const namedQuote = getOriginalFutureView(named, COMMISSION)!.next!;
+    assert.equal(namedQuote.nextSeason, 3, 'its title says season 2');
+    assert.equal(namedQuote.suggestedTitle, 'Harrow Lane: Season 3', 'not "Harrow Lane Season 2: Season 2"');
+    assert.equal(getOriginalInstallment(of(named)), 2);
+    const renamed = renewOriginal(named, COMMISSION, undefined, undefined, '  Harrow Lane:   The Reckoning ');
+    assert.ok(renamed.changed, renamed.message);
+    assert.equal(of(renamed.player, renamed.nextCommissionId).title, 'Harrow Lane: The Reckoning', 'the player\'s own name, tidied');
+    assert.equal(of(renamed.player, renamed.nextCommissionId).seasonNumber, 3);
+    const blank = renewOriginal(named, COMMISSION, undefined, undefined, '   ');
+    assert.equal(blank.changed, false, 'an empty name orders nothing');
+    assert.equal(renewOriginal(named, COMMISSION, undefined, undefined, 'x'.repeat(80)).changed, false, 'too long orders nothing');
+    /* the next season of a renamed season keeps the show's name and its count */
+    const third = getOriginalFutureView(renamed.player, renamed.nextCommissionId!);
+    assert.equal(third?.next?.suggestedTitle, 'Harrow Lane: Season 4');
+    /* a film: "Name 2" is the second one; "Apollo 13" is not the thirteenth */
+    const film = company(8.4, { title: 'Harrow Lane 2', projectType: 'MOVIE', seasonNumber: 1 });
+    const filmQuote = getOriginalFutureView(film, COMMISSION)?.next;
+    assert.equal(filmQuote?.suggestedTitle, 'Harrow Lane 3');
+    assert.equal(getOriginalInstallment({ title: 'Apollo 13', projectType: 'MOVIE', seasonNumber: 1 }), 1);
 
     console.log('original renewal audit passed');
 };

@@ -112,7 +112,7 @@ export const ActorEmpireIntroStyle: React.FC = () => (
   `}</style>
 );
 
-const GrainAndVignette: React.FC = () => (
+export const GrainAndVignette: React.FC = () => (
   <>
     <div
       className="ae-intro-motion pointer-events-none absolute inset-[-50%] z-[60] opacity-[0.05]"
@@ -229,6 +229,52 @@ export const ActorEmpireLoadingScreen: React.FC<ActorEmpireLoadingScreenProps> =
           </div>
           <div className="ae-intro-motion mt-[22px] min-h-4 text-center text-[11.5px] font-black uppercase tracking-[0.32em] text-[#a8aab0]" style={{ animation: 'aeIntroRiseIn .8s cubic-bezier(.16,1,.3,1) .5s forwards' }}>
             {status}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* 20 Nov 2026: opening a saved career. The start-up loading screen's own look (background, gold bar, type), but not a
+   second start-up: the logo and title do not rise in again. It names the career being opened and moves with the real
+   steps of the open (read, check, prepare), so it reads as the next step after the slot tap, not as loading again. */
+type CareerOpeningScreenProps = {
+  progress: number;
+  label: string;
+  name: string;
+  detail: string;
+  status: string;
+};
+
+export const CareerOpeningScreen: React.FC<CareerOpeningScreenProps> = ({ progress, label, name, detail, status }) => {
+  const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
+  return (
+    <div className="relative flex h-full w-full items-start justify-center overflow-hidden bg-[radial-gradient(100%_66%_at_50%_38%,#0e0c08_0%,#040404_64%)] px-[30px] text-white" data-career-opening>
+      <GrainAndVignette />
+      <div className="relative z-10 mt-[26dvh] flex w-full max-w-[420px] flex-col items-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[linear-gradient(155deg,#221c12,#0b0a07_65%)] shadow-[0_0_0_1px_rgba(232,182,76,0.30),inset_0_1px_0_rgba(255,223,142,0.18),0_18px_40px_-14px_rgba(0,0,0,0.95),0_0_50px_-8px_rgba(232,182,76,0.28)]">
+          <img src={ACTOR_EMPIRE_INTRO_LOGO} alt="" className="h-full w-full rounded-2xl object-cover" />
+        </div>
+        <div className="mt-7 text-[11.5px] font-black uppercase tracking-[0.42em] text-[#e8b64c]">{label}</div>
+        <div className="mt-3 w-full break-words text-center font-['Anton',sans-serif] text-[clamp(36px,11vw,52px)] leading-[1.02] tracking-[0.02em] text-white [text-wrap:balance]">{name}</div>
+        <div className="mt-2.5 text-[12px] font-black uppercase tracking-[0.24em] text-[#8b8e94]">{detail}</div>
+        <div className="mt-[8dvh] w-full">
+          <div className="mb-3.5 flex items-baseline justify-between">
+            <div className="min-w-0 truncate pr-3 text-[11.5px] font-black uppercase tracking-[0.3em] text-[#a8aab0]">{status}</div>
+            <div className="font-['Anton',sans-serif] text-[22px] tracking-[0.06em] text-[#e8b64c] drop-shadow-[0_0_24px_rgba(232,182,76,0.5)]">{safeProgress}%</div>
+          </div>
+          {/* a sweep drawn by the compositor (transform only), so the track keeps moving while the open's heavy work holds
+              the page's own thread and the bar itself cannot step */}
+          <style>{'@keyframes aeCareerOpenSweep{from{transform:translateX(-100%)}to{transform:translateX(560%)}}'}</style>
+          <div className="relative h-[7px] overflow-hidden rounded-full bg-[#17171a] shadow-[inset_0_1px_3px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)]">
+            <div className="ae-intro-motion pointer-events-none absolute inset-y-0 left-0 w-[18%] rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,223,142,0.35),transparent)] will-change-transform" style={{ animation: 'aeCareerOpenSweep 1.6s linear infinite' }} />
+            <div
+              className="relative h-full rounded-full bg-[linear-gradient(90deg,#8a6420,#e8b64c_45%,#ffdf8e_85%,#fff)] shadow-[0_0_18px_rgba(232,182,76,0.55),0_0_46px_rgba(232,182,76,0.22)] transition-[width] duration-200 ease-out"
+              style={{ width: `${safeProgress}%` }}
+            >
+              <div className="ae-intro-motion absolute inset-0 rounded-full bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)] bg-[length:60px_100%] bg-no-repeat" style={{ animation: 'aeIntroBarShine 1.4s linear infinite' }} />
+            </div>
           </div>
         </div>
       </div>

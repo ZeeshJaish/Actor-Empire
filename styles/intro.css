@@ -542,6 +542,18 @@
   }
   .slot-info{flex:1;min-width:0}
   .slot-tags{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .slot-tags .tag{white-space:nowrap}
+  /* 20 Nov 2026 (Zeesh: the slot card is not symmetric): the card's own actions, one even row under the career */
+  .slot-card.active-slot{flex-wrap:wrap;row-gap:14px}
+  .slot-manage{
+    flex-basis:100%;
+    display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:10px;
+  }
+  .slot-manage .slot-delete{
+    min-height:36px;padding:0 8px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    white-space:nowrap;letter-spacing:.16em;
+  }
   .tag{
     font-size:9.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;
     padding:5px 10px;border-radius:7px;
@@ -581,7 +593,8 @@
   }
   .slot-delete.slot-send:disabled{opacity:.6;cursor:default}
   .slot-send-note{
-    margin:6px 0 2px;
+    flex-basis:100%;
+    margin:-4px 0 0;
     font-family:'Archivo',sans-serif;font-size:11px;line-height:1.35;
     color:#c7cad1;
   }
@@ -638,6 +651,7 @@
     .slot-bar{align-items:flex-start;flex-direction:column}
     .slot-actions{width:100%;justify-content:space-between}
     .slot-import{padding:9px 11px;font-size:9.5px;letter-spacing:.14em}
+    .slot-manage .slot-delete{letter-spacing:.1em}
   }
   #act4.on .menu-foot{animation:riseIn .7s var(--ease-out) .5s forwards}
   /* AE-006: the optional alerts card sits in the flow under the slots. As an overlay at the bottom it covered

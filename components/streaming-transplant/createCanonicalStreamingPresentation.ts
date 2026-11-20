@@ -80,9 +80,14 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
   };
   const history: NonNullable<ContentDeskState['history']> = [];
   const addedAt = new Map<string, number>();
+  /* 20 Nov 2026: the order each title joined in (the lists below keep the order things were added), so titles that share
+     a week still sort newest or oldest first */
+  const addedOrder = new Map<string, number>();
+  let joinedCount = 0;
   const noteAdded = (projectId: string, at: number) => {
     const known = addedAt.get(projectId);
-    if (known === undefined || at < known) addedAt.set(projectId, at);
+    joinedCount += 1;
+    if (known === undefined || at < known) { addedAt.set(projectId, at); addedOrder.set(projectId, joinedCount); }
   };
   platform.catalogLicenses.forEach(licence => {
     const kept = licence.windowType === 'PERMANENT' || Boolean(licence.permanentPurchase);
@@ -151,6 +156,7 @@ export const createCanonicalContentDeskState = (player: Player, preparedContext?
       poster: posterById.get(projectId),
       schedulable,
       addedAt: addedAt.get(projectId),
+      addedOrder: addedOrder.get(projectId),
       /* Window: any title on a licence that runs out (an Original's own
          window included — it leaves when it ends). Kept: no licence end at
          all. Lapsed: a licensed title with no active licence — it was listed
