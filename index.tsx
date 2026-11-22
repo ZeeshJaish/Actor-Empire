@@ -5,8 +5,12 @@ import './ui-layout/railInteractions.css';
 import { installHorizontalRailDrag } from './ui-layout/railInteractions';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
-import { bootstrapFirebase, installGlobalTelemetryHandlers, recordNonFatal, trackGameEvent } from './services/firebaseService';
+import { bootstrapFirebase, installGlobalTelemetryHandlers, noteReactComponentStack, recordNonFatal, trackGameEvent } from './services/firebaseService';
+import { drawIdleFaces, endLazyFaceLoading, loadKeptFaces } from './services/npcAvatar';
 import { markSelfReload } from './services/sessionBreadcrumb';
+
+// 21 Nov 2026 (boot freeze): the game code has loaded; people made from now on draw their face at once, as before
+endLazyFaceLoading();
 
 installHorizontalRailDrag(document);
 
@@ -101,7 +105,26 @@ try {
   console.error('Startup telemetry could not initialize.', error);
 }
 
-const root = ReactDOM.createRoot(rootElement);
+/* 21 Nov 2026: an error React cannot hand to a boundary keeps React's component stack, so its global_js_error report names
+   the component once the build's source map is applied (1.0.30's React #185 left only React's own throw site). The
+   error then goes out exactly as React's own handler sends it: a window error event (the boot guard and the
+   global_js_error report listen to it). */
+const reportLikeReact = (error: unknown) => {
+  if (typeof window.reportError === 'function') { window.reportError(error); return; }
+  if (typeof window.ErrorEvent === 'function') {
+    const message = error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
+      ? (error as { message: string }).message
+      : String(error);
+    if (!window.dispatchEvent(new window.ErrorEvent('error', { bubbles: true, cancelable: true, message, error }))) return;
+  }
+  console.error(error);
+};
+const root = ReactDOM.createRoot(rootElement, {
+  onUncaughtError: (error: unknown, errorInfo: { componentStack?: string }) => {
+    noteReactComponentStack(error, errorInfo?.componentStack);
+    reportLikeReact(error);
+  },
+} as Parameters<typeof ReactDOM.createRoot>[1]);
 root.render(
   <React.StrictMode>
     <RootRecoveryBoundary>
@@ -110,3 +133,9 @@ root.render(
     </RootRecoveryBoundary>
   </React.StrictMode>
 );
+
+/* 21 Nov 2026 (boot freeze): the built-in people's faces are read from the phone right away, and any still missing are
+   drawn while the phone is idle after start-up, famous people first (services/npcAvatar.ts). A face a screen or a week
+   reads before then is drawn on the spot. */
+void loadKeptFaces();
+window.setTimeout(() => { drawIdleFaces(); }, 1200);

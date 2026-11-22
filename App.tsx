@@ -87,7 +87,7 @@ import { hydrateGenreXP } from './services/genreCatalog';
 import { createInstagramReferralOutcome } from './services/instagramOfferLogic';
 import { executeStockTrade } from './services/stockLogic';
 import { migratePlayerSave } from './services/saveMigration';
-import { markPortraitLoadDone } from './services/npcAvatar';
+import { markPortraitLoadDone, setIdleFacesPaused } from './services/npcAvatar';
 import { forgetSaveWriteRecord, readSaveWriteRecord } from './services/saveWriteLimits';
 import { getRecoveryFlaggedVersions, getSwitchLimit, isSwitchOn, startSessionSwitches } from './services/remoteSwitches';
 import { getRamClass, rememberNativeMemoryGiB } from './services/deviceMemoryClass';
@@ -3386,6 +3386,8 @@ export const App: React.FC = () => {
     activeWeekStageRef.current = 'paint_wait';
     setPendingWeekProcessingFailure(null);
     setIsProcessing(true);
+    // 22 Nov 2026 (boot freeze work): the idle face drawing waits while the week plays (services/npcAvatar.ts)
+    setIdleFacesPaused(true);
     try {
         await yieldForWeekProcessingPaint();
         markTraceAction('process_week_started', {
@@ -3749,6 +3751,7 @@ export const App: React.FC = () => {
       notePageWeekStage(null);
       weekTapGuardRef.current = false;
       setIsProcessing(false);
+      setIdleFacesPaused(false);
       try {
         // Phase 1 (2026-11-17), the plan's Phase H item 7: forced_ad (0 or 1) is set at the stop.
         /* Phase 1 (2026-11-17), plan item 8: the save limit this week's write ran with (B3 turns a failed ~12 s week

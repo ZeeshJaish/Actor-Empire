@@ -14,7 +14,7 @@ import { STREAMING_EXECUTIVE_CANDIDATES } from './streamingCompany';
 import { WRITER_NPC_LIBRARY } from './writerNpcLibrary';
 import { getNpcRelationshipScore } from './relationshipBond';
 export { getGenderedAvatar } from './npcAvatar';
-import { getGenderedAvatar } from './npcAvatar';
+import { copyPersonKeepingFace, drawLazyFace, faceOnCreation, keepFace } from './npcAvatar';
 import { createDeterministicRng } from './deterministicRandom';
 
 const ACTOR_TRAITS: ActorTrait[] = ['DIVA', 'METHOD', 'WORKAHOLIC', 'UNRELIABLE', 'EASY_GOING', 'BOX_OFFICE_POISON', 'PROFESSIONAL', 'AMBITIOUS'];
@@ -144,12 +144,14 @@ const createInvestorOwnerNPC = ({
     const gender = investorOwnerGender(canonicalPersonName(name));
     const netWorth = Math.max(5_000_000, Math.round(cashCapacity * 2.4));
     const tier = investorOwnerTier(cashCapacity);
-    return {
+    return faceOnCreation({
         id,
         name,
         handle: `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 22) || id}`,
         gender,
-        avatar: getGenderedAvatar(gender, canonicalPersonName(name)),
+        /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+        get avatar() { return drawLazyFace(this, gender, canonicalPersonName(name)); },
+        set avatar(value: string) { keepFace(this, value); },
         tier,
         prestigeBias: tags.includes('prestige') || tags.includes('legacy') ? 'PRESTIGE' : tags.includes('commercial') || tags.includes('global') ? 'COMMERCIAL' : 'MIXED',
         openness: 18 + (stableHash(canonicalPersonName(name)) % 32),
@@ -166,7 +168,7 @@ const createInvestorOwnerNPC = ({
         traits: tags.includes('aggressive') || tags.includes('high-risk') ? ['AMBITIOUS', 'DIVA'] : ['PROFESSIONAL', 'AMBITIOUS'],
         potential: Math.min(100, 60 + (stableHash(`${canonicalPersonName(name)}:potential`) % 30)),
         isIndependent: true
-    };
+    });
 };
 
 export const createInvestorOwnerNPCs = (): NPCActor[] => {
@@ -203,12 +205,14 @@ export const createInvestorOwnerNPCs = (): NPCActor[] => {
 export const createNPCFromMusicArtist = (artist: MusicArtist, idOverride?: string): NPCActor => {
     const gender = musicArtistGenderToNpcGender(artist.gender);
     const filmGenre = MUSIC_GENRE_TO_FILM_GENRE[artist.genre] || MUSIC_GENRE_TO_FILM_GENRE[artist.subgenre] || 'DRAMA';
-    return {
+    return faceOnCreation({
         id: idOverride || `music_npc_${artist.id}`,
         name: artist.stageName,
         handle: `@${artist.stageName.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 24) || artist.id}`,
         gender,
-        avatar: getGenderedAvatar(gender, artist.stageName),
+        /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+        get avatar() { return drawLazyFace(this, gender, artist.stageName); },
+        set avatar(value: string) { keepFace(this, value); },
         tier: musicArtistTierToNpcTier(artist.fameTier),
         prestigeBias: artist.soundtrackFitTags.includes('prestige') || artist.genre === 'Classical' || artist.genre === 'Jazz' ? 'PRESTIGE' : artist.fameTier === 'SUPERSTAR' || artist.fameTier === 'LEGEND' ? 'COMMERCIAL' : 'MIXED',
         openness: artist.availability === 'COMMON' ? 62 : artist.availability === 'SELECTIVE' ? 42 : 22,
@@ -225,7 +229,7 @@ export const createNPCFromMusicArtist = (artist: MusicArtist, idOverride?: strin
         traits: artist.scandalRisk === 'HIGH' ? ['DIVA', 'UNRELIABLE'] : artist.availability === 'RARE' ? ['PROFESSIONAL', 'AMBITIOUS'] : ['AMBITIOUS'],
         potential: Math.max(35, Math.min(100, artist.reputation + (artist.fameTier === 'EMERGING' ? 18 : artist.fameTier === 'KNOWN' ? 10 : 4))),
         isIndependent: artist.dealPreference.toLowerCase().includes('rights') || artist.availability === 'RARE'
-    };
+    });
 };
 
 const normalizeTalentName = (value: string): string =>
@@ -695,13 +699,15 @@ const createNPCFromCeleb = (celeb: RealCeleb, id: string): NPCActor => {
     else if (celeb.tier === 'ESTABLISHED') fame = 60 + Math.random() * 25;
     else fame = 30 + Math.random() * 30;
 
-    return {
+    return faceOnCreation({
         id,
         // Real people appear under their satire stand-in; the portrait stays seeded by the real name so faces never change.
         name: fictionalPersonName(celeb.name),
         handle: celeb.handle ? fictionalHandle(celeb.name, celeb.handle) : celeb.handle,
         gender: celeb.gender,
-        avatar: getGenderedAvatar(celeb.gender, celeb.name),
+        /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+        get avatar() { return drawLazyFace(this, celeb.gender, celeb.name); },
+        set avatar(value: string) { keepFace(this, value); },
         tier: celeb.tier,
         prestigeBias: celeb.bias,
         openness,
@@ -719,7 +725,7 @@ const createNPCFromCeleb = (celeb: RealCeleb, id: string): NPCActor => {
         isIndependent: celeb.isIndependent ?? true,
         age: celeb.age ?? estimateTalentAge(celeb),
         forbesCategory: celeb.forbesCategory
-    };
+    });
 };
 
 export const GLOBAL_ACTOR_PACKS = Array.from(
@@ -809,12 +815,14 @@ const generateRandomNPC = (seed: number | string, random: () => number = Math.ra
         if(!traits.includes(t)) traits.push(t);
     }
 
-    return {
+    return faceOnCreation({
         id: id || `npc_rnd_${seed}_${Date.now()}`,
         name,
         handle,
         gender,
-        avatar: getGenderedAvatar(gender, name),
+        /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+        get avatar() { return drawLazyFace(this, gender, name); },
+        set avatar(value: string) { keepFace(this, value); },
         tier,
         prestigeBias: 'MIXED',
         openness,
@@ -830,7 +838,7 @@ const generateRandomNPC = (seed: number | string, random: () => number = Math.ra
         traits,
         potential: 40 + random() * 60, // High potential for unknowns
         isIndependent: random() > 0.7
-    };
+    });
 };
 
 /** #311: a built-in unknown's id, the same every session */
@@ -858,12 +866,14 @@ export const generateNPCs = (): NPCActor[] => {
         else if (celeb.tier === 'ESTABLISHED') fame = 60 + Math.random() * 25;
         else fame = 30 + Math.random() * 30;
 
-        npcs.push({
+        npcs.push(faceOnCreation({
             id: `celeb_dir_${idx}`,
             name: celeb.name,
             handle: celeb.handle,
             gender: celeb.gender,
-            avatar: getGenderedAvatar(celeb.gender, celeb.name),
+            /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+            get avatar() { return drawLazyFace(this, celeb.gender, celeb.name); },
+            set avatar(value: string) { keepFace(this, value); },
             tier: celeb.tier,
             prestigeBias: celeb.bias,
             openness,
@@ -876,7 +886,7 @@ export const generateNPCs = (): NPCActor[] => {
                 fame,
                 genreXP: createGenreXP(celeb.genres || ['DRAMA'])
             }
-        });
+        }));
     });
 
     // 3. Add Music Artists as world NPCs for Forbes, social, and industry surfaces.
@@ -899,12 +909,14 @@ export const generateNPCs = (): NPCActor[] => {
         
         const tier: NPCTier = random() > 0.8 ? 'RISING' : 'INDIE';
 
-        npcs.push({
+        npcs.push(faceOnCreation({
             id: `rnd_dir_${i}`,
             name: `${first} ${last}`,
             handle: `@${first.toLowerCase()}_films`,
             gender,
-            avatar: getGenderedAvatar(gender, `${first} ${last}`),
+            /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+            get avatar() { return drawLazyFace(this, gender, `${first} ${last}`); },
+            set avatar(value: string) { keepFace(this, value); },
             tier,
             prestigeBias: random() > 0.5 ? 'PRESTIGE' : 'COMMERCIAL',
             openness: 40 + Math.floor(random() * 40),
@@ -917,7 +929,7 @@ export const generateNPCs = (): NPCActor[] => {
                 fame: 5 + random() * 10,
                 genreXP: createGenreXP([GENRES[Math.floor(random() * GENRES.length)]], random)
             }
-        });
+        }));
     }
 
     // 5. Add Random Actors (Filler for low budget)
@@ -931,12 +943,14 @@ export const generateNPCs = (): NPCActor[] => {
 
 /** Streaming leaders are real world NPCs, so their portraits and identities are
  * shared anywhere the game needs to reference them after the founding table. */
-export const STREAMING_EXECUTIVE_NPCS: NPCActor[] = STREAMING_EXECUTIVE_CANDIDATES.map(candidate => ({
+export const STREAMING_EXECUTIVE_NPCS: NPCActor[] = STREAMING_EXECUTIVE_CANDIDATES.map(candidate => (faceOnCreation({
     id: `streaming_exec_${candidate.id}`,
     name: candidate.name,
     handle: `@${candidate.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`,
     gender: candidate.gender,
-    avatar: getGenderedAvatar(candidate.gender, candidate.name),
+    /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+    get avatar() { return drawLazyFace(this, candidate.gender, candidate.name); },
+    set avatar(value: string) { keepFace(this, value); },
     tier: candidate.skill >= 88 ? 'A_LIST' : candidate.skill >= 82 ? 'ESTABLISHED' : 'RISING',
     prestigeBias: candidate.preferredStrategy === 'CREATIVE_FIRST' ? 'PRESTIGE' : 'COMMERCIAL',
     openness: Math.max(25, Math.min(90, candidate.loyalty)),
@@ -950,7 +964,7 @@ export const STREAMING_EXECUTIVE_NPCS: NPCActor[] = STREAMING_EXECUTIVE_CANDIDAT
         talent: candidate.skill,
         reputation: candidate.ethics,
     },
-}));
+})));
 
 // GLOBAL DB (Initialized once in app)
 export const NPC_DATABASE = [...generateNPCs(), ...CREW_PROFESSIONALS, ...STREAMING_EXECUTIVE_NPCS, ...WRITER_NPC_LIBRARY].map(projectBuiltinPerson);
@@ -991,15 +1005,15 @@ export const updateNPCLives = (npcs: NPCActor[]): NPCActor[] => {
             else if(newFame > 50) newTier = 'ESTABLISHED';
             else if(newFame > 20) newTier = 'RISING';
             
-            return {
-                ...npc,
-                tier: newTier,
-                stats: {
-                    ...npc.stats,
-                    talent: newTalent,
-                    fame: newFame
-                }
+            // 21 Nov 2026: the same object a spread made, but a face not drawn yet stays undrawn (npcAvatar.ts)
+            const grown = copyPersonKeepingFace(npc);
+            grown.tier = newTier;
+            grown.stats = {
+                ...npc.stats,
+                talent: newTalent,
+                fame: newFame
             };
+            return grown;
         }
         return npc;
     });

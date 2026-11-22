@@ -1000,7 +1000,9 @@ export const useGameActions = ({ player, setPlayer, setToastMessage, setActivePr
             let followerGain = 0;
             if (!oldState.isFollowing && newState.isFollowing) {
                 // NPC just followed player!
-                followerGain = Math.floor(npc.stats.fame * 100 * (0.01 + Math.random() * 0.02));
+                /* 21 Nov 2026 (1.0.30 Crashlytics: "reading 'fame'" on Instagram): brand accounts, creator and media
+                   profiles in Instagram's pool have no stats; they count as fame 0, as calculateInteraction already does */
+                followerGain = Math.floor((Number(npc.stats?.fame) || 0) * 100 * (0.01 + Math.random() * 0.02));
                 setToastMessage({ title: tr('actions.npc.newFollowerTitle'), subtext: tr('actions.npc.newFollowerSubtext', { npcName: npc.name, followerGain: followerGain.toString() }) });
             }
 

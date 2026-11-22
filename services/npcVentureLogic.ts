@@ -1,5 +1,6 @@
 import { AuditionOpportunity, BudgetTier, GameLanguage, Genre, IndustryContentFingerprint, IndustryProject, NewsItem, NpcVentureArchetype, NpcVentureState, Player, ProjectType, RoleType, StudioAiSlateCommitment, WorldState } from '../types';
 import { NPC_DATABASE, calculateProjectFameMultiplier } from './npcLogic';
+import { copyPersonKeepingFace } from './npcAvatar';
 import { calculateProjectPay, generateProjectDetails, generateProjectTitle, getEstimatedBudget } from './roleLogic';
 import { getEnabledGlobalCreatorSocialProfiles } from './youtubeLogic';
 import { getPlayerLanguage, t } from './i18n';
@@ -54,17 +55,19 @@ const getTalentPool = (player: Player) => {
 
     return merged
         .filter((npc, idx, arr) => arr.findIndex(entry => entry.id === npc.id || entry.name.toLowerCase() === npc.name.toLowerCase()) === idx)
-        .map(npc => ({
-            ...npc,
-            handle: npc.handle || `@${npc.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
-            followers: Number.isFinite(npc.followers) ? Math.max(0, npc.followers) : 0,
-            netWorth: Number.isFinite(npc.netWorth) ? Math.max(250000, npc.netWorth) : 1_000_000,
-            stats: {
+        .map(npc => {
+            // 21 Nov 2026: the same object a spread made, but a face not drawn yet stays undrawn (npcAvatar.ts)
+            const person = copyPersonKeepingFace(npc) as typeof npc & { handle: string; followers: number; netWorth: number; stats: NonNullable<typeof npc.stats> };
+            person.handle = npc.handle || `@${npc.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`;
+            person.followers = Number.isFinite(npc.followers) ? Math.max(0, npc.followers) : 0;
+            person.netWorth = Number.isFinite(npc.netWorth) ? Math.max(250000, npc.netWorth) : 1_000_000;
+            person.stats = {
                 ...(npc.stats || {}),
                 fame: Number.isFinite(npc.stats?.fame) ? npc.stats?.fame : (npc.tier === 'ICON' || npc.tier === 'A_LIST' ? 82 : npc.tier === 'ESTABLISHED' ? 62 : 42),
                 talent: Number.isFinite(npc.stats?.talent) ? npc.stats?.talent : (npc.tier === 'ICON' ? 92 : npc.tier === 'A_LIST' ? 86 : npc.tier === 'ESTABLISHED' ? 74 : 60),
-            },
-        }));
+            } as NonNullable<typeof npc.stats>;
+            return person;
+        });
 };
 
 const uniqueCompanyName = (world: WorldState, archetype: NpcVentureArchetype, rng: () => number): string => {

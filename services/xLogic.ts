@@ -3,6 +3,7 @@ import { Player, XPost, NPCActor } from '../types';
 import { NPC_DATABASE } from './npcLogic';
 import { getAwardGossipTemplate } from './awardLogic';
 import { getEnabledGlobalCreatorProfiles } from './youtubeLogic';
+import { copyPersonKeepingFace } from './npcAvatar';
 import { normalizeUniverseMap } from './universeLogic';
 import { getPlayerLanguage, t } from './i18n';
 import { getAbsoluteWeek } from './legacyLogic';
@@ -247,10 +248,12 @@ export const generateIndustryXPosts = (player: Player): XPost[] => {
 export const generateXFeed = (player: Player): XPost[] => {
     const feed: XPost[] = [];
     const language = getPlayerLanguage(player);
-    const creatorProfiles = getEnabledGlobalCreatorProfiles(player).map(creator => ({
-        ...creator,
-        tier: 'A_LIST' as const
-    }));
+    // 22 Nov 2026: the same object a spread made, but a creator's face not drawn yet stays undrawn (services/npcAvatar.ts)
+    const creatorProfiles = getEnabledGlobalCreatorProfiles(player).map(creator => {
+        const profile = copyPersonKeepingFace(creator) as typeof creator & { tier: 'A_LIST' };
+        profile.tier = 'A_LIST';
+        return profile;
+    });
     const npcMap = [...NPC_DATABASE, ...(Array.isArray(player.flags?.extraNPCs) ? player.flags.extraNPCs : []), ...creatorProfiles];
 
     // 1. Add Player's recent posts (this week)

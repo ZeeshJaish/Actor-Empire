@@ -28,15 +28,15 @@ import {
     extendStreamingCampaign,
     streamingCampaignExtensionPrice,
     quoteStreamingCampaign,
+    readStreamingCampaignWorld,
     startStreamingCampaign,
     stopStreamingCampaign,
     streamingCampaignRateCard,
     streamingCampaignBook,
-    streamingCampaignMarkets,
     streamingCampaignRegions,
-    streamingCampaignSubjects,
     topUpStreamingCampaign,
     type StreamingCampaignDraft,
+    type StreamingCampaignReads,
     type StreamingCampaignProblem,
     type StreamingCampaignSubject,
 } from '../../../services/campaigns/streamingCampaigns';
@@ -174,9 +174,11 @@ export const CampaignStudio: React.FC<Props> = ({ player, brand, onUpdatePlayer,
     useEffect(() => { Object.values(CAMPAIGN_SCENES).forEach(scene => { const image = new Image(); image.decoding = 'async'; image.src = scene.thumb; }); }, []);
     const book = streamingCampaignBook(player.ownedStreamingPlatform);
     const week = getAbsoluteWeek(player.age, player.currentWeek);
-    const markets = useMemo(() => streamingCampaignMarkets(player), [player]);
+    /* Kadam 2 (22 Nov 2026): what campaigns read from the career, once per career change, shared with the builder */
+    const reads = useMemo(() => readStreamingCampaignWorld(player), [player]);
+    const markets = reads.markets;
     /* a campaign keeps its subject's id; its poster reads the title's genre from the catalogue */
-    const genres = useMemo(() => new Map(streamingCampaignSubjects(player).map(item => [item.id, item.genre])), [player]);
+    const genres = useMemo(() => new Map(reads.subjects.map(item => [item.id, item.genre])), [reads]);
     const art = (campaign: typeof book.campaigns[number]) => ({ ...campaign.subject, genre: genres.get(campaign.subject.id) });
     const live = book.campaigns.filter(campaign => campaign.status === 'RUNNING' || campaign.status === 'PAUSED');
     const past = book.campaigns.filter(campaign => campaign.status === 'FINISHED' || campaign.status === 'STOPPED').slice().reverse();
@@ -193,7 +195,7 @@ export const CampaignStudio: React.FC<Props> = ({ player, brand, onUpdatePlayer,
 
     if (building) {
         return (
-            <CampaignBuilder player={player} brand={brand} accent={accent} initialSubject={again ? null : initialSubject} initialDraft={again}
+            <CampaignBuilder player={player} reads={reads} brand={brand} accent={accent} initialSubject={again ? null : initialSubject} initialDraft={again}
                 onCancel={() => { setAgain(null); if (initialSubject && !again) onClose(); else setBuilding(false); }}
                 onLaunch={(next, id) => { onUpdatePlayer(next); setLaunched(id); setAgain(null); setBuilding(false); }} />
         );
@@ -320,6 +322,8 @@ const cx = (...names: Array<string | false | null | undefined>) => names.filter(
 
 export const CampaignBuilder: React.FC<{
     player: Player;
+    /** Kadam 2: the Studio's reads of this same career (worked out here when it is not given) */
+    reads?: StreamingCampaignReads;
     brand: Brand;
     accent: string;
     initialSubject: Props['initialSubject'];
@@ -328,10 +332,13 @@ export const CampaignBuilder: React.FC<{
     initialStep?: Step;
     onCancel: () => void;
     onLaunch: (player: Player, campaignId: string) => void;
-}> = ({ player, brand, accent, initialSubject, initialDraft = null, initialStep, onCancel, onLaunch }) => {
-    const subjects = useMemo(() => streamingCampaignSubjects(player), [player]);
-    const markets = useMemo(() => streamingCampaignMarkets(player), [player]);
-    const regions = useMemo(() => streamingCampaignRegions(player).sort((left, right) => right.countryIds.length - left.countryIds.length), [player]);
+}> = ({ player, reads, brand, accent, initialSubject, initialDraft = null, initialStep, onCancel, onLaunch }) => {
+    /* Kadam 2 (22 Nov 2026): the service, its subjects and its markets once per career change; every tap's quote and
+       the launch reuse them (each tap used to work all three out again: 90 MB and 86 ms a tap on a 600-title service) */
+    const world = useMemo(() => reads ?? readStreamingCampaignWorld(player), [player, reads]);
+    const subjects = world.subjects;
+    const markets = world.markets;
+    const regions = useMemo(() => streamingCampaignRegions(player, markets).sort((left, right) => right.countryIds.length - left.countryIds.length), [player, markets]);
     /* Run again opens on Review with everything filled in; a title's Promote on Where */
     const known = Boolean(initialSubject) && subjects.some(item => item.kind === initialSubject!.kind && item.id === initialSubject!.id);
     const [step, setStep] = useState<Step>(initialStep ?? (initialDraft ? 'REVIEW' : known ? 'WHERE' : 'WHAT'));
@@ -364,11 +371,11 @@ export const CampaignBuilder: React.FC<{
     const nights = formats.filter(id => CAMPAIGN_FORMATS[id].group === 'BIG_MOMENT');
     const budget: CampaignBudget = { kind: 'WEEKS', weeks: flowing.length ? weeks : 1, strength };
     const draft: StreamingCampaignDraft | null = subject ? { subject: { kind: subject.kind, id: subject.id }, where, formats, budget, places } : null;
-    const quote = useMemo(() => (draft ? quoteStreamingCampaign(player, draft) : null), [player, subjectKey, where, formats, weeks, strength, places]);
+    const quote = useMemo(() => (draft ? quoteStreamingCampaign(player, draft, world) : null), [player, world, subjectKey, where, formats, weeks, strength, places]);
     const countryIds = quote?.countryIds ?? [];
     /* every format's price in these countries: a week at Normal, or a big moment's night at its place */
     const countryKey = countryIds.join(',');
-    const rates = useMemo(() => streamingCampaignRateCard(player, countryIds, places), [player, countryKey, places]);
+    const rates = useMemo(() => streamingCampaignRateCard(player, countryIds, places, markets), [player, markets, countryKey, places]);
     const weekPrice = flowing.reduce((sum, id) => sum + rates[id].weekly, 0);
     const nightPrice = nights.reduce((sum, id) => sum + (rates[id].show?.price ?? 0), 0);
     const at = STEPS.indexOf(step);
@@ -406,7 +413,7 @@ export const CampaignBuilder: React.FC<{
             ...draft, name: subject?.name,
             creativeIds: creativeIdsFor(frames, Object.fromEntries(frames.map(frame => [frame.key, kept[frame.key]?.mediaId]))),
             ...(pictureMediaId ? { pictureMediaId } : {}),
-        });
+        }, world);
         if (result.ok && result.campaignId) {
             const campaignId = result.campaignId;
             launchingRef.current = true;

@@ -5,6 +5,7 @@ import {
     BUILTIN_PROJECT_ALIASES,
 } from './fictionalNameCatalog';
 import { PACK_TALENT_ALIASES } from './packTalentAliases';
+import { copyPersonKeepingFace } from './npcAvatar';
 
 // 2: the global talent packs and creator list get satire stand-ins too, so saves rename those people once.
 export const BUILTIN_NAME_VERSION = 2;
@@ -62,6 +63,15 @@ export const fictionalHandle = (canonicalName: string, oldHandle: string): strin
 };
 
 /** Applies to issued built-ins and global-pack people. Custom edits and imported content keep their names. */
+/* 21 Nov 2026: a renamed copy keeps a face that is not drawn yet undrawn (a spread would draw it: services/npcAvatar.ts
+   drawLazyFace). Same keys, same order, same values as the spread it replaces. */
+const renamedPerson = <T extends { name: string; handle?: string }>(person: T, name: string, handle: string | undefined): T => {
+    const copy = copyPersonKeepingFace(person);
+    copy.name = name;
+    if (person.handle) copy.handle = handle;
+    return copy;
+};
+
 export const projectBuiltinPerson = <T extends { id: string; name: string; handle?: string }>(person: T): T => {
     const canonical = own(BUILTIN_PERSON_IDENTITIES, person.id);
     if (!canonical) {
@@ -71,13 +81,13 @@ export const projectBuiltinPerson = <T extends { id: string; name: string; handl
         const name = own(PACK_TALENT_ALIASES, real);
         if (!name || name === person.name) return person;
         const handle = person.handle ? fictionalHandle(real, person.handle) : person.handle;
-        return { ...person, name, ...(person.handle ? { handle } : {}) };
+        return renamedPerson(person, name, handle);
     }
     if (person.name !== canonical && person.name !== fictionalPersonName(canonical)) return person;
     const name = fictionalPersonName(canonical);
     const handle = person.handle ? fictionalHandle(canonical, person.handle) : person.handle;
     if (name === person.name && handle === person.handle) return person;
-    return { ...person, name, ...(person.handle ? { handle } : {}) };
+    return renamedPerson(person, name, handle);
 };
 
 const textPairs: Record<string, string> = {

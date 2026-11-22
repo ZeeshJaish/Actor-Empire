@@ -27,6 +27,15 @@ const genericFailureForStage = (stage: string): string => {
     return 'Week processing stopped unexpectedly.';
 };
 
+/** The device's own words for a storage failure: the step, then the DOMException's name and message, if it gave any. */
+const describeStorageCause = (error: IndexedDbOperationError): string[] => {
+    const cause = error.cause as { name?: unknown; message?: unknown } | null | undefined;
+    const name = cause && typeof cause.name === 'string' ? cause.name : '';
+    const message = cause && typeof cause.message === 'string' ? cause.message : '';
+    const said = [name, message].filter(Boolean).join(': ').replace(/\s+/g, ' ').slice(0, 160);
+    return [`Storage step: ${error.operation}${said ? ` — device said: ${said}` : ''}`];
+};
+
 const integrityFailureLabel = (value: string): string => {
     const normalized = value.trim().toLowerCase();
     if (normalized === 'industry intelligence state changed') {
@@ -101,7 +110,10 @@ export const describeWeekProcessingFailure = (
                     ? 'Another game tab or older session blocked device storage.'
                     : error.code === 'ABORTED'
                         ? 'The device stopped the verified save operation.'
-                        : 'Device storage failed before the verified save completed.'],
+                        : 'Device storage failed before the verified save completed.',
+                /* 21 Nov 2026 (two iPhone WEEK_FAILED reports on 1.0.30 said only STORAGE_FAILED / STORAGE_TIMEOUT): what the
+                   device itself said, and which storage step, so the cause (quota, a lost storage connection…) can be told */
+                ...describeStorageCause(error)],
         };
     }
 

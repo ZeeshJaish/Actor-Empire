@@ -734,9 +734,21 @@ export const renderProfilePortrait = (ctx: Ctx, selection: ProfileBuilderSelecti
   drawHairFront(ctx, state, scale);
 };
 
+/* 21 Nov 2026 (boot freeze work): the two canvases are kept and reused. Setting a canvas's width and height (as below, even
+   to the same values) clears its bitmap and resets its context, so every portrait starts exactly as on new canvases: the
+   same picture, byte for byte. A new pair for each of the ~800 people's faces cost about a quarter more time. A pair whose
+   context the browser has lost is replaced. */
+let portraitCanvases: { source: HTMLCanvasElement; output: HTMLCanvasElement } | null = null;
+const contextLost = (canvas: HTMLCanvasElement): boolean => {
+  const context = canvas.getContext('2d') as (CanvasRenderingContext2D & { isContextLost?: () => boolean }) | null;
+  return !context || (typeof context.isContextLost === 'function' && context.isContextLost());
+};
+
 export const exportProfilePortrait = (selection: ProfileBuilderSelection, exportScale = 3): string => {
-  const sourceCanvas = document.createElement('canvas');
-  const canvas = document.createElement('canvas');
+  if (portraitCanvases && (contextLost(portraitCanvases.source) || contextLost(portraitCanvases.output))) portraitCanvases = null;
+  portraitCanvases ||= { source: document.createElement('canvas'), output: document.createElement('canvas') };
+  const sourceCanvas = portraitCanvases.source;
+  const canvas = portraitCanvases.output;
   const scale = PROFILE_CANVAS_SCALE * exportScale;
   const sourceWidth = PROFILE_ART_GRID.width * scale;
   const sourceHeight = PROFILE_ART_GRID.height * scale;

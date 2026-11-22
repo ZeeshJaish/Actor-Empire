@@ -7,7 +7,7 @@ import {
     type NPCTier,
     type NPCPrestige,
 } from '../types';
-import { getGenderedAvatar } from './npcAvatar';
+import { drawLazyFace, faceOnCreation, keepFace } from './npcAvatar';
 
 export interface CrewMarketCandidate extends Omit<NPCActor, 'tier'> {
     tier: CrewMarketTier;
@@ -110,7 +110,6 @@ const hash = (value: string): number => {
     return result >>> 0;
 };
 
-const avatarFor = (profile: CrewProfile) => getGenderedAvatar(profile.gender, profile.name);
 
 const crewForbesCategory = (role: CrewOccupation): string => ({
     CINEMATOGRAPHER: 'Cinematographer',
@@ -119,12 +118,14 @@ const crewForbesCategory = (role: CrewOccupation): string => ({
     VFX_SUPERVISOR: 'VFX Supervisor',
 }[role]);
 
-export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map((profile): NPCActor => ({
+export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map((profile): NPCActor => (faceOnCreation({
     id: profile.id,
     name: profile.name,
     handle: `@${profile.name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
     gender: profile.gender,
-    avatar: avatarFor(profile),
+    /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+    get avatar() { return drawLazyFace(this, profile.gender, profile.name); },
+    set avatar(value: string) { keepFace(this, value); },
     tier: profile.npcTier,
     prestigeBias: profile.prestige,
     openness: profile.tier === 'LEGEND' ? 28 : profile.tier === 'PROFESSIONAL' ? 54 : 78,
@@ -144,7 +145,7 @@ export const CREW_PROFESSIONALS: NPCActor[] = PROFILES.map((profile): NPCActor =
     traits: profile.tier === 'INDIE' ? ['AMBITIOUS', 'WORKAHOLIC'] : ['PROFESSIONAL', 'WORKAHOLIC'],
     potential: Math.max(profile.talent, profile.tier === 'INDIE' ? 88 : profile.talent),
     isIndependent: profile.tier !== 'LEGEND',
-})).map(projectBuiltinPerson);
+}))).map(projectBuiltinPerson);
 
 export const getCrewMarketAbsoluteWeek = (age: number, week: number): number => (
     (Math.max(1, Math.round(age)) - 1) * 52 + Math.max(1, Math.min(52, Math.round(week)))

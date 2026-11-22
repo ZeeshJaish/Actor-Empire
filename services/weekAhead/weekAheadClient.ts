@@ -1,6 +1,7 @@
 import type { Player } from '../../types';
 import { NPC_DATABASE } from '../npcLogic';
-import { getGenderedAvatar, getPortraitsForWorker } from '../npcAvatar';
+import { getGenderedAvatar, getPortraitsForWorker, isFaceStillWaiting, peopleForWorker, whenWaitingFacesDrawn } from '../npcAvatar';
+import { PORTRAIT_PENDING_PREFIX } from './weekAheadProtocol';
 import type { WeekAheadResult } from './weekAheadEngine';
 import { applyCareerPatches, unpackCareerPatches } from './careerPatch';
 import type { WeekAheadStageRequest, WeekAheadToMain, WeekAheadToWorker, WeekAheadVerifiedLive } from './weekAheadProtocol';
@@ -166,7 +167,8 @@ export const createWeekAheadClient = (
         clearSettle();
         const id = ++seq;
         discardCurrent();
-        if (!post({ kind: 'speculate', id, player, npcs: NPC_DATABASE as unknown[], stage: withWriteRecord(stageTarget()) })) { current = null; return false; }
+        // 21 Nov 2026: a face nobody has read yet goes as a pending mark, so sending the list draws nothing (npcAvatar.ts)
+        if (!post({ kind: 'speculate', id, player, npcs: peopleForWorker(NPC_DATABASE as unknown[], PORTRAIT_PENDING_PREFIX), stage: withWriteRecord(stageTarget()) })) { current = null; return false; }
         current = { id, basis: player, done: false, npcRefs: (NPC_DATABASE as unknown[]).slice(), settled: false, startedAt: Date.now() };
         return true;
     };
@@ -189,9 +191,16 @@ export const createWeekAheadClient = (
                     giveUp(message.reason);
                     break;
                 case 'need-portraits': {
-                    const drawn: Record<string, string> = {};
-                    for (const request of message.requests) drawn[request.cacheKey] = getGenderedAvatar(request.gender, request.nameSeed);
-                    post({ kind: 'portraits', requestId: message.requestId, drawn });
+                    const answer = () => {
+                        const drawn: Record<string, string> = {};
+                        for (const request of message.requests) drawn[request.cacheKey] = getGenderedAvatar(request.gender, request.nameSeed);
+                        post({ kind: 'portraits', requestId: message.requestId, drawn });
+                    };
+                    /* 22 Nov 2026: built-in faces that still wait for the idle drawing (the first weeks after a start ask for
+                       every NPC, because every NPC's net worth moves) are answered once that drawing is done, so this answer
+                       never draws hundreds of faces in one go on the main thread (services/npcAvatar.ts). */
+                    if (message.requests.some(request => isFaceStillWaiting(request.cacheKey))) void whenWaitingFacesDrawn().then(answer);
+                    else answer();
                     break;
                 }
                 case 'done':
@@ -227,7 +236,7 @@ export const createWeekAheadClient = (
         worker.onmessageerror = () => giveUp('a message could not be read');
         // Portraits first: the worker loads the game code only after it has them (see weekAhead.worker.ts).
         // Phase 1 (2026-11-17): the load-time faces and the NPC list's faces, not every face of the session.
-        if (!post({ kind: 'init', portraits: getPortraitsForWorker(NPC_DATABASE as unknown[]), npcs: NPC_DATABASE as unknown[] })) giveUp('init could not be sent');
+        if (!post({ kind: 'init', portraits: getPortraitsForWorker(NPC_DATABASE as unknown[]), npcs: peopleForWorker(NPC_DATABASE as unknown[], PORTRAIT_PENDING_PREFIX) })) giveUp('init could not be sent');
     }
 
     /** Back on screen or on Home: the career on screen is sent at once if nothing is prepared for it; a prepared

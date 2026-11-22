@@ -315,6 +315,67 @@ export const createPlayerStreamingTitleRouteEvaluator = (player: Player, absolut
     };
 };
 
+/* 22 Nov 2026 (Kadam 2, big streaming careers). CAPTAIN444's service (194 countries, 603 titles) spent ~30 s of a 33.5 s
+   week in the week's viewing, which asks evaluatePlayerStreamingTitleRoute about every title x country x route with only
+   the platform and the owned titles, so each call worked the same week's facts out again: the service's market list (its
+   package countries), the commercial offer, the title's rights context and the title's owned-country access. Here each is
+   worked out once (the market list and the offer once a week, the rights context once a title, the owned access once a
+   title and country) with exactly the expressions the evaluator would use itself, and handed over as `prepared`, so every
+   decision is the same.
+   Tools only: with globalThis.__AE_STREAMING_ROUTE_CHECK__ set, every call is also answered the old way, and any decision
+   that differs throws (globalThis.__AE_STREAMING_ROUTE_CHECKED__ counts the calls checked). */
+type StreamingRouteCheckGlobals = { __AE_STREAMING_ROUTE_CHECK__?: boolean; __AE_STREAMING_ROUTE_CHECKED__?: number };
+export const createPlayerStreamingTitleRouteWeek = (
+    player: Player,
+    absoluteWeek: number,
+    platform: OwnedStreamingPlatformState,
+    ownedTitleIds: ReadonlySet<string>,
+) => {
+    const offer = projectStreamingCommercialOffers(platform.serviceConfiguration.pricing);
+    const activeCountryIds = new Set(getOwnedPlatformPackageCountryIds(platform));
+    const titles = new Map<string, ReturnType<typeof prepareTitleRouteContext>>();
+    const ownedAccess = new Map<string, ReadonlySet<string>>();
+    const checkGlobals = globalThis as StreamingRouteCheckGlobals;
+    const check = Boolean(checkGlobals.__AE_STREAMING_ROUTE_CHECK__);
+    // the evaluator asks only `has(country)`; each answer is getOwnedTitleCountryAccess for that one country, as before
+    const ownedCountriesOf = (projectId: string): ReadonlySet<string> => {
+        let known = ownedAccess.get(projectId);
+        if (!known) {
+            const answers = new Map<string, boolean>();
+            known = {
+                has: (countryId: string) => {
+                    let answer = answers.get(countryId);
+                    if (answer === undefined) {
+                        answer = getOwnedTitleCountryAccess(player, projectId, [countryId], absoluteWeek).includes(countryId);
+                        answers.set(countryId, answer);
+                    }
+                    return answer;
+                },
+            } as unknown as ReadonlySet<string>;
+            ownedAccess.set(projectId, known);
+        }
+        return known;
+    };
+    return (projectId: string, countryId: string, route: StreamingTitleAccessRoute): StreamingTitleAccessDecision => {
+        let title = titles.get(projectId);
+        if (!title) {
+            title = prepareTitleRouteContext(player, projectId, absoluteWeek, platform, ownedTitleIds.has(projectId));
+            titles.set(projectId, title);
+        }
+        const decision = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, absoluteWeek, route, {
+            platform, ownedTitleIds, offer, activeCountryIds, title, ownedCountryIds: ownedCountriesOf(projectId),
+        });
+        if (check) {
+            const before = evaluatePlayerStreamingTitleRoute(player, projectId, countryId, absoluteWeek, route, { platform, ownedTitleIds });
+            if (JSON.stringify(before) !== JSON.stringify(decision)) {
+                throw new Error(`Streaming route check: ${projectId} ${countryId} ${JSON.stringify(route)} gave ${JSON.stringify(decision)}, before ${JSON.stringify(before)}`);
+            }
+            checkGlobals.__AE_STREAMING_ROUTE_CHECKED__ = (checkGlobals.__AE_STREAMING_ROUTE_CHECKED__ || 0) + 1;
+        }
+        return decision;
+    };
+};
+
 export const getStreamingContentAvailability = (
     player: Player,
     projectId: string,

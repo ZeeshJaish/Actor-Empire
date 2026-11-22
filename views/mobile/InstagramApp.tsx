@@ -285,6 +285,50 @@ interface InstagramAppProps {
   onInteract: (npc: NPCActor, type: InteractionType) => void;
 }
 
+/* 22 Nov 2026 (Kadam 3, measured on the Redmi): with no search text this list shows everyone (~850 people), which took 1.1 s
+   on the Redmi even with every face ready, and on the first start after an update some faces are still being drawn then.
+   The first rows now show at once and the rest are added a screenful per frame, so the search opens at once and never
+   waits for hundreds of faces together. The same rows, in the same order. */
+const SEARCH_ROWS_PER_FRAME = 24;
+const InstagramSearchPeople: React.FC<{
+  people: NPCActor[];
+  npcStates: Record<string, NPCState>;
+  onOpen: (npc: NPCActor) => void;
+  onFollow: (npc: NPCActor) => void;
+}> = ({ people, npcStates, onOpen, onFollow }) => {
+  const [shown, setShown] = useState(SEARCH_ROWS_PER_FRAME);
+  useEffect(() => {
+    if (shown >= people.length) return;
+    const frame = requestAnimationFrame(() => setShown(count => count + SEARCH_ROWS_PER_FRAME));
+    return () => cancelAnimationFrame(frame);
+  }, [shown, people.length]);
+  return (
+    <>
+      {people.slice(0, shown).map(npc => {
+        const isFollowing = npcStates[npc.id]?.isFollowing || false;
+        return (
+          <div key={npc.id} onClick={() => onOpen(npc)} className="flex items-center gap-3 active:bg-zinc-900 p-2 rounded-xl transition-colors cursor-pointer">
+            <img src={npc.avatar} className="w-12 h-12 rounded-full object-cover" />
+            <div className="flex-1">
+              <div className="font-bold text-sm flex items-center gap-1">
+                {npc.name}
+                {npc.tier === 'A_LIST' && <div className="bg-blue-500 rounded-full p-0.5"><Check size={8} strokeWidth={4} /></div>}
+              </div>
+              <div className="text-xs text-zinc-500">{npc.handle}</div>
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); onFollow(npc); }}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${isFollowing ? 'bg-zinc-800 text-zinc-300' : 'bg-blue-600 text-white'}`}
+            >
+              {isFollowing ? 'Following' : 'Follow'}
+            </button>
+          </div>
+        );
+      })}
+    </>
+  );
+};
+
 export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPost, onReactPost, onRespondDM, onFollow, onInteract }) => {
   const [tab, setTab] = useState<'FEED' | 'SEARCH' | 'PROFILE'>('FEED');
   const [view, setView] = useState<'MAIN' | 'NPC_PROFILE' | 'FANDOM_PROFILE' | 'DM_LIST' | 'DM' | 'POST_DETAIL'>('MAIN');
@@ -883,27 +927,13 @@ export const InstagramApp: React.FC<InstagramAppProps> = ({ player, onBack, onPo
                                     <span className="text-[9px] font-black uppercase tracking-[0.15em]" style={{ color: fandom.primaryColor }}>Fan community</span>
                                 </button>
                             ))}
-                            {npcPool.filter(n => n.name.toLowerCase().includes(searchQuery.toLowerCase())).map(npc => {
-                                const isFollowing = npcStates[npc.id]?.isFollowing || false;
-                                return (
-                                    <div key={npc.id} onClick={() => handleNPCClick(npc)} className="flex items-center gap-3 active:bg-zinc-900 p-2 rounded-xl transition-colors cursor-pointer">
-                                        <img src={npc.avatar} className="w-12 h-12 rounded-full object-cover" />
-                                        <div className="flex-1">
-                                            <div className="font-bold text-sm flex items-center gap-1">
-                                                {npc.name}
-                                                {npc.tier === 'A_LIST' && <div className="bg-blue-500 rounded-full p-0.5"><Check size={8} strokeWidth={4} /></div>}
-                                            </div>
-                                            <div className="text-xs text-zinc-500">{npc.handle}</div>
-                                        </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onFollow(npc); }}
-                                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${isFollowing ? 'bg-zinc-800 text-zinc-300' : 'bg-blue-600 text-white'}`}
-                                        >
-                                            {isFollowing ? 'Following' : 'Follow'}
-                                        </button>
-                                    </div>
-                                )
-                            })}
+                            <InstagramSearchPeople
+                                key={searchQuery}
+                                people={npcPool.filter(n => n.name.toLowerCase().includes(searchQuery.toLowerCase()))}
+                                npcStates={npcStates}
+                                onOpen={handleNPCClick}
+                                onFollow={onFollow}
+                            />
                         </div>
                     </div>
                 )}

@@ -36,7 +36,7 @@ import {
 } from '../streamingPlanOffer';
 import { resolveStreamingTechTree, streamingTechAdEffects, streamingTechSmartAiEffects } from '../streamingTechTreeCatalogue';
 import { resolveStreamingStoreEditions } from '../streamingStoreEditions';
-import { createPlayerStreamingTitleRouteEvaluator, createStreamingCatalogueReadContext, evaluatePlayerStreamingTitleRoute } from '../streamingContentAvailability';
+import { createPlayerStreamingTitleRouteEvaluator, createPlayerStreamingTitleRouteWeek, createStreamingCatalogueReadContext } from '../streamingContentAvailability';
 import type { StreamingTitleAccessRoute } from '../streamingTitleAccess';
 import { normalizeStreamingLanguageId } from '../streamingLocalizationCapabilities';
 import {
@@ -1063,12 +1063,10 @@ function* buildViewingStateSteps(
     const ownedTitleIds = new Set(candidates
         .filter(candidate => candidate.ownedLibrary)
         .map(candidate => candidate.entry.projectId));
-    const evaluateCachedRoute = createStreamingTitleRouteCache((projectId, countryId, route) => (
-        evaluatePlayerStreamingTitleRoute(preparedPlayer, projectId, countryId, absoluteWeek, route, {
-            platform,
-            ownedTitleIds,
-        })
-    ));
+    // 22 Nov 2026 (Kadam 2): the week's market list, offer and title facts once, not per title x country x route
+    const evaluateCachedRoute = createStreamingTitleRouteCache(
+        createPlayerStreamingTitleRouteWeek(preparedPlayer, absoluteWeek, platform, ownedTitleIds),
+    );
     const activeEntitlementHouseholds = new Map<string, number>();
     (preparedPlayer.world.worldStreamingAudienceChoice?.entitlements || []).forEach(row => {
         if (row.kind !== 'PURCHASE' && (row.expiresAtAbsoluteWeek || 0) <= absoluteWeek) return;

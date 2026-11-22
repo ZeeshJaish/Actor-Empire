@@ -17,6 +17,7 @@ import { CAMPAIGN_FORMATS } from '../campaigns/campaignFormats';
 import {
     extendStreamingCampaign,
     quoteStreamingCampaign,
+    readStreamingCampaignWorld,
     startStreamingCampaign,
     stopStreamingCampaign,
     streamingCampaignBook,
@@ -70,8 +71,11 @@ const pickCountries = (player: Player, skill: number, count: number): string[] =
  * If even the smallest is over the limit, the smallest is proposed (it becomes a card with its reason).
  */
 const fitDraft = (player: Player, base: StreamingCampaignDraft, limit: number) => {
+    /* Kadam 2 (22 Nov 2026): the career's campaign reads once for all the sizing steps (up to 13 quotes of one career;
+       the same values, so the same quotes) */
+    const reads = readStreamingCampaignWorld(player);
     let draft = base;
-    let quote = quoteStreamingCampaign(player, draft);
+    let quote = quoteStreamingCampaign(player, draft, reads);
     const shrink = (): StreamingCampaignDraft | null => {
         const countries = draft.where.countryIds || [];
         if (countries.length > 3) return { ...draft, where: { kind: 'COUNTRIES', countryIds: countries.slice(0, Math.max(3, Math.floor(countries.length * 0.7))) } };
@@ -84,7 +88,7 @@ const fitDraft = (player: Player, base: StreamingCampaignDraft, limit: number) =
         const next = shrink();
         if (!next) break;
         draft = next;
-        quote = quoteStreamingCampaign(player, draft);
+        quote = quoteStreamingCampaign(player, draft, reads);
     }
     return { draft, quote };
 };

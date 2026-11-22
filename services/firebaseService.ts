@@ -1652,6 +1652,33 @@ export const submitPlayerIssueReport = (
   return issueId;
 };
 
+/* 21 Nov 2026 (React #185 on 1.0.30: Crashlytics showed only React's own throw site, so the component could not be told):
+   a JS error's own stack goes along, compacted to `name@file:line:col` per frame with no host, so each minified frame can
+   be mapped back with the build's source map. Works for Chrome/WebView ("at f (url:l:c)") and WebKit ("f@url:l:c"). */
+export const compactJsStack = (stack: unknown, maxFrames = 12): string => {
+  if (typeof stack !== 'string' || !stack) return '';
+  return stack.split('\n')
+    .map(line => line.trim())
+    .filter(line => /:\d+:\d+\)?$/.test(line))
+    .slice(0, maxFrames)
+    .map(line => line
+      .replace(/^at\s+/, '')
+      .replace(/\(?(?:[a-z][a-z0-9+.-]*):\/\/[^\s)]*\/([^/\s)]+:\d+:\d+)\)?/gi, '@$1')
+      .replace(/\s+@/, '@')
+      .replace(/@@/, '@'))
+    .join(' < ')
+    .slice(0, 900);
+};
+
+/* The component stack React gave for an error it could not hand to a boundary (index.tsx onUncaughtError); the window
+   'error' report of the same error carries it, so React's error still makes one report, as before. */
+const reactComponentStacks = new WeakMap<object, string>();
+export const noteReactComponentStack = (error: unknown, componentStack: unknown): void => {
+  if (!error || typeof error !== 'object') return;
+  const compact = compactJsStack(componentStack, 16);
+  if (compact) reactComponentStacks.set(error, compact);
+};
+
 export const installGlobalTelemetryHandlers = () => {
   if (typeof window === 'undefined' || !isNativeTelemetry()) return;
   const globalWindow = window as typeof window & { __actorEmpireTelemetryInstalled?: boolean };
@@ -1663,12 +1690,17 @@ export const installGlobalTelemetryHandlers = () => {
       source: event.filename || 'unknown',
       line: event.lineno || 0,
       column: event.colno || 0,
+      js_stack: compactJsStack((event.error as { stack?: unknown } | null)?.stack),
+      ...(event.error && typeof event.error === 'object' && reactComponentStacks.has(event.error)
+        ? { component_stack: reactComponentStacks.get(event.error) }
+        : {}),
     });
   });
 
   window.addEventListener('unhandledrejection', (event) => {
     recordNonFatal(event.reason || 'Unhandled promise rejection', 'global_unhandled_rejection', {
       promise: 'unhandled',
+      js_stack: compactJsStack((event.reason as { stack?: unknown } | null)?.stack),
     });
   });
 };

@@ -103,6 +103,46 @@ const getForbesCelebAvatar = (npc: Pick<NPCActor, 'avatar' | 'gender' | 'name'>)
     getCanonicalProfileAvatar(npc.avatar, npc.gender, npc.name)
 );
 
+/* 22 Nov 2026 (Kadam 3, measured on the Redmi): the ranking lists everyone (~400 people), 1.3 s on the Redmi even with every
+   face ready, and on the first start after an update some faces are still being drawn then. The first rows now show at
+   once and the rest are added a screenful per frame, each row reading its face when it is drawn. The same rows, in the
+   same order. */
+const FORBES_ROWS_PER_FRAME = 24;
+interface ForbesActorRow { id: string; name: string; netWorth: number; isPlayer: boolean; avatarOf: () => string; forbesCategory?: string }
+const ForbesActorRows: React.FC<{ actors: ForbesActorRow[]; youLabel: string }> = ({ actors, youLabel }) => {
+  const [shown, setShown] = useState(FORBES_ROWS_PER_FRAME);
+  useEffect(() => {
+    if (shown >= actors.length) return;
+    const frame = requestAnimationFrame(() => setShown(count => count + FORBES_ROWS_PER_FRAME));
+    return () => cancelAnimationFrame(frame);
+  }, [shown, actors.length]);
+  return (
+    <>
+      {actors.slice(0, shown).map((actor, idx) => (
+        <div key={actor.id} className={`flex items-center gap-4 p-4 ${actor.isPlayer ? 'bg-zinc-900/50' : ''}`}>
+          <div className={`font-mono font-bold text-lg w-8 text-center ${idx < 3 ? 'text-amber-400' : 'text-zinc-600'}`}>
+            #{idx + 1}
+          </div>
+          <div className="relative">
+            <img src={actor.avatarOf()} className={`w-10 h-10 rounded-full object-cover ${actor.isPlayer ? 'border-2 border-amber-500' : 'grayscale opacity-70'}`} />
+            {idx === 0 && <div className="absolute -top-2 -right-2 text-amber-400"><Crown size={12} fill="currentColor"/></div>}
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <div className={`font-bold ${actor.isPlayer ? 'text-white' : 'text-zinc-300'}`}>{actor.name}</div>
+              {actor.isPlayer && <span className="bg-amber-500 text-black text-[8px] font-bold px-1.5 rounded">{youLabel}</span>}
+            </div>
+            <div className="text-[10px] text-zinc-500 uppercase tracking-wide">{actor.forbesCategory}</div>
+          </div>
+          <div className="font-mono font-bold text-emerald-500 text-sm">
+            {formatMoney(actor.netWorth)}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+};
+
 export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePlayer, onOpenStocks, onImmersiveChange, initialStudioId, initialStudioName, onInitialStudioConsumed, onInitialStudioUnavailable }) => {
   const [tab, setTab] = useState<Tab>('ACTORS');
   const [selectedStudioProfile, setSelectedStudioProfile] = useState<ForbesStudioProfileData | null>(null);
@@ -183,7 +223,9 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
           netWorth: npc.netWorth + (getTalentCareerProfile(player.world, npc.id)?.income || 0),
           isPlayer: false,
           tier: npc.tier,
-          avatar: getForbesCelebAvatar(npc),
+          /* 22 Nov 2026 (Kadam 3, the Redmi): the face is read when the row is drawn (ForbesActorRows), not for everyone
+             ranked at once */
+          avatarOf: () => getForbesCelebAvatar(npc),
           forbesCategory: npc.forbesCategory || npc.occupation
       })),
       {
@@ -192,7 +234,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
           netWorth: playerNetWorth,
           isPlayer: true,
           tier: player.stats.fame > 90 ? 'ICON' : player.stats.fame > 70 ? 'A_LIST' : player.stats.fame > 40 ? 'ESTABLISHED' : 'RISING',
-          avatar: getCanonicalProfileAvatar(player.avatar, player.gender, player.name),
+          avatarOf: () => getCanonicalProfileAvatar(player.avatar, player.gender, player.name),
           forbesCategory: 'Actor'
       }
   ].sort((a, b) => b.netWorth - a.netWorth);
@@ -713,27 +755,7 @@ export const ForbesApp: React.FC<ForbesAppProps> = ({ player, onBack, onUpdatePl
             {/* ACTORS LIST */}
             {tab === 'ACTORS' && (
                 <div className="divide-y divide-zinc-900">
-                    {actorRanking.map((actor, idx) => (
-                        <div key={actor.id} className={`flex items-center gap-4 p-4 ${actor.isPlayer ? 'bg-zinc-900/50' : ''}`}>
-                            <div className={`font-mono font-bold text-lg w-8 text-center ${idx < 3 ? 'text-amber-400' : 'text-zinc-600'}`}>
-                                #{idx + 1}
-                            </div>
-                            <div className="relative">
-                                <img src={actor.avatar} className={`w-10 h-10 rounded-full object-cover ${actor.isPlayer ? 'border-2 border-amber-500' : 'grayscale opacity-70'}`} />
-                                {idx === 0 && <div className="absolute -top-2 -right-2 text-amber-400"><Crown size={12} fill="currentColor"/></div>}
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <div className={`font-bold ${actor.isPlayer ? 'text-white' : 'text-zinc-300'}`}>{actor.name}</div>
-                                    {actor.isPlayer && <span className="bg-amber-500 text-black text-[8px] font-bold px-1.5 rounded">{tr('forbes.you')}</span>}
-                                </div>
-                                <div className="text-[10px] text-zinc-500 uppercase tracking-wide">{actor.forbesCategory}</div>
-                            </div>
-                            <div className="font-mono font-bold text-emerald-500 text-sm">
-                                {formatMoney(actor.netWorth)}
-                            </div>
-                        </div>
-                    ))}
+                    <ForbesActorRows actors={actorRanking} youLabel={tr('forbes.you')} />
                 </div>
             )}
 

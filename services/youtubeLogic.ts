@@ -4,7 +4,8 @@ import { resolveYoutubeWeek, readYoutubeAudience, quoteYoutubeBrand, quoteYoutub
 import { availableCreatorSpend, recordCreatorSpend } from './creatorEconomy';
 
 import { GameLanguage, Gender, NPCActor, NPCPrestige, NPCTier, Player, YoutubeBrandDeal, YoutubeChannel, YoutubeCollabOffer, YoutubeCreatorIdentity, YoutubeMerchResult, YoutubeMerchTier, YoutubeMusicVideoFeatureOffer, YoutubeVideo, YoutubeVideoType } from '../types';
-import { getGenderedAvatar, NPC_DATABASE } from './npcLogic';
+import { NPC_DATABASE } from './npcLogic';
+import { drawLazyFace, faceOnCreation, keepFace } from './npcAvatar';
 import { MOD_TALENT_ROWS, ModTalentRow } from './modTalentData';
 import { MOD_TALENT_SUPPLEMENT_ROWS } from './modTalentSupplement';
 import { hydrateGenreXP } from './genreCatalog';
@@ -314,12 +315,14 @@ const globalCreator = (
     prestigeBias?: NPCPrestige,
     forbesCategory?: string,
     age?: number
-): GlobalCreatorProfile => ({
+): GlobalCreatorProfile => faceOnCreation({
     // Id and portrait stay keyed to the real name (saves keep their creators); the shown name and handle are the stand-in.
     id: `yt_global_${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`,
     name: fictionalPersonName(name),
     handle: fictionalHandle(name, `@${name.toLowerCase().replace(/[^a-z0-9]+/g, '')}`),
-    avatar: getGenderedAvatar(gender, `${name} ${country}`),
+    /* 21 Nov 2026: drawn when first read, not at load (services/npcAvatar.ts drawLazyFace) */
+    get avatar() { return drawLazyFace(this, gender, `${name} ${country}`); },
+    set avatar(value: string) { keepFace(this, value); },
     followers: Math.max(1000, Math.floor(followersM * M)),
     country,
     gender,
@@ -456,7 +459,10 @@ export const getEnabledGlobalCreatorSocialProfiles = (player: Player): NPCActor[
         name: creator.name,
         handle: creator.handle,
         gender: creator.gender,
-        avatar: creator.avatar,
+        /* 22 Nov 2026 (Kadam 3, the Redmi: Instagram, X and Forbes build these for every enabled creator on each open, which
+           drew every creator's face not drawn yet at once): the face is read from the creator only when it is shown */
+        get avatar() { return creator.avatar; },
+        set avatar(value: string) { keepFace(this, value); },
         tier: creator.tier || (creator.followers >= 20 * M ? 'A_LIST' : 'ESTABLISHED'),
         prestigeBias: creator.prestigeBias || 'COMMERCIAL',
         openness: creator.followers >= 20 * M ? 12 : 28,

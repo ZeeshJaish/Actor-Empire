@@ -59,9 +59,10 @@ const liveCountryIds = (platform: OwnedStreamingPlatformState): string[] => [...
     .filter(operation => operation.scope === 'COUNTRY' && operation.status === 'ACTIVE' && operation.countryId)
     .map(operation => operation.countryId!))].sort();
 
-/** The live countries with their homes and how dear their ads are (their homes' entertainment budget against $30). */
-export const streamingCampaignMarkets = (player: Player): Map<string, CampaignMarket> => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+/** The live countries with their homes and how dear their ads are (their homes' entertainment budget against $30).
+    Kadam 2 (22 Nov 2026): a caller that already normalized the service passes it (readStreamingCampaignWorld). */
+export const streamingCampaignMarkets = (player: Player, prepared?: OwnedStreamingPlatformState): Map<string, CampaignMarket> => {
+    const platform = prepared ?? normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     return new Map(liveCountryIds(platform).flatMap(countryId => {
         const market = campaignMarketOf(player, countryId);
         return market ? [[countryId, market] as const] : [];
@@ -77,8 +78,8 @@ export interface StreamingCampaignSubject {
 }
 
 /** What a campaign can be about: the service, each title it streams now or an Original with its week booked, and the universes and franchises among them. */
-export const streamingCampaignSubjects = (player: Player): StreamingCampaignSubject[] => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+export const streamingCampaignSubjects = (player: Player, prepared?: OwnedStreamingPlatformState): StreamingCampaignSubject[] => {
+    const platform = prepared ?? normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const programWeek = platform.launchCommit ? Math.max(1, absoluteWeek - platform.launchCommit.committedAtAbsoluteWeek + 1) : 0;
     /* #291: a campaign builds a premiere: the awareness is waiting for it when it opens */
@@ -113,13 +114,35 @@ export const streamingCampaignSubjects = (player: Player): StreamingCampaignSubj
 };
 
 /** The regions among the live countries. */
-export const streamingCampaignRegions = (player: Player): Array<{ id: StreamingDayOneRegionId; name: string; countryIds: string[] }> => {
+export const streamingCampaignRegions = (
+    player: Player,
+    markets: Map<string, CampaignMarket> = streamingCampaignMarkets(player),
+): Array<{ id: StreamingDayOneRegionId; name: string; countryIds: string[] }> => {
     const byRegion = new Map<StreamingDayOneRegionId, string[]>();
-    streamingCampaignMarkets(player).forEach((market, countryId) => {
+    markets.forEach((market, countryId) => {
         const region = getStreamingDayOneMarket(countryId)?.regionId;
         if (region) byRegion.set(region, [...(byRegion.get(region) || []), countryId]);
     });
     return [...byRegion.entries()].map(([id, countryIds]) => ({ id, name: STREAMING_DAY_ONE_REGION_LABELS[id], countryIds }));
+};
+
+/**
+ * Kadam 2 (22 Nov 2026, the "advertising a new movie in the streaming studio keeps kicking me out" report: iOS, a
+ * 101.6 MB career): what a campaign reads from the career, worked out once. Each quote used to normalize the service
+ * four times and build every subject and market again: on a 600-title service live in 194 countries that was 86 ms
+ * and 90 MB of throwaway memory a tap (ten taps of the builder, 0.85 GB), and the Marketing seat quoted up to 13
+ * drafts a week the same way. The builder now works this out once per career change and every tap reuses it; the
+ * seat once for all its sizing steps. The values are the same ones, so every quote and campaign is the same.
+ */
+export interface StreamingCampaignReads {
+    platform: OwnedStreamingPlatformState;
+    subjects: StreamingCampaignSubject[];
+    markets: Map<string, CampaignMarket>;
+}
+
+export const readStreamingCampaignWorld = (player: Player): StreamingCampaignReads => {
+    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    return { platform, subjects: streamingCampaignSubjects(player, platform), markets: streamingCampaignMarkets(player, platform) };
 };
 
 /* ── a campaign before it starts ──────────────────────────────────────── */
@@ -173,10 +196,14 @@ export interface StreamingCampaignQuote {
 export type StreamingCampaignRate = CampaignRate;
 
 /** #154: every format's price in these countries, so HOW can show what each costs before it is picked. */
-export const streamingCampaignRateCard = (player: Player, countryIds: string[], places?: Partial<Record<CampaignFormatId, string>>): Record<CampaignFormatId, StreamingCampaignRate> => {
-    const all = streamingCampaignMarkets(player);
-    return campaignRateCardOf(countryIds.map(id => all.get(id)).filter((market): market is CampaignMarket => Boolean(market)), places);
-};
+export const streamingCampaignRateCard = (
+    player: Player,
+    countryIds: string[],
+    places?: Partial<Record<CampaignFormatId, string>>,
+    all: Map<string, CampaignMarket> = streamingCampaignMarkets(player),
+): Record<CampaignFormatId, StreamingCampaignRate> => (
+    campaignRateCardOf(countryIds.map(id => all.get(id)).filter((market): market is CampaignMarket => Boolean(market)), places)
+);
 
 /** #154: a weeks budget as the builder may make it: 1–12 weeks, how hard one of 1, 1.5 and 2. */
 const builtBudget = (budget: CampaignBudget): CampaignBudget => (budget.kind === 'WEEKS' ? {
@@ -184,8 +211,7 @@ const builtBudget = (budget: CampaignBudget): CampaignBudget => (budget.kind ===
     strength: (CAMPAIGN_STRENGTHS as readonly number[]).includes(budget.strength) ? budget.strength : 1,
 } : budget);
 
-const resolveCountries = (player: Player, where: StreamingCampaignDraft['where']): string[] => {
-    const markets = streamingCampaignMarkets(player);
+const resolveCountries = (markets: Map<string, CampaignMarket>, where: StreamingCampaignDraft['where']): string[] => {
     const live = [...markets.keys()];
     if (where.kind === 'LIVE') return live;
     if (where.kind === 'REGION') return live.filter(countryId => getStreamingDayOneMarket(countryId)?.regionId === where.regionId);
@@ -193,11 +219,15 @@ const resolveCountries = (player: Player, where: StreamingCampaignDraft['where']
 };
 
 /** What a draft would cost, take in energy and do in a month, and what stops it. */
-export const quoteStreamingCampaign = (player: Player, draft: StreamingCampaignDraft): StreamingCampaignQuote => {
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
-    const subject = streamingCampaignSubjects(player).find(item => item.kind === draft.subject.kind && item.id === draft.subject.id) || null;
-    const countryIds = resolveCountries(player, draft.where);
-    const allMarkets = streamingCampaignMarkets(player);
+export const quoteStreamingCampaign = (
+    player: Player,
+    draft: StreamingCampaignDraft,
+    reads: StreamingCampaignReads = readStreamingCampaignWorld(player),
+): StreamingCampaignQuote => {
+    const { platform } = reads;
+    const subject = reads.subjects.find(item => item.kind === draft.subject.kind && item.id === draft.subject.id) || null;
+    const countryIds = resolveCountries(reads.markets, draft.where);
+    const allMarkets = reads.markets;
     const markets = countryIds.map(id => allMarkets.get(id)!).filter(Boolean);
     const formats = [...new Set(draft.formats)].filter(id => id in CAMPAIGN_FORMATS);
     const problems: StreamingCampaignProblem[] = [];
@@ -297,17 +327,22 @@ const creativesOf = (draft: StreamingCampaignDraft): Pick<Campaign, 'creativeIds
     return Object.keys(ids).length ? { creativeIds: ids as Campaign['creativeIds'] } : {};
 };
 
-export const startStreamingCampaign = (player: Player, draft: StreamingCampaignDraft): StreamingCampaignResult => {
-    const quote = quoteStreamingCampaign(player, draft);
+export const startStreamingCampaign = (
+    player: Player,
+    draft: StreamingCampaignDraft,
+    reads: StreamingCampaignReads = readStreamingCampaignWorld(player),
+): StreamingCampaignResult => {
+    const quote = quoteStreamingCampaign(player, draft, reads);
     if (quote.problems.length || !quote.subject) return { player, ok: false, problems: quote.problems };
-    const platform = normalizeOwnedStreamingPlatformState(player.ownedStreamingPlatform, player.id);
+    const { platform } = reads;
     const absoluteWeek = getAbsoluteWeek(player.age, player.currentWeek);
     const book = streamingCampaignBook(platform);
     const id = createDeterministicId('streaming_campaign', platform.simulationSeed, `campaign:${absoluteWeek}:${book.campaigns.length}:${draft.subject.kind}:${draft.subject.id}`);
     const campaign: Campaign = {
         id,
         name: draft.name?.trim() || `${quote.subject.name}${quote.subject.kind === 'SERVICE' ? '' : ''}`,
-        subject: { kind: quote.subject.kind, id: quote.subject.id, name: quote.subject.name, projectIds: quote.subject.projectIds },
+        /* its own copy of the ids: the reads (and their subjects) can be shared by the builder's taps */
+        subject: { kind: quote.subject.kind, id: quote.subject.id, name: quote.subject.name, projectIds: [...quote.subject.projectIds] },
         where: { kind: draft.where.kind, ...(draft.where.kind === 'REGION' && draft.where.regionId ? { regionId: draft.where.regionId } : {}) },
         countryIds: quote.countryIds,
         formats: [...new Set(draft.formats)],
