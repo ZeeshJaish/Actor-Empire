@@ -94,7 +94,7 @@ import { isUnderAdultAge } from './ageGate';
 import { generateWeeklyFeed, NPC_DATABASE, calculateProjectFameMultiplier, generateNewUnknowns, updateNPCLives, createNPCFromMusicArtist, getGenderedAvatar } from './npcLogic';
 import { generateAgentOffers, generateManagerOffer, generateDirectOffer, getRandomAgents, getRandomManagers, getRandomTrainers, getRandomStylists, getRandomTherapists, getRandomPublicists, getRandomWellness, sanitizeTeamPools } from './teamLogic';
 import { processStockMarket, calculatePortfolioValue, getDividendPayout, initializeStocks } from './stockLogic';
-import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, createCanonicalAwardNominationId, resolveCanonicalAwardSeason, generateFullBallot, getAwardCeremonyYear, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from './awardLogic';
+import { AWARD_CALENDAR, checkAwardEligibility, AwardDefinition, createCanonicalAwardNominationId, isCurrentGenerationAwardEntry, resolveCanonicalAwardSeason, generateFullBallot, getAwardCeremonyYear, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from './awardLogic';
 import { createDeterministicId } from './deterministicRandom';
 import { isPlayerCastInProject, isPlayerDirectingProject } from './ownedProductionCareer';
 import { processDynastyCareerWeek } from './dynastyCareer';
@@ -109,7 +109,8 @@ import { calculateStreamingAdvertisingRevenueFullCurrency, calculateStreamingSub
 import { attributeStreamingTitleRevenue, settleStreamingContractRoyaltyForPlayer,collectStreamingStudioRoyaltyReceipts } from './streamingContractSettlement';
 import {resolvePlatformController} from './platformAi/platformAiState';
 import { applyPlayerTalentReceipt } from './playerTalentFinance';
-import { creditTalentAward } from './talentCareer';
+import { appendIndustryEventFacts } from './industryWorld/industryEventLedger';
+import { buildAwardNominationFacts, settleAwardNight } from './awardNightSettlement';
 import { processStreamingRightsCalendarWeek } from './streamingRightsCalendar';
 import { processStreamingOpportunityPremieres } from './streamingOpportunityMarket';
 import { buildStreamingPlatformRunsForProject, summarizeStreamingPlatformRuns } from './streamingReleaseRuns';
@@ -6178,7 +6179,7 @@ const processGameWeekInScope = async (
                 event.data?.awardYear === awardYear
             );
             const alreadyHasSeasonRecords = nextPlayer.awards.some(award => award.type === def.type && award.year === awardYear);
-            const alreadyHasHistory = nextPlayer.world.awardHistory.some(entry => entry.type === def.type && entry.year === awardYear);
+            const alreadyHasHistory = nextPlayer.world.awardHistory.some(entry => isCurrentGenerationAwardEntry(entry) && entry.type === def.type && entry.year === awardYear);
 
             if (alreadyScheduled || alreadyHasHistory) return;
 
@@ -6221,6 +6222,11 @@ const processGameWeekInScope = async (
                 }
             }
             nextPlayer.scheduledEvents.push({ id: `evt_award_${def.type}_${awardYear}`, week: ceremonyWeek, type: 'AWARD_CEREMONY', title: def.name, description: t(language, 'services.gameLoop.awards.ceremony.description'), data: { awardDef: def, awardYear, nominations: noms, fullBallot: fullBallot } });
+            /* 21 Nov 2026: the race goes to the industry ledger (AWARD_NOMINATED), so the media covers it in its own voices */
+            const nominationFacts = buildAwardNominationFacts(nextPlayer, def.type, def.name, awardYear, noms, fullBallot);
+            if (nominationFacts.length) {
+                nextPlayer.world = { ...nextPlayer.world, industryEvents: appendIndustryEventFacts(nextPlayer.world.industryEvents, nominationFacts) };
+            }
             if (addedNominationEntries && !alreadyHasSeasonRecords) {
                 nextPlayer.news.unshift({ id: `news_noms_${def.type}_${awardYear}`, headline: t(language, 'services.gameLoop.awards.news.nominations', { awardName: def.name }), category: 'TOP_STORY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'HIGH' });
             }
@@ -6229,7 +6235,7 @@ const processGameWeekInScope = async (
 
     const awardShow = AWARD_CALENDAR[nextPlayer.currentWeek];
     if (awardShow) {
-        const existingEntry = nextPlayer.world.awardHistory.find(h => h.year === nextPlayer.age && h.type === awardShow.type);
+        const existingEntry = nextPlayer.world.awardHistory.find(h => isCurrentGenerationAwardEntry(h) && h.year === nextPlayer.age && h.type === awardShow.type);
         const ceremonyPendingForPlayer = nextPlayer.pendingEvent?.type === 'AWARD_CEREMONY' && nextPlayer.pendingEvent.data?.awardDef?.type === awardShow.type;
         if (!existingEntry && !ceremonyPendingForPlayer) {
             const broadcastCeremony = eventsToday.find(event => (
@@ -6243,31 +6249,19 @@ const processGameWeekInScope = async (
             );
             nextPlayer.world.awardHistory.push(historyEntry);
             nextPlayer.world.awardHistory = sanitizeAwardHistoryEntries(nextPlayer.world.awardHistory);
-            historyEntry.winners.forEach(winner => {
-                if (!winner.projectId) return;
-                /* #293: the platform's Original won: worth telling, without a popup */
-                const wonOriginal = nextPlayer.ownedStreamingPlatform?.originalCommissions?.find(item => item.canonicalProjectId === winner.projectId);
-                if (wonOriginal) logsToAdd.push({ msg: `🏆 ${wonOriginal.title} won ${winner.category} at the ${awardShow.name || awardShow.type}.`, type: 'positive' });
-                const industryProject = nextPlayer.world.projects.find(project => project.id === winner.projectId);
-                const activeProject = nextPlayer.activeReleases.find(project => project.id === winner.projectId)?.projectDetails;
-                const pastProject = nextPlayer.pastProjects.find(project => project.id === winner.projectId);
-                const category = winner.category.toLowerCase();
-                const awardId = `${awardShow.type}:${nextPlayer.age}:${winner.category}`;
-                if (category.includes('screenplay')) {
-                    const talentId = industryProject?.writerId || activeProject?.writerId || pastProject?.writerId;
-                    const talentName = industryProject?.writerName || activeProject?.writerName || pastProject?.writerName;
-                    if (talentId && talentName === winner.winnerName) nextPlayer.world = creditTalentAward(nextPlayer.world,
-                        winner.projectId, { talentId, talentName, role: 'WRITER' }, awardId, settlementAbsoluteWeek);
-                } else if (category.includes('director') && industryProject?.directorId && industryProject.directorName === winner.winnerName) {
-                    nextPlayer.world = creditTalentAward(nextPlayer.world, winner.projectId,
-                        { talentId: industryProject.directorId, talentName: industryProject.directorName, role: 'DIRECTOR' }, awardId, settlementAbsoluteWeek);
-                } else if (/actor|actress/i.test(category) && industryProject?.leadActorId && industryProject.leadActorName === winner.winnerName) {
-                    nextPlayer.world = creditTalentAward(nextPlayer.world, winner.projectId,
-                        { talentId: industryProject.leadActorId, talentName: industryProject.leadActorName, role: 'ACTOR' }, awardId, settlementAbsoluteWeek);
-                }
+            /* 21 Nov 2026: the same night settlement as an attended ceremony (talent credits, #293 log, AWARD_WON facts
+               for the media, composed headlines); see services/awardNightSettlement.ts */
+            const settledNight = settleAwardNight(nextPlayer, {
+                awardType: awardShow.type,
+                showName: awardShow.name || awardShow.type,
+                awardYear: nextPlayer.age,
+                historyEntry,
+                ballot: broadcastCeremony?.data?.fullBallot,
+                language,
+                absoluteWeek: settlementAbsoluteWeek,
             });
-            const bestPic = historyEntry.winners.find(w => w.category.includes('Picture') || w.category.includes('Series'));
-            if (bestPic) { nextPlayer.news.unshift({ id: createDeterministicId('news_award', awardShow.type, nextPlayer.age), headline: t(language, 'services.gameLoop.awards.news.winner', { projectName: bestPic.projectName, awardName: awardShow.name }), category: 'INDUSTRY', week: nextPlayer.currentWeek, year: nextPlayer.age, impactLevel: 'MEDIUM' }); }
+            nextPlayer = settledNight.player;
+            settledNight.logs.forEach(log => logsToAdd.push(log));
         }
     }
     emitLoopStage('awards_done', {

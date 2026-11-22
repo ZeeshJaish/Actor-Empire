@@ -3,8 +3,9 @@ import { readCreatorWorld } from '../../services/creatorEconomy';
 import React, { useEffect, useState } from 'react';
 import { isUnderAdultAge } from '../../services/ageGate';
 import { AgeGatePopup } from '../../components/AgeGatePopup';
-import { Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, PregnancyCarrier } from '../../types';
+import { Business, Player, Commitment, InstaPostType, NPCActor, InteractionType, Agent, Manager, Message, SponsorshipActionType, AuditionOpportunity, DatingMatch, InstaPost, Relationship, SponsorshipOffer, NegotiationData, ContractFilm, YoutubeBrandDeal, YoutubeCollabOffer, YoutubeMusicVideoFeatureOffer, PregnancyCarrier } from '../../types';
 import { MessageSquare, Search, BarChart3, Camera, Users, Newspaper, TrendingUp, Activity, Heart, Folder, Flame, Gem, Landmark, X, CheckCircle, AlertCircle, BookOpen, Map } from 'lucide-react';
+import { isAcquiredStudio } from '../../services/studioGroup';
 import { getPhaseDuration } from '../../services/roleLogic';
 
 // Import sub-apps
@@ -106,6 +107,8 @@ interface MobilePageProps {
 export const MobilePage: React.FC<MobilePageProps> = (props) => {
   const [appMode, setAppMode] = useState<MobileAppMode>('HOME');
   const [toast, setToast] = useState<{msg: string, color: string} | null>(null);
+  /* 21 Nov 2026: which studio takes a platform's commission (more than one studio, and not a renewal) */
+  const [commissionStudioPick, setCommissionStudioPick] = useState<{ offerId: string; studioIds: string[]; selectedId: string } | null>(null);
   const [forbesStudioTargetId, setForbesStudioTargetId] = useState<string | null>(null);
   const [forbesStudioTargetName, setForbesStudioTargetName] = useState<string | null>(null);
   const [initialStockId, setInitialStockId] = useState<string | null>(null);
@@ -247,6 +250,25 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
       else handleUpdatePlayer(read);
   };
 
+  /** Accepts a platform's commission into one studio and opens it there. */
+  const acceptPlatformCommissionInto = (offerId: string, studio: Business, isRenewalHome = false) => {
+      const accepted = acceptPlatformAiPlayerCommission({
+          player: props.player!,
+          offerId,
+          studioId: studio.id,
+          absoluteWeek: getAbsoluteWeek(props.player!.age, props.player!.currentWeek),
+      });
+      if (!accepted.changed) {
+          showToast(accepted.reason === 'INSUFFICIENT_PLATFORM_CASH' ? 'The platform withdrew: funding is no longer available.' : 'This offer is no longer available.', 'bg-rose-500');
+          return;
+      }
+      handleUpdatePlayer(accepted.player);
+      showToast(isRenewalHome
+          ? `${accepted.offer!.platformName} renewal goes to ${studio.name}, which made the last season.`
+          : `${accepted.offer!.platformName} commission added to ${studio.name}.`, 'bg-emerald-500');
+      props.onOpenPlatformCommission?.(studio.id, offerId);
+  };
+
   // --- HANDLER: Accept Offers (Modified for Multi-Film) ---
   const handleAcceptMessage = (msg: Message) => {
       if (msg.isExpired) {
@@ -261,26 +283,25 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
 
       if (msg.type === 'OFFER_PLATFORM_COMMISSION') {
           const offerId = String(msg.data?.offerId || '');
-          const studio = props.player!.businesses
-              .filter(candidate => candidate.type === 'PRODUCTION_HOUSE' && candidate.isActive && candidate.studioState)
-              .sort((left, right) => (right.stats.brandHealth + right.stats.customerSatisfaction) - (left.stats.brandHealth + left.stats.customerSatisfaction))[0];
-          if (!offerId || !studio) {
+          const eligible = props.player!.businesses
+              .filter(candidate => candidate.type === 'PRODUCTION_HOUSE' && candidate.isActive && candidate.studioState);
+          if (!offerId || !eligible.length) {
               showToast('No active Production House can take this commission.', 'bg-rose-500');
               return;
           }
-          const accepted = acceptPlatformAiPlayerCommission({
-              player: props.player!,
-              offerId,
-              studioId: studio.id,
-              absoluteWeek: getAbsoluteWeek(props.player!.age, props.player!.currentWeek),
-          });
-          if (!accepted.changed) {
-              showToast(accepted.reason === 'INSUFFICIENT_PLATFORM_CASH' ? 'The platform withdrew: funding is no longer available.' : 'This offer is no longer available.', 'bg-rose-500');
+          /* 21 Nov 2026 (player report: "studio commissioned renewals go to subsidiaries, not my main studio that made it").
+             A renewal goes to the studio that made the season it continues. Otherwise one studio takes it at once, and with
+             more the player picks (the main studio comes first). It used to go to the studio with the best brand health and
+             satisfaction, often a subsidiary. */
+          const offer = props.player!.world.platformAiPlayerCommissionOffers?.[offerId];
+          const preferred = offer?.preferredStudioId ? eligible.find(candidate => candidate.id === offer.preferredStudioId) : undefined;
+          if (preferred || eligible.length === 1) {
+              acceptPlatformCommissionInto(offerId, preferred || eligible[0], Boolean(preferred && offer?.renewalOfOfferId));
               return;
           }
-          handleUpdatePlayer(accepted.player);
-          showToast(`${accepted.offer!.platformName} commission added to ${studio.name}.`, 'bg-emerald-500');
-          props.onOpenPlatformCommission?.(studio.id, offerId);
+          const mainStudio = eligible.find(candidate => !isAcquiredStudio(candidate))
+              || [...eligible].sort((left, right) => (right.stats.brandHealth + right.stats.customerSatisfaction) - (left.stats.brandHealth + left.stats.customerSatisfaction))[0];
+          setCommissionStudioPick({ offerId, studioIds: eligible.map(candidate => candidate.id), selectedId: mainStudio.id });
           return;
       }
 
@@ -791,6 +812,40 @@ export const MobilePage: React.FC<MobilePageProps> = (props) => {
                 </div>}
 
                 {/* TOAST NOTIFICATION (Inside Phone Screen for better Z-index/Visibility) */}
+                {/* 21 Nov 2026: which studio makes a platform's commission (more than one studio; the main one comes first) */}
+                {commissionStudioPick && (() => {
+                    const studios = commissionStudioPick.studioIds
+                        .map(id => props.player!.businesses.find(business => business.id === id))
+                        .filter((business): business is Business => Boolean(business));
+                    const chosen = studios.find(business => business.id === commissionStudioPick.selectedId) || studios[0];
+                    const offer = props.player!.world.platformAiPlayerCommissionOffers?.[commissionStudioPick.offerId];
+                    return (
+                        <div data-commission-studio-pick className="absolute inset-0 z-[110] flex items-end bg-black/70" onClick={() => setCommissionStudioPick(null)}>
+                            <div onClick={event => event.stopPropagation()} className="max-h-[80%] w-full overflow-y-auto rounded-t-3xl border-t border-white/10 bg-zinc-950 p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+                                <div className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-300">{offer?.platformName || 'Platform'} commission</div>
+                                <div className="mt-1 text-lg font-black text-white">Which studio makes it?</div>
+                                <div className="mt-3 space-y-2">
+                                    {studios.map(business => {
+                                        const selected = business.id === chosen?.id;
+                                        return (
+                                            <button key={business.id} type="button" data-commission-studio={business.id} onClick={() => setCommissionStudioPick({ ...commissionStudioPick, selectedId: business.id })} className={`flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left ${selected ? 'border-emerald-400/70 bg-emerald-400/10' : 'border-white/10 bg-white/[0.04]'}`}>
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-sm font-black text-white">{business.name}</span>
+                                                    <span className="block text-[11px] font-semibold text-zinc-400">{isAcquiredStudio(business) ? 'Subsidiary' : 'Main studio'}</span>
+                                                </span>
+                                                {selected && <CheckCircle size={18} className="shrink-0 text-emerald-300" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <button type="button" data-commission-studio-accept onClick={() => { if (!chosen) return; setCommissionStudioPick(null); acceptPlatformCommissionInto(commissionStudioPick.offerId, chosen); }} className="mt-4 min-h-12 w-full rounded-2xl bg-emerald-400 px-4 text-sm font-black uppercase tracking-[0.06em] text-black">
+                                    Accept for {chosen?.name}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {toast && (
                     <div className={`absolute top-14 left-1/2 -translate-x-1/2 z-[100] ${toast.color} text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold animate-in slide-in-from-top fade-in w-max max-w-[90%] justify-center border border-white/10`}>
                         {toast.color.includes('rose') ? <AlertCircle size={16} /> : <CheckCircle size={16} />}

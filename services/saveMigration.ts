@@ -1182,13 +1182,34 @@ const hasAcquisitionDebtRecords = (player: Player): boolean => (Array.isArray(pl
  *    values (second, now run on its own just before this list). It marks the career once with its repair version;
  *    that counts as a repair only on a career with takeover cases or debt-ledger entries (crash fix, 19 Nov).
  *  - 2026-11-15 (B13): restoreDroppedOriginalCommissions gives back originals the old 40-item cap dropped
- *  - 2026-11-15 (B16): holdPrelaunchPurchasesForSlate keeps titles bought before launch on the shelves for the Slate */
+ *  - 2026-11-15 (B16): holdPrelaunchPurchasesForSlate keeps titles bought before launch on the shelves for the Slate
+ *  - 2026-11-21 (heir awards): tagInheritedAwardHistory marks an older heir's inherited award seasons, once */
+/* 21 Nov 2026 (heir awards): an heir who took over before this update still has the earlier generation's award
+   seasons unmarked, dated by the parent's age, so a season of the heir's own whose year matched one was skipped
+   (no nominations, no ceremony). Once per career: every season dated at or after the heir's current age can only be
+   the earlier generation's (the heir's own seasons so far are dated at or before it, and one of this year is already
+   past its own invite and ceremony), so it is marked inherited. Not an heir, or already done: the very same object. */
+const tagInheritedAwardHistory = (player: Player): Player => {
+    if (!(player.bloodline?.length) || !player.world || player.world.awardHistoryInheritedTagged) return player;
+    const history = Array.isArray(player.world.awardHistory) ? player.world.awardHistory : [];
+    return {
+        ...player,
+        world: {
+            ...player.world,
+            awardHistory: history.map(entry => (entry.inherited || Number(entry.year) < player.age
+                ? entry : { ...entry, inherited: true })),
+            awardHistoryInheritedTagged: true,
+        },
+    };
+};
+
 const LOAD_REPAIRS_AFTER_DEBT: ReadonlyArray<(player: Player) => Player> = [
     healCopiedEpisodeRatings,
     advanceOriginalPitches,
     settleLegacySocialCounts,
     restoreDroppedOriginalCommissions,
     holdPrelaunchPurchasesForSlate,
+    tagInheritedAwardHistory,
 ];
 
 /** migratePlayerSave, also saying whether a load repair changed the career (week-speed plan Phase 1, 2026-11-17):

@@ -1,5 +1,5 @@
 import { getStudioOwnershipPercent } from '../../../../services/studioOwnership';
-import { getFullMergerCarveOutTerms } from '../../../../services/studioGroup';
+import { getFullMergerCarveOutTerms, isAcquiredStudio } from '../../../../services/studioGroup';
 import React from 'react';
 import {
     ArrowLeft,
@@ -34,6 +34,7 @@ import {
     getStudioSaleValuation,
     getStudioSaleWindowState,
     normalizeStudioSalePricing,
+    setStudioSaleHold,
     withdrawStudioSaleDeck,
 } from '../../../../services/studioSale';
 
@@ -449,6 +450,10 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
     const revalidationIssue = activeDeck ? getStudioSaleRevalidationIssue(player, liveStudio, activeDeck) : null;
     const valuation = React.useMemo(() => getStudioSaleValuation(player, liveStudio), [player, liveStudio]);
     const readiness = React.useMemo(() => getStudioSaleReadiness(player, liveStudio), [player, liveStudio]);
+    /* 21 Nov 2026: a subsidiary, or a main studio with subsidiaries, starts projects without the player */
+    const saleStartsProjectsOnItsOwn = isAcquiredStudio(liveStudio) || (player.businesses || []).some(business => (
+        business.id !== liveStudio.id && isAcquiredStudio(business) && business.isActive !== false && business.studioState?.operatingModel !== 'FULL_MERGER'
+    ));
     const ownershipPercent = getStudioOwnershipPercent(player, liveStudio);
     const catalogRetentionAllowed = getStudioSaleEffectiveTransferTerms(player, liveStudio, { catalogRights: 'SELLER_RETAINS_BACK_CATALOG' }).catalogRights !== 'FULL_LIBRARY';
     const windowState = activeDeck ? getStudioSaleWindowState(player, activeDeck) : null;
@@ -881,6 +886,43 @@ export const StudioSaleRoom: React.FC<StudioSaleRoomProps> = ({
                                 <p className="mt-1 text-[10px] font-bold leading-relaxed text-zinc-400">
                                     These are the only live projects blocking this sale. Finish, release, or move them before opening offers.
                                 </p>
+                                {/* 21 Nov 2026 (player report: the queue went 19 → 33 → 43 weeks): the studios in this sale kept
+                                    starting projects on their own. Held (or once listed), they start nothing new. */}
+                                {isActiveDeck(deck) ? (
+                                    <p data-sale-paused className="mt-1 text-[10px] font-black leading-relaxed text-emerald-200">
+                                        New projects are paused while the sale is open, so this list only gets shorter.
+                                    </p>
+                                ) : saleStartsProjectsOnItsOwn ? (
+                                    liveStudio.studioState?.saleHold ? (
+                                        <div data-sale-paused className="mt-2 flex items-center justify-between gap-2">
+                                            <p className="min-w-0 text-[10px] font-black leading-relaxed text-emerald-200">
+                                                New projects are on hold for this sale, so this list only gets shorter.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                data-sale-hold-release
+                                                onClick={() => onUpdatePlayer(setStudioSaleHold(player, liveStudio.id, false))}
+                                                className="shrink-0 rounded-[9px] border border-white/15 bg-black/30 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.08em] text-zinc-200"
+                                            >
+                                                Resume
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2">
+                                            <p className="text-[10px] font-bold leading-relaxed text-amber-200/90">
+                                                Its studios keep starting projects on their own, so this list can grow.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                data-sale-hold
+                                                onClick={() => onUpdatePlayer(setStudioSaleHold(player, liveStudio.id, true))}
+                                                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-[10px] border border-emerald-300/40 bg-emerald-300/10 px-3 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-100"
+                                            >
+                                                Hold new projects
+                                            </button>
+                                        </div>
+                                    )
+                                ) : null}
                             </div>
                             <button
                                 type="button"

@@ -9,6 +9,16 @@ import { createDeterministicId, createDeterministicRng } from './deterministicRa
 import { getHistoricalCatalogueAwardProjects } from './historicalCatalogueAwards';
 import { getAbsoluteWeek } from './legacyLogic';
 import { getCareerProjects, getOutsideOriginalAwardRows } from './outsideOriginals';
+import {
+    AWARD_CATEGORY_LISTS,
+    AWARD_RETIRED_CATEGORIES,
+    findAwardCategoryForTitle,
+    fitsAwardCategory,
+    getAwardCategorySpec,
+    isAwardMusicCategory,
+    isAwardTitleCategory,
+    type AwardCategorySpec,
+} from './awardCategories';
 
 const resolveAwardMediaType = (...candidates: unknown[]): ProjectType => {
     for (const candidate of candidates) {
@@ -82,7 +92,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
         name: 'BAFTA Film Awards',
         shortName: 'BAFTA',
         description: '',
-        categories: ["Best Film", "Best Director", "Best Actor", "Best Actress", "Best Supporting Actor", "Best Supporting Actress", "Best Score"],
+        categories: AWARD_CATEGORY_LISTS.BAFTA,
         focus: 'Artistic',
         color: 'text-blue-400'
     },
@@ -91,12 +101,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
         name: 'Golden Globe Awards',
         shortName: 'Golden Globe',
         description: '',
-        categories: [
-            "Best Motion Picture - Drama", "Best TV Series - Drama", 
-            "Best Actor - Motion Picture", "Best Actress - Motion Picture",
-            "Best Actor - TV Series", "Best Actress - TV Series",
-            "Best Original Song", "Best Score"
-        ],
+        categories: AWARD_CATEGORY_LISTS.GOLDEN_GLOBE,
         focus: 'Commercial',
         color: 'text-rose-400'
     },
@@ -105,12 +110,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
         name: 'Primetime Emmy Awards',
         shortName: 'Emmy',
         description: '',
-        categories: [
-            "Outstanding Drama Series", "Outstanding Comedy Series", 
-            "Outstanding Lead Actor", "Outstanding Lead Actress",
-            "Outstanding Supporting Actor", "Outstanding Supporting Actress",
-            "Outstanding Original Song", "Outstanding Score"
-        ],
+        categories: AWARD_CATEGORY_LISTS.EMMY,
         focus: 'Industry',
         color: 'text-emerald-400'
     },
@@ -119,13 +119,7 @@ export const AWARD_SHOW_DB: Record<AwardType, AwardShowLore> = {
         name: 'The Oscars',
         shortName: 'Oscar',
         description: '',
-        categories: [
-            "Best Picture", "Best Director", 
-            "Best Actor", "Best Actress",
-            "Best Supporting Actor", "Best Supporting Actress", 
-            "Best Original Screenplay", "Best Cinematography",
-            "Best Original Song", "Best Score"
-        ],
+        categories: AWARD_CATEGORY_LISTS.OSCAR,
         focus: 'Prestige',
         color: 'text-amber-400'
     }
@@ -171,7 +165,36 @@ export interface Nomination {
     category: string;
     isPlayer: boolean;
     nomineeName?: string; // For NPCs
+    /** 22 Nov 2026: the nominated person's NPC id (performer, director, writer, crew), so credits reach the right person. */
+    nomineeId?: string;
     playerCreditRole?: 'ACTOR' | 'WRITER' | 'DIRECTOR' | 'PRODUCER' | 'MUSIC';
+    /* 21 Nov 2026 (Zeesh: one rule for every nominee). A player nomination keeps the parts the ballot scores it from;
+       on the ballot, `score` is the ballot score and `nominationScore` the score that earned the nomination. */
+    ballotInputs?: AwardBallotInputs;
+    nominationScore?: number;
+    /** Set on the ballot, for real ties only: earlier wins this season, rating, campaign, a seeded draw. */
+    tie?: AwardBallotTie;
+}
+
+/** The parts every nominee's ballot score is made of, player or world, all on the 0-100 scale. */
+export interface AwardBallotInputs {
+    craft: number;
+    quality: number;
+    rating: number;
+    campaign: number;
+    genre?: string;
+    /** The acting performance, for the show's taste for great performances. */
+    performance?: number;
+    /** 22 Nov 2026: voters rarely hand the same person the same award again right away (4 for a win last season, 2
+        more for one the season before). Set on the ballot. */
+    fatigue?: number;
+}
+
+export interface AwardBallotTie {
+    momentum: number;
+    rating: number;
+    campaign: number;
+    draw: number;
 }
 
 export interface AwardResolvedWinner {
@@ -179,6 +202,7 @@ export interface AwardResolvedWinner {
     winnerName: string;
     projectName: string;
     projectId?: string;
+    personId?: string;
     isPlayer: boolean;
 }
 
@@ -197,7 +221,7 @@ export const createCanonicalAwardRecordId = (
 ): string => createDeterministicId('award_record', awardType, awardYear, category, projectId);
 
 const isMusicAwardCategory = (category: string): boolean => (
-    /song|score|music composition|music and lyrics/i.test(category)
+    isAwardMusicCategory(category) || /song|score|music composition|music and lyrics/i.test(category)
 );
 
 const getNomineeNameForMusicCategory = (project: any, category: string, fallbackName: string): string => {
@@ -284,15 +308,11 @@ const getPlayerCreativeCreditFlags = (player: Player, project: any) => {
     };
 };
 
-const getProducerAwardCategory = (awardType: AwardType, project: any): string | null => {
-    if (awardType === 'OSCAR') return project.mediaType === 'MOVIE' ? 'Best Picture' : null;
-    if (awardType === 'BAFTA') return project.mediaType === 'MOVIE' ? 'Best Film' : null;
-    if (awardType === 'GOLDEN_GLOBE') {
-        return project.mediaType === 'SERIES' ? 'Best TV Series - Drama' : 'Best Motion Picture - Drama';
-    }
-    if (awardType === 'EMMY') return project.mediaType === 'SERIES' ? 'Outstanding Drama Series' : null;
-    return null;
-};
+/* 22 Nov 2026: the producer's title goes where a studio would enter it: a comedy into Musical or Comedy (Globes) or
+   Comedy Series (Emmys), an animated film into Animated, a non-English film into its own category. */
+const getProducerAwardCategory = (awardType: AwardType, project: any): string | null => findAwardCategoryForTitle(awardType, {
+    kind: 'PICTURE', mediaType: project.mediaType === 'SERIES' ? 'SERIES' : 'MOVIE', genre: project.genre, languageId: project.languageId,
+});
 
 type AwardLike = {
     type: string;
@@ -384,7 +404,8 @@ export const sanitizeAwardCeremonyEvent = <T extends PendingEvent>(event: T): T 
     if (event.type !== 'AWARD_CEREMONY') return event;
     const awardType = event.data?.awardDef?.type as AwardType | undefined;
     if (!awardType || !AWARD_SHOW_DB[awardType]) return event;
-    const allowedCategories = new Set(AWARD_SHOW_DB[awardType].categories);
+    /* 22 Nov 2026: a ceremony frozen before the real-world category lists keeps its own (retired) categories */
+    const allowedCategories = new Set([...AWARD_SHOW_DB[awardType].categories, ...(AWARD_RETIRED_CATEGORIES[awardType] || [])]);
     const nominations = (Array.isArray(event.data?.nominations) ? event.data.nominations : [])
         .filter((nomination: Nomination) => allowedCategories.has(nomination.category));
     const sourceBallot = event.data?.fullBallot && typeof event.data.fullBallot === 'object'
@@ -430,6 +451,14 @@ const getProjectAwardSeasonYear = (project: any, awardType: AwardType | null): n
             ? timing.releaseYear + 1
             : timing.releaseYear;
     }
+    /* 22 Nov 2026: the Globes field is set in week 50, so a title out in weeks 51-52 runs at the next Globes instead of
+       missing them for good (the same rule as the Emmys' cut-off). */
+    if (awardType === 'GOLDEN_GLOBE') {
+        const globesInviteWeek = getAwardDefinitionByType('GOLDEN_GLOBE')?.inviteWeek || 50;
+        return timing.releaseWeek && timing.releaseWeek > globesInviteWeek
+            ? timing.releaseYear + 2
+            : timing.releaseYear + 1;
+    }
 
     return timing.releaseYear + 1;
 };
@@ -458,7 +487,7 @@ export const getAwardEligibilityDiagnostics = (player: Player) => {
         ...player.activeReleases.map(project => ({ project, active: true })),
     ];
     const seasonal = sourceProjects.filter(({ project, active }) => (
-        (!active || Number((project as any).weekNum || 0) > 2)
+        (!active || Number((project as any).weekNum || 0) >= 1)
         && isProjectEligibleForAwardSeason(project, awardType, nextWindow.inviteYear)
     ));
     const mediaMatches = seasonal.filter(({ project }) => {
@@ -587,6 +616,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
             director: fromActive ? p.projectDetails.director : p.director,
             directorName: fromActive ? p.projectDetails.directorName : p.directorName,
             isOriginal: fromActive ? p.projectDetails.isOriginal : p.isOriginal,
+            languageId: fromActive ? p.projectDetails?.originalLanguageId : (p.originalLanguageId ?? p.projectDetails?.originalLanguageId),
             soundtrackRevenue: fromActive ? p.soundtrackRevenue : p.soundtrackRevenue,
             gross: fromActive ? p.totalGross : p.gross,
             streamingRevenue: fromActive ? p.streamingRevenue : p.streamingRevenue,
@@ -602,19 +632,41 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
     });
     
     // Player Active Releases (Currently running or just finished)
+    /* 22 Nov 2026: any release counts, not only one 3+ weeks out: a title out in the invite week (or late December)
+       otherwise missed its only season. */
     player.activeReleases.forEach(r => {
-        if (r.weekNum > 2 && isProjectEligibleForAwardSeason(r, awardType, awardYear)) {
+        if (r.weekNum >= 1 && isProjectEligibleForAwardSeason(r, awardType, awardYear)) {
             addCandidate(r, true);
         }
     });
 
     const nominations: Nomination[] = [];
     const isFemale = player.gender === 'FEMALE';
-    const actorTerm = isFemale ? 'Actress' : 'Actor';
+    /* 22 Nov 2026: Cinematic and Box Office Achievement (Globes) is relative, like the real one: a film the player
+       produced is in when it out-grossed the fifth biggest film of the season. */
+    const boxOfficeCategory = awardType ? findAwardCategoryForTitle(awardType, { kind: 'BOX_OFFICE', mediaType: 'MOVIE' }) : null;
+    const boxOfficeBar = boxOfficeCategory && awardType
+        ? (getWorldProjectsForAwardSeason(player, awardType, awardYear)
+            .filter(project => getWorldProjectMediaType(project) === 'MOVIE' && Number(project.boxOffice) > 0)
+            .map(project => Number(project.boxOffice))
+            .sort((left, right) => right - left)[4] ?? 0)
+        : 0;
 
     // 2. EVALUATE CANDIDATES
     candidates.forEach(project => {
         if ((project.rating || 0) < 7.0) return; // Minimum 7.0 to be considered
+        /* 21 Nov 2026: the parts this title's ballot score is made of (the same parts as any world nominee) */
+        const ballotQuality = clampAwardScore(Number(project.quality) || 0);
+        const ballotRating = clampAwardScore((Number(project.rating) || 0) * 10);
+        const ballotCampaign = clampAwardScore(Number(project.campaignForecastSnapshot?.awardsVisibility ?? (ballotQuality - 2)));
+        const ballotInputsFor = (craft: number, performance?: number): AwardBallotInputs => ({
+            craft: clampAwardScore(Number(craft) || 0),
+            quality: ballotQuality,
+            rating: ballotRating,
+            campaign: ballotCampaign,
+            genre: project.genre,
+            ...(performance !== undefined ? { performance } : {}),
+        });
         const mediaTypeMatchesAward =
             awardType === 'EMMY'
                 ? project.mediaType === 'SERIES'
@@ -622,7 +674,7 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                     ? true
                     : project.mediaType === 'MOVIE';
         if (awardType && mediaTypeMatchesAward) {
-            const addMusicNomination = (category: string | null, score: number, threshold: number) => {
+            const addMusicNomination = (category: string | null, score: number, threshold: number, craft: number) => {
                 if (!category || !AWARD_SHOW_DB[awardType].categories.includes(category) || score < threshold) return;
                 const exists = player.awards.some(a =>
                     a.projectId === project.id &&
@@ -637,7 +689,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                     category,
                     isPlayer: true,
                     nomineeName: getNomineeNameForMusicCategory(project, category, player.name),
-                    playerCreditRole: 'MUSIC'
+                    playerCreditRole: 'MUSIC',
+                    ballotInputs: ballotInputsFor(craft),
                 });
             };
 
@@ -687,7 +740,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 addMusicNomination(
                     getPlayerMusicAwardCategory(awardType, project.mediaType, 'SONG'),
                     songScore,
-                    awardType === 'OSCAR' ? 89 : awardType === 'EMMY' ? 86 : 84
+                    awardType === 'OSCAR' ? 89 : awardType === 'EMMY' ? 86 : 84,
+                    songCraft
                 );
             }
             if (hasOriginalScore) {
@@ -705,7 +759,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 addMusicNomination(
                     getPlayerMusicAwardCategory(awardType, project.mediaType, 'SCORE'),
                     scoreNominationScore,
-                    awardType === 'OSCAR' ? 89 : awardType === 'BAFTA' ? 86 : awardType === 'EMMY' ? 86 : 84
+                    awardType === 'OSCAR' ? 89 : awardType === 'BAFTA' ? 86 : awardType === 'EMMY' ? 86 : 84,
+                    scoreCraft
                 );
             }
 
@@ -713,7 +768,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 category: string | null,
                 score: number,
                 threshold: number,
-                playerCreditRole: NonNullable<Nomination['playerCreditRole']>
+                playerCreditRole: NonNullable<Nomination['playerCreditRole']>,
+                craft: number
             ) => {
                 if (!category || !AWARD_SHOW_DB[awardType].categories.includes(category) || score < threshold) return;
                 const exists = hasExistingPlayerAwardRecord(player, project.id, category, awardType);
@@ -725,7 +781,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                     category,
                     isPlayer: true,
                     nomineeName: getPlayerAwardNomineeName(player, playerCreditRole),
-                    playerCreditRole
+                    playerCreditRole,
+                    ballotInputs: ballotInputsFor(craft),
                 });
             };
 
@@ -737,20 +794,25 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                 `award-nomination:${awardType}:${awardYear}:creative:${project.id}`
             )() * 8;
 
+            /* 22 Nov 2026: writing and directing compete at every show that has the category (Globes film, Emmys by
+               drama or comedy series), not only the Oscars and BAFTA */
+            const creativeTitle = { mediaType: project.mediaType === 'SERIES' ? 'SERIES' as const : 'MOVIE' as const, genre: project.genre, languageId: project.languageId };
             if (playerCreativeCredits.WRITER) {
                 addPlayerCreativeNomination(
-                    awardType === 'OSCAR' ? 'Best Original Screenplay' : null,
+                    findAwardCategoryForTitle(awardType, { kind: 'SCREENPLAY', ...creativeTitle }),
                     prestigeBase + (project.hiddenStats?.scriptQuality || qualityScore) * 0.2 + writerScore * 0.28 + creativeLuck,
                     86,
-                    'WRITER'
+                    'WRITER',
+                    project.hiddenStats?.scriptQuality || qualityScore
                 );
             }
             if (playerCreativeCredits.DIRECTOR) {
                 addPlayerCreativeNomination(
-                    ['OSCAR', 'BAFTA'].includes(awardType) ? 'Best Director' : null,
+                    findAwardCategoryForTitle(awardType, { kind: 'DIRECTOR', ...creativeTitle }),
                     prestigeBase + (project.hiddenStats?.directorQuality || qualityScore) * 0.2 + directorScore * 0.28 + creativeLuck,
                     awardType === 'OSCAR' ? 87 : 82,
-                    'DIRECTOR'
+                    'DIRECTOR',
+                    project.hiddenStats?.directorQuality || qualityScore
                 );
             }
             if (playerCreativeCredits.PRODUCER) {
@@ -758,8 +820,14 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                     getProducerAwardCategory(awardType, project),
                     prestigeBase + producerHeat + Number(project.campaignForecastSnapshot?.awardsVisibility || 0) * 0.18 + creativeLuck,
                     awardType === 'OSCAR' ? 88 : awardType === 'EMMY' ? 81 : 79,
-                    'PRODUCER'
+                    'PRODUCER',
+                    qualityScore
                 );
+                const gross = Number(project.gross) || 0;
+                if (boxOfficeCategory && project.mediaType === 'MOVIE' && gross > 0 && gross >= boxOfficeBar) {
+                    const boxCraft = getAwardBoxOfficeCraft(gross);
+                    addPlayerCreativeNomination(boxOfficeCategory, Math.max(boxCraft, 1), 0, 'PRODUCER', boxCraft);
+                }
             }
         }
 
@@ -770,10 +838,16 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
         // Minor, cameo, and ensemble roles should not be treated as supporting award contenders.
         if (!isLeadRole && !isSupportingRole) return;
 
+        /* 21 Nov 2026 (Zeesh: "Oscar ke bonus kabhi lagte nahi, ise theek karo"): the score's taste checks the CEREMONY
+           week (Oscars = 10). This runs at the invite week (6), so the Oscar drama and great-performance bonuses never
+           applied. */
         const nomScore = calculateActorAwardNominationScore(
             project,
-            week,
+            getAwardCeremonyWeek(awardType) || week,
             createDeterministicRng(`award-nomination:${awardType || 'UNKNOWN'}:${awardYear}:actor:${project.id}`)() * 15,
+        );
+        const actingPerformance = clampAwardScore(
+            Number.isFinite(Number(project.playerRolePerformance)) ? Number(project.playerRolePerformance) : ballotQuality
         );
 
         // LOWERED THRESHOLDS for accessibility
@@ -782,29 +856,19 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
         // categories the ceremony then dropped, and Globe acting nominations never matched the Globe list.
         const threshold = awardType === 'OSCAR' ? 85 : awardType === 'EMMY' ? 80 : 75; // Oscars 85, Emmys 80, Others 75
 
-        if (nomScore >= threshold) {
-            let cat = '';
-
-            // Map to specific award show categories with gender
-            if (awardType === 'EMMY') {
-                if (project.mediaType !== 'SERIES') return; // Emmys are strictly TV
-                cat = isLeadRole ? `Outstanding Lead ${actorTerm}` : `Outstanding Supporting ${actorTerm}`;
-            }
-            else if (awardType === 'BAFTA') {
-               if (project.mediaType !== 'MOVIE') return; // BAFTA Film Awards
-               cat = isLeadRole ? `Best ${actorTerm}` : `Best Supporting ${actorTerm}`;
-            }
-            else if (awardType === 'GOLDEN_GLOBE') {
-                // Globes split Movie and TV
-                if (project.mediaType === 'SERIES') {
-                    cat = `Best ${actorTerm} - TV Series`;
-                } else {
-                    cat = `Best ${actorTerm} - Motion Picture`;
-                }
-            } else { // OSCARS (Week 10)
-                if (project.mediaType !== 'MOVIE') return; // Oscars are strictly Movie
-                cat = isLeadRole ? `Best ${actorTerm}` : `Best Supporting ${actorTerm}`;
-            }
+        if (nomScore >= threshold && awardType) {
+            /* 22 Nov 2026: the show's own category for this performance: lead or supporting, film or TV, and at the
+               Globes and Emmys drama or musical/comedy, as the real shows split them. No category (an animated voice
+               role, a documentary, a film at the Emmys) means no nomination. */
+            const cat = findAwardCategoryForTitle(awardType, {
+                kind: 'ACTING',
+                gender: isFemale ? 'FEMALE' : 'MALE',
+                role: isLeadRole ? 'LEAD' : 'SUPPORTING',
+                mediaType: project.mediaType === 'SERIES' ? 'SERIES' : 'MOVIE',
+                genre: project.genre,
+                languageId: project.languageId,
+            });
+            if (!cat) return;
 
             if (project.isPlayer) {
                 // Check if already nominated for this project/category to avoid duplicates
@@ -818,7 +882,8 @@ export const checkAwardEligibility = (player: Player, week: number, awardYear = 
                         category: cat,
                         isPlayer: true,
                         nomineeName: getPlayerAwardNomineeName(player, 'ACTOR'),
-                        playerCreditRole: 'ACTOR'
+                        playerCreditRole: 'ACTOR',
+                        ballotInputs: ballotInputsFor(actingPerformance, actingPerformance),
                     });
                 }
             }
@@ -836,6 +901,93 @@ const hashToUnit = (value: string): number => {
     }
     return (hash >>> 0) / 4294967295;
 };
+
+/* ---------- 21 Nov 2026: one rule for every nominee (Zeesh: "jab sabko 100 mil jaye to kya karenge") ----------
+   Before, a world nominee's ballot score was capped at 100, while the player's kept its own bonuses and up to 15 luck
+   with no cap (often 105-118). A nominated player nearly always won, and a real tie fell to the alphabetical project id.
+   Now every nominee in a category is scored from the same parts (craft, quality, rating, campaign), with the same taste
+   of the show and the same small seeded luck, and the sum is not capped, so the order is kept and exact ties are
+   practically impossible. A real tie goes to momentum this season, then rating, then campaign, then a seeded draw. */
+const AWARD_BALLOT_LUCK = 6;
+
+/* 22 Nov 2026: by the category's kind (the same weights as before for every old category) */
+const getAwardCraftWeight = (category: string): number => {
+    switch (getAwardCategorySpec(category).kind) {
+        case 'ACTING': return 0.66;
+        case 'DIRECTOR': return 0.68;
+        case 'SCREENPLAY': return 0.7;
+        case 'CINEMATOGRAPHY': return 0.7;
+        case 'VFX': return 0.7;
+        case 'SCORE': return 0.72;
+        case 'SONG': return 0.72;
+        case 'BOX_OFFICE': return 0.75;
+        default: return 0.58;
+    }
+};
+
+/** The show's taste, the same for every nominee in an acting race. It used to lift only the player, and never fired. */
+export const getAwardShowTasteBonus = (
+    awardType: AwardType, category: string, genre?: string, performance?: number,
+): number => {
+    if (!/Actor|Actress/.test(category)) return 0;
+    const acting = Number.isFinite(Number(performance)) ? Number(performance) : 0;
+    let bonus = 0;
+    if (awardType === 'OSCAR' && ['DRAMA', 'THRILLER', 'MYSTERY'].includes(String(genre))) bonus += 10;
+    if (awardType === 'OSCAR' && acting > 90) bonus += 5;
+    if (/Supporting/.test(category) && acting >= 88) bonus += 3;
+    return bonus;
+};
+
+/** A nominee's standing before the night's luck: the parts and the show's taste. Decides who makes the ballot. */
+export const getAwardBallotStanding = (awardType: AwardType, category: string, inputs: AwardBallotInputs): number => {
+    const part = (value: number) => clampAwardScore(Number.isFinite(Number(value)) ? Number(value) : 0);
+    return part(inputs.craft) * getAwardCraftWeight(category)
+        + part(inputs.quality) * 0.2
+        + part(inputs.rating) * 0.13
+        + part(inputs.campaign) * 0.05
+        + getAwardShowTasteBonus(awardType, category, inputs.genre, inputs.performance);
+};
+
+/** One nominee's ballot score: the same parts, taste and luck for the player and the world, never capped, less the
+    voters' fatigue with last year's winner. */
+export const scoreAwardBallotEntry = (
+    awardType: AwardType, awardYear: number, category: string, projectId: string, inputs: AwardBallotInputs,
+): number => {
+    const luck = createDeterministicRng(`award-ballot-luck:${awardType}:${awardYear}:${category}:${projectId}`)()
+        * AWARD_BALLOT_LUCK;
+    return getAwardBallotStanding(awardType, category, inputs) + luck - Math.max(0, Number(inputs.fatigue) || 0);
+};
+
+const getAwardTieDraw = (nomination: Pick<Nomination, 'category' | 'project'>, awardType?: string, awardYear?: number) => (
+    hashToUnit(`award-tie:${awardType || ''}:${awardYear ?? ''}:${nomination.category}:${nomination.project.id}`)
+);
+
+/** Every winner pick uses this one order: the score, then, for a real tie only, momentum, rating, campaign and a
+    seeded draw. The project id is the very last resort, so the same ballot always gives the same winner. */
+export const compareAwardBallotEntries = (a: Nomination, b: Nomination): number => (
+    (b.score - a.score)
+    || ((b.tie?.momentum ?? 0) - (a.tie?.momentum ?? 0))
+    || ((b.tie?.rating ?? 0) - (a.tie?.rating ?? 0))
+    || ((b.tie?.campaign ?? 0) - (a.tie?.campaign ?? 0))
+    || ((b.tie?.draw ?? getAwardTieDraw(b)) - (a.tie?.draw ?? getAwardTieDraw(a)))
+    || a.project.id.localeCompare(b.project.id)
+);
+
+/** The winner of one category's ballot: the same pick on the ceremony screen, in the history and in the news. */
+export const pickAwardBallotWinner = (nominees: Nomination[] | undefined | null): Nomination | null => (
+    Array.isArray(nominees) && nominees.length ? [...nominees].sort(compareAwardBallotEntries)[0] : null
+);
+
+/** 21 Nov 2026 (heir careers): a season inherited from an earlier generation is marked at succession. Its year is
+    that generation's age, so it never stands for (or blocks) a season of this career. */
+export const isCurrentGenerationAwardEntry = (entry: { inherited?: boolean } | null | undefined): boolean => (
+    !entry?.inherited
+);
+
+/** The ceremony week of a show (Oscars 10, BAFTA 4, Globes 2, Emmys 38). */
+export const getAwardCeremonyWeek = (awardType?: AwardType | null): number => Number(
+    Object.entries(AWARD_CALENDAR).find(([, definition]) => definition.type === awardType)?.[0] ?? 0,
+);
 
 const getWorldProjectMediaType = (project: IndustryProject): ProjectType => (
     project.mediaType === 'SERIES' ? 'SERIES' : 'MOVIE'
@@ -855,7 +1007,9 @@ export const isWorldProjectEligibleForAwardSeason = (
         return seasonYear === awardYear;
     }
     if (awardType === 'GOLDEN_GLOBE') {
-        return project.year + 1 === awardYear;
+        /* 22 Nov 2026: out after the week-50 field is set: the next Globes (see getProjectAwardSeasonYear) */
+        const globesInviteWeek = getAwardDefinitionByType('GOLDEN_GLOBE')?.inviteWeek || 50;
+        return (project.weekReleased > globesInviteWeek ? project.year + 2 : project.year + 1) === awardYear;
     }
     return mediaType === 'MOVIE' && project.year + 1 === awardYear;
 };
@@ -866,7 +1020,7 @@ const getWorldProjectsForAwardSeason = (
     const savedProjects = [...(player.world.projects || []), ...getOutsideOriginalAwardRows(player)].filter(project => (
         isWorldProjectEligibleForAwardSeason(project, awardType, awardYear)
     ));
-    if (player.world.awardHistory.some(entry => entry.type === awardType && entry.year === awardYear)) {
+    if (player.world.awardHistory.some(entry => isCurrentGenerationAwardEntry(entry) && entry.type === awardType && entry.year === awardYear)) {
         return savedProjects;
     }
     const definition = getAwardDefinitionByType(awardType);
@@ -890,10 +1044,11 @@ const getWorldProjectsForAwardSeason = (
     return [...savedProjects, ...seededProjects];
 };
 
-export const getWorldAwardCategoryScore = (
+/** A world title's parts for one category (21 Nov 2026: split out so its ballot score uses the player's rule). */
+export const getWorldAwardCategoryInputs = (
     project: IndustryProject,
     category: string
-): number => {
+): AwardBallotInputs => {
     const quality = clampAwardScore(project.quality);
     const ratingScore = clampAwardScore((project.rating ?? (4.8 + quality * 0.045)) * 10);
     const stableProfile = (field: string, bias = 0) => clampAwardScore(
@@ -901,40 +1056,252 @@ export const getWorldAwardCategoryScore = (
     );
     const profile = project.awardProfile;
     const campaign = clampAwardScore(profile?.campaign ?? stableProfile('campaign', -2));
-    const combine = (craft: number, craftWeight = 0.62) => clampAwardScore(
-        (craft * craftWeight)
-        + (quality * 0.2)
-        + (ratingScore * 0.13)
-        + (campaign * 0.05)
-    );
-
-    if (/Actor|Actress/.test(category)) {
-        return combine(profile?.leadPerformance ?? stableProfile('performance'), 0.66);
-    }
-    if (category.includes('Director')) {
-        return combine(profile?.directing ?? stableProfile('directing'), 0.68);
-    }
-    if (category.includes('Screenplay')) {
-        return combine(profile?.screenplay ?? stableProfile('screenplay'), 0.7);
-    }
-    if (category.includes('Cinematography')) {
-        return combine(profile?.cinematography ?? stableProfile('cinematography'), 0.7);
-    }
-    if (/score|music composition/i.test(category)) {
-        return combine(profile?.originalScore ?? stableProfile('original-score', -3), 0.72);
-    }
-    if (/song|music and lyrics/i.test(category)) {
+    /* 22 Nov 2026: by the category's kind, not words in its name; Visual Effects and Box Office added */
+    const kind = getAwardCategorySpec(category).kind;
+    const acting = kind === 'ACTING';
+    let craft: number;
+    if (acting) craft = profile?.leadPerformance ?? stableProfile('performance');
+    else if (kind === 'DIRECTOR') craft = profile?.directing ?? stableProfile('directing');
+    else if (kind === 'SCREENPLAY') craft = profile?.screenplay ?? stableProfile('screenplay');
+    else if (kind === 'CINEMATOGRAPHY') craft = profile?.cinematography ?? stableProfile('cinematography');
+    else if (kind === 'SCORE') craft = profile?.originalScore ?? stableProfile('original-score', -3);
+    else if (kind === 'SONG') {
         const genreBoost = ['MUSICAL', 'ANIMATION', 'BIOPIC'].includes(project.genre) ? 8 : -5;
-        return combine(profile?.originalSong ?? stableProfile('original-song', genreBoost), 0.72);
-    }
-    if (/Picture|Series|Film/.test(category)) {
-        return combine(profile?.picture ?? stableProfile('picture'), 0.58);
-    }
-    return combine(stableProfile(category), 0.6);
+        craft = profile?.originalSong ?? stableProfile('original-song', genreBoost);
+    } else if (kind === 'VFX') {
+        const spectacle = ['SCI_FI', 'SUPERHERO', 'FANTASY', 'ACTION', 'ADVENTURE'].includes(project.genre) ? 22 : -8;
+        const budget = ['HIGH', 'BLOCKBUSTER', 'MEGA'].includes(String(project.budgetTier)) ? 12 : String(project.budgetTier) === 'MID' ? 4 : -6;
+        craft = clampAwardScore(quality * 0.55 + spectacle + budget + (hashToUnit(`${project.id}:vfx`) - 0.5) * 10);
+    } else if (kind === 'BOX_OFFICE') craft = getAwardBoxOfficeCraft(project.boxOffice);
+    else craft = profile?.picture ?? stableProfile('picture');
+    return { craft, quality, rating: ratingScore, campaign, genre: project.genre, ...(acting ? { performance: craft } : {}) };
 };
 
-// Generates a season-specific ballot. World projects are ranked by the craft
-// relevant to each category instead of being sampled from the entire save.
+/** Box office on the award scale: $1M = 0, $10M = 33, $100M = 67, $1B = 100. */
+export const getAwardBoxOfficeCraft = (gross: unknown): number => {
+    const value = Number(gross);
+    return value > 0 ? clampAwardScore(((Math.log10(value) - 6) / 3) * 100) : 0;
+};
+
+/** A world title's standing in a category (0-100): decides which titles reach the ballot. Unchanged numbers. */
+export const getWorldAwardCategoryScore = (
+    project: IndustryProject,
+    category: string
+): number => {
+    const inputs = getWorldAwardCategoryInputs(project, category);
+    return clampAwardScore(
+        (inputs.craft * getAwardCraftWeight(category))
+        + (inputs.quality * 0.2)
+        + (inputs.rating * 0.13)
+        + (inputs.campaign * 0.05)
+    );
+};
+
+/* ---------- 22 Nov 2026: the world's nominees are real titles and real people ----------
+   Zeesh: "we try to have everything as per the real world". Before, a category with fewer than five titles over a fixed
+   bar was filled with made-up titles ("Season Selection 494") that often won; supporting races took each title's LEAD
+   actor, so one person won lead and supporting; cinematography went to the lead actor, the score to pop acts, a best
+   picture to "Producers". Now:
+   - every eligible real title competes by the category's rules (film or TV, drama or comedy, animated, not English);
+   - the field is relative, like a class topper: the best five entries that exist are nominated, however the year
+     went, and the best one wins even when it is the only one; a category with no real entry that year is not
+     presented;
+   - each entry names the real person: the billed lead for lead races; for supporting races a performer of the right
+     gender, the same for the title at every show, never a lead of the season; the director; the writer; the
+     cinematographer, VFX supervisor or composer from the crew list; the studio for a title award;
+   - one entry per person in a category;
+   - a performance (and directing) is scored from the person's own skill first, the title second. */
+type AwardPerson = (typeof NPC_DATABASE)[number];
+
+interface AwardPeople {
+    byId: Map<string, AwardPerson>;
+    byName: Map<string, AwardPerson>;
+    actors: Record<'MALE' | 'FEMALE', AwardPerson[]>;
+    writers: AwardPerson[];
+    music: AwardPerson[];
+    crew: Record<string, AwardPerson[]>;
+}
+
+const addAwardPerson = (people: AwardPeople, person: AwardPerson) => {
+    if (!person?.id || people.byId.has(person.id)) return;
+    people.byId.set(person.id, person);
+    const occupation = String((person as any).occupation || '');
+    /* a name shared by two people resolves to the actor (a title's lead is looked up by name only when its id is not
+       a person's, as for a passed pitch's lead) */
+    const named = person.name ? people.byName.get(person.name) : undefined;
+    if (person.name && (!named || (occupation === 'ACTOR' && String((named as any).occupation) !== 'ACTOR'))) people.byName.set(person.name, person);
+    if (occupation === 'ACTOR' && (person.gender === 'MALE' || person.gender === 'FEMALE')) people.actors[person.gender].push(person);
+    else if (occupation === 'WRITER') people.writers.push(person);
+    else if (occupation === 'MUSIC_ARTIST') people.music.push(person);
+    else if (['CINEMATOGRAPHER', 'COMPOSER', 'VFX_SUPERVISOR'].includes(occupation)) (people.crew[occupation] ||= []).push(person);
+};
+
+const emptyAwardPeople = (): AwardPeople => ({ byId: new Map(), byName: new Map(), actors: { MALE: [], FEMALE: [] }, writers: [], music: [], crew: {} });
+
+let builtInAwardPeople: AwardPeople | null = null;
+let saveAwardPeople: { source: unknown; people: AwardPeople } | null = null;
+
+/** Everyone who can be nominated: the built-in people and the save's own (most world titles' leads are save NPCs). */
+const getAwardPeople = (player: Player): AwardPeople => {
+    if (!builtInAwardPeople) {
+        builtInAwardPeople = emptyAwardPeople();
+        NPC_DATABASE.forEach(person => addAwardPerson(builtInAwardPeople!, person));
+    }
+    const extra = (player.flags as any)?.extraNPCs;
+    if (!Array.isArray(extra) || !extra.length) return builtInAwardPeople;
+    if (saveAwardPeople?.source === extra) return saveAwardPeople.people;
+    const people = emptyAwardPeople();
+    NPC_DATABASE.forEach(person => addAwardPerson(people, person));
+    extra.forEach((person: AwardPerson) => addAwardPerson(people, person));
+    saveAwardPeople = { source: extra, people };
+    return people;
+};
+
+/** The same pick every time for the same seed: the best hash plus how well the person fits the title. */
+const pickAwardPerson = (
+    pool: AwardPerson[], seed: string, fit: (person: AwardPerson) => number, skip?: (person: AwardPerson) => boolean,
+): AwardPerson | null => {
+    let best: AwardPerson | null = null;
+    let bestScore = -Infinity;
+    for (const person of pool) {
+        if (skip?.(person)) continue;
+        const score = hashToUnit(`${seed}:${person.id}`) + fit(person);
+        if (score > bestScore) {
+            best = person;
+            bestScore = score;
+        }
+    }
+    return best;
+};
+
+const getAwardPersonSkill = (person?: AwardPerson | null): number | null => {
+    const value = Number((person as any)?.stats?.talent);
+    return person && Number.isFinite(value) ? clampAwardScore(value) : null;
+};
+
+/** Genre experience, and big films with established names (small ones with newer ones). */
+const getAwardPersonFit = (person: AwardPerson, project: IndustryProject): number => {
+    const genreXp = Number((person as any).stats?.genreXP?.[project.genre] || 0) > 0
+        || (Array.isArray((person as any).specialties) && (person as any).specialties.includes(project.genre));
+    const bigFilm = ['HIGH', 'BLOCKBUSTER', 'MEGA'].includes(String(project.budgetTier));
+    const established = ['A_LIST', 'ICON', 'LEGEND', 'ESTABLISHED'].includes(String((person as any).crewTier || person.tier));
+    return (genreXp ? 0.25 : 0) + (bigFilm === established ? 0.2 : 0);
+};
+
+/** A performance (or directing) on the award scale: the person's own skill first, then the title around it. */
+const getAwardPerformanceCraft = (skill: number | null, project: IndustryProject, fallback: number, seed: string): number => (
+    skill === null
+        ? fallback
+        : clampAwardScore(skill * 0.5 + clampAwardScore(project.quality) * 0.35 + 6 + (hashToUnit(seed) - 0.5) * 10)
+);
+
+/** The company a title award is credited to: the player's studio, a world studio or platform, or the studio id. */
+const getAwardStudioName = (player: Player, project: IndustryProject): string => {
+    const studioId = String(project.studioId || (project as any).physicalProducerStudioId || '');
+    const own = (player.businesses || []).find(business => business.id === studioId);
+    const worldStudio = (player.world as any).studios?.[studioId];
+    const platform = (player.world as any).platforms?.[studioId];
+    const name = own?.name || worldStudio?.name || platform?.identity?.name || platform?.name;
+    if (name) return String(name);
+    return studioId
+        ? studioId.toLowerCase().split(/[_\s]+/).filter(Boolean).map(word => word[0].toUpperCase() + word.slice(1)).join(' ')
+        : project.title;
+};
+
+interface AwardWorldEntry {
+    nomination: Nomination;
+    inputs: AwardBallotInputs;
+    standing: number;
+    personKey: string;
+}
+
+const buildWorldAwardEntries = (
+    player: Player,
+    awardType: AwardType,
+    category: string,
+    spec: AwardCategorySpec,
+    projects: IndustryProject[],
+    seasonLeads: { ids: Set<string>; names: Set<string> },
+): AwardWorldEntry[] => {
+    const people = getAwardPeople(player);
+    const entries: AwardWorldEntry[] = [];
+    projects.forEach(project => {
+        if (!fitsAwardCategory(spec, { mediaType: getWorldProjectMediaType(project), genre: project.genre, languageId: project.originalLanguageId })) return;
+        const base = getWorldAwardCategoryInputs(project, category);
+        let craft = base.craft;
+        let nomineeName: string | undefined;
+        let nomineeId: string | undefined;
+        if (spec.kind === 'PICTURE' || spec.kind === 'BOX_OFFICE') {
+            if (spec.kind === 'BOX_OFFICE' && !(Number(project.boxOffice) > 0)) return;
+            nomineeName = getAwardStudioName(player, project);
+        } else if (spec.kind === 'ACTING' && spec.role === 'SUPPORTING') {
+            const gender = spec.gender || 'MALE';
+            const performer = pickAwardPerson(
+                people.actors[gender],
+                `award-supporting:${project.id}:${gender}`,
+                person => getAwardPersonFit(person, project),
+                person => person.id === project.leadActorId || person.name === project.leadActorName
+                    || seasonLeads.ids.has(person.id) || seasonLeads.names.has(person.name),
+            );
+            if (!performer) return;
+            nomineeName = performer.name;
+            nomineeId = performer.id;
+            craft = getAwardPerformanceCraft(getAwardPersonSkill(performer), project, clampAwardScore(base.craft - 4), `award-performance:${project.id}:${performer.id}`);
+        } else if (spec.kind === 'ACTING') {
+            const lead = (project.leadActorId && people.byId.get(project.leadActorId))
+                || (project.leadActorName && people.byName.get(project.leadActorName)) || null;
+            /* a lead whose gender is unknown cannot be placed in a gendered race */
+            if (!project.leadActorName || !lead || lead.gender !== spec.gender) return;
+            nomineeName = project.leadActorName;
+            nomineeId = lead.id;
+            craft = getAwardPerformanceCraft(getAwardPersonSkill(lead), project, base.craft, `award-performance:${project.id}:${lead.id}`);
+        } else if (spec.kind === 'DIRECTOR') {
+            if (!project.directorName) return;
+            const director = (project.directorId && people.byId.get(project.directorId)) || people.byName.get(project.directorName) || null;
+            nomineeName = project.directorName;
+            nomineeId = director?.id || project.directorId;
+            craft = getAwardPerformanceCraft(getAwardPersonSkill(director), project, base.craft, `award-directing:${project.id}:${nomineeId || nomineeName}`);
+        } else if (spec.kind === 'SCREENPLAY') {
+            const credited = project.writerName?.trim();
+            const writer = (project.writerId && people.byId.get(project.writerId))
+                || (credited ? people.byName.get(credited) : null)
+                || (credited ? null : pickAwardPerson(people.writers, `award-writer:${project.id}`, person => getAwardPersonFit(person, project)));
+            nomineeName = credited || writer?.name;
+            if (!nomineeName) return;
+            nomineeId = writer?.id || project.writerId;
+            const skill = getAwardPersonSkill(writer);
+            craft = skill === null ? base.craft : clampAwardScore(base.craft * 0.6 + skill * 0.4);
+        } else if (spec.kind === 'CINEMATOGRAPHY' || spec.kind === 'VFX' || spec.kind === 'SCORE') {
+            const role = spec.kind === 'CINEMATOGRAPHY' ? 'CINEMATOGRAPHER' : spec.kind === 'VFX' ? 'VFX_SUPERVISOR' : 'COMPOSER';
+            const member = pickAwardPerson(people.crew[role] || [], `award-crew:${role}:${project.id}`, person => getAwardPersonFit(person, project));
+            if (!member) return;
+            nomineeName = member.name;
+            nomineeId = member.id;
+            craft = clampAwardScore(base.craft * 0.6 + (getAwardPersonSkill(member) ?? base.craft) * 0.4);
+        } else {
+            const artist = pickAwardPerson(people.music, `award-song:${project.id}`, () => 0);
+            nomineeName = getNomineeNameForMusicCategory(project, category, artist?.name || getFallbackAwardNominee(category, project.id || project.title));
+            nomineeId = people.byName.get(nomineeName)?.id;
+        }
+        const inputs: AwardBallotInputs = { ...base, craft, ...(spec.kind === 'ACTING' ? { performance: craft } : {}) };
+        entries.push({
+            nomination: {
+                project: { id: project.id, name: project.title },
+                score: 0,
+                category,
+                isPlayer: false,
+                nomineeName,
+                ...(nomineeId ? { nomineeId } : {}),
+            },
+            inputs,
+            standing: getAwardBallotStanding(awardType, category, inputs),
+            personKey: spec.kind === 'PICTURE' || spec.kind === 'BOX_OFFICE' ? `title:${project.id}` : `person:${nomineeId || nomineeName}`,
+        });
+    });
+    return entries;
+};
+
+// Generates a season-specific ballot: the player's nominations first, then the world's real field (see above).
 export const generateFullBallot = (
     player: Player,
     awardType: AwardType,
@@ -944,142 +1311,128 @@ export const generateFullBallot = (
     const lore = AWARD_SHOW_DB[awardType];
     const ballot: Record<string, Nomination[]> = {};
     const worldProjects = getWorldProjectsForAwardSeason(player, awardType, awardYear);
-    
+    /* 21 Nov 2026: momentum for a real tie: the title's wins this season (same award year) at shows already held */
+    const seasonWins = new Map<string, number>();
+    (player.world.awardHistory || [])
+        .filter(entry => entry.year === awardYear && entry.type !== awardType && isCurrentGenerationAwardEntry(entry))
+        .forEach(entry => entry.winners.forEach(winner => {
+            if (winner.projectId) seasonWins.set(winner.projectId, (seasonWins.get(winner.projectId) || 0) + 1);
+        }));
+    /* 22 Nov 2026 (Zeesh: last year's winner, as in the real world): voters seldom give the same person the same award
+       again right away. Who won this category at this show one or two seasons ago; title awards are exempt. */
+    const recentWinners = new Set<string>();
+    (player.world.awardHistory || []).forEach(entry => {
+        const yearsAgo = awardYear - entry.year;
+        if (entry.type !== awardType || !isCurrentGenerationAwardEntry(entry) || yearsAgo < 1 || yearsAgo > 2) return;
+        entry.winners.forEach(winner => {
+            if (isAwardTitleCategory(winner.category, awardType)) return;
+            const people = winner.isPlayer ? ['player'] : [winner.personId, winner.winnerName].filter(Boolean) as string[];
+            people.forEach(who => recentWinners.add(`${winner.category}::${who}::${yearsAgo}`));
+        });
+    });
+    /* 4 for a win last season, 2 more for one the season before: a third straight win is the hardest */
+    const fatigueFor = (nomination: Nomination, category: string): number => {
+        if (isAwardTitleCategory(category, awardType)) return 0;
+        const people = nomination.isPlayer ? ['player'] : [nomination.nomineeId, nomination.nomineeName].filter(Boolean) as string[];
+        const won = (yearsAgo: number) => people.some(who => recentWinners.has(`${category}::${who}::${yearsAgo}`));
+        return (won(1) ? 4 : 0) + (won(2) ? 2 : 0);
+    };
+    /* Every entry goes on the ballot the same way: scored by the one rule (when its parts are known) and given the
+       tie-break keys. Entries without parts (an old queued nomination) keep their score. */
+    const onBallot = (nomination: Nomination, inputs: AwardBallotInputs | undefined, category: string): Nomination => {
+        const scored = inputs ? { ...inputs, fatigue: fatigueFor(nomination, category) } : undefined;
+        return {
+            ...nomination,
+            ...(scored ? {
+                nominationScore: nomination.score,
+                score: scoreAwardBallotEntry(awardType, awardYear, category, nomination.project.id, scored),
+            } : {}),
+            tie: {
+                momentum: seasonWins.get(nomination.project.id) || 0,
+                rating: clampAwardScore(Number(inputs?.rating) || 0),
+                campaign: clampAwardScore(Number(inputs?.campaign) || 0),
+                draw: getAwardTieDraw(nomination, awardType, awardYear),
+            },
+        };
+    };
+    /* no lead of this season is anyone's supporting performer */
+    const seasonLeads = { ids: new Set<string>(), names: new Set<string>() };
+    worldProjects.forEach(project => {
+        if (project.leadActorId) seasonLeads.ids.add(project.leadActorId);
+        if (project.leadActorName) seasonLeads.names.add(project.leadActorName);
+    });
+
     lore.categories.forEach(cat => {
+        const spec = getAwardCategorySpec(cat, awardType);
         const categoryNoms: Nomination[] = [];
-        
-        // 1. Add Player if they are nominated in this category
+
+        // 1. The player's best nomination in this category (by the same order)
         const pNom = playerNoms
             .filter(n => n.category === cat)
-            .sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0];
+            .sort(compareAwardBallotEntries)[0];
         if (pNom) {
-            categoryNoms.push(pNom);
+            categoryNoms.push(onBallot(pNom, pNom.ballotInputs, cat));
         }
-        if (cat.includes('Screenplay')) {
+        // 2. The player's own titles written by an NPC writer: the writer is the nominee
+        if (spec.kind === 'SCREENPLAY') {
             const creditedPlayerFilms = [
                 ...getCareerProjects(player).filter(project => !project.isQaArchive).map(project => ({
                     id: project.id, name: project.name, writerId: project.writerId, writerName: project.writerName,
                     quality: project.projectQuality, rating: project.rating, release: project,
+                    mediaType: resolveAwardMediaType((project as any).projectType, (project as any).type, (project as any).projectDetails?.type),
+                    genre: (project as any).genre ?? (project as any).projectDetails?.genre,
                 })),
-                ...player.activeReleases.filter(project => project.weekNum > 2).map(project => ({
+                ...player.activeReleases.filter(project => project.weekNum >= 1).map(project => ({
                     id: project.id, name: project.name, writerId: project.projectDetails.writerId,
                     writerName: project.projectDetails.writerName,
                     quality: project.projectDetails.hiddenStats.qualityScore, rating: project.imdbRating || 0, release: project,
+                    mediaType: resolveAwardMediaType(project.projectDetails?.type, (project as any).type),
+                    genre: project.projectDetails?.genre,
                 })),
             ].filter(project => project.writerId && project.writerName && !['PLAYER_SELF', 'player'].includes(project.writerId)
                 && project.quality >= 75 && project.rating >= 7
+                && fitsAwardCategory(spec, { mediaType: project.mediaType, genre: project.genre })
                 && isProjectEligibleForAwardSeason(project.release, awardType, awardYear)
                 && !categoryNoms.some(nomination => nomination.project.id === project.id))
                 .map(project => ({
-                    project: { id: project.id, name: project.name }, category: cat, isPlayer: false,
-                    nomineeName: project.writerName!, score: Math.min(100, project.quality * 0.7 + project.rating * 3),
-                } as Nomination))
-                .sort((left, right) => right.score - left.score || left.project.id.localeCompare(right.project.id));
-            categoryNoms.push(...creditedPlayerFilms.slice(0, Math.max(0, 5 - categoryNoms.length)));
+                    nomination: {
+                        project: { id: project.id, name: project.name }, category: cat, isPlayer: false,
+                        nomineeName: project.writerName!, nomineeId: project.writerId,
+                        score: Math.min(100, project.quality * 0.7 + project.rating * 3),
+                    } as Nomination,
+                    /* the writer's work is the script: the same parts as any nominee */
+                    inputs: {
+                        craft: project.quality, quality: project.quality, rating: project.rating * 10,
+                        campaign: project.quality - 2, genre: project.genre,
+                    } as AwardBallotInputs,
+                }))
+                .sort((left, right) => compareAwardBallotEntries(left.nomination, right.nomination));
+            categoryNoms.push(...creditedPlayerFilms.slice(0, Math.max(0, 5 - categoryNoms.length))
+                .map(entry => onBallot(entry.nomination, entry.inputs, cat)));
         }
 
-        // 2. Fill the rest with NPCs (Total 4-5 nominees)
-        const spotsLeft = 5 - categoryNoms.length;
-        if (spotsLeft > 0) {
-            
-            // Gender check
-            const isActress = cat.includes('Actress');
-            const isActor = cat.includes('Actor') && !cat.includes('Actress'); // Strict check
-            const isDirector = cat.includes('Director');
-            const isScreenplayAward = cat.includes('Screenplay');
-            const isMusicAward = isMusicAwardCategory(cat);
-            const isProjectAward = cat.includes('Picture') || cat.includes('Series') || cat.includes('Musical') || cat.includes('Play') || cat.includes('Film');
-            const reallyIsProjectAward = isProjectAward && !isActor && !isActress && !isDirector;
-            
-            // Type check based on award show
-            const requiresSeries = awardType === 'EMMY' || /TV Series|Drama Series|Comedy Series/.test(cat);
-            const requiresMovie = !requiresSeries;
-
-            let candidates = worldProjects.filter(p => {
-                if (categoryNoms.some(nomination => nomination.project.id === p.id)) return false;
-                if (p.quality < 50) return false;
-                const mediaType = getWorldProjectMediaType(p);
-                if (requiresSeries && mediaType !== 'SERIES') return false;
-                if (requiresMovie && mediaType !== 'MOVIE') return false;
-                return getWorldAwardCategoryScore(p, cat) >= (isMusicAward ? 74 : 68);
-            });
-            
-            // Filter candidates by Actor Gender if applicable
-            // IMPORTANT: Don't fail if NPC_DATABASE lookup misses (due to save/load cycle ID mismatch)
-            if (isActress) {
-                candidates = candidates.filter(p => {
-                    const actor = NPC_DATABASE.find(n => n.id === p.leadActorId);
-                    return actor ? actor.gender === 'FEMALE' : hashToUnit(`${p.id}:gender`) >= 0.5;
-                });
-            } else if (isActor) {
-                candidates = candidates.filter(p => {
-                    const actor = NPC_DATABASE.find(n => n.id === p.leadActorId);
-                    return actor ? actor.gender === 'MALE' : hashToUnit(`${p.id}:gender`) < 0.5;
-                });
-            }
-
-            candidates = candidates
-                .sort((a, b) => (
-                    getWorldAwardCategoryScore(b, cat) - getWorldAwardCategoryScore(a, cat)
-                    || a.id.localeCompare(b.id)
-                ))
-                .slice(0, spotsLeft);
-            
-            candidates.forEach(p => {
-                // Determine nominee name based on category
-                const linkedActor = p.leadActorId ? NPC_DATABASE.find(n => n.id === p.leadActorId) : null;
-                let nomineeName = p.leadActorName || linkedActor?.name || p.directorName || p.title;
-                if (isActor || isActress) nomineeName = p.leadActorName || linkedActor?.name || getFallbackAwardNominee(cat, p.id || p.title);
-                else if (isDirector) nomineeName = p.directorName || getFallbackAwardNominee(cat, p.id || p.title);
-                else if (isScreenplayAward) nomineeName = p.writerName?.trim() || NPC_DATABASE.find(n => n.id === p.writerId && n.occupation === 'WRITER')?.name || 'Uncredited Writing Team';
-                else if (isMusicAward) nomineeName = getNomineeNameForMusicCategory(
-                    p,
-                    cat,
-                    getFallbackAwardNominee(cat, p.id || p.title)
-                );
-                else if (reallyIsProjectAward) nomineeName = "Producers";
-
-                categoryNoms.push({
-                    project: { id: p.id, name: p.title },
-                    score: getWorldAwardCategoryScore(p, cat),
-                    category: cat,
-                    isPlayer: false,
-                    nomineeName: nomineeName
-                });
-            });
-
-            // Fallback if world DB is empty or filtered out
-            while (categoryNoms.length < 5) {
-                const slot = categoryNoms.length;
-                const rng = createDeterministicRng(`award-ballot:${awardType}:${awardYear}:${cat}:${slot}`);
-                const fallbackProjectId = createDeterministicId('award_fallback_project', awardType, awardYear, cat, slot);
-                const fakeTitle = `Season Selection ${Math.floor(rng() * 900) + 100}`;
-                
-                // Pick random NPC of correct gender
-                const pool = NPC_DATABASE.filter(n => {
-                    if (isMusicAward) return n.occupation === 'MUSIC_ARTIST';
-                    if (isScreenplayAward) return n.occupation === 'WRITER';
-                    if (isActress) return n.gender === 'FEMALE';
-                    if (isActor) return n.gender === 'MALE';
-                    return true;
-                });
-                
-                const randomNPC = pool.length > 0 ? pool[Math.floor(rng() * pool.length)] : null;
-                const randomName = randomNPC ? randomNPC.name : (isScreenplayAward ? 'Uncredited Writing Team' : isMusicAward ? 'Music Team' : isActress ? "Emma Stone" : "Timothée Chalamet");
-
-                categoryNoms.push({
-                    project: { id: fallbackProjectId, name: fakeTitle },
-                    score: 76 + (rng() * 8),
-                    category: cat,
-                    isPlayer: false,
-                    nomineeName: reallyIsProjectAward ? "Producers" : randomName
-                });
-            }
+        // 3. The world's real field, best first, one entry per person and per title
+        const takenTitles = new Set(categoryNoms.map(nomination => nomination.project.id));
+        const takenPeople = new Set(categoryNoms
+            .filter(nomination => !nomination.isPlayer)
+            .map(nomination => `person:${nomination.nomineeId || nomination.nomineeName}`));
+        const field = buildWorldAwardEntries(player, awardType, cat, spec, worldProjects, seasonLeads)
+            .sort((left, right) => (
+                right.standing - left.standing
+                || left.nomination.project.id.localeCompare(right.nomination.project.id)
+            ));
+        for (const entry of field) {
+            if (categoryNoms.length >= 5) break;
+            if (takenTitles.has(entry.nomination.project.id) || takenPeople.has(entry.personKey)) continue;
+            takenTitles.add(entry.nomination.project.id);
+            takenPeople.add(entry.personKey);
+            categoryNoms.push(onBallot({ ...entry.nomination, score: entry.standing }, entry.inputs, cat));
         }
-        
-        ballot[cat] = categoryNoms.sort((a,b) => (
-            b.score - a.score || a.project.id.localeCompare(b.project.id)
-        ));
+
+        /* Zeesh's class-topper rule: the best entry that exists wins, even in a thin year (a single entry included);
+           only a category with no real entry at all is not presented that year (no title is ever made up) */
+        if (!categoryNoms.length) return;
+        ballot[cat] = categoryNoms.sort(compareAwardBallotEntries);
     });
 
     return ballot;
@@ -1089,32 +1442,29 @@ export const determineWinners = (
     nominations: Nomination[],
     fullBallot?: Record<string, Nomination[]>
 ): { won: boolean, nomination: Nomination }[] => {
+    /* 21 Nov 2026: a nomination wins only when it IS its category's ballot winner (a player entry, the same project).
+       The ballot's pick uses the one order. Without a ballot (an old pending ceremony), the player's best nomination
+       per category is still checked against the old world threshold. */
     const playerBestByCategory = new Map<string, Nomination>();
 
     nominations.forEach(nom => {
         const existing = playerBestByCategory.get(nom.category);
-        if (
-            !existing
-            || nom.score > existing.score
-            || (nom.score === existing.score && nom.project.id.localeCompare(existing.project.id) < 0)
-        ) {
+        if (!existing || compareAwardBallotEntries(nom, existing) < 0) {
             playerBestByCategory.set(nom.category, nom);
         }
     });
 
     return nominations.map(nom => {
+        const ballotWinner = fullBallot && fullBallot[nom.category]?.length
+            ? pickAwardBallotWinner(fullBallot[nom.category])
+            : null;
+        if (ballotWinner) {
+            return { won: Boolean(ballotWinner.isPlayer && ballotWinner.project.id === nom.project.id), nomination: nom };
+        }
+
         const playerContender = playerBestByCategory.get(nom.category);
         if (!playerContender || playerContender.project.id !== nom.project.id) {
             return { won: false, nomination: nom };
-        }
-
-        if (fullBallot && fullBallot[nom.category]?.length) {
-            const sortedBallot = [...fullBallot[nom.category]].sort((a, b) => (
-                b.score - a.score || a.project.id.localeCompare(b.project.id)
-            ));
-            const topNominee = sortedBallot[0];
-            const playerWins = topNominee.isPlayer && topNominee.project.id === nom.project.id;
-            return { won: playerWins, nomination: nom };
         }
 
         const worldWinnerScore = 90 + createDeterministicRng(
@@ -1139,6 +1489,7 @@ export const createAwardHistoryFromBallot = (
         winnerName: winner.winnerName,
         projectName: winner.projectName,
         ...(winner.projectId ? { projectId: winner.projectId } : {}),
+        ...(winner.personId && !winner.isPlayer ? { personId: winner.personId } : {}),
         isPlayer: winner.isPlayer
     }))
 });
@@ -1151,7 +1502,7 @@ export const resolveCanonicalAwardSeason = (
     ceremonyBallot?: Record<string, Nomination[]>
 ): AwardHistoryEntry => {
     const existing = player.world.awardHistory.find(entry => (
-        entry.type === awardType && entry.year === awardYear
+        isCurrentGenerationAwardEntry(entry) && entry.type === awardType && entry.year === awardYear
     ));
     if (existing) return existing;
     if (resolvedWinners?.length) {
@@ -1168,25 +1519,28 @@ export const resolveCanonicalAwardSeason = (
         ? player.pendingEvent : undefined;
     const frozenBallot = ceremonyBallot || scheduledCeremony?.data?.fullBallot
         || pendingCeremony?.data?.fullBallot;
-    // This function creates the historical record AFTER the ceremony
-    const lore = AWARD_SHOW_DB[awardType];
-    const year = awardYear;
+    /* 22 Nov 2026: one way to decide a season: its ballot. A season without a frozen one (a save from before the invite
+       ran, a skipped week) gets one built now by the same rules, instead of the old looser path that ignored film/TV
+       at the Globes and could give an acting award to "Producers". A ballot frozen before the real-world category lists
+       is decided with its own categories. */
+    const ballot: Record<string, Nomination[]> = frozenBallot && typeof frozenBallot === 'object' && Object.keys(frozenBallot).length
+        ? frozenBallot as Record<string, Nomination[]>
+        : generateFullBallot(player, awardType, [], awardYear);
     const historyEntry: AwardHistoryEntry = {
-        year,
+        year: awardYear,
         type: awardType,
         winners: []
     };
+    const playerWins = player.awards.filter(award => (
+        award.type === awardType && award.outcome === 'WON' && award.year === awardYear
+    ));
+    const categories = [
+        ...Object.keys(ballot),
+        ...playerWins.map(award => award.category).filter(category => !(category in ballot)),
+    ];
 
-    const worldCandidates = getWorldProjectsForAwardSeason(player, awardType, year)
-        .filter(project => project.quality > 55);
-
-    lore.categories.forEach(cat => {
-        const playerWin = player.awards.find(a => 
-            a.type === awardType && 
-            a.category === cat && 
-            a.outcome === 'WON' &&
-            a.year === year
-        );
+    categories.forEach(cat => {
+        const playerWin = playerWins.find(award => award.category === cat);
 
         if (playerWin) {
             const playerProject = [
@@ -1207,109 +1561,23 @@ export const resolveCanonicalAwardSeason = (
                 projectId: playerWin.projectId,
                 isPlayer: true
             });
-        } else {
-            const nominees = Array.isArray(frozenBallot?.[cat])
-                ? (frozenBallot[cat] as Nomination[]).filter(nomination => (
-                    nomination?.project?.id && nomination.project.name
-                    && Number.isFinite(nomination.score)
-                )) : [];
-            if (nominees.length > 0) {
-                const winner = [...nominees].sort((a, b) => (
-                    b.score - a.score || a.project.id.localeCompare(b.project.id)
-                ))[0];
-                historyEntry.winners.push({
-                    category: cat,
-                    winnerName: winner.nomineeName || (winner.isPlayer ? player.name : winner.project.name),
-                    projectName: winner.project.name,
-                    projectId: winner.project.id,
-                    isPlayer: winner.isPlayer
-                });
-                return;
-            }
-            // Determine filter based on category gender
-            const isActress = cat.includes('Actress');
-            const isActor = cat.includes('Actor') && !cat.includes('Actress'); // Strict
-            const isDirector = cat.includes('Director');
-            const isScreenplayAward = cat.includes('Screenplay');
-            const isMusicAward = isMusicAwardCategory(cat);
-            const isProjectAward = cat.includes('Picture') || cat.includes('Series') || cat.includes('Musical') || cat.includes('Play') || cat.includes('Film');
-
-            let possibleWinners = [...worldCandidates];
-            
-            // Filter by gender if needed
-            if (isActress) {
-                possibleWinners = possibleWinners.filter(p => {
-                    const actor = NPC_DATABASE.find(n => n.id === p.leadActorId);
-                    return actor ? actor.gender === 'FEMALE' : true;
-                });
-            } else if (isActor) {
-                possibleWinners = possibleWinners.filter(p => {
-                    const actor = NPC_DATABASE.find(n => n.id === p.leadActorId);
-                    return actor ? actor.gender === 'MALE' : true;
-                });
-            }
-            
-            possibleWinners.sort((a,b) => (
-                getWorldAwardCategoryScore(b, cat) - getWorldAwardCategoryScore(a, cat)
-                || a.id.localeCompare(b.id)
-            ));
-            const winnerProj = possibleWinners[0] || null;
-            const winnerProjectId = winnerProj?.id
-                || createDeterministicId('award_fallback_winner', awardType, year, cat);
-
-            let winnerName = "Unknown";
-            let projName = "Untitled Project";
-
-            if (winnerProj) {
-                projName = winnerProj.title;
-
-                if (isActor || isActress) winnerName = winnerProj.leadActorName || getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title);
-                else if (isDirector) winnerName = winnerProj.directorName || getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title);
-                else if (isScreenplayAward) winnerName = winnerProj.writerName?.trim() || NPC_DATABASE.find(n => n.id === winnerProj.writerId && n.occupation === 'WRITER')?.name || 'Uncredited Writing Team';
-                else if (isMusicAward) winnerName = getNomineeNameForMusicCategory(
-                    winnerProj,
-                    cat,
-                    getFallbackAwardNominee(cat, winnerProj.id || winnerProj.title)
-                );
-                else if (isProjectAward) winnerName = "Producers";
-                else winnerName = winnerProj.leadActorName; 
-            } else {
-                // Deterministic fallback generation (correct gender).
-                const rng = createDeterministicRng(`award-season:${awardType}:${year}:${cat}:winner`);
-                projName = `Season Selection ${Math.floor(rng() * 900) + 100}`;
-                
-                // Fallback random actor of CORRECT gender
-                const pool = NPC_DATABASE.filter(n => {
-                    if (isMusicAward) return n.occupation === 'MUSIC_ARTIST';
-                    if (isScreenplayAward) return n.occupation === 'WRITER';
-                    if (isActress) return n.gender === 'FEMALE';
-                    if (isActor) return n.gender === 'MALE';
-                    return true;
-                });
-                
-                // Ensure pool isn't empty (safety check)
-                const randomActor = pool.length > 0 ? pool[Math.floor(rng() * pool.length)] : null;
-                
-                if (randomActor) {
-                    winnerName = randomActor.name;
-                } else {
-                    // Ultimate fallback if DB is somehow empty of a gender (unlikely)
-                    winnerName = isMusicAward ? "Music Team" : isActress ? fictionalPersonName("Meryl Streep") : fictionalPersonName("Robert De Niro");
-                }
-                
-                if (isDirector) winnerName = fictionalPersonName("Christopher Nolan"); // Placeholder director
-                if (isScreenplayAward) winnerName = randomActor?.occupation === 'WRITER' ? randomActor.name : 'Uncredited Writing Team';
-                if (isProjectAward) winnerName = "Producers";
-            }
-
-            historyEntry.winners.push({
-                category: cat,
-                winnerName: winnerName,
-                projectName: projName,
-                projectId: winnerProjectId,
-                isPlayer: false
-            });
+            return;
         }
+        const nominees = Array.isArray(ballot[cat])
+            ? (ballot[cat] as Nomination[]).filter(nomination => (
+                nomination?.project?.id && nomination.project.name
+                && Number.isFinite(nomination.score)
+            )) : [];
+        const winner = pickAwardBallotWinner(nominees);
+        if (!winner) return;
+        historyEntry.winners.push({
+            category: cat,
+            winnerName: winner.nomineeName || (winner.isPlayer ? player.name : winner.project.name),
+            projectName: winner.project.name,
+            projectId: winner.project.id,
+            ...(winner.nomineeId && !winner.isPlayer ? { personId: winner.nomineeId } : {}),
+            isPlayer: winner.isPlayer
+        });
     });
 
     return historyEntry;

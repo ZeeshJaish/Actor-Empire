@@ -1,8 +1,11 @@
 import React, { useMemo } from 'react';
 import { Player, PendingEvent, ClothingItem, Vehicle, Award } from '../types';
 import { CLOTHING_CATALOG, CAR_CATALOG, MOTORCYCLE_CATALOG, BOAT_CATALOG, AIRCRAFT_CATALOG } from '../services/lifestyleLogic';
-import { createCanonicalAwardRecordId, determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from '../services/awardLogic';
+import { createCanonicalAwardRecordId, determineWinners, generateSeasonWinners, AwardResolvedWinner, Nomination, pickAwardBallotWinner, sanitizeAwardCeremonyEvent, sanitizeAwardHistoryEntries, sanitizeAwardRecords } from '../services/awardLogic';
 import { NPC_DATABASE } from '../services/npcLogic';
+import { settleAwardNight } from '../services/awardNightSettlement';
+import { getAwardCategorySpec, getAwardTopPrizeCategory, isAwardMusicCategory, isAwardTitleCategory } from '../services/awardCategories';
+import { getPlayerLanguage } from '../services/i18n';
 import {
   AwardNightConfig,
   AwardNightFlow,
@@ -41,8 +44,27 @@ const upsertAwardRecord = (awards: Award[], nextAward: Award): Award[] => {
 };
 
 const isMusicAwardCategory = (category: string) => (
-  /song|score|soundtrack|trailer|music video/i.test(category)
+  isAwardMusicCategory(category) || /song|score|soundtrack|trailer|music video/i.test(category)
 );
+
+/** 22 Nov 2026: what the player is nominated as, read from the category (the night's words follow it). */
+type AwardCreditRole = 'ACTOR' | 'DIRECTOR' | 'WRITER' | 'PRODUCER' | 'MUSIC';
+const getAwardCreditRole = (category: string): AwardCreditRole => {
+  const kind = getAwardCategorySpec(category).kind;
+  if (kind === 'DIRECTOR') return 'DIRECTOR';
+  if (kind === 'SCREENPLAY') return 'WRITER';
+  if (kind === 'PICTURE' || kind === 'BOX_OFFICE') return 'PRODUCER';
+  if (kind === 'SCORE' || kind === 'SONG') return 'MUSIC';
+  return 'ACTOR';
+};
+
+/** 22 Nov 2026: each show in its own house (the Globes in Beverly Hills, BAFTA in London), not one LA theatre. */
+const AWARD_VENUES: Record<string, { venue: string; city: string }> = {
+  OSCAR: { venue: 'Dolby Grand Theatre', city: 'Los Angeles' },
+  GOLDEN_GLOBE: { venue: 'Beverly Grand Hotel', city: 'Beverly Hills' },
+  BAFTA: { venue: 'Royal Festival Stage', city: 'London' },
+  EMMY: { venue: 'Peacock Grand Theater', city: 'Los Angeles' },
+};
 
 const musicNpcId = (artistId: string) => `music_npc_${artistId}`;
 
@@ -91,10 +113,8 @@ const getNomineeDisplayName = (nomination: Nomination, playerName: string) => (
   nomination.nomineeName || (nomination.isPlayer ? playerName : nomination.project.name)
 );
 
-const isProjectAwardCategory = (category: string): boolean => {
-  const isPersonCategory = category.includes('Actor') || category.includes('Actress') || category.includes('Director');
-  return /Picture|Series|Musical|Film/.test(category) && !isPersonCategory;
-};
+/* 22 Nov 2026: from the one category table ("Best Actress - Motion Picture Drama" names a person) */
+const isProjectAwardCategory = (category: string): boolean => isAwardTitleCategory(category);
 
 const toAwardNomineeDisplay = (nomination: Nomination, playerName: string): AwardNomineeDisplay => {
   if (isProjectAwardCategory(nomination.category)) {
@@ -116,10 +136,11 @@ const nomineeDisplayName = (nominee: AwardNomineeDisplay): string => (
 );
 
 const buildFallbackOpponentNames = (category: string, playerName: string): string[] => {
-  const isActress = category.includes('Actress');
-  const isActor = category.includes('Actor') && !category.includes('Actress');
-  const isDirector = category.includes('Director');
-  const isProjectAward = (category.includes('Picture') || category.includes('Series') || category.includes('Musical') || category.includes('Film')) && !isActor && !isActress && !isDirector;
+  const spec = getAwardCategorySpec(category);
+  const isActress = spec.kind === 'ACTING' && spec.gender === 'FEMALE';
+  const isActor = spec.kind === 'ACTING' && spec.gender !== 'FEMALE';
+  const isDirector = spec.kind === 'DIRECTOR';
+  const isProjectAward = isAwardTitleCategory(category);
 
   if (isProjectAward) return ['Midnight Echo', 'Glass Kingdom', 'Neon Harbor'];
   if (isDirector) return ['Ava Laurent', 'Marcus Vale', 'Elena Cross'];
@@ -269,16 +290,50 @@ const buildAwardPressQuestions = (
     : context.nominations > 1
       ? `You have ${context.nominations} career nomination${context.nominations === 1 ? '' : 's'}`
       : 'This is one of your biggest industry nights';
+  /* 22 Nov 2026: the first question fits what the player is nominated for, not always a performance */
+  const firstQuestion: Record<AwardCreditRole, { q: string; humble: string; bold: string; risky: string }> = {
+    ACTOR: {
+      q: 'What part of that performance are you proudest of?',
+      humble: 'The quiet scenes. They look simple, but they ask the most from you.',
+      bold: 'I gave that role everything. If people felt it, that is the win already.',
+      risky: 'The part where everyone realized I was not playing around this year.',
+    },
+    DIRECTOR: {
+      q: 'What was the hardest call you made behind the camera?',
+      humble: 'Trusting the cast to find it on the day. They made every shot better.',
+      bold: 'Every frame was a choice, and I would make each one again.',
+      risky: 'Ignoring every note that would have made it safer.',
+    },
+    WRITER: {
+      q: 'Which scene on the page are you proudest of?',
+      humble: 'The quiet pages. The cast lifted them higher than I wrote them.',
+      bold: 'The ending. I rewrote it until it hurt, and it was worth it.',
+      risky: 'The scene everyone told me to cut.',
+    },
+    PRODUCER: {
+      q: 'What was the hardest part of getting it made?',
+      humble: 'Holding a great team together that long. The credit is theirs.',
+      bold: 'Putting the money down when nobody else would.',
+      risky: 'Saying no to the safer version the money wanted.',
+    },
+    MUSIC: {
+      q: 'Where did the music for it begin?',
+      humble: 'With the first notes from the director. I just listened hard.',
+      bold: 'With one melody I could not shake for a month.',
+      risky: 'With a sound nobody thought belonged in a story like this.',
+    },
+  };
+  const opening = firstQuestion[getAwardCreditRole(primary.cat)];
   return [
     {
       outlet: 'Red Carpet Live',
       name: 'Sarah Jenkins · Entertainment Desk',
       mug: 'TV',
-      q: `${primary.movie} put you in the ${primary.cat} race at ${event.title}. What part of that performance are you proudest of?`,
+      q: `${primary.movie} put you in the ${primary.cat} race at ${event.title}. ${opening.q}`,
       opts: [
-        { t: 'The quiet scenes. They look simple, but they ask the most from you.', s: 'HUMBLE', fx: '+3 Rep +1 Buzz', consequences: { reputation: 3, buzz: 1 } },
-        { t: 'I gave that role everything. If people felt it, that is the win already.', s: 'BOLD', fx: '+2 Fame +3 Buzz', consequences: { fame: 2, buzz: 3 } },
-        { t: 'The part where everyone realized I was not playing around this year.', s: 'RISKY', fx: '+5 Buzz +Followers', consequences: { buzz: 5, followers: 18000 } }
+        { t: opening.humble, s: 'HUMBLE', fx: '+3 Rep +1 Buzz', consequences: { reputation: 3, buzz: 1 } },
+        { t: opening.bold, s: 'BOLD', fx: '+2 Fame +3 Buzz', consequences: { fame: 2, buzz: 3 } },
+        { t: opening.risky, s: 'RISKY', fx: '+5 Buzz +Followers', consequences: { buzz: 5, followers: 18000 } }
       ]
     },
     {
@@ -312,25 +367,39 @@ const getResolvedWinnerEntry = (
   currentResults: { won: boolean; nomination: Nomination }[]
 ): Nomination | null => {
   const nominees = fullBallot?.[category];
-  if (nominees?.length) return [...nominees].sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0];
-  const result = currentResults.find(item => item.nomination.category === category);
-  return result?.won ? result.nomination : null;
+  if (nominees?.length) return pickAwardBallotWinner(nominees);
+  const result = currentResults.find(item => item.nomination.category === category && item.won);
+  return result ? result.nomination : null;
 };
 
+/* 21 Nov 2026 (Zeesh: "ek raat me 30-30 awards"): a nomination is won only when it IS the winner: the category's
+   winner is a player entry for this same project. Before, every player nomination in a category counted as won as soon
+   as any player entry won it, so a big studio "won" 20+ awards a night (probe: Oscars 4 real wins, 20 shown). */
 const isPlayerResolvedWinner = (
   result: { won: boolean; nomination: Nomination },
   fullBallot: Record<string, Nomination[]> | undefined,
   currentResults: { won: boolean; nomination: Nomination }[]
-): boolean => Boolean(getResolvedWinnerEntry(result.nomination.category, fullBallot, currentResults)?.isPlayer || result.won);
+): boolean => {
+  const winner = getResolvedWinnerEntry(result.nomination.category, fullBallot, currentResults);
+  return Boolean(winner?.isPlayer && winner.project.id === result.nomination.project.id);
+};
+
+/** What one award win gives (the same numbers the summary shows and the night applies). */
+const getAwardWinReward = (category: string) => (
+  isMusicAwardCategory(category)
+    ? { fame: 2, reputation: 3, followers: 25_000 }
+    : { fame: 5, reputation: 2, followers: 50_000 }
+);
 
 const buildFillers = (
   fullBallot: Record<string, Nomination[]> | undefined,
   playerCategories: Set<string>,
-  playerName: string
+  playerName: string,
+  awardType?: string
 ): { fillers: FillerCategory[]; closing: FillerCategory } => {
   const fallbackClosing = {
     cat: 'Best Motion Picture',
-    noms: ['The Cheat Code', 'Glass Kingdom', 'Neon Harbor', 'Past Lives'],
+    noms: ['The Cheat Code', 'Glass Kingdom', 'Neon Harbor', 'Velvet Hours'],
     winner: 'Glass Kingdom'
   };
   if (!fullBallot) return {
@@ -341,10 +410,11 @@ const buildFillers = (
     closing: fallbackClosing
   };
 
-  const otherCategories = Object.keys(fullBallot).filter(category => !playerCategories.has(category));
+  const otherCategories = Object.keys(fullBallot)
+    .filter(category => !playerCategories.has(category) && (fullBallot[category] || []).length > 0);
   const toFiller = (category: string): FillerCategory => {
     const nominees = fullBallot[category] || [];
-    const winner = [...nominees].sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0] || nominees[0];
+    const winner = pickAwardBallotWinner(nominees) || nominees[0];
     return {
       cat: category,
       noms: nominees.slice(0, 4).map(nomination => toAwardNomineeDisplay(nomination, playerName)),
@@ -352,8 +422,27 @@ const buildFillers = (
     };
   };
 
-  const fillers = otherCategories.slice(0, 2).map(toFiller);
-  const closingCategory = otherCategories.find(category => /picture|film|series/i.test(category)) || otherCategories[2];
+  /* 22 Nov 2026: the night closes on the show's top prize (or, when that is the player's own race, the next title
+     award), not the first name with "Picture" in it ("Best Actress - Motion Picture" was picked and then shown twice
+     in Other Major Winners). The two before it are the main person races, each shown once. */
+  const topPrize = awardType && ['OSCAR', 'BAFTA', 'GOLDEN_GLOBE', 'EMMY'].includes(awardType)
+    ? getAwardTopPrizeCategory(awardType as 'OSCAR' | 'BAFTA' | 'GOLDEN_GLOBE' | 'EMMY') : null;
+  const closingCategory = (topPrize && otherCategories.includes(topPrize) ? topPrize : null)
+    || otherCategories.find(category => getAwardCategorySpec(category).kind === 'PICTURE')
+    || otherCategories[otherCategories.length - 1];
+  const fillerRank = (category: string): number => {
+    const spec = getAwardCategorySpec(category);
+    if (spec.kind === 'ACTING') return spec.role === 'SUPPORTING' ? 2 : 0;
+    if (spec.kind === 'DIRECTOR') return 1;
+    if (spec.kind === 'SCREENPLAY') return 3;
+    return 4;
+  };
+  const fillers = otherCategories
+    .map((category, index) => ({ category, index }))
+    .filter(item => item.category !== closingCategory)
+    .sort((left, right) => fillerRank(left.category) - fillerRank(right.category) || left.index - right.index)
+    .slice(0, 2)
+    .map(item => toFiller(item.category));
   return {
     fillers: fillers.length ? fillers : [fallbackClosing],
     closing: closingCategory ? toFiller(closingCategory) : fallbackClosing
@@ -421,8 +510,29 @@ const buildAwardNightConfig = (
     rivals: buildFallbackOpponentNames('Best Actor', player.name),
     won: false
   };
-  const { fillers, closing } = buildFillers(fullBallot, new Set(playerCategories.map(category => category.cat)), player.name);
+  const awardType = String(event.data?.awardDef?.type || '');
+  const { fillers, closing } = buildFillers(fullBallot, new Set(playerCategories.map(category => category.cat)), player.name, awardType);
   const context = getCareerContext(player);
+  /* 22 Nov 2026: the show's own house, and words for what the player is nominated as */
+  const house = AWARD_VENUES[awardType] || AWARD_VENUES.OSCAR;
+  const creditRole = getAwardCreditRole(primary.cat);
+  const roleNoun = { ACTOR: 'an actor', DIRECTOR: 'a director', WRITER: 'a writer', PRODUCER: 'a producer', MUSIC: 'an artist' }[creditRole];
+  const crownLine = {
+    ACTOR: 'A STAR IS CROWNED',
+    DIRECTOR: 'A DIRECTOR\'S NIGHT',
+    WRITER: 'THE PAGE TAKES THE NIGHT',
+    PRODUCER: 'A NIGHT FOR THE STUDIO',
+    MUSIC: 'THE SOUND OF THE NIGHT',
+  }[creditRole];
+  /* 21 Nov 2026: the summary shows what the wins really give, not a fixed "+50K" */
+  const awardRewards = playerCategories
+    .filter(category => category.won)
+    .map(category => getAwardWinReward(category.cat))
+    .reduce((sum, reward) => ({
+      fame: sum.fame + reward.fame,
+      reputation: sum.reputation + reward.reputation,
+      followers: sum.followers + reward.followers
+    }), { fame: 0, reputation: 0, followers: 0 });
   const primaryRival = getNomineeText(primary.rivals[0]);
   const rivalLine = primaryRival.project ? `${primaryRival.name} for ${primaryRival.project}` : primaryRival.name;
 
@@ -432,15 +542,16 @@ const buildAwardNightConfig = (
     avatarUrl: player.avatar,
     showName: event.title,
     showEdition: `${event.data?.awardYear || player.age} Ceremony · Tonight`,
-    venue: 'Dolby Grand Theatre',
-    city: 'Los Angeles',
-    headlineGood: 'A STAR IS CROWNED',
+    venue: house.venue,
+    city: house.city,
+    headlineGood: crownLine,
     headlineBad: 'STYLE MISSES THE MARK',
     playerMovie: primary.movie,
     playerCategory: primary.cat,
     playerWins: primary.won,
     playerRivals: primary.rivals,
     playerCategories,
+    awardRewards,
     ceremonyFillers: fillers,
     ceremonyClosing: closing,
     pressQuestions: buildAwardPressQuestions(player, event, primary),
@@ -448,7 +559,7 @@ const buildAwardNightConfig = (
     newspaperAngle: `${player.name} carried ${context.profile} into a category where ${rivalLine} is also drawing heavy chatter.`,
     newspaperClosing: context.wins > 0
       ? `With ${context.wins} career win${context.wins === 1 ? '' : 's'} already in the story, tonight could add another chapter.`
-      : `For an actor ${context.reputationLine}, tonight could be the room that changes the billing forever.`,
+      : `For ${roleNoun} ${context.reputationLine}, tonight could be the room that changes the billing forever.`,
     wardrobe: buildWardrobe(player)
   };
 };
@@ -460,13 +571,14 @@ const buildCeremonyResolvedWinners = (
 ): AwardResolvedWinner[] => {
   if (fullBallot) {
     return Object.entries(fullBallot).flatMap(([category, nominees]) => {
-      const winnerEntry = [...nominees].sort((a, b) => b.score - a.score || a.project.id.localeCompare(b.project.id))[0];
+      const winnerEntry = pickAwardBallotWinner(nominees);
       if (!winnerEntry) return [];
       return [{
         category,
         winnerName: getNomineeDisplayName(winnerEntry, player.name),
         projectName: winnerEntry.project.name,
         projectId: winnerEntry.project.id,
+        ...(winnerEntry.nomineeId && !winnerEntry.isPlayer ? { personId: winnerEntry.nomineeId } : {}),
         isPlayer: winnerEntry.isPlayer
       }];
     });
@@ -547,7 +659,6 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event: r
 
     if (event.type === 'AWARD_CEREMONY') {
       const pastProjectsUpdate = [...player.pastProjects];
-      const winNewsItems: any[] = [];
       let updatedAwards = [...updatedPlayer.awards];
       const awardYear = event.data?.awardYear || player.age;
 
@@ -583,21 +694,14 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event: r
           const musicCategory = isMusicAwardCategory(res.nomination.category);
           const wonProject = pastProjectsUpdate.find(project => project.id === res.nomination.project.id)
             || updatedPlayer.activeReleases.find(release => release.id === res.nomination.project.id);
+          const reward = getAwardWinReward(res.nomination.category);
           updatedPlayer.stats = {
             ...updatedPlayer.stats,
-            fame: Math.min(100, updatedPlayer.stats.fame + (musicCategory ? 2 : 5)),
-            reputation: Math.min(100, updatedPlayer.stats.reputation + (musicCategory ? 3 : 2)),
-            followers: updatedPlayer.stats.followers + (musicCategory ? 25000 : 50000)
+            fame: Math.min(100, updatedPlayer.stats.fame + reward.fame),
+            reputation: Math.min(100, updatedPlayer.stats.reputation + reward.reputation),
+            followers: updatedPlayer.stats.followers + reward.followers
           };
           if (musicCategory && wonProject) updatedPlayer = boostMusicAwardPeople(updatedPlayer, wonProject, res.nomination.category);
-          winNewsItems.push({
-            id: `news_win_${Date.now()}`,
-            headline: `${res.nomination.project.name} wins ${res.nomination.category} at ${event.title}!`,
-            category: 'TOP_STORY',
-            week: player.currentWeek,
-            year: player.age,
-            impactLevel: 'HIGH'
-          });
         }
       });
 
@@ -611,24 +715,31 @@ export const RedCarpetEvent: React.FC<RedCarpetEventProps> = ({ player, event: r
         const historyEntry = generateSeasonWinners(updatedPlayer, awardType, awardYear, ceremonyResolvedWinners);
         updatedPlayer.world = {
           ...updatedPlayer.world,
+          /* an earlier generation's season of the same year (an heir) stays; only this career's own is replaced */
           awardHistory: sanitizeAwardHistoryEntries([
-            ...(updatedPlayer.world.awardHistory || []).filter(entry => !(entry.type === awardType && entry.year === awardYear)),
+            ...(updatedPlayer.world.awardHistory || []).filter(entry => !(entry.type === awardType && entry.year === awardYear && !entry.inherited)),
             historyEntry
           ])
         };
-      }
-      if (winNewsItems.length === 1) {
-        updatedPlayer.news = [winNewsItems[0], ...updatedPlayer.news];
-      } else if (winNewsItems.length > 1) {
-        const categories = winNewsItems.map(item => item.headline.match(/ wins (.+) at /)?.[1]).filter(Boolean);
-        updatedPlayer.news = [{
-          id: `news_multi_win_${Date.now()}`,
-          headline: `${player.name} wins ${winNewsItems.length} awards at ${event.title}: ${categories.slice(0, 3).join(', ')}${categories.length > 3 ? ' and more' : ''}!`,
-          category: 'TOP_STORY',
-          week: player.currentWeek,
-          year: player.age,
-          impactLevel: 'HIGH'
-        }, ...updatedPlayer.news];
+        /* 21 Nov 2026: the same night settlement as a broadcast ceremony: the NPC winners' credits, the #293 log, the
+           AWARD_WON facts the media covers in its own voices, and composed headlines (the night's top prize, and the
+           player's own wins in one line) instead of the fixed "X wins Y at Z!" lines. */
+        const settled = settleAwardNight(updatedPlayer, {
+          awardType,
+          showName: event.title,
+          awardYear,
+          historyEntry,
+          ballot: fullBallot,
+          language: getPlayerLanguage(player),
+          playerAttended: true
+        });
+        updatedPlayer = settled.player;
+        if (settled.logs.length) {
+          updatedPlayer.logs = [
+            ...(updatedPlayer.logs || []),
+            ...settled.logs.map(log => ({ week: player.currentWeek, year: player.age, message: log.msg, type: log.type }))
+          ].slice(-50) as Player['logs'];
+        }
       }
     }
 

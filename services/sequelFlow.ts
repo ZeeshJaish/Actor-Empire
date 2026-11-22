@@ -2,6 +2,7 @@ import type { Player, ProjectType, Script } from '../types';
 import { getAbsoluteWeek } from './legacyLogic';
 import { normalizeProjectTitle } from './projectNaming';
 import { inferStoryCompass } from './characterIdentityLogic';
+import { suggestReturningBackendDemand } from './talentParticipation';
 
 export const CONTINUATION_COOLDOWN_WEEKS = 4;
 
@@ -248,6 +249,12 @@ export const createContinuationScript = (request: CreateContinuationRequest): {
     const franchiseId = getFranchiseId(project)!;
     const installmentNumber = mode === 'SPINOFF' ? 1 : getInstallmentNumber(project) + 1;
     const projectType: ProjectType = sourceType;
+    /* 21 Nov 2026 (player report: "doesn't let us pick episode amount when we renew a show, it defaults to 8"): the
+       next season starts from the last season's episode count. It used to carry none, and Greenlight then took 8. */
+    const sourceEpisodes = Number(sourceDetails.episodes ?? project?.episodes);
+    const continuedEpisodes = sourceType === 'SERIES' && Number.isFinite(sourceEpisodes) && sourceEpisodes > 0
+        ? Math.max(4, Math.min(24, Math.round(sourceEpisodes)))
+        : undefined;
 
     const script: Script = {
         id: `script_${mode.toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -276,6 +283,7 @@ export const createContinuationScript = (request: CreateContinuationRequest): {
         universeId: overrides?.universeId ?? sourceDetails.universeId ?? project?.universeId,
         universeSagaName: overrides?.universeSagaName ?? sourceDetails.universeSagaName ?? project?.universeSagaName,
         universePhaseName: overrides?.universePhaseName ?? sourceDetails.universePhaseName ?? project?.universePhaseName,
+        ...(mode !== 'SPINOFF' && continuedEpisodes ? { episodes: continuedEpisodes } : {}),
         ...overrides,
         title,
         franchiseId,
@@ -283,4 +291,66 @@ export const createContinuationScript = (request: CreateContinuationRequest): {
     };
 
     return { ok: true, eligibility, script };
+};
+
+/** The people a next season (or sequel) brings back, with their asks: the director (+20%), the key crew (+18%) and
+    the cast (+20%), each with a backend ask; the player and studio staff need no deal. 21 Nov 2026: moved here from the
+    studio's own next-season setup (ProductionHouseGame), unchanged, so a streamer's renewal brings back the same people
+    the same way. */
+export const buildContinuationReturningTalent = (project: any): any[] => {
+    const isInternallyControlledTalent = (id: string) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
+    const details = project?.projectDetails || project || {};
+    const returningTalent: any[] = [];
+
+    if (details.directorId) {
+        const dirSalary = details.crewList?.find((c: any) => c.role === 'DIRECTOR')?.salary || project.budget * 0.05;
+        returningTalent.push({
+            role: 'DIRECTOR',
+            id: details.directorId,
+            originalSalary: dirSalary,
+            newDemand: dirSalary * 1.2, // 20% bump
+            backendDemandPoints: suggestReturningBackendDemand('DIRECTOR', dirSalary, isInternallyControlledTalent(details.directorId)),
+            negotiated: isInternallyControlledTalent(details.directorId),
+            accepted: isInternallyControlledTalent(details.directorId),
+            attemptsLeft: isInternallyControlledTalent(details.directorId) ? 0 : 3
+        });
+    }
+
+    if (details.crewList) {
+        details.crewList.forEach((crewMember: any) => {
+            if (!crewMember?.id || crewMember.role === 'DIRECTOR') return;
+            if (!['CINEMATOGRAPHER', 'COMPOSER', 'LINE_PRODUCER', 'VFX_SUPERVISOR'].includes(crewMember.role)) return;
+
+            const originalSalary = crewMember.salary || project.budget * 0.02;
+            returningTalent.push({
+                role: crewMember.role,
+                id: crewMember.id,
+                originalSalary,
+                newDemand: originalSalary * 1.18,
+                negotiated: isInternallyControlledTalent(crewMember.id),
+                accepted: isInternallyControlledTalent(crewMember.id),
+                attemptsLeft: isInternallyControlledTalent(crewMember.id) ? 0 : 3
+            });
+        });
+    }
+
+    const sourceCastList = details.castList;
+    if (sourceCastList) {
+        sourceCastList.forEach((c: any) => {
+            if (c.actorId && c.actorId !== 'UNKNOWN') {
+                const originalSalary = c.salary || project.budget * (c.roleType === 'LEAD' ? 0.08 : 0.03);
+                returningTalent.push({
+                    role: c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR',
+                    id: c.actorId,
+                    originalSalary: originalSalary,
+                    newDemand: originalSalary * 1.2, // 20% bump
+                    backendDemandPoints: suggestReturningBackendDemand(c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR', originalSalary, isInternallyControlledTalent(c.actorId)),
+                    negotiated: isInternallyControlledTalent(c.actorId),
+                    accepted: isInternallyControlledTalent(c.actorId),
+                    attemptsLeft: isInternallyControlledTalent(c.actorId) ? 0 : 3
+                });
+            }
+        });
+    }
+    return returningTalent;
 };

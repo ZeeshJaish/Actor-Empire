@@ -374,15 +374,20 @@ const compactAwardHistory = (value: unknown): any[] => {
   const entries = Array.isArray(value) ? value : [];
   return entries
     .map((entry: any, index: number) => ({ entry, index }))
+    /* 21 Nov 2026 (heir awards): this career's own seasons are kept first; an earlier generation's (marked
+       inherited, dated by that generation's age) are dropped first. A career with no inherited seasons sorts exactly
+       as before. */
     .sort((left, right) => (
-      Number(right.entry?.year || 0) - Number(left.entry?.year || 0)
+      Number(Boolean(left.entry?.inherited)) - Number(Boolean(right.entry?.inherited))
+      || Number(right.entry?.year || 0) - Number(left.entry?.year || 0)
       || String(left.entry?.type || '').localeCompare(String(right.entry?.type || ''))
       || left.index - right.index
     ))
     .slice(0, AWARD_HISTORY_MAX_ITEMS)
     .map(item => item.entry)
     .sort((left: any, right: any) => (
-      Number(left?.year || 0) - Number(right?.year || 0)
+      Number(Boolean(right?.inherited)) - Number(Boolean(left?.inherited))
+      || Number(left?.year || 0) - Number(right?.year || 0)
       || String(left?.type || '').localeCompare(String(right?.type || ''))
     ));
 };

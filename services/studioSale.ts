@@ -1107,6 +1107,23 @@ export const refreshStudioSaleDeck = (player: Player, studioId: string): StudioS
         message: 'Buyer terms refreshed for the current cash, debt, ownership and assets. Review the revised proceeds and accept a bid again.' };
 };
 
+/* 21 Nov 2026 (player report: "trying to sell a studio, but the active slate went from 19 weeks to 33 to 43"): a studio is
+   listed only once its slate is clear, and while the player waits, its subsidiaries kept starting new projects on their
+   own, so the wait grew. The player can hold them: while held (and while a listing is live), the studios in this sale
+   start nothing new; what is running finishes. Nothing else about the sale changes. */
+export const setStudioSaleHold = (player: Player, studioId: string, held: boolean): Player => ({
+    ...player,
+    businesses: (player.businesses || []).map(business => {
+        if (business.id !== studioId || !business.studioState) return business;
+        if (held === Boolean(business.studioState.saleHold)) return business;
+        const { saleHold: _previous, ...studioState } = business.studioState;
+        return {
+            ...business,
+            studioState: held ? { ...studioState, saleHold: { startedWeek: player.currentWeek, startedYear: player.age } } : studioState,
+        };
+    }),
+});
+
 export const withdrawStudioSaleDeck = (player: Player, studioId: string): StudioSaleResult => {
     const studio = getStudioBusiness(player, studioId);
     const deck = studio?.studioState?.saleDeck;
@@ -1119,7 +1136,8 @@ export const withdrawStudioSaleDeck = (player: Player, studioId: string): Studio
     const withdrawnDeck: StudioSaleDeck = { ...deck, status: 'WITHDRAWN' };
     return {
         success: true,
-        player: updateStudioDeck(player, studioId, withdrawnDeck),
+        /* 21 Nov 2026: a withdrawn sale lets its studios plan again */
+        player: setStudioSaleHold(updateStudioDeck(player, studioId, withdrawnDeck), studioId, false),
         deck: withdrawnDeck,
         message: 'Sale listing cancelled. You can relist later with a new ask.',
     };

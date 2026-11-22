@@ -59,6 +59,8 @@ export interface AwardNightConfig {
   playerWins: boolean;
   playerRivals: AwardNomineeDisplay[];
   playerCategories?: PlayerAwardCategory[];
+  /** 21 Nov 2026: what tonight's wins really give (the summary used to say a fixed "+50K") */
+  awardRewards?: { fame: number; reputation: number; followers: number };
   ceremonyFillers: FillerCategory[];
   ceremonyClosing: FillerCategory;
   pressQuestions: PressQuestion[];
@@ -94,10 +96,11 @@ export const DEFAULT_CONFIG: AwardNightConfig = {
   playerMovie: 'The Cheat Code',
   playerCategory: 'Best Actor',
   playerWins: true,
-  playerRivals: ['Adam Driver', 'Atlas Hart', 'Rema Ray'],
+  /* 22 Nov 2026: no real people's names, even in this fallback (the game's satire-name rule) */
+  playerRivals: ['Adam Drivor', 'Atlas Hart', 'Rema Ray'],
   ceremonyFillers: [
     { cat: 'Best Original Screenplay', noms: ['Midnight Echoes', 'Paper Cities', 'Silence', 'The Last Stand'], winner: 'Paper Cities' },
-    { cat: 'Best Director', noms: ['Ava Laurent', 'Marcus Vale', 'Elena Cross', 'Jordan Peele'], winner: 'Elena Cross' }
+    { cat: 'Best Director', noms: ['Ava Laurent', 'Marcus Vale', 'Elena Cross', 'Jordan Pell'], winner: 'Elena Cross' }
   ],
   ceremonyClosing: { cat: 'Best Motion Picture', noms: ['The Cheat Code', 'Glass Kingdom', 'Neon Harbor', 'Past Lives'], winner: 'Glass Kingdom' },
   pressQuestions: [
@@ -1201,7 +1204,7 @@ const CeremonyScene: React.FC<{ cfg: AwardNightConfig; onDone: () => void }> = (
         {mode === 'step' && step && step.type === 'filler' && (
           <>
             <div className="cat-kicker">Award Category</div>
-            <div className="cat-name">{step.cat}</div>
+            <div className="cat-name" style={step.cat.length > 34 ? { fontSize: 26 } : undefined}>{step.cat}</div>
             <div className="cat-for">&nbsp;</div>
             <div className="nomlist">{step.noms.map(nomRow)}</div>
           </>
@@ -1209,14 +1212,15 @@ const CeremonyScene: React.FC<{ cfg: AwardNightConfig; onDone: () => void }> = (
         {mode === 'step' && isPlayer && sub === 'trans' && (
           <>
             <div className="cat-kicker you">Coming Up Next</div>
-            <div className="cat-name" style={{ fontSize: 40 }}>{step.cat}</div>
+            {/* 22 Nov 2026: the real-world names are long ("Best Actress - Motion Picture Musical or Comedy"): smaller type for them */}
+            <div className="cat-name" style={{ fontSize: step.cat.length > 30 ? 30 : 40 }}>{step.cat}</div>
             <div className="cat-for">Featuring <b>{step.movie}</b></div>
           </>
         )}
         {mode === 'step' && isPlayer && sub === 'reveal' && (
           <>
             <div className="cat-kicker">Category</div>
-            <div className="cat-name">{step.cat}</div>
+            <div className="cat-name" style={step.cat.length > 34 ? { fontSize: 26 } : undefined}>{step.cat}</div>
             <div className="cat-for">The nominees are…</div>
             <div className="nomlist">{step.noms.map(nomRow)}</div>
           </>
@@ -1251,6 +1255,14 @@ const CeremonyScene: React.FC<{ cfg: AwardNightConfig; onDone: () => void }> = (
 /* ============================================================
    7. SUMMARY
    ============================================================ */
+/** 50000 → "50K", 1250000 → "1.25M" (the summary's followers). */
+const formatAwardFollowers = (value: number): string => {
+  const amount = Math.max(0, Math.round(value || 0));
+  if (amount >= 1_000_000) return `${Number((amount / 1_000_000).toFixed(2))}M`;
+  if (amount >= 1_000) return `${Number((amount / 1_000).toFixed(1))}K`;
+  return String(amount);
+};
+
 const SummaryScene: React.FC<{ cfg: AwardNightConfig; onLeave: () => void }> = ({ cfg, onLeave }) => {
   const isRedCarpetOnly = cfg.mode === 'RED_CARPET';
   const playerCategories = cfg.playerCategories?.length
@@ -1318,9 +1330,19 @@ const SummaryScene: React.FC<{ cfg: AwardNightConfig; onLeave: () => void }> = (
           ))}
         </div>
         <div className="sum-stats">
-          <div className="s"><div className="l">Fame</div><div className="v">+{wins ? 'High' : 'Low'}</div></div>
-          <div className="s"><div className="l">Reputation</div><div className="v">+{wins ? 'High' : 'Med'}</div></div>
-          <div className="s"><div className="l">Followers</div><div className="v">+{wins ? '50K' : '10K'}</div></div>
+          {cfg.awardRewards ? (
+            <>
+              <div className="s"><div className="l">Fame</div><div className="v">+{cfg.awardRewards.fame}</div></div>
+              <div className="s"><div className="l">Reputation</div><div className="v">+{cfg.awardRewards.reputation}</div></div>
+              <div className="s"><div className="l">Followers</div><div className="v">+{formatAwardFollowers(cfg.awardRewards.followers)}</div></div>
+            </>
+          ) : (
+            <>
+              <div className="s"><div className="l">Fame</div><div className="v">+{wins ? 'High' : 'Low'}</div></div>
+              <div className="s"><div className="l">Reputation</div><div className="v">+{wins ? 'High' : 'Med'}</div></div>
+              <div className="s"><div className="l">Followers</div><div className="v">+{wins ? '50K' : '10K'}</div></div>
+            </>
+          )}
         </div>
       </div>
       <div className="cta"><button onClick={onLeave}>{cfg.completeLabel || 'Leave Party & Save'}</button></div>

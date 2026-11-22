@@ -7,8 +7,9 @@
  * set", and 4 weeks before the premiere the platform names the date: a line in the activity log and news, no popup, because there is nothing
  * to decide. A commission follows the same words, from the week its slate entry appears.
  */
-import type { Player } from '../types';
+import type { PlatformAiContentPlan, PlatformAiPlayerCommissionOffer, Player } from '../types';
 import { addActivityLog } from './activityLog';
+import { WORLD_COUNTRY_DEFINITIONS_BY_ID } from './worldEconomy/worldCountryRegistry';
 import { gameWeekLabel } from './gameWeek';
 import { getAbsoluteWeek } from './legacyLogic';
 
@@ -65,6 +66,45 @@ const live = (platformId: string, platformName: string, premiereWeek: number): S
     platformId, platformName, stage: 'LIVE', premiereWeek, outsideWeek: null, weeksLeft: 0, label: `On ${platformName}`, line: `Streaming on ${platformName}.`,
 });
 
+/* 21 Nov 2026 (Red's report: a commissioned show "still says unreleased" long after delivery): a platform may take up to a
+   year to place a delivered title, and some wait on more than its calendar. Before it has a week, the card says what it
+   is waiting for, read from the same state the platform's scheduling checks (platformAiTurn scheduleReadyPlans,
+   platformAiRelease schedulePlatformStreamingWindow). Read only: the scheduling itself is unchanged. */
+const countryName = (countryId: string) => WORLD_COUNTRY_DEFINITIONS_BY_ID[countryId]?.name || countryId;
+
+export const commissionPremiereWaitLine = (
+    player: Player,
+    offer: Pick<PlatformAiPlayerCommissionOffer, 'platformId' | 'platformName'>,
+    plan: PlatformAiContentPlan | undefined,
+    now: number,
+): string => {
+    const name = offer.platformName;
+    const ai = player.world?.platforms?.[offer.platformId]?.ai;
+    if (ai && ai.status !== 'ACTIVE') return `${name} has stopped putting out new titles for now, so it has not picked a week.`;
+    if (ai && plan) {
+        const open = new Set((ai.marketOperations || [])
+            .filter(operation => operation.status === 'ACTIVE' && operation.countryId)
+            .map(operation => operation.countryId!));
+        const closed = (plan.releaseCountryIds || []).filter(countryId => !open.has(countryId));
+        if (closed.length) {
+            const where = closed.length === 1 ? countryName(closed[0]) : `${closed.length} of the countries it was made for`;
+            return `${name} is not open in ${where} right now. It picks a week once it is.`;
+        }
+        const jobs = (ai.localizationJobs || []).filter(job => job.contentPlanId === plan.id && job.status !== 'CANCELLED');
+        if (jobs.some(job => job.status === 'WAITING_FOR_FUNDS')) {
+            return `${name} still has to pay for the dubbing and subtitles. It picks a week once they are done.`;
+        }
+        const dubbing = jobs.filter(job => job.status === 'IN_PROGRESS' && job.startedAtAbsoluteWeek !== null);
+        if (dubbing.length) {
+            const ready = Math.max(...dubbing.map(job => job.startedAtAbsoluteWeek! + job.leadWeeks));
+            return ready > now
+                ? `${name} is dubbing and subtitling it, ready ${gameWeekLabel(ready, now)}. Then it picks a week.`
+                : `${name} is dubbing and subtitling it. Then it picks a week.`;
+        }
+    }
+    return `${name} picks a week from its calendar, up to a year ahead.`;
+};
+
 const soldContracts = (player: Pick<Player, 'world'>) => Object.values(player.world?.streamingRightsContracts || {})
     .filter(contract => contract.status === 'ACTIVE' && contract.seller?.type === 'PLAYER_STUDIO' && Boolean(contract.buyer?.platformId));
 
@@ -91,7 +131,7 @@ export const getStreamingPremiereStatus = (player: Player, projectId: string): S
     if (!offer) return null;
     const plan = player.world?.platforms?.[offer.platformId]?.ai?.slate.find(item => item.id === offer.platformContentPlanId);
     const entry = plan?.releaseEntries?.[0];
-    if (!entry) return notSet(offer.platformId, offer.platformName, null, now);
+    if (!entry) return { ...notSet(offer.platformId, offer.platformName, null, now), line: commissionPremiereWaitLine(player, offer, plan, now) };
     return now >= entry.premiereAtAbsoluteWeek ? live(offer.platformId, offer.platformName, entry.premiereAtAbsoluteWeek) : dated(offer.platformId, offer.platformName, entry.premiereAtAbsoluteWeek, now);
 };
 

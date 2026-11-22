@@ -47,6 +47,7 @@ import {
     approveSubsidiaryProjectProposal,
     getSubsidiaryProjectRevenueBreakdown,
     rejectSubsidiaryProjectProposal,
+    isStudioPausedForSale,
 } from '../../../services/subsidiaryOperations';
 import { resolveSubsidiaryDecision } from '../../../services/subsidiaryDecisions';
 import type { DevelopmentLabInitialTab } from './DevelopmentLab';
@@ -1034,7 +1035,8 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                                             {[
                                                 ['Focus', getMandateOptionLabel('focus', draftMandate.focus, language)],
                                                 ['Pace', getMandateOptionLabel('releasePace', draftMandate.releasePace, language)],
-                                                ['Auto', getMandateOptionLabel('autoProduction', draftMandate.autoProduction, language)],
+                                                /* 21 Nov 2026: a studio held for its sale starts nothing new; say so where its auto mode shows */
+                                                ['Auto', isStudioPausedForSale(player, studio) ? 'Held for sale' : getMandateOptionLabel('autoProduction', draftMandate.autoProduction, language)],
                                             ].map(([label, value]) => (
                                                 <div key={label} className="rounded-[13px] border border-emerald-300/15 bg-emerald-300/[0.05] p-2">
                                                     <div className="text-[5px] font-black uppercase tracking-wider text-zinc-600">{label}</div>

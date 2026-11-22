@@ -202,6 +202,11 @@ export interface CreatePlatformAiPlayerCommissionOfferInput {
     minimumImdbRating?: number;
     absoluteWeek: number;
     bigDeal?: boolean;
+    /** 21 Nov 2026: the episodes the platform orders for a series (default 8, the cost base) */
+    orderedEpisodes?: number;
+    /** 21 Nov 2026 (renewals): the season this continues and the studio that made it */
+    renewalOfOfferId?: string;
+    preferredStudioId?: string;
 }
 
 export interface PlatformAiPlayerCommissionResult {
@@ -243,6 +248,12 @@ export const createPlatformAiPlayerCommissionOffer = (
         genre: input.genre,
         ...(input.targetAudience ? { targetAudience: input.targetAudience } : {}),
         ...(input.bigDeal ? { bigDeal: true } : {}),
+        /* 21 Nov 2026: whoever orders a show sets its length (Greenlight shows it locked) */
+        ...(input.projectType === 'SERIES'
+            ? { orderedEpisodes: Math.max(4, Math.min(24, Math.round(Number(input.orderedEpisodes) || PLATFORM_COMMISSION_DEFAULT_EPISODES))) }
+            : {}),
+        ...(input.renewalOfOfferId ? { renewalOfOfferId: input.renewalOfOfferId } : {}),
+        ...(input.preferredStudioId ? { preferredStudioId: input.preferredStudioId } : {}),
         status: 'PENDING',
         productionBudget,
         producerFee,
@@ -873,6 +884,28 @@ export const transferPlatformAiPlayerCommission = (input: {
 
 /** #246 (plan §25.4 Q8): how long a platform watches a commissioned series before it decides on another season */
 export const PLATFORM_COMMISSION_RENEWAL_WEEKS = 16;
+/** 21 Nov 2026: a new series order is 8 episodes (the cost base); a renewal orders what season 1 had */
+export const PLATFORM_COMMISSION_DEFAULT_EPISODES = 8;
+
+/** The project a commission made (released, running or still in production), or null. */
+export const findCommissionSeasonProject = (player: Player, offer: PlatformAiPlayerCommissionOffer): any | null => {
+    const ids = new Set([offer.commitmentId, offer.canonicalProductionId].filter(Boolean) as string[]);
+    if (!ids.size) return null;
+    return [...(player.pastProjects || []), ...(player.activeReleases || []), ...(player.commitments || [])]
+        .find((item: any) => ids.has(String(item?.id))
+            || ids.has(String(item?.projectDetails?.canonicalProductionId || item?.canonicalProductionId || ''))
+            || String(item?.projectDetails?.hiddenStats?.playerPlatformCommissionOfferId || item?.hiddenStats?.playerPlatformCommissionOfferId || '') === offer.id) || null;
+};
+
+/** The episodes a delivered commission had: its project, else its script, else the order, else 8. */
+export const getCommissionSeasonEpisodes = (player: Player, offer: PlatformAiPlayerCommissionOffer): number => {
+    const project: any = findCommissionSeasonProject(player, offer);
+    const studioScript: any = offer.scriptId
+        ? (player.businesses || []).flatMap(business => business.studioState?.scripts || []).find((script: any) => script?.id === offer.scriptId)
+        : undefined;
+    const episodes = Number(project?.projectDetails?.episodes ?? project?.episodes ?? studioScript?.episodes ?? offer.orderedEpisodes);
+    return Number.isFinite(episodes) && episodes > 0 ? Math.max(4, Math.min(24, Math.round(episodes))) : PLATFORM_COMMISSION_DEFAULT_EPISODES;
+};
 
 const nextSeasonTitle = (title: string) => {
     const match = /Season\s+(\d+)/i.exec(title);
@@ -884,11 +917,23 @@ export const decidePlatformAiCommissionRenewals = (sourcePlayer: Player, absolut
     let player = sourcePlayer;
     for (const offer of Object.values(getOffers(player)).sort((left, right) => left.id.localeCompare(right.id))) {
         if (offer.status !== 'DELIVERED' || offer.projectType !== 'SERIES' || offer.renewalDecidedAtAbsoluteWeek !== undefined) continue;
-        const from = offer.releasedAtAbsoluteWeek ?? offer.deliveredAtAbsoluteWeek;
-        if (from === null || absoluteWeek - from < PLATFORM_COMMISSION_RENEWAL_WEEKS) continue;
         const platform = player.world.platforms?.[offer.platformId];
         const plan = platform?.ai?.slate.find(item => item.id === offer.platformContentPlanId);
-        const fundingMillions = roundMillions(offer.productionBudget / FULL_CURRENCY_PER_MILLION);
+        /* 21 Nov 2026 (Zeesh): a rival platform decides on another season only after the show has premiered, from its
+           real reception. It used to decide 16 weeks after DELIVERY (the offer's own release week was never filled in),
+           so it could ask for season 2 of a show nobody had seen yet. A show it has not premiered keeps waiting. The
+           player's own platform is not this path: it renews whenever the player likes. */
+        const premieredAt = plan?.status === 'RELEASED' && Number.isFinite(Number(plan.releasedAtAbsoluteWeek))
+            ? Number(plan.releasedAtAbsoluteWeek)
+            : offer.releasedAtAbsoluteWeek;
+        if (premieredAt === null || premieredAt === undefined || absoluteWeek - premieredAt < PLATFORM_COMMISSION_RENEWAL_WEEKS) continue;
+        /* 22 Nov 2026: the renewal orders the length season 1 had, and the platform pays for the length it orders (Greenlight
+           costs a series by its length, 8 episodes = the base). The cap grows by the new order over the old one: a season 1
+           ordered before 22 Nov (no orderedEpisodes) counts as 8. Never less than season 1's cap, and no compounding: a
+           12-episode season 2 renewed at 12 keeps its cap. */
+        const renewalEpisodes = getCommissionSeasonEpisodes(player, offer);
+        const previousOrder = Number(offer.orderedEpisodes) > 0 ? Number(offer.orderedEpisodes) : PLATFORM_COMMISSION_DEFAULT_EPISODES;
+        const fundingMillions = roundMillions(offer.productionBudget / FULL_CURRENCY_PER_MILLION * Math.max(1, renewalEpisodes / previousOrder));
         const worthIt = Boolean(platform && plan && platform.ai?.status === 'ACTIVE') && (offer.deliveredImdbRating ?? 0) >= offer.minimumImdbRating
             && platform!.cashReserve >= fundingMillions * 1.25
             && !getPlatformAiSpendingRestrictions(platform!, absoluteWeek).blocksNewGreenlights;
@@ -926,6 +971,11 @@ export const decidePlatformAiCommissionRenewals = (sourcePlayer: Player, absolut
         const hired = createPlatformAiPlayerCommissionOffer({
             player, platformId: offer.platformId, planId, title, projectType: offer.projectType, genre: offer.genre, targetAudience: offer.targetAudience,
             productionFundingMillions: fundingMillions, minimumImdbRating: offer.minimumImdbRating, absoluteWeek,
+            /* 21 Nov 2026 (player reports: renewals went to a subsidiary, and the old cast was gone): the renewal knows its
+               season, the studio that made it and that season's length */
+            orderedEpisodes: renewalEpisodes,
+            renewalOfOfferId: offer.id,
+            ...(offer.studioId ? { preferredStudioId: offer.studioId } : {}),
         });
         player = addActivityLog(hired.player, hired.changed
             ? `${offer.platformName} renewed "${offer.title}" and wants your studio back for ${title}.`

@@ -174,11 +174,13 @@ export interface GreenlightWizardProps {
     onUpdatePlayer: (p: Player) => void;
     onComplete: () => void;
     platformCommissionOffer?: PlatformAiPlayerCommissionOffer;
+    /** 21 Nov 2026 (renewals): open the studio's own next-season setup for the season this renewal continues */
+    onWriteNextSeason?: (offerId: string) => void;
     /** #282: opened from the player's own Commission page */
     originalCommission?: OriginalWizardMode;
 }
 
-export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalCommission, player, studio, initialConcept, onBack, onOpenScriptMarket, onOpenScriptDevelopment, onUpdatePlayer, onComplete, platformCommissionOffer }) => {
+export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalCommission, player, studio, initialConcept, onBack, onOpenScriptMarket, onOpenScriptDevelopment, onWriteNextSeason, onUpdatePlayer, onComplete, platformCommissionOffer }) => {
     const language = getPlayerLanguage(player);
     const tr = (key: Parameters<typeof t>[1], vars?: Parameters<typeof t>[2]) => t(language, key, vars);
     const [selectedScriptId, setSelectedScriptId] = useState<string | null>(initialConcept?.scriptId || null);
@@ -195,6 +197,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
     const lastCommissionTitle = useRef('');
     const [commissionDeal, setCommissionDeal] = useState<OriginalDealKind>('BUY');
     const [episodeShares, setEpisodeShares] = useState<number[] | null>(null);
+    /* 21 Nov 2026: the player's episode count for a series nobody ordered (null = the script's own count) */
+    const [episodeCountChoice, setEpisodeCountChoice] = useState<number | null>(Number(initialConcept?.episodeCount) > 0 ? Number(initialConcept.episodeCount) : null);
     const [commissionMoment, setCommissionMoment] = useState<{ headline: string; subtext: string; post: { handle: string; text: string } } | null>(null);
     const [pacing, setPacing] = useState<GreenlightPacing>('MODERATE');
     const [marketingBudgetPreset, setMarketingBudgetPreset] = useState<MarketingBudgetPreset>(initialConcept?.reservedMarketingBudget !== undefined ? 'CUSTOM' : 'STANDARD');
@@ -404,6 +408,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             visualStyle,
             pacing,
             episodeNameSet: episodeNames.set || undefined,
+            episodeCount: episodeCountChoice ?? undefined,
             customEpisodeNames: Object.keys(episodeNames.custom).length ? episodeNames.custom : undefined,
             episodeBudgetShares: episodeShares || undefined,
             reservedMarketingBudget,
@@ -517,6 +522,8 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                 const isAvailable = !hasExistingConcept || isResumableScript || s.id === initialConcept?.scriptId || s.id === selectedScriptId;
                 if (!isAvailable) return false;
                 if (!platformCommissionOffer) return true;
+                /* 21 Nov 2026: a renewal's own next-season script (prepared from the season it continues) always fits */
+                if (platformCommissionOffer.preparedScriptId && s.id === platformCommissionOffer.preparedScriptId) return true;
                 const scriptType = resolveProjectType(s.projectType, s.type, s.projectDetails?.type);
                 return scriptType === platformCommissionOffer.projectType
                     && Array.isArray(s.genres)
@@ -524,11 +531,44 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             });
     }, [studio.studioState?.scripts, studio.studioState?.concepts, initialConcept?.scriptId, selectedScriptId, contractedTalentIds, platformCommissionOffer]);
 
-    const selectedScript = useMemo(() => {
+    const baseSelectedScript = useMemo(() => {
         return scripts.find(s => s.id === selectedScriptId)
             || (selectedScriptId ? normalizeReturningTalentEntries((Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : []).find(s => s.id === selectedScriptId)) : null)
             || (initialConcept ? normalizeReturningTalentEntries((Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : []).find(s => s.id === initialConcept.scriptId)) : null);
     }, [scripts, selectedScriptId, studio.studioState?.scripts, initialConcept?.scriptId, contractedTalentIds]);
+    /* 21 Nov 2026 (player report: "can't pick the episode amount when we renew a show, it defaults to 8"; Zeesh: the
+       same Episodes part, no new screen, and consistent everywhere): whoever orders the show sets its length. The
+       player's own Original: its order. A rival platform's commission: its order (old offers without one keep the
+       script's count). Anything else: the player, with − / + in the Episodes part, starting from the script's count
+       (a next season starts from the last season's). Everything downstream (budget, names, episode money, the project)
+       reads the script's episodes, so the count is applied to the script here. */
+    const orderedEpisodes: number | null = originalCommission
+        ? originalCommission.episodes
+        : (platformCommissionOffer?.orderedEpisodes ?? null);
+    const episodeCountLocked = orderedEpisodes !== null || Boolean(platformCommissionOffer);
+    const selectedScript = useMemo(() => {
+        if (!baseSelectedScript) return baseSelectedScript;
+        if (resolveProjectType(baseSelectedScript.projectType, (baseSelectedScript as any).type, (baseSelectedScript as any).projectDetails?.type) !== 'SERIES') return baseSelectedScript;
+        const episodes = orderedEpisodes ?? (platformCommissionOffer ? null : episodeCountChoice);
+        if (!episodes || episodes === Number(baseSelectedScript.episodes)) return baseSelectedScript;
+        return { ...baseSelectedScript, episodes };
+    }, [baseSelectedScript, orderedEpisodes, platformCommissionOffer, episodeCountChoice]);
+    /* another script starts from its own count (a draft reopened keeps the count it was left with) */
+    const episodeChoiceScriptRef = useRef(selectedScriptId);
+    useEffect(() => {
+        if (episodeChoiceScriptRef.current === selectedScriptId) return;
+        episodeChoiceScriptRef.current = selectedScriptId;
+        setEpisodeCountChoice(null);
+    }, [selectedScriptId]);
+    /* 21 Nov 2026 (renewals): the next-season script prepared for this renewal is picked as soon as it is ready */
+    const preparedRenewalScript = platformCommissionOffer?.preparedScriptId
+        ? (Array.isArray(studio.studioState?.scripts) ? studio.studioState!.scripts : []).find((script: any) => script?.id === platformCommissionOffer.preparedScriptId)
+        : undefined;
+    useEffect(() => {
+        if (!selectedScriptId && preparedRenewalScript && scripts.some((script: any) => script.id === preparedRenewalScript.id)) {
+            setSelectedScriptId(preparedRenewalScript.id);
+        }
+    }, [selectedScriptId, preparedRenewalScript?.id, scripts]);
     const selectedStoryCompass = useMemo(() => (
         selectedScript
             ? inferStoryCompass(selectedScript, selectedScript.isOriginal === false ? 'MARKET_INFERENCE' : 'SCRIPT_DNA')
@@ -942,6 +982,7 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                 setTalentBackendDraft(normalizeTalentBackendDraft(existingConcept.talentBackendDraft));
                 setBackgroundCastingPlan(normalizeBackgroundCastingPlan(existingConcept.backgroundCastingPlan, backgroundCastingContext));
                 setSelectedLocations(existingConcept.selectedLocations || []);
+                setEpisodeCountChoice(Number(existingConcept.episodeCount) > 0 ? Number(existingConcept.episodeCount) : null);
                 setEquipmentChoices(existingConcept.equipmentChoices || {
                     cameras: 'TIER_3',
                     lighting: 'TIER_3',
@@ -2041,11 +2082,15 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
             ownedEquipmentLevels: studio.studioState?.equipment || {},
             gearTiers: GEAR_TIERS,
         });
-        /* #283: on Originals a series costs by its length. 8 episodes is the total itself. */
-        return originalCommission
-            ? scaleOriginalBudget(breakdown, getOriginalEpisodeScale(resolveProjectType(selectedScript?.projectType, (selectedScript as any)?.type), originalCommission.episodes))
+        /* #283: on Originals a series costs by its length. 8 episodes is the total itself.
+           21 Nov 2026 (Zeesh, decision g): every series now costs by its length the same way (studio series too).
+           22 Nov 2026: except an AI platform's order made before that (no orderedEpisodes): its cap was set for the flat
+           cost, so it keeps the flat cost and the player is not squeezed mid-deal. */
+        const flatCostPlatformOrder = Boolean(platformCommissionOffer) && !(Number(platformCommissionOffer?.orderedEpisodes) > 0);
+        return resolveProjectType(selectedScript?.projectType, (selectedScript as any)?.type) === 'SERIES' && !flatCostPlatformOrder
+            ? scaleOriginalBudget(breakdown, getOriginalEpisodeScale('SERIES', Number(selectedScript?.episodes) || 8))
             : breakdown;
-    }, [originalCommission?.episodes, tone, selectedCrew, crewModes, castList, backgroundCastingPlan.estimatedCost, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, productionLocations, crewMarket]);
+    }, [originalCommission?.episodes, selectedScript?.episodes, selectedScript?.projectType, platformCommissionOffer, tone, selectedCrew, crewModes, castList, backgroundCastingPlan.estimatedCost, selectedLocations, availableActors, availableDirectors, player, equipmentChoices, studio, productionLocations, crewMarket]);
     const musicPreviewProject = useMemo<ProjectDetails | null>(() => {
         if (!selectedScript) return null;
         const previewBudget = Math.max(1_000_000, budgetBreakdown.total || 1_000_000);
@@ -3563,6 +3608,30 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
                                     <div className="mt-1 text-lg font-black">Choose a {platformCommissionOffer.genre} {platformCommissionOffer.projectType.toLowerCase()} script</div>
                                     <div className="mt-2 text-xs font-semibold text-violet-100/65">Fixed cap {formatMoney(platformCommissionOffer.productionBudget)} • Producer fee {formatMoney(platformCommissionOffer.producerFee)} • Minimum expectation {platformCommissionOffer.minimumImdbRating.toFixed(1)} IMDb</div>
                                 </div>
+                                {/* 21 Nov 2026 (renewals): the next season is written the way the studio writes its own next
+                                    season, with the season's director, crew and cast coming back */}
+                                {platformCommissionOffer.renewalOfOfferId && (
+                                    <div data-renewal-season className="mt-2 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                                        <span className="min-w-0">
+                                            <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">Next season</span>
+                                            <span className="mt-1 block text-sm font-bold text-white">
+                                                {preparedRenewalScript
+                                                    ? (preparedRenewalScript.status === 'READY'
+                                                        ? `${preparedRenewalScript.title} is written`
+                                                        : `${preparedRenewalScript.title} is being written`)
+                                                    : 'Write it with last season\'s team'}
+                                            </span>
+                                            <span className="mt-0.5 block text-[11px] font-semibold text-zinc-400">
+                                                {preparedRenewalScript
+                                                    ? (preparedRenewalScript.status === 'READY' ? 'Picked below.' : 'It shows here once it is ready.')
+                                                    : 'The director, crew and cast are asked back first.'}
+                                            </span>
+                                        </span>
+                                        {!preparedRenewalScript && onWriteNextSeason && (
+                                            <button type="button" data-write-next-season onClick={() => onWriteNextSeason(platformCommissionOffer.id)} className="min-h-10 shrink-0 rounded-xl bg-emerald-400 px-3 text-[11px] font-black uppercase tracking-[0.08em] text-black">Write it</button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
                         <GreenlightScriptStep
@@ -3739,15 +3808,38 @@ export const GreenlightWizard: React.FC<GreenlightWizardProps> = ({ originalComm
 
                         <div className="space-y-8 pb-20">
                             {selectedScript && resolveProjectType(selectedScript.projectType, (selectedScript as any).type, (selectedScript as any).projectDetails?.type) === 'SERIES' && (
-                                <EpisodeNamesCard
-                                    title={selectedScript.title}
-                                    seed={selectedScript.id}
-                                    genre={selectedScript.genres?.[0]}
-                                    episodes={Number(selectedScript.episodes) || 8}
-                                    season={Number(selectedScript.installmentNumber) || 1}
-                                    value={episodeNames}
-                                    onChange={setEpisodeNames}
-                                />
+                                <div className="space-y-2">
+                                    {/* 21 Nov 2026: the season's length, here in the Episodes part (Zeesh: no new screen). Whoever
+                                        ordered the show set it; otherwise the player does, starting from the script's count. */}
+                                    <div data-episode-count className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                                        <span className="min-w-0">
+                                            <span className="block text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">Episodes</span>
+                                            <span className="mt-1 block text-[11px] font-semibold text-zinc-400">
+                                                {episodeCountLocked
+                                                    ? (originalCommission ? 'Set in the order' : `Ordered by ${platformCommissionOffer?.platformName || 'the platform'}`)
+                                                    : 'Cost follows the length · 8 is the base'}
+                                            </span>
+                                        </span>
+                                        {episodeCountLocked ? (
+                                            <span data-episode-count-value className="text-2xl font-black text-white">{Number(selectedScript.episodes) || 8}</span>
+                                        ) : (
+                                            <span className="flex shrink-0 items-center gap-2">
+                                                <button type="button" aria-label="Fewer episodes" data-episode-count-minus disabled={(Number(selectedScript.episodes) || 8) <= 4} onClick={() => setEpisodeCountChoice(Math.max(4, (Number(selectedScript.episodes) || 8) - 1))} className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-lg font-black text-white disabled:opacity-30">−</button>
+                                                <span data-episode-count-value className="w-8 text-center text-xl font-black text-white">{Number(selectedScript.episodes) || 8}</span>
+                                                <button type="button" aria-label="More episodes" data-episode-count-plus disabled={(Number(selectedScript.episodes) || 8) >= 24} onClick={() => setEpisodeCountChoice(Math.min(24, (Number(selectedScript.episodes) || 8) + 1))} className="grid h-9 w-9 place-items-center rounded-lg bg-white/10 text-lg font-black text-white disabled:opacity-30">+</button>
+                                            </span>
+                                        )}
+                                    </div>
+                                    <EpisodeNamesCard
+                                        title={selectedScript.title}
+                                        seed={selectedScript.id}
+                                        genre={selectedScript.genres?.[0]}
+                                        episodes={Number(selectedScript.episodes) || 8}
+                                        season={Number(selectedScript.installmentNumber) || 1}
+                                        value={episodeNames}
+                                        onChange={setEpisodeNames}
+                                    />
+                                </div>
                             )}
                             {commissionIsSeries && (
                                 <EpisodeBudgetBars

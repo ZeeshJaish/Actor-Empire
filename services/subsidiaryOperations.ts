@@ -1039,12 +1039,35 @@ export const rejectSubsidiaryProjectProposal = (
     return { success: true, player: updatedPlayer };
 };
 
+/* 21 Nov 2026 (player report: "trying to sell a studio, but the active slate went from 19 weeks to 33 to 43"): a studio is
+   listed only once its slate is clear, and closes only with a clear slate, and its subsidiaries kept starting new
+   projects meanwhile, so the wait only grew. While the player holds a studio for its sale (studioSale setStudioSaleHold)
+   or its listing is live, the studios in that sale start nothing new: its own, or every subsidiary when it is the main
+   studio's sale. What is running finishes. Withdraw the sale or resume and they carry on as before. */
+const LIVE_SALE_DECK_STATUSES = ['LISTED', 'NEGOTIATING', 'SIGNING'];
+const isHeldForSale = (business: Business): boolean => {
+    const deck = business.studioState?.saleDeck;
+    return Boolean(business.studioState?.saleHold) || Boolean(deck && LIVE_SALE_DECK_STATUSES.includes(deck.status));
+};
+
+export const isStudioPausedForSale = (player: Player, studio: Business): boolean => (
+    isHeldForSale(studio)
+    || (player.businesses || []).some(business => (
+        business.type === 'PRODUCTION_HOUSE'
+        && !isAcquiredStudio(business)
+        && business.studioState?.operatingModel !== 'FULL_MERGER'
+        && isHeldForSale(business)
+    ))
+);
+
 export const processSubsidiaryAutonomousOperations = (player: Player): Player => {
     let nextPlayer = player;
     const currentAbsolute = absoluteWeek(player.age, player.currentWeek);
 
     nextPlayer.businesses.forEach(studio => {
         if (!studio.studioState || !isAcquiredStudio(studio) || studio.studioState.operatingModel === 'FULL_MERGER') return;
+        /* nothing new while it is held for a sale, not even a stalled slate item moved into production */
+        if (isStudioPausedForSale(nextPlayer, studio)) return;
         const initialStudioState = normalizeStudioState(studio.studioState, player.currentWeek);
         nextPlayer = reviveDormantSubsidiaryProduction(nextPlayer, { ...studio, studioState: initialStudioState }, initialStudioState);
         const currentStudio = nextPlayer.businesses.find(candidate => candidate.id === studio.id) || studio;

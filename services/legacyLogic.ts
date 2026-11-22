@@ -284,6 +284,13 @@ export const buildLegacyStudioInheritance = (
     /* #206: the world's dates move back with the heir, except the clocks moved just below */
     const inheritedWorld = player.world ? rebaseWorldForLegacy(rewritePlayerSelfReferencesForLegacyParent(player.world, parentActor), Math.max(0, sourceAbsoluteWeek - targetAbsoluteWeek), ['cinemaMarket', 'talentCareer', 'cinemaExposure', 'talentParticipation']) : undefined;
     if(inheritedWorld?.cinemaMarket)inheritedWorld.cinemaMarket=rebaseCinemaSavedState(inheritedWorld.cinemaMarket,targetAbsoluteWeek-sourceAbsoluteWeek);
+    /* 21 Nov 2026 (heir awards): every season so far is the earlier generation's. Its year is that generation's age
+       (not a dated key, so the rebase above keeps it), and the heir's age restarts: marked, it never stands for (or
+       blocks) a season of the heir's own. */
+    if(inheritedWorld){
+        inheritedWorld.awardHistory=(inheritedWorld.awardHistory||[]).map(entry=>({...entry,inherited:true}));
+        inheritedWorld.awardHistoryInheritedTagged=true;
+    }
     const cinemaClockShift=targetAbsoluteWeek-sourceAbsoluteWeek;
     if(inheritedWorld && cinemaClockShift){
         if(inheritedWorld.talentCareer){

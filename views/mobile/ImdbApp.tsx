@@ -9,6 +9,7 @@ import { formatMoney } from '../../services/formatUtils';
 import { getProjectIdentityLabel } from '../../services/genreCatalog';
 import { getProjectReleaseLabel, getProjectReleaseTiming } from '../../services/releaseTiming';
 import { AWARD_CALENDAR, AwardShowLore, AwardDefinition, Nomination, sanitizeAwardRecords, getAwardCeremonyYear, getAwardShowLore } from '../../services/awardLogic';
+import { isAwardTitleCategory } from '../../services/awardCategories';
 import { ArrowLeft, Star, Film, ChevronRight, User, TrendingUp, DollarSign, Eye, Award as AwardIcon, Calendar, BookOpen, Clock, List, MessageSquare, Users, Globe, Zap, LayoutGrid, Shield, ArrowRight, Tv, Music2, Handshake, Mountain, Car, Sparkles } from 'lucide-react';
 import { buildUniverseRoster, calculateUniverseProductWeeklyRevenue, getFallbackCharacterName, getUniverseDashboardProjects, getUniverseReleaseActivity, normalizeCharacterAbilityType, normalizeCharacterStoryRole, normalizeUniverseForSave, normalizeUniverseMap } from '../../services/universeLogic';
 import { calculateProjectMusicImpact, getMusicCreditRoleLabel, getMusicStrategyLabel, getProjectMusicPlan } from '../../services/musicIndustry';
@@ -662,10 +663,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
               </div>
 
               {Object.entries(ballot).map(([category, nominees]) => {
-                  const isProjectAward = category.includes('Picture') || category.includes('Series') || category.includes('Musical') || category.includes('Film');
-                  // Project awards are when the PROJECT ITSELF is the nominee (e.g. Best Picture)
-                  // Actor awards are when a PERSON is the nominee
-                  const reallyProjectAward = isProjectAward && !category.includes('Actor') && !category.includes('Actress') && !category.includes('Director');
+                  // Project awards are when the PROJECT ITSELF is the nominee (e.g. Best Picture); a person otherwise.
+                  // 22 Nov 2026: from the one category table ("Outstanding Directing for a Drama Series" names a person)
+                  const reallyProjectAward = isAwardTitleCategory(category, pendingCeremony?.data?.awardDef?.type);
 
                   return (
                     <div key={category} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -723,7 +723,9 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
       const lore = getAwardShowLore(language, selectedShow.type as AwardType);
       const playerResults = player.awards.filter(a => a.type === selectedShow.type && a.year === selectedShow.year);
       // Use the passed flag or fallback to history presence
-      const historyEntry = player.world.awardHistory?.find(h => h.year === selectedShow.year && h.type === selectedShow.type);
+      /* 21 Nov 2026 (heir award seasons): an heir's world keeps the parent's seasons, whose years can match the heir's own
+         age-years. This page is the heir's season, so a parent's entry for the same year is never it. */
+      const historyEntry = player.world.awardHistory?.find(h => !h.inherited && h.year === selectedShow.year && h.type === selectedShow.type);
       
       const isCompleted = selectedShow.hasPassed || !!historyEntry;
       const selectedShowName = getAwardShowName(selectedShow.type);
@@ -747,13 +749,17 @@ export const ImdbApp: React.FC<ImdbAppProps> = ({ player, onBack }) => {
               </div>
 
               <div className="space-y-4">
-                  {lore.categories.map((cat) => {
+                  {/* 22 Nov 2026: a held season shows its own categories (seasons before the real-world lists keep their
+                      old ones), an announced one its ballot's, a future one the show's list */}
+                  {(historyEntry
+                      ? Array.from(new Set<string>(historyEntry.winners.map(winner => String(winner.category))))
+                      : ballot ? Object.keys(ballot) : lore.categories
+                  ).map((cat: string) => {
                       const playerResult = playerResults.find(r => r.category === cat);
                       const actualWinner = historyEntry?.winners.find(w => w.category === cat);
                       const pendingNominees = ballot ? ballot[cat] : [];
-                      
-                      const isProjectAward = cat.includes('Picture') || cat.includes('Series') || cat.includes('Musical') || cat.includes('Film');
-                      const reallyProjectAward = isProjectAward && !cat.includes('Actor') && !cat.includes('Actress') && !cat.includes('Director');
+
+                      const reallyProjectAward = isAwardTitleCategory(cat, selectedShow.type);
 
                       return (
                           <div key={cat} className={`rounded-xl border overflow-hidden ${playerResult ? (playerResult.outcome === 'WON' ? 'bg-amber-900/10 border-amber-500/50' : 'bg-zinc-800 border-zinc-700') : 'bg-zinc-900 border-zinc-800'}`}>

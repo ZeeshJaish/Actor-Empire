@@ -30,8 +30,7 @@ import { markGameCheckpoint } from '../../../services/firebaseService';
 import { discardUnreleasedScript, renameStudioProjectTitle } from '../../../services/projectNaming';
 import { getProjectReleaseLabel, getProjectReleaseSortValue, getProjectReleaseTiming } from '../../../services/releaseTiming';
 import { getCommitmentDisplayPhase, getReleaseDisplayPhase, getReleaseProgressWeek } from '../../../services/releasePresentation';
-import { createContinuationScript, getContinuationEligibility, getContinuationScriptBaseline } from '../../../services/sequelFlow';
-import { suggestReturningBackendDemand } from '../../../services/talentParticipation';
+import { buildContinuationReturningTalent, createContinuationScript, getContinuationEligibility, getContinuationScriptBaseline } from '../../../services/sequelFlow';
 import { getStudioGroup, getStudioSaleTreasuryLock, getStudioLiquidationBlocker, performStudioTreasuryTransfer } from '../../../services/studioGroup';
 import { getStudioGroupValuation } from '../../../services/studioGroupValuation';
 import { StudioGroupView } from './StudioGroupView';
@@ -47,6 +46,7 @@ import {
     transferPlatformAiPlayerCommission,
     platformAiCommissionKillFee,
 } from '../../../services/platformAi';
+import { findCommissionSeasonProject } from '../../../services/platformAi/platformAiPlayerCommissions';
 
 interface ProductionHouseGameProps {
     player: Player;
@@ -133,7 +133,7 @@ const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player,
     const [view, setView] = useState<StudioView>('DASHBOARD');
     const [rightsMarketTargetId, setRightsMarketTargetId] = useState<string | null>(null);
     const [selectedProjectDashboard, setSelectedProjectDashboard] = useState<any>(null);
-    const [sequelSetupProject, setSequelSetupProject] = useState<{ project: any, isSpinoff: boolean } | null>(null);
+    const [sequelSetupProject, setSequelSetupProject] = useState<{ project: any, isSpinoff: boolean, renewalOfferId?: string } | null>(null);
     const [activeStudioId, setActiveStudioId] = useState<string | null>(null);
     const [returnAfterStudioTool, setReturnAfterStudioTool] = useState<'STUDIO_GROUP' | null>(null);
     const [studioGroupCommandReturnId, setStudioGroupCommandReturnId] = useState<string | null>(null);
@@ -658,6 +658,18 @@ const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player,
         setSequelSetupProject({ project, isSpinoff: true });
     };
 
+    /* 21 Nov 2026 (renewals; Zeesh: consistent, no new screen): a rival platform's renewal is written the way the studio
+       writes its own next season: the same setup, with the season's director, crew and cast asked back first. */
+    const handleWriteNextSeason = (offerId: string) => {
+        const offers = player.world.platformAiPlayerCommissionOffers || {};
+        const offer = offers[offerId];
+        const previous = offer?.renewalOfOfferId ? offers[offer.renewalOfOfferId] : undefined;
+        const project = previous ? findCommissionSeasonProject(player, previous) : null;
+        if (!offer || !project) return;
+        closeStudioTool();
+        setSequelSetupProject({ project, isSpinoff: false, renewalOfferId: offerId });
+    };
+
     const handleStartWritingSequel = (writer: Writer | null, title: string, isSpinoff: boolean, selectedProjectType: ProjectType) => {
         if (!sequelSetupProject) return;
         const project = sequelSetupProject.project;
@@ -675,7 +687,6 @@ const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player,
             },
         });
         if (!continuation.ok || !continuation.script) return;
-        const isInternallyControlledTalent = (id: string) => id === 'PLAYER_SELF' || id === 'STUDIO_STAFF';
         const lockedWriterSkill = Math.max(10, Math.min(100, Math.round(Number(writer?.skill || 50))));
         const sequelBaseline = getContinuationScriptBaseline(project, lockedWriterSkill);
 
@@ -687,60 +698,9 @@ const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player,
         // Generate a new script based on the past project
         const newScriptId = continuation.script.id;
         
-        // Calculate returning talent demands
+        // Calculate returning talent demands (21 Nov 2026: one helper, shared with a streamer's renewal)
         const details = project.projectDetails || project;
-        const returningTalent: any[] = [];
-        
-        if (details.directorId) {
-            const dirSalary = details.crewList?.find((c: any) => c.role === 'DIRECTOR')?.salary || project.budget * 0.05;
-            returningTalent.push({
-                role: 'DIRECTOR',
-                id: details.directorId,
-                originalSalary: dirSalary,
-                newDemand: dirSalary * 1.2, // 20% bump
-                backendDemandPoints: suggestReturningBackendDemand('DIRECTOR', dirSalary, isInternallyControlledTalent(details.directorId)),
-                negotiated: isInternallyControlledTalent(details.directorId),
-                accepted: isInternallyControlledTalent(details.directorId),
-                attemptsLeft: isInternallyControlledTalent(details.directorId) ? 0 : 3
-            });
-        }
-
-        if (details.crewList) {
-            details.crewList.forEach((crewMember: any) => {
-                if (!crewMember?.id || crewMember.role === 'DIRECTOR') return;
-                if (!['CINEMATOGRAPHER', 'COMPOSER', 'LINE_PRODUCER', 'VFX_SUPERVISOR'].includes(crewMember.role)) return;
-
-                const originalSalary = crewMember.salary || project.budget * 0.02;
-                returningTalent.push({
-                    role: crewMember.role,
-                    id: crewMember.id,
-                    originalSalary,
-                    newDemand: originalSalary * 1.18,
-                    negotiated: isInternallyControlledTalent(crewMember.id),
-                    accepted: isInternallyControlledTalent(crewMember.id),
-                    attemptsLeft: isInternallyControlledTalent(crewMember.id) ? 0 : 3
-                });
-            });
-        }
-        
-        const sourceCastList = details.castList;
-        if (sourceCastList) {
-            sourceCastList.forEach((c: any) => {
-                if (c.actorId && c.actorId !== 'UNKNOWN') {
-                    const originalSalary = c.salary || project.budget * (c.roleType === 'LEAD' ? 0.08 : 0.03);
-                    returningTalent.push({
-                        role: c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR',
-                        id: c.actorId,
-                        originalSalary: originalSalary,
-                        newDemand: originalSalary * 1.2, // 20% bump
-                        backendDemandPoints: suggestReturningBackendDemand(c.roleType === 'LEAD' ? 'LEAD_ACTOR' : 'SUPPORTING_ACTOR', originalSalary, isInternallyControlledTalent(c.actorId)),
-                        negotiated: isInternallyControlledTalent(c.actorId),
-                        accepted: isInternallyControlledTalent(c.actorId),
-                        attemptsLeft: isInternallyControlledTalent(c.actorId) ? 0 : 3
-                    });
-                }
-            });
-        }
+        const returningTalent: any[] = buildContinuationReturningTalent(project);
 
         const loglines = isSpinoff ? [
             `A thrilling new spin-off set in the universe of ${project.title}, exploring untold stories and new characters.`,
@@ -899,6 +859,20 @@ const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player,
             [{ talentId: writer.id, talentName: writer.name, role: 'WRITER', amount: writer.fee }],
             `sequel_writer:${newScriptId}`, getAbsoluteWeek(player.age, player.currentWeek)).world;
         updatedPlayer.businesses = updatedPlayer.businesses.map(b => b.id === studio.id ? updatedStudio : b);
+        /* 21 Nov 2026 (renewals): a rival platform's renewal remembers the next-season script written for it, and its
+           Greenlight picks it as soon as it is ready */
+        const renewalOffer = sequelSetupProject.renewalOfferId
+            ? player.world.platformAiPlayerCommissionOffers?.[sequelSetupProject.renewalOfferId]
+            : undefined;
+        if (renewalOffer) {
+            updatedPlayer.world = {
+                ...updatedPlayer.world,
+                platformAiPlayerCommissionOffers: {
+                    ...(updatedPlayer.world.platformAiPlayerCommissionOffers || {}),
+                    [renewalOffer.id]: { ...renewalOffer, preparedScriptId: newScriptId },
+                },
+            };
+        }
         onUpdatePlayer(updatedPlayer);
         
         // Close modals and open Development Lab
@@ -1088,6 +1062,7 @@ const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player,
                         studio={studio} 
                         initialConcept={selectedConcept}
                         platformCommissionOffer={platformCommissionTargetId ? player.world.platformAiPlayerCommissionOffers?.[platformCommissionTargetId] : undefined}
+                        onWriteNextSeason={handleWriteNextSeason}
                         onBack={() => {
                             closeStudioTool();
                         }} 

@@ -1557,6 +1557,8 @@ export interface ProjectConcept {
     scriptId: string;
     /** #301: the season's money, while the wizard is still open */
     episodeBudgetShares?: number[];
+    /** 21 Nov 2026: the player's episode count for a series nobody ordered (absent = the script's own count) */
+    episodeCount?: number;
     /** Optional saved Greenlight choices; absent on old drafts means no backend promises. */
     talentBackendDraft?: Record<string, number>;
     lastUpdated: number;
@@ -2095,6 +2097,9 @@ export interface StudioState {
     mergerPreIntegrationBalance?: number;
     mergerPreIntegrationStats?: BusinessStats;
     saleDeck?: StudioSaleDeck;
+    /** 21 Nov 2026: the player is waiting for the slate to clear so it can list this studio. While set, the studios in the
+     *  sale start no new projects on their own. Cleared when a listing is withdrawn or the player resumes. */
+    saleHold?: { startedWeek: number; startedYear: number };
     /** Exact private company state captured when compact AI control becomes player gameplay. */
     industryHandoffSnapshot?: StudioIndustryHandoffSnapshot;
 }
@@ -2173,6 +2178,14 @@ export interface PlatformAiPlayerCommissionOffer {
     premiereAnnouncedAtAbsoluteWeek?: number;
     /** #246: when the platform decided on another season */
     renewalDecidedAtAbsoluteWeek?: number;
+    /** 21 Nov 2026: the episodes the platform ordered (whoever orders a show sets its length; Greenlight shows it
+        locked). Old offers have none and keep their script's count. */
+    orderedEpisodes?: number;
+    /** 21 Nov 2026 (renewals): the season this offer continues, the studio that made it, and the next-season script
+        prepared there with the season's people coming back. */
+    renewalOfOfferId?: string;
+    preferredStudioId?: string;
+    preparedScriptId?: string;
     /** #241: when the platform wrote about the missed date, and when it sued */
     deadlineNoticeAtAbsoluteWeek?: number;
     lawsuitFiledAtAbsoluteWeek?: number;
@@ -9539,8 +9552,13 @@ export interface AwardHistoryEntry {
         projectName: string;
         /** Stable identity lets later systems observe awards without title matching. */
         projectId?: string;
+        /** 22 Nov 2026: the winning NPC's id (performer, director, writer, crew), so credits reach the right person. */
+        personId?: string;
         isPlayer: boolean;
     }[];
+    /** 21 Nov 2026 (heir careers): a season from an earlier generation. Its `year` is that generation's age, so it
+        must never stand for (or block) a season of the heir's own, whose age restarted. */
+    inherited?: boolean;
 }
 
 export type IndustryTalentBookingRole = 'ACTOR' | 'DIRECTOR' | 'WRITER';
@@ -12154,6 +12172,9 @@ export interface WorldState {
     universes: Record<UniverseId, Universe>;
     famousMoviesReleased: string[];
     awardHistory: AwardHistoryEntry[];
+    /** 21 Nov 2026 (heir awards): the earlier generations' seasons in awardHistory are marked `inherited` (set at
+        succession, or once by the load repair for heirs who took over before). */
+    awardHistoryInheritedTagged?: boolean;
     upcomingRivals: IndustryProject[];
     platforms?: Record<PlatformId, PlatformState>;
     studios?: Record<StudioId, NPCStudioState>;

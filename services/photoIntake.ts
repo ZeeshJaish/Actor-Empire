@@ -33,6 +33,7 @@ export type PhotoIntakeProblem =
     | 'TOO_MANY_PIXELS'
     | 'HEIC_UNSUPPORTED'
     | 'NOT_A_PICTURE'
+    | 'UNREADABLE'
     | 'NO_CANVAS'
     | 'ENCODE_FAILED';
 
@@ -50,6 +51,7 @@ const MESSAGES: Record<PhotoIntakeProblem, string> = {
     TOO_MANY_PIXELS: 'That picture is over 80 megapixels. Pick a smaller copy, or take a screenshot of it and pick that.',
     HEIC_UNSUPPORTED: 'This phone cannot open HEIC photos in the game. Pick a JPG or PNG, or take a screenshot of the photo and pick that.',
     NOT_A_PICTURE: 'That file could not be opened as a picture. Pick a JPG or PNG, or take a screenshot of it and pick that.',
+    UNREADABLE: 'Your phone did not let the game read this photo. Save it to your phone, or pick it from the Files app, then try again.',
     NO_CANVAS: 'This phone could not prepare the picture. Close a few apps and try again.',
     ENCODE_FAILED: 'This phone could not save the picture. Try again, or pick a smaller one.',
 };
@@ -214,6 +216,152 @@ const decodeWithImageElement = (file: Blob): Promise<Omit<DecodedPhoto, 'sniff'>
     image.src = objectUrl;
 });
 
+/* ---------- 21 Nov 2026: a second chance, ONLY after both ways above failed ----------
+   YNDBABU12 (Samsung, 1.0.30): a plain Gallery JPG "could not be opened as a picture", and his save holds no uploaded
+   picture at all, so no pick ever worked on that phone. The two ways above decode the picked file as the phone hands
+   it over. Here, and only here (a phone where they work never reaches this, so its pictures come out exactly as
+   before), the file is read into memory and that copy is decoded the same two ways, then through a data URL. A phone
+   that will not hand over the bytes at all gets its own message. Every outcome here is reported with what failed, so
+   the next report names its cause instead of "not a picture". */
+const errorName = (error: unknown): string => (error instanceof Error ? (error.name || 'Error') : typeof error);
+
+const readBlobBytes = (file: Blob): Promise<ArrayBuffer> => {
+    if (typeof (file as any).arrayBuffer === 'function') return (file as any).arrayBuffer();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error || new Error('read failed'));
+        reader.readAsArrayBuffer(file);
+    });
+};
+
+const SNIFF_MIME: Partial<Record<PhotoFormat, string>> = {
+    jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif',
+};
+
+const decodeWithDataUrl = (bytes: ArrayBuffer, type: string): Promise<Omit<DecodedPhoto, 'sniff'>> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('data url read failed'));
+    reader.onload = () => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.onload = () => resolve({
+            source: image,
+            width: image.naturalWidth || image.width,
+            height: image.naturalHeight || image.height,
+            dispose: () => undefined,
+        });
+        image.onerror = () => reject(new Error('data url could not decode'));
+        image.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(new Blob([bytes], { type }));
+});
+
+interface PhotoRecovery {
+    decoded: Omit<DecodedPhoto, 'sniff'> | null;
+    unreadable: boolean;
+    steps: string[];
+}
+
+const decodeFromMemoryCopy = async (file: Blob, sniff: PhotoSniff, targetMaxSide: number): Promise<PhotoRecovery> => {
+    const steps: string[] = [];
+    let bytes: ArrayBuffer | null = null;
+    try {
+        bytes = await readBlobBytes(file);
+        steps.push(`read:${bytes.byteLength}`);
+    } catch (error) {
+        steps.push(`read:${errorName(error)}`);
+    }
+    if (!bytes || !bytes.byteLength) return { decoded: null, unreadable: true, steps };
+    const type = SNIFF_MIME[sniff.format] || file.type || 'image/jpeg';
+    const copy = new Blob([bytes], { type });
+    const usable = (decoded: Omit<DecodedPhoto, 'sniff'> | null, step: string) => {
+        if (decoded && decoded.width && decoded.height) {
+            steps.push(`${step}:ok`);
+            return decoded;
+        }
+        decoded?.dispose();
+        steps.push(`${step}:empty`);
+        return null;
+    };
+    if (typeof createImageBitmap === 'function' && sniff.format !== 'svg') {
+        const big = sniff.width && sniff.height && sniff.width * sniff.height > FULL_DECODE_PIXEL_BUDGET;
+        if (big) {
+            const quarterTurn = (sniff.orientation || 1) >= 5;
+            const shownWidth = quarterTurn ? sniff.height! : sniff.width!;
+            const shownHeight = quarterTurn ? sniff.width! : sniff.height!;
+            const side = Math.max(targetMaxSide, PHOTO_EDITOR_MAX_SIDE);
+            const scaled = fitPhotoInside(shownWidth, shownHeight, side, side);
+            try {
+                const decoded = usable(await decodeWithBitmap(copy, scaled), 'bitmap-copy-scaled');
+                if (decoded && decoded.width === scaled.width && decoded.height === scaled.height) return { decoded, unreadable: false, steps };
+                decoded?.dispose();
+            } catch (error) {
+                steps.push(`bitmap-copy-scaled:${errorName(error)}`);
+            }
+        }
+        try {
+            const decoded = usable(await decodeWithBitmap(copy), 'bitmap-copy');
+            if (decoded) return { decoded, unreadable: false, steps };
+        } catch (error) {
+            steps.push(`bitmap-copy:${errorName(error)}`);
+        }
+    }
+    try {
+        const decoded = usable(await decodeWithImageElement(copy), 'image-copy');
+        if (decoded) return { decoded, unreadable: false, steps };
+    } catch (error) {
+        steps.push(`image-copy:${errorName(error)}`);
+    }
+    try {
+        const decoded = usable(await decodeWithDataUrl(bytes, type), 'data-url');
+        if (decoded) return { decoded, unreadable: false, steps };
+    } catch (error) {
+        steps.push(`data-url:${errorName(error)}`);
+    }
+    return { decoded: null, unreadable: false, steps };
+};
+
+/** The WebView's Chrome version from its user agent ("Chrome/91.0.4472.114" → "91.0.4472.114"). */
+const webViewVersion = (): string => {
+    try {
+        return (globalThis.navigator?.userAgent || '').match(/Chrome\/([\d.]+)/)?.[1] || 'none';
+    } catch {
+        return 'unknown';
+    }
+};
+
+const reportPhotoRecovery = (file: Blob, sniff: PhotoSniff, recovery: PhotoRecovery) => {
+    const name = String((file as File).name || '');
+    const context = {
+        photo_size: file.size,
+        photo_type: file.type || 'none',
+        photo_ext: (name.match(/\.([a-z0-9]{1,5})$/i)?.[1] || 'none').toLowerCase(),
+        photo_format: sniff.format,
+        photo_dims: sniff.width && sniff.height ? `${sniff.width}x${sniff.height}` : 'unknown',
+        photo_steps: recovery.steps.join('|').slice(0, 240),
+        photo_recovered: Boolean(recovery.decoded),
+        webview: webViewVersion(),
+    };
+    /* Loaded only here, so the normal path does not even import it. Vite turns import.meta.glob into the same lazy import
+       as a plain import(). The audits bundle with plain esbuild, which leaves it alone (there it throws and nothing is
+       sent), so an audit that touches a photo does not pull in all of firebaseService and the music CSV it reaches. */
+    let loadFirebaseService: (() => Promise<typeof import('./firebaseService')>) | undefined;
+    try {
+        loadFirebaseService = import.meta.glob('./firebaseService.ts')['./firebaseService.ts'] as typeof loadFirebaseService;
+    } catch {
+        return;
+    }
+    if (!loadFirebaseService) return;
+    void loadFirebaseService()
+        .then(service => service.recordNonFatal(
+            new Error(recovery.decoded ? 'photo decoded from a memory copy' : 'photo could not be decoded'),
+            recovery.decoded ? 'photo_intake_recovered' : 'photo_intake_failed',
+            context,
+        ))
+        .catch(() => undefined);
+};
+
 /** The size a picture is drawn at, at most `maxWidth` × `maxHeight`, never enlarged. */
 export const fitPhotoInside = (width: number, height: number, maxWidth: number, maxHeight: number) => {
     const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
@@ -256,7 +404,15 @@ export const decodePhoto = async (file: Blob, targetMaxSide = PHOTO_EDITOR_MAX_S
     }
     if (!decoded || !decoded.width || !decoded.height) {
         decoded?.dispose();
-        throw new PhotoIntakeError(sniff.format === 'heic' || (sniff.format === 'unknown' && looksHeicByName(file)) ? 'HEIC_UNSUPPORTED' : 'NOT_A_PICTURE');
+        decoded = null;
+        if (sniff.format === 'heic' || (sniff.format === 'unknown' && looksHeicByName(file))) {
+            throw new PhotoIntakeError('HEIC_UNSUPPORTED');
+        }
+        /* 21 Nov 2026: only here, after both ways failed (see decodeFromMemoryCopy) */
+        const recovery = await decodeFromMemoryCopy(file, sniff, targetMaxSide);
+        reportPhotoRecovery(file, sniff, recovery);
+        if (!recovery.decoded) throw new PhotoIntakeError(recovery.unreadable ? 'UNREADABLE' : 'NOT_A_PICTURE');
+        decoded = recovery.decoded;
     }
     if (tooManyPixels(decoded.width, decoded.height)) {
         decoded.dispose();
