@@ -79,7 +79,7 @@ const formatMoney = (val: number) => {
     return `$${val}`;
 };
 
-type SlateRibbon = { label: string; color: string; onColor: string };
+export type SlateRibbon = { label: string; color: string; onColor: string };
 
 /** Black or white, whichever reads on this colour */
 const getReadableInk = (hex: string): string => {
@@ -1256,8 +1256,9 @@ const ProductionHouseGameScreen: React.FC<ProductionHouseGameProps> = ({ player,
                             {recentPastProjectsPreview.map(p => (
                                 <ArchiveProjectCard 
                                     key={p.id} 
-                                    project={p as any} 
+                                    project={p as any}
                                     isLatestInstallment={latestInstallmentIds.has(p.id)}
+                                    ribbon={getSlateRibbon(p, player)}
                                     onClick={() => {
                                         setSelectedProjectDashboard(p);
                                     }}
@@ -2352,7 +2353,7 @@ const ActiveProjectCard: React.FC<{ project: any, ribbon?: SlateRibbon | null, o
     );
 };
 
-const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean, onClick?: () => void }> = ({ project, isLatestInstallment, onClick }) => {
+export const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean, ribbon?: SlateRibbon | null, onClick?: () => void }> = ({ project, isLatestInstallment, ribbon, onClick }) => {
     const formatMoney = (val: number) => {
         const prefix = val < 0 ? '-$' : '$';
         const abs = Math.abs(val);
@@ -2374,9 +2375,19 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
     const projectRevenue = getStudioArchiveRevenue(project);
     const projectBudget = project.budget || 0;
     const marketOutcomeRevenue = getProjectMarketOutcomeRevenue(project, projectRevenue, projectBudget);
+    /* 23 Nov 2026 (player report: "an Original I order from my own studio is labelled Average or Flop, but it earns on
+       the platform"): the player's own service pays the whole production bill and the studio keeps no share of the
+       viewing money, so a studio verdict on it could only read Average (Flop when the payment fell short of the cost)
+       whatever the show does. The verdict is the service's: the card says ORIGINAL in the service's colour and shows
+       what the service paid. The weekly loop never judged these (gameLoop hands them to the platform loop). */
+    const isOwnPlatformOriginal = !project.isPlatformCommissionCredit && project.projectDetails?.hiddenStats?.ownedStreamingOriginal === true;
+    const paidByService = isOwnPlatformOriginal ? getProjectFundingEconomics(project, projectBudget).platformFunding : 0;
     if (project.isPlatformCommissionCredit) {
         outcomeLabel = null;
         outcomeColor = "";
+    } else if (isOwnPlatformOriginal) {
+        outcomeLabel = "ORIGINAL";
+        outcomeColor = "bg-violet-500 text-white";
     } else if (marketOutcomeRevenue > projectBudget * 5) {
         outcomeLabel = "BLOCKBUSTER";
         outcomeColor = "bg-purple-500 text-white";
@@ -2449,7 +2460,10 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
                             </div>
                         )}
                         {outcomeLabel && (
-                            <div className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md shadow-sm ${outcomeColor}`}>
+                            <div
+                                className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md shadow-sm ${outcomeColor}`}
+                                style={isOwnPlatformOriginal && ribbon ? { background: ribbon.color, color: ribbon.onColor } : undefined}
+                            >
                                 {outcomeLabel}
                             </div>
                         )}
@@ -2478,9 +2492,9 @@ const ArchiveProjectCard: React.FC<{ project: any, isLatestInstallment?: boolean
                             <div className="text-[10px] font-mono font-bold text-zinc-300">{formatMoney(project.budget || 0)}</div>
                         </div>
                         <div className="text-right">
-                            <div className="text-[8px] text-zinc-400 uppercase font-bold">{project.isPlatformCommissionCredit ? 'Producer Fee' : 'Project Revenue'}</div>
+                            <div className="text-[8px] text-zinc-400 uppercase font-bold">{project.isPlatformCommissionCredit ? 'Producer Fee' : paidByService > 0 ? 'Paid by service' : 'Project Revenue'}</div>
                             <div className="text-[10px] font-mono font-bold text-emerald-400">
-                                {formatMoney(project.isPlatformCommissionCredit ? project.producerFee || 0 : projectRevenue)}
+                                {formatMoney(project.isPlatformCommissionCredit ? project.producerFee || 0 : paidByService > 0 ? paidByService : projectRevenue)}
                             </div>
                             {project.views && (
                                 <div className="text-[7px] text-zinc-500 font-bold">

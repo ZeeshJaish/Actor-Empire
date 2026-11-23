@@ -214,6 +214,9 @@ const SubsidiaryArchiveTile: React.FC<{
         budget?: number;
         type?: string;
         revenueSource?: 'THEATRICAL' | 'STREAMING' | 'HYBRID' | 'OTHER' | 'NONE';
+        /** 23 Nov 2026: an Original made for the player's own service. The service paid the bill and the studio keeps no
+            share of the viewing money, so this studio has no revenue to judge it by: no HIT or FLOP. */
+        ownOriginal?: boolean;
     };
 }> = ({ project }) => {
     const rating = Number(project.rating || 0);
@@ -222,7 +225,9 @@ const SubsidiaryArchiveTile: React.FC<{
     const isStreamingFirst = project.revenueSource === 'STREAMING';
     const hitMultiplier = isStreamingFirst ? 1.35 : 2;
     const flopMultiplier = isStreamingFirst ? 0.35 : 1;
-    const outcome = budget > 0 && revenue >= budget * hitMultiplier
+    const outcome = project.ownOriginal
+        ? 'ORIGINAL'
+        : budget > 0 && revenue >= budget * hitMultiplier
         ? 'HIT'
         : budget > 0 && revenue < budget * flopMultiplier
             ? 'FLOP'
@@ -243,7 +248,7 @@ const SubsidiaryArchiveTile: React.FC<{
             </div>
             <div className="relative flex h-full flex-col justify-between p-3">
                 <div className="flex justify-end">
-                    <span className={`rounded px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.12em] ${outcome === 'HIT' ? 'bg-emerald-400 text-black' : outcome === 'FLOP' ? 'bg-rose-500 text-white' : 'bg-zinc-600 text-white'}`}>
+                    <span className={`rounded px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.12em] ${outcome === 'HIT' ? 'bg-emerald-400 text-black' : outcome === 'FLOP' ? 'bg-rose-500 text-white' : outcome === 'ORIGINAL' ? 'bg-violet-500 text-white' : 'bg-zinc-600 text-white'}`}>
                         {outcome}
                     </span>
                 </div>
@@ -359,6 +364,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                 rating: release.imdbRating,
                 revenue: revenue.total,
                 revenueSource: revenue.source,
+                ownOriginal: release.projectDetails?.hiddenStats?.ownedStreamingOriginal === true,
                 budget: release.budget,
                 type: release.type,
             };
@@ -371,6 +377,7 @@ export const OwnedStudioCommandCenter: React.FC<OwnedStudioCommandCenterProps> =
                 rating: project.imdbRating || project.rating,
                 revenue: revenue.total,
                 revenueSource: revenue.source,
+                ownOriginal: (project as any).projectDetails?.hiddenStats?.ownedStreamingOriginal === true,
                 budget: Number((project as any).budget || (project as any).projectDetails?.estimatedBudget || 0),
                 type: resolveProjectType(project.projectType, (project as any).projectDetails?.type, project.type),
             };
