@@ -113,12 +113,14 @@ export const TheatricalDeskStep: React.FC<TheatricalDeskModel & {
         ))}
       </div>
       {regionHint && <p className={css.secnote} role="status" data-region-hint>{regionHint}</p>}
-      <div className={css.mapread}><b>{selectedRegionCount}</b><span>regions</span><em>{totalScreens.toLocaleString()} screens</em></div>
+      {/* 23 Nov 2026 (player report: "I booked all 47,000+ screens, only 5,000-7,000 played"): this number is reach,
+          the screens the chosen partners could give; cinemas book shows by demand after release */}
+      <div className={css.mapread}><b>{selectedRegionCount}</b><span>regions</span><em>{totalScreens.toLocaleString()} accessible screens</em></div>
     </section>
 
     <section className={css.sec}>
       <span className={css.seclabel}>CINEMA PARTNERS</span>
-      <p className={css.secnote}>Stack partners for reach. Each contract changes screens, booking cost, and the cut.</p>
+      <p className={css.secnote}>Stack partners for reach. Each contract changes accessible screens, booking cost, and the cut. Cinemas then book shows by demand, so fewer screens may play.</p>
       {regions.filter(region => region.selected).map(region => <div key={region.id} className={join(css.regblock, css.on)} style={{ '--dh': '30' } as React.CSSProperties}>
         <div className={css.reghead}><b>{region.label}</b><em>{region.chains.filter(chain => chain.selected).length} live</em><span className={css.regmarks}>{region.chains.filter(chain => chain.selected).map(chain => <i key={chain.id} style={{ '--pt': chain.color } as React.CSSProperties} />)}</span></div>
         <div className={css.chains}>

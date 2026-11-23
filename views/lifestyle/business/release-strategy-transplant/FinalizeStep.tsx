@@ -42,7 +42,8 @@ export const FinalizeStep: React.FC<FinalizeStepModel & { energyCost: number; di
     <Chip label="DISTRIBUTION" value={yourPlatformName ? 'Your platform' : route === 'STREAMING' ? 'Streaming' : 'Theatrical'} />
     {/* U9 (2026-11-15): "No bids and no fee" read as "earns nothing". It is an internal transfer: the service earns from it */}
     {yourPlatformName && <Chip label="WHERE" value={yourPlatformName} sub="Internal transfer, no fee: your service earns from its viewers" />}
-    {route === 'THEATRICAL' && <Chip label="FOOTPRINT" value={`${screenCount.toLocaleString()} screens`} sub={`${regionCount} regions`} />}
+    {/* 23 Nov 2026: reach, not a booking (see TheatricalDeskStep) */}
+    {route === 'THEATRICAL' && <Chip label="ACCESSIBLE SCREENS" value={screenCount.toLocaleString()} sub={`${regionCount} regions`} />}
     {route === 'THEATRICAL' && <Chip label="WHO CARRIES IT" value={partnerNames.length ? `${partnerNames.length} chains` : 'None'} sub={partnerNames.join(' · ')} />}
     {!yourPlatformName && route === 'STREAMING' && buyerNames.length > 1 && <Chip label="BUYERS" value={`${buyerNames.length} platforms`} sub={buyerNames.join(' · ')} />}
     {!yourPlatformName && route === 'STREAMING' && buyerNames.length <= 1 && buyerName && <Chip label="BUYER" value={buyerName} />}
