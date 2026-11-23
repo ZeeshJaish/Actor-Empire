@@ -1,5 +1,8 @@
 import UIKit
 import Capacitor
+#if DEBUG
+import GoogleMobileAds
+#endif
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,8 +11,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        #if DEBUG
+        logAdNetworkStatusForTesting()
+        #endif
         return true
     }
+
+    #if DEBUG
+    /// Debug builds only (ad mediation test, 23 Nov 2026): every 15 s for 5 minutes, print each ad
+    /// network's start-up state (AdMob, Unity) as "AE-ADS" lines. Never compiled into a store build.
+    private func logAdNetworkStatusForTesting() {
+        var ticks = 0
+        Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { timer in
+            ticks += 1
+            let statuses = MobileAds.shared.initializationStatus.adapterStatusesByClassName
+            if statuses.isEmpty {
+                NSLog("AE-ADS t=%ds: ads SDK not started yet", ticks * 15)
+            }
+            for (name, status) in statuses.sorted(by: { $0.key < $1.key }) {
+                let state = status.state == .ready ? "READY" : "NOT_READY"
+                NSLog("AE-ADS t=%ds: %@ = %@ (%.2fs) %@", ticks * 15, name, state, status.latency, status.description)
+            }
+            if ticks >= 20 { timer.invalidate() }
+        }
+    }
+    #endif
 
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.

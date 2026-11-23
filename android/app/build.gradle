@@ -41,6 +41,11 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
     implementation "com.android.billingclient:billing:$playBillingVersion"
+    // Ad mediation (23 Nov 2026): Unity Ads bids inside AdMob. Adapter 4.20.1.0 is built for
+    // play-services-ads 25.4.0, the version @capacitor-community/admob 8.4.2 resolves (25.4.+).
+    // Bump both together. Plan: ae marketing/monetization/2026-11-23-ad-mediation-plan.md
+    implementation "com.unity3d.ads:unity-ads:4.20.1"
+    implementation "com.google.ads.mediation:unity:4.20.1.0"
 }
 
 apply from: 'capacitor.build.gradle'

@@ -1,5 +1,5 @@
 {
-  "originHash" : "18c7608ae4d53d47ba7d64efe15dcaf40f6e9318cc7007532035951daa25ac56",
+  "originHash" : "c8da2b5c1552edf4cb589606e8a8a817bcfd928ecb06764d3130201848f53769",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -53,6 +53,14 @@
       "state" : {
         "revision" : "19dffda9a9caf8d86570ff846535902d8509d7bf",
         "version" : "3.5.0"
+      }
+    },
+    {
+      "identity" : "googleads-mobile-ios-mediation-unity",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/googleads/googleads-mobile-ios-mediation-unity.git",
+      "state" : {
+        "revision" : "188967a5c062987496cd276b83dc25e84f87d9a6"
       }
     },
     {
@@ -152,6 +160,15 @@
       "state" : {
         "revision" : "13b248eaa73b7826f0efb1bcf455e251d65ecb1b",
         "version" : "3.1.0"
+      }
+    },
+    {
+      "identity" : "unity-ads-swift-package",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Unity-Technologies/Unity-Ads-Swift-Package.git",
+      "state" : {
+        "revision" : "09bdf0e27186667f381196f57ceece714c8917a2",
+        "version" : "4.21.0"
       }
     }
   ],
