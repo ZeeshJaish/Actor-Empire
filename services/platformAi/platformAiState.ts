@@ -629,13 +629,21 @@ export const normalizePlatformAiLocalizationJobs = (
         const canonicalPlan = plansById.get(contentPlanId);
         if (!canonicalPlan) continue;
         const canonicalCountryIds = normalizeStreamingDayOneMarketIds(canonicalPlan.releaseCountryIds).sort();
-        const canonicalProjectId = canonicalPlan.source === 'COMMISSIONED_ORIGINAL'
-            ? createDeterministicId('platform_ai_project', platformId, canonicalPlan.id)
-            : null;
+        /* 24 Nov 2026 (players' commissions stuck on "<platform> picks a week" for years): a commissioned original is the
+           platform's own (platform_ai_project) or one the player's studio makes for it (player_commission_project, made in
+           platformAiPlayerCommissions from the same platform and plan). Both are the plan's canonical project. Only the first
+           was accepted, so the dubbing job planned for a player's commission was dropped here every week, planned and paid
+           again, and never finished: the platform never picked a premiere week. */
+        const canonicalProjectIds = canonicalPlan.source === 'COMMISSIONED_ORIGINAL'
+            ? [
+                createDeterministicId('platform_ai_project', platformId, canonicalPlan.id),
+                createDeterministicId('player_commission_project', platformId, canonicalPlan.id),
+            ]
+            : [];
         if (
             canonicalPlan.localizationLevel !== level
             || savedCountryIds.some(countryId => !canonicalCountryIds.includes(countryId))
-            || canonicalPlan.source === 'COMMISSIONED_ORIGINAL' && projectId !== canonicalProjectId
+            || canonicalPlan.source === 'COMMISSIONED_ORIGINAL' && !canonicalProjectIds.includes(projectId)
             || canonicalPlan.source !== 'COMMISSIONED_ORIGINAL' && !canonicalPlan.sourceProjectIds.includes(projectId)
         ) continue;
         const exactLanguageId = normalizeStreamingLanguageId(raw.languageId);
