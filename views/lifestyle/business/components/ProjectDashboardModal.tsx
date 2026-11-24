@@ -227,11 +227,32 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
     const releaseFallback = isReleaseHistoryPhase ? { currentAge: player.age, currentWeek: player.currentWeek } : {};
     const releaseTiming = getProjectReleaseTiming(project, releaseFallback);
     const releaseSummaryLabel = getProjectReleaseLabel(project, releaseFallback, { emptyLabel: tr('projectDashboard.tba') });
-    const runWeek = getReleaseProgressWeek(project);
-    const phaseKey = PHASES.find(p => p.id === project.phase)?.id;
-    const currentPhaseLabel = phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : String(project.phase || tr('projectDashboard.phase.PLANNING')).replace(/[_-]/g, ' ');
-    const timelineValue = runWeek > 0 ? tr('projectDashboard.timeline.runWeek', { week: runWeek }) : releaseTiming.releaseWeek ? tr('projectDashboard.timeline.week', { week: releaseTiming.releaseWeek }) : currentPhaseLabel;
-    const timelineCaption = runWeek > 0 ? currentPhaseLabel : releaseTiming.releaseWeek ? releaseSummaryLabel : tr('projectDashboard.timeline.currentStage');
+    /* 24 Nov 2026 (Red, X: a Disney+ commission showed "Substantial loss" and -$176.9M, "Box Office Flop", "ROI -100%" and
+       "Run Week 1 · Released"): a show your studio made for another platform arrives here as a film that was released and ran in
+       cinemas (the Past projects builder stamps every credit RELEASED, and the credit is a STREAMING row). It never did. The platform
+       paid the production, up to its cap, and paid the studio a producer fee; the studio has no cinema run, no receipts and no
+       cash at risk, and the platform picks the premiere. So this page says where the show stands with the platform and what the
+       studio was paid, and carries no film verdicts. Films and your own platform-funded shows are untouched. */
+    const isCommissionCredit = project.isPlatformCommissionCredit === true;
+    const commissionPremiere = isCommissionCredit ? getStreamingPremiereStatus(player, String(project.id)) : null;
+    const commissionPlatformName: string = isCommissionCredit
+        ? (project.platformName || commissionPremiere?.platformName || PLATFORMS.find(item => item.id === project.platformId)?.name || 'the platform')
+        : '';
+    /* the game's own release stages: delivered and waiting for the platform's week, dated, or streaming */
+    const displayPhase: string = !isCommissionCredit ? project.phase
+        : commissionPremiere?.stage === 'LIVE' ? 'STREAMING'
+        : commissionPremiere?.stage === 'DATED' ? 'PLANNED RELEASE'
+        : 'AWAITING RELEASE';
+    const runWeek = isCommissionCredit ? 0 : getReleaseProgressWeek(project);
+    const phaseKey = PHASES.find(p => p.id === displayPhase)?.id;
+    const currentPhaseLabel = phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : String(displayPhase || tr('projectDashboard.phase.PLANNING')).replace(/[_-]/g, ' ');
+    const commissionStageCaption = !commissionPremiere || commissionPremiere.stage === 'DATE_NOT_SET'
+        ? 'Date not set'
+        : commissionPremiere.stage === 'DATED'
+            ? `In ${commissionPremiere.weeksLeft ?? 0} week${commissionPremiere.weeksLeft === 1 ? '' : 's'}`
+            : `On ${commissionPremiere.platformName}`;
+    const timelineValue = isCommissionCredit ? currentPhaseLabel : runWeek > 0 ? tr('projectDashboard.timeline.runWeek', { week: runWeek }) : releaseTiming.releaseWeek ? tr('projectDashboard.timeline.week', { week: releaseTiming.releaseWeek }) : currentPhaseLabel;
+    const timelineCaption = isCommissionCredit ? commissionStageCaption : runWeek > 0 ? currentPhaseLabel : releaseTiming.releaseWeek ? releaseSummaryLabel : tr('projectDashboard.timeline.currentStage');
     const resolvedProjectType = resolveProjectType(
         project.projectType,
         project.type,
@@ -376,6 +397,8 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
     const getDynamicBuzz = () => {
         if (relatedNews.length > 0) return relatedNews;
+        /* a commission has no cinema run to write about: only real news about it (the platform dating it) belongs here */
+        if (isCommissionCredit) return [];
 
         const title = project.name || project.title || tr('projectDashboard.untitledProject');
         const genre = String(resolvedProjectGenre).toLowerCase();
@@ -741,9 +764,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                 {/* Floating Badge */}
                                 <div className="absolute top-6 left-6 flex flex-col gap-2">
                                     <div className="px-4 py-1.5 bg-amber-500 text-black text-[10px] font-black uppercase tracking-[0.2em] rounded-full shadow-lg">
-                                        {phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : project.phase}
+                                        {phaseKey ? tr(`projectDashboard.phase.${phaseKey}`) : displayPhase}
                                     </div>
-                                    {project.phase === 'RELEASED' && (
+                                    {project.phase === 'RELEASED' && !isCommissionCredit && (
                                         <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-lg backdrop-blur-md border ${
                                             actualGross > (project.budget || 0) * 5 ? 'bg-purple-500/80 text-white border-purple-400/50' :
                                             actualGross > (project.budget || 0) * 2 ? 'bg-emerald-500/80 text-white border-emerald-400/50' :
@@ -849,8 +872,9 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                  {/* Quick Stats */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:col-span-2">
                                     <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center min-h-[120px]">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.productionCost')}</div>
-                                        <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{isCommissionCredit ? 'Production cap' : tr('projectDashboard.metric.productionCost')}</div>
+                                        {/* a commission's cap is its main number: on a 320px phone it was cut to "$176...", so it is a size smaller there */}
+                                        <div className={`${isCommissionCredit ? 'text-lg min-[350px]:text-2xl' : 'text-2xl'} sm:text-3xl font-bold text-white tracking-tight truncate`}>
                                             {formatMoney(project.projectDetails?.estimatedBudget || project.budget || 0)}
                                         </div>
                                     </div>
@@ -864,7 +888,7 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </div>
                                     </div>
                                     <div className="p-5 sm:p-6 bg-white/[0.03] rounded-3xl border border-white/5 backdrop-blur-sm flex flex-col justify-center min-h-[120px]">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{tr('projectDashboard.metric.release')}</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{isCommissionCredit ? 'Delivered' : tr('projectDashboard.metric.release')}</div>
                                         <div className="text-2xl sm:text-3xl font-bold text-white tracking-tight truncate">
                                             {releaseSummaryLabel}
                                         </div>
@@ -878,7 +902,8 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         <div className="text-lg sm:text-3xl font-bold text-white tracking-tight leading-tight break-words">
                                             {timelineValue}
                                         </div>
-                                        <div className="mt-1 truncate text-[10px] font-black uppercase tracking-widest text-zinc-600">
+                                        {/* a commission's caption ("Date not set", "In 4 weeks", "On Disney+") wraps instead of being cut on a narrow phone */}
+                                        <div className={`mt-1 text-[10px] font-black uppercase tracking-widest text-zinc-600 ${isCommissionCredit ? 'break-words' : 'truncate'}`}>
                                             {timelineCaption}
                                         </div>
                                     </div>
@@ -927,8 +952,42 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                         </section>
                                     )}
 
+                                    {/* 24 Nov 2026: a show made for another platform. What the platform paid, what your studio was paid, and no film finances. */}
+                                    {isCommissionCredit && (
+                                        <section data-commission-briefing className="relative col-span-2 overflow-hidden rounded-[30px] border border-sky-300/15 bg-[radial-gradient(circle_at_12%_0%,rgba(56,189,248,0.16),transparent_42%),linear-gradient(118deg,rgba(14,116,144,0.16),rgba(8,15,25,0.72)_48%,rgba(30,41,59,0.28))] px-5 py-6 shadow-[0_20px_55px_rgba(8,47,73,0.16)] sm:px-7 lg:col-span-4">
+                                            <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-sky-200 via-sky-400/50 to-transparent" />
+                                            <div className="relative">
+                                                <div className="flex items-start gap-3.5">
+                                                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-300/10 text-sky-200">
+                                                        <ShieldCheck size={20} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-[10px] font-black uppercase tracking-[0.28em] text-sky-200">Made for {commissionPlatformName}</div>
+                                                        <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-zinc-200 sm:text-[15px]">
+                                                            {commissionPlatformName} paid for the production, up to its cap, and paid your studio a producer fee. The cost of making it is not a loss on your side.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-5 grid grid-cols-1 divide-y divide-sky-100/10 rounded-2xl border border-sky-100/10 bg-slate-950/20 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                                                    <div className="px-4 py-3.5">
+                                                        <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-100/45">Production cap</div>
+                                                        <div className="mt-1 font-mono text-base font-black text-sky-100">{formatMoney(Number(project.budget) || 0)}</div>
+                                                    </div>
+                                                    <div className="px-4 py-3.5">
+                                                        <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-100/45">Producer fee paid</div>
+                                                        <div className="mt-1 font-mono text-base font-black text-emerald-300">{formatMoney(Number(project.producerFee) || 0)}</div>
+                                                    </div>
+                                                    <div className="px-4 py-3.5">
+                                                        <div className="text-[8px] font-black uppercase tracking-[0.2em] text-sky-100/45">Your cash at risk</div>
+                                                        <div className="mt-1 font-mono text-base font-black text-white">{formatMoney(0)}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    )}
+
                                     {/* Financial Performance (Moved Up) */}
-                                    {['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) && (
+                                    {!isCommissionCredit && ['RELEASED', 'STREAMING', 'IN THEATERS', 'BIDDING'].includes(project.phase) && (
                                         <>
                                             <div className="p-5 sm:p-6 bg-emerald-500/5 rounded-3xl border border-emerald-500/10 backdrop-blur-sm flex flex-col justify-center h-[120px] relative overflow-hidden group">
                                                 <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">
@@ -1103,15 +1162,15 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
                                     <div className="flex items-center justify-between mb-8">
                                         <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{tr('projectDashboard.timeline.productionJourney')}</h3>
                                         <div className="px-3 py-1 bg-zinc-800 rounded-full text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                                            {PHASES.findIndex(p => p.id === project.phase) + 1} / {PHASES.length}
+                                            {PHASES.findIndex(p => p.id === displayPhase) + 1} / {PHASES.length}
                                         </div>
                                     </div>
                                     <div className="relative">
                                         <div className="flex items-center justify-between relative px-1 overflow-x-auto no-scrollbar gap-2 sm:gap-0">
                                             <div className="absolute left-4 right-4 top-4 sm:top-5 h-[1px] bg-zinc-800 z-0 hidden sm:block"></div>
                                             {PHASES.map((p, index) => {
-                                                const isActive = project.phase === p.id;
-                                                const isPast = PHASES.findIndex(phase => phase.id === project.phase) > index;
+                                                const isActive = displayPhase === p.id;
+                                                const isPast = PHASES.findIndex(phase => phase.id === displayPhase) > index;
                                                 return (
                                                     <div key={p.id} className="relative z-10 flex flex-col items-center shrink-0 sm:shrink">
                                                         <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-700 ${
@@ -1292,7 +1351,8 @@ export const ProjectDashboardModal: React.FC<ProjectDashboardModalProps> = ({ pr
 
 
                                  {/* Actions */}
-                                <div className="md:col-span-2 flex flex-col sm:flex-row gap-4 mt-8">
+                                {/* sm:flex-wrap: the "where it streams" and premiere panels are min-w-full, so on a wide screen they ran off the side (827px) */}
+                                <div className="md:col-span-2 flex flex-col sm:flex-row sm:flex-wrap gap-4 mt-8">
                                     {onConfigureRelease && project.projectDetails?.releasePlanningDraft && (
                                         <button
                                             onClick={() => onConfigureRelease(project)}

@@ -59,6 +59,9 @@ export interface PlatformCommissionFilmographyCredit {
     awards: [];
     streamingRevenue: 0;
     sourceLabel: string;
+    /* 24 Nov 2026: the dashboard says "Made for Disney+", so the row carries the platform that ordered it */
+    platformId: PlatformAiPlayerCommissionOffer['platformId'];
+    platformName: string;
     isPlatformCommissionCredit: true;
     countsTowardOwnedStudioEvaluation: false;
     producerFee: number;
@@ -106,12 +109,15 @@ export const buildPlatformCommissionFilmography = <T>(input: {
                 awards: [] as [],
                 streamingRevenue: 0 as const,
                 sourceLabel: getCommissionSourceLabel(offer),
+                platformId: offer.platformId,
+                platformName: offer.platformName,
                 isPlatformCommissionCredit: true as const,
                 countsTowardOwnedStudioEvaluation: false as const,
                 producerFee: offer.producerFee,
                 releasedAtAbsoluteWeek: offer.deliveredAtAbsoluteWeek,
-                releaseYear: Math.max(0, Math.floor(absoluteWeek / 52)),
-                releaseWeek: Math.max(1, absoluteWeek % 52 || 52),
+                /* the same conversion as getProjectReleaseTiming: absolute week 1600 is Age 31, Week 41 (this said Age 30, Week 40) */
+                releaseYear: Math.floor(absoluteWeek / 52) + 1,
+                releaseWeek: (absoluteWeek % 52) + 1,
                 projectDetails: {
                     studioId: input.studioId,
                     genre: offer.genre,
