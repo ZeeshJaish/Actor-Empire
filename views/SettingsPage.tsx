@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ArrowLeft, Twitter, Send, Star, Globe, LogOut, Coffee, Bug, CheckCircle2, ChevronRight, FileText, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Star, Globe, LogOut, Coffee, Bug, CheckCircle2, ChevronRight, FileText, ShieldCheck, Gauge, Database, Copy, Smartphone, MessageCircle, LifeBuoy, Bell, Download, Upload } from 'lucide-react';
 import { GameLanguage, Player } from '../types';
 import { APP_DISPLAY_VERSION } from '../services/appVersion';
 import { getAdPrivacyOptionsRequired, openAdPrivacyOptions, subscribeAdPrivacyOptions } from '../services/adLogic';
@@ -12,6 +12,7 @@ import { isSaveTransferSurface, type SaveTransferResult } from '../services/save
 import { addBreadcrumb, enableManualPushNotifications, getFirebaseAuthStatus, getFirebasePushStatus, markTraceAction, onFirebaseAuthStatusChanged, onFirebasePushStatusChanged, submitPlayerIssueReport, trackGameEvent, getIssueReportDelivery, onIssueReportDeliveryChanged, type IssueReportDelivery } from '../services/firebaseService';
 import { CountryFlagSvg } from '../components/studio-finance/components/FlagField';
 import { APP_STORE_ID, noteStoreReviewTrouble, openStoreReviewPage } from '../services/storeReview';
+import { COMMUNITY_LINKS, type CommunityLinkId } from '../services/communityLinks';
 
 interface SettingsPageProps {
   player: Player;
@@ -24,6 +25,16 @@ interface SettingsPageProps {
 
 type SettingsMode = 'SETTINGS' | 'PERFORMANCE' | 'GAMEPLAY' | 'LANGUAGE' | 'SUPPORT' | 'COMMUNITY' | 'DATA_TRANSFER' | 'CHANGELOG';
 type SettingsIcon = React.ComponentType<{ size?: number; className?: string }>;
+
+/* 28 Nov 2026: how Community draws each of the studio's official links (services/communityLinks.ts): its title and
+   its colour. The old first row, x.com/ActorEmpire, no longer existed. */
+const COMMUNITY_ROWS: Record<CommunityLinkId, { titleKey: string; tile: string }> = {
+  discord: { titleKey: 'settings.joinDiscord', tile: 'bg-[#5865F2]' },
+  youtube: { titleKey: 'settings.watchYouTube', tile: 'bg-[#FF0000]' },
+  instagram: { titleKey: 'settings.followInstagram', tile: 'bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]' },
+  x: { titleKey: 'settings.followX', tile: 'bg-black' },
+  telegram: { titleKey: 'settings.joinTelegram', tile: 'bg-[#26A5E4]' },
+};
 
 const ISSUE_CATEGORIES = [
   { id: 'CRASH_RESTART', labelKey: 'settings.issue.crashRestart', hintKey: 'settings.issue.crashRestartHint' },
@@ -1039,25 +1050,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ player, onUpdatePlay
         {renderSubpageHeader('Links', 'Community')}
 
         <div className="space-y-3">
-          <a href="https://x.com/ActorEmpire" target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-zinc-900/55 rounded-2xl hover:bg-zinc-800 transition-colors border border-white/5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-black rounded-lg text-white"><Twitter size={20}/></div>
-              <div>
-                <div className="font-bold text-white">{tr('settings.followX')}</div>
-                <div className="text-xs text-zinc-500">@ActorEmpire</div>
+          {/* 28 Nov 2026: the studio's five official links, in the list's order. A tap opens the link outside the game, as
+              these rows always did, and only counts the tap (community_link_open, like the Start screen and the letter). */}
+          {COMMUNITY_LINKS.map(link => (
+            <a
+              key={link.id}
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-community-link={link.id}
+              onClick={() => trackGameEvent('community_link_open', { platform: link.id, source: 'settings' })}
+              className="flex items-center justify-between p-4 bg-zinc-900/55 rounded-2xl hover:bg-zinc-800 transition-colors border border-white/5"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`p-2 rounded-lg text-white shrink-0 ${COMMUNITY_ROWS[link.id].tile}`}>
+                  <svg viewBox="0 0 24 24" width={20} height={20} aria-hidden="true" focusable="false">
+                    <path d={link.iconPath} fill="currentColor" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-white">{tr(COMMUNITY_ROWS[link.id].titleKey)}</div>
+                  <div className="text-xs text-zinc-500 truncate">{link.handle}</div>
+                </div>
               </div>
-            </div>
-          </a>
-
-          <a href="https://t.me/actorempire" target="_blank" rel="noreferrer" className="flex items-center justify-between p-4 bg-zinc-900/55 rounded-2xl hover:bg-zinc-800 transition-colors border border-white/5">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500 rounded-lg text-white"><Send size={20}/></div>
-              <div>
-                <div className="font-bold text-white">{tr('settings.joinTelegram')}</div>
-                <div className="text-xs text-zinc-500">{tr('settings.telegramSub')}</div>
-              </div>
-            </div>
-          </a>
+            </a>
+          ))}
 
           {/* 2026-11-17: the store page for this phone's store (it was the App Store on Android too), with no question
               about liking the game next to it (services/storeReview.ts) */}

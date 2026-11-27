@@ -15,6 +15,7 @@ import { resolveStreamingPlatformBrandById } from '../../services/streamingPlatf
 import { isDeveloperMessage } from '../../services/developerNotes';
 import { ROLE_OFFER_PREFERENCES, deleteAllMessages, getRoleOfferPreference, setRoleOfferPreference } from '../../services/roleOfferPreference';
 import { ZEDBURY_PATH, ZEDBURY_VIEWBOX } from '../../assets/zedbury';
+import CommunityLinks from '../../components/CommunityLinks';
 
 /* Zeesh, 2026-11-09: the developer's note reads like a letter from the studio (it was an emoji in a white circle on a
    black card). Only the developer's messages use these. */
@@ -62,6 +63,16 @@ const DeveloperLetter: React.FC<{ message: Message; version: string }> = ({ mess
                         ))}
                     </div>
                     <span className="ml-auto shrink-0 rounded-full border border-white/10 px-2 py-0.5 font-mono text-[10px] text-zinc-500">v{version}</span>
+                </div>
+                {/* 23 Nov 2026: the studio's socials under the signature */}
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-x-3 gap-y-3">
+                    <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Join the community</div>
+                    <CommunityLinks
+                        source="developer_letter"
+                        className="flex items-center gap-2"
+                        linkClassName="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-zinc-300 transition-colors hover:bg-white/10 hover:text-white active:scale-95"
+                        iconSize={16}
+                    />
                 </div>
             </div>
         </article>

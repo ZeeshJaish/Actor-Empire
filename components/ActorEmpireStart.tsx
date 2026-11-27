@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import type { ActState } from './types';
+import CommunityLinks from './CommunityLinks';
 import '../styles/intro.css';
 
 interface Props {
@@ -85,7 +86,11 @@ export default function ActorEmpireStart({
           Start Career
           <div className="btn-glow" />
         </button>
-        <div className="credit">{credit}</div>
+        {/* 23 Nov 2026: the studio's socials, a quiet row under Start (no popup, never in the way) */}
+        <div className="cta-foot">
+          <CommunityLinks source="start_menu" className="hero-socials" linkClassName="hero-social" iconSize={17} />
+          <div className="credit">{credit}</div>
+        </div>
       </div>
     </section>
   );
